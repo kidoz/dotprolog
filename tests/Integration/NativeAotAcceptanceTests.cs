@@ -75,6 +75,7 @@ public sealed class NativeAotAcceptanceTests
                     "row     7",
                     "alice likes bob",
                     "+(1,*(2,3))",
+                    "427",
                     "done",
                 ],
                 runLog.ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
