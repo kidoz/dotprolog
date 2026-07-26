@@ -33,6 +33,28 @@ Or, with [just](https://just.systems):
 $ just hello
 ```
 
+## Calling Prolog from C#
+
+```csharp
+var engine = new PrologEngine();
+engine.ConsultText("colour(red).  colour(green).  colour(blue).");
+
+foreach (PrologSolution solution in engine.Query("colour(C)").Solutions())
+{
+    Console.WriteLine(solution["C"]);      // red, green, blue
+}
+
+bool ok = engine.Query("1 < 2").Prove();
+```
+
+Answers are produced on demand and marshalled into plain .NET objects as they arrive, so they stay valid after the query has moved on — and an unbounded goal is fine as long as you stop taking:
+
+```csharp
+var first = engine.Query("between(1, 1000000000, X)").Solutions().Take(4);
+```
+
+This works from F# and VB the same way. One engine runs one goal at a time and is not thread-safe.
+
 ## Repository layout
 
 | Path | What it is |
@@ -70,6 +92,23 @@ Runtime consult / assert : parser -> semantic IR -> Prolog bytecode -> AOT-compa
 
 Only the second is implemented today. It never emits CLR IL, so it stays valid inside a NativeAOT process — runtime-loaded predicates execute as bytecode and are not turned into new machine code.
 
+That is verified, not assumed. `samples/AotAcceptance` publishes to a self-contained native executable with no managed assemblies beside it, then at run time consults a `.pl` file it has never seen, enumerates solutions, asserts and retracts clauses, and catches an ISO error — with zero trimming or AOT warnings in the build. CI runs it on Windows, Linux, and macOS:
+
+```console
+$ DOTPROLOG_RUN_AOT_TESTS=1 dotnet test tests/Integration
+```
+
+Dynamic predicates use the logical update view, so a goal sees exactly the clauses that existed when it started:
+
+```prolog
+:- dynamic p/1.
+p(1).
+p(2).
+
+% [1,2] — the asserted clauses are not visible to the goal that asserted them
+?- findall(X, (p(X), assertz(p(9))), L).
+```
+
 The engine owns its control state: heap, trail, environment stack, choice-point stack, and argument registers are plain arrays, and Prolog calls are jumps inside a single dispatch loop. Prolog recursion depth therefore does not consume CLR stack, and failure is a return value rather than an exception. Last-call optimisation makes tail recursion run at constant stack depth.
 
 ## What the language supports today
@@ -80,6 +119,9 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 | Control | `,/2`, `;/2`, `->/2`, `*->/2`, `\+/1`, `!/0`, `call/1`, `not/1`, `true/0`, `fail/0` |
 | Exceptions | `throw/1`, `catch/3`, with catchable ISO `error/2` terms |
 | All solutions | `findall/3`, `forall/2` |
+| Database | `assertz/1`, `asserta/1`, `retract/1`, `clause/2`, `retractall/1`, `abolish/1`, `:- dynamic` |
+| Ranges | `between/3` |
+| Loading | `consult/1`, `ensure_loaded/1` at run time |
 | Unification | `=/2`, `\=/2` |
 | Arithmetic | `is/2`, `=:=/2`, `=\=/2`, `</2`, `>/2`, `=</2`, `>=/2` |
 | Standard order | `==/2`, `\==/2`, `@</2`, `@>/2`, `@=</2`, `@>=/2`, `compare/3` |
@@ -105,7 +147,7 @@ squares(L) :- findall(S, (item(N), S is N * N), L).   % L = [1,4,9]
 
 Every error the engine raises is a catchable `error(Formal, Context)` term, so `existence_error`, `type_error`, `instantiation_error`, and `evaluation_error` can all be handled in Prolog rather than aborting the run.
 
-Not yet implemented: modules, DCGs, streams and file I/O, dynamic predicates, runtime `consult/1`, `bagof/3`, `setof/3`, `copy_term/2`, and `call/N` for N above one.
+Not yet implemented: modules, DCGs, streams and file I/O, `bagof/3`, `setof/3`, `copy_term/2`, and `call/N` for N above one.
 
 One known deviation: a cut inside a goal reached through `call/1` is local to that goal and prunes nothing in the meta-call, so `call((a, !, b))` behaves as `call((a, b))`.
 
