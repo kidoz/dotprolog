@@ -71,6 +71,11 @@ internal static class Program
                 format("sum=~d~n", [Sum]),
                 format(atom(Aligned), "~w~t~8|~d", [row, 7]), write(Aligned), nl,
 
+                % An operator declared at run time, in a native image, changing how a term prints.
+                op(700, xfx, likes),
+                write(likes(alice, bob)), nl,
+                write_canonical(1 + 2 * 3), nl,
+
                 write(done), nl.
             """;
 
