@@ -1,5 +1,6 @@
 <Solution>
     <Folder Name="/src/">
+        <Project Path="src/Prolog.CodeGen.CSharp/Prolog.CodeGen.CSharp.csproj" />
         <Project Path="src/Prolog.Compiler/Prolog.Compiler.csproj" />
         <Project Path="src/Prolog.DotNetTool/Prolog.DotNetTool.csproj" />
         <Project Path="src/Prolog.Runtime/Prolog.Runtime.csproj" />
@@ -7,6 +8,7 @@
     </Folder>
     <Folder Name="/tests/">
         <Project Path="tests/Integration/Integration.Tests.csproj" />
+        <Project Path="tests/Prolog.CodeGen.CSharp.Tests/Prolog.CodeGen.CSharp.Tests.csproj" />
         <Project Path="tests/Prolog.Compiler.Tests/Prolog.Compiler.Tests.csproj" />
         <Project Path="tests/Prolog.Runtime.Tests/Prolog.Runtime.Tests.csproj" />
         <Project Path="tests/Prolog.Syntax.Tests/Prolog.Syntax.Tests.csproj" />
