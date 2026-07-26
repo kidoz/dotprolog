@@ -76,7 +76,19 @@ public sealed class ProgramLoader
 
             SyntaxTerm head = clause;
             SyntaxTerm? body = null;
-            if (clause is CompoundTerm { Name: ":-", Arity: 2 } rule)
+
+            // A grammar rule becomes an ordinary clause before anything else looks at it, so the
+            // rest of the loader and the whole compiler never learn that DCGs exist.
+            if (clause is CompoundTerm { Name: "-->", Arity: 2 } grammarRule)
+            {
+                if (!DcgTranslator.TryTranslate(grammarRule, diagnostics, fileName, out head, out SyntaxTerm translated))
+                {
+                    continue;
+                }
+
+                body = translated;
+            }
+            else if (clause is CompoundTerm { Name: ":-", Arity: 2 } rule)
             {
                 head = rule.Arguments[0];
                 body = rule.Arguments[1];

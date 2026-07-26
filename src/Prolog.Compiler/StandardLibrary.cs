@@ -236,6 +236,26 @@ internal static class StandardLibrary
         '$predmerge_step'('>', A, As, B, Bs, P, [B|R]) :- '$predmerge'([A|As], Bs, P, R).
         '$predmerge_step'('=', A, As, _, Bs, P, [A|R]) :- '$predmerge'(As, Bs, P, R).
 
+        % --- Grammars ---------------------------------------------------------------
+        % A grammar rule is translated into an ordinary clause when it is loaded, so
+        % phrase/2,3 only has to supply the two list arguments. It walks the control
+        % constructs itself because a body built at run time was never translated.
+
+        phrase(Body, List) :- phrase(Body, List, []).
+
+        phrase(Body, List, Rest) :- '$phrase'(Body, List, Rest).
+
+        '$phrase'(Body, _, _) :- var(Body), !, throw(error(instantiation_error, phrase/3)).
+        '$phrase'((A, B), S0, S) :- !, '$phrase'(A, S0, S1), '$phrase'(B, S1, S).
+        '$phrase'((A ; B), S0, S) :- !, ( '$phrase'(A, S0, S) ; '$phrase'(B, S0, S) ).
+        '$phrase'((A -> B), S0, S) :- !, ( '$phrase'(A, S0, S1) -> '$phrase'(B, S1, S) ).
+        '$phrase'(\+ A, S0, S) :- !, \+ '$phrase'(A, S0, _), S = S0.
+        '$phrase'(!, S, S) :- !.
+        '$phrase'({Goal}, S, S) :- !, call(Goal).
+        '$phrase'([], S, S) :- !.
+        '$phrase'([H|T], S0, S) :- !, append([H|T], S, S0).
+        '$phrase'(Body, S0, S) :- '$add_args'(Body, [S0, S], Goal), call(Goal).
+
         % --- bagof/3 and setof/3 ---------------------------------------------------
         % Unlike findall/3 these fail when the goal has no solutions, and they group
         % the solutions by the goal's free variables, offering one group per binding

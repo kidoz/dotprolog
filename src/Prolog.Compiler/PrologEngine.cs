@@ -260,8 +260,20 @@ public sealed class PrologEngine : IRuntimeCompiler
         SyntaxTerm term = TermReifier.ToSyntax(machine, clause);
         SyntaxTerm head = term;
         SyntaxTerm? body = null;
+        List<Diagnostic> diagnostics = [];
 
-        if (term is CompoundTerm { Name: ":-", Arity: 2 } rule)
+        // A grammar rule asserted at run time is translated exactly as one read from a file, so
+        // assertz((greeting --> [hello])) defines greeting//0 rather than a clause of -->/2.
+        if (term is CompoundTerm { Name: "-->", Arity: 2 } grammarRule)
+        {
+            if (!DcgTranslator.TryTranslate(grammarRule, diagnostics, null, out head, out SyntaxTerm translated))
+            {
+                throw new PrologException($"The asserted grammar rule did not translate: {string.Join("; ", diagnostics)}");
+            }
+
+            body = translated;
+        }
+        else if (term is CompoundTerm { Name: ":-", Arity: 2 } rule)
         {
             head = rule.Arguments[0];
             body = rule.Arguments[1];
@@ -274,7 +286,6 @@ public sealed class PrologEngine : IRuntimeCompiler
             _ => throw new PrologException("type_error(callable, _)"),
         };
 
-        List<Diagnostic> diagnostics = [];
         var compiler = new ClauseCompiler(Program, new ConstantPool(Program), diagnostics, null);
         int address = compiler.Compile(head, body);
 

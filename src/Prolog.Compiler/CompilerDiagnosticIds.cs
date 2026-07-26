@@ -20,4 +20,7 @@ public static class CompilerDiagnosticIds
 
     /// <summary>A <c>:- dynamic</c> declaration was read by a loader with no machine to load into.</summary>
     public const string DynamicNotAvailable = "DPL1006";
+
+    /// <summary>A grammar rule could not be translated into an ordinary clause.</summary>
+    public const string InvalidGrammarRule = "DPL1007";
 }
