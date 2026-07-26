@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 namespace Prolog.Runtime;
 
 /// <summary>
@@ -159,11 +161,129 @@ public static class CoreBuiltins
         // between/3 is the simplest nondeterministic native predicate, and the clearest example of one.
         registry.RegisterNondeterministic("between", 3, static machine => Between(machine, long.MinValue), Between);
 
+        registry.Register("succ", 2, Succ);
+        registry.Register("plus", 3, Plus);
+
+        // The one piece call/2..8 needs from the runtime: everything else about them is Prolog.
+        registry.Register("$add_args", 3, AddArguments);
+
         TextBuiltins.Register(registry);
         SortBuiltins.Register(registry);
         FormatBuiltins.Register(registry);
         DatabaseBuiltins.Register(registry);
         ControlPredicates.Install(program);
+    }
+
+    /// <summary><c>succ(?Int, ?Successor)</c> over the natural numbers, in either direction.</summary>
+    private static bool Succ(Machine machine)
+    {
+        Cell value = machine.Argument(0);
+        Cell successor = machine.Argument(1);
+
+        if (value.Tag == CellTag.Integer)
+        {
+            return value.Integer >= 0
+                ? machine.Unify(successor, Cell.Integer60(value.Integer + 1))
+                : throw PrologErrors.Type(machine, "not_less_than_zero", value);
+        }
+
+        if (value.Tag != CellTag.Reference)
+        {
+            throw PrologErrors.Type(machine, "integer", value);
+        }
+
+        if (successor.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        if (successor.Tag != CellTag.Integer)
+        {
+            throw PrologErrors.Type(machine, "integer", successor);
+        }
+
+        // succ(X, 0) has no solution, because 0 is not the successor of a natural number.
+        return successor.Integer > 0 && machine.Unify(value, Cell.Integer60(successor.Integer - 1));
+    }
+
+    /// <summary><c>plus(?A, ?B, ?Sum)</c>: any one of the three may be the unbound one.</summary>
+    private static bool Plus(Machine machine)
+    {
+        Cell first = machine.Argument(0);
+        Cell second = machine.Argument(1);
+        Cell sum = machine.Argument(2);
+
+        if (first.Tag == CellTag.Integer && second.Tag == CellTag.Integer)
+        {
+            return machine.Unify(sum, Cell.Integer60(first.Integer + second.Integer));
+        }
+
+        if (sum.Tag != CellTag.Integer)
+        {
+            throw sum.Tag == CellTag.Reference ? PrologErrors.Instantiation(machine) : PrologErrors.Type(machine, "integer", sum);
+        }
+
+        if (first.Tag == CellTag.Integer)
+        {
+            return machine.Unify(second, Cell.Integer60(sum.Integer - first.Integer));
+        }
+
+        return second.Tag == CellTag.Integer
+            ? machine.Unify(first, Cell.Integer60(sum.Integer - second.Integer))
+            : throw PrologErrors.Instantiation(machine);
+    }
+
+    /// <summary>
+    /// <c>'$add_args'(+Goal, +Extra, -Expanded)</c>: appends arguments to a goal, which is the whole
+    /// of what <c>call/2</c> and its higher arities do before meta-calling the result.
+    /// </summary>
+    private static bool AddArguments(Machine machine)
+    {
+        Cell goal = machine.Argument(0);
+
+        if (goal.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        List<Cell> extra = TermList.ReadProper(machine, machine.Argument(1));
+
+        if (extra.Count == 0)
+        {
+            return machine.Unify(machine.Argument(2), goal);
+        }
+
+        if (goal.Tag == CellTag.Atom)
+        {
+            int atomFunctor = machine.Symbols.InternFunctor(goal.Index, extra.Count);
+            return machine.Unify(machine.Argument(2), machine.CreateStructure(atomFunctor, CollectionsMarshal.AsSpan(extra)));
+        }
+
+        if (goal.Tag != CellTag.Structure)
+        {
+            throw PrologErrors.Type(machine, "callable", goal);
+        }
+
+        Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(goal.Index).Index);
+        int arity = functor.Arity + extra.Count;
+
+        if (arity >= Machine.ArgumentRegisterCount)
+        {
+            throw PrologErrors.Representation(machine, "max_arity");
+        }
+
+        var arguments = new Cell[arity];
+        for (int i = 0; i < functor.Arity; i++)
+        {
+            arguments[i] = machine.HeapAt(goal.Index + 1 + i);
+        }
+
+        extra.CopyTo(arguments, functor.Arity);
+
+        return machine.Unify(
+            machine.Argument(2),
+            machine.CreateStructure(machine.Symbols.InternFunctor(functor.NameAtom, arity), arguments)
+        );
     }
 
     /// <summary>
