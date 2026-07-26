@@ -7,9 +7,10 @@ A Prolog language implementation for .NET 10, written in C# 14.
 The goal is a first-class Prolog experience on the .NET SDK, the way C# and F# have one: `.dplproj` projects, a `plc` compiler, `dotnet prolog`, `dotnet new` templates, and NativeAOT publishing.
 
 **Status: early, but usable.** `dotnet new prolog-console` through `dotnet publish -p:PublishAot=true`
-works today. What is missing: `dotnet test` on a `.dplproj`, the `plc` compiler, and generating IL for
-predicate bodies — a `.dplproj` currently embeds its Prolog source and compiles it to bytecode at
-startup. Nothing is published to NuGet: package identity is still an open decision.
+works today, and Prolog tests run under Microsoft.Testing.Platform. What is missing: driving those
+tests with `dotnet test` itself, the `plc` compiler, and generating IL for predicate bodies — a
+`.dplproj` currently embeds its Prolog source and compiles it to bytecode at startup. Nothing is
+published to NuGet: package identity is still an open decision.
 
 ## Hello, world
 
@@ -131,6 +132,7 @@ bundles of [widget, gadget]:
 | `src/Prolog.Build.Tasks` | MSBuild task that runs the generator |
 | `src/DotProlog.Sdk` | The `DotProlog.Sdk` MSBuild SDK package |
 | `src/Prolog.Templates` | `dotnet new prolog-console` and `prolog-lib` |
+| `src/Prolog.Testing` | Microsoft.Testing.Platform host for Prolog tests |
 | `src/Prolog.DotNetTool` | The `dotnet prolog` command |
 | `tests/` | Unit tests per component, plus end-to-end execution tests |
 | `benchmarks/` | BenchmarkDotNet suite for the reader, compiler, and engine |
@@ -138,6 +140,7 @@ bundles of [widget, gadget]:
 | `samples/PricingRules` | A `.dplproj`: Prolog rules plus their `.dpli` contract |
 | `samples/PricingConsole`, `samples/PricingFSharp`, `samples/PricingVisualBasic` | C#, F#, and VB apps referencing it |
 | `samples/GreetingApp` | A Prolog application built from a `.dplproj` |
+| `samples/PricingTests` | Prolog tests in a `.dplproj`, run by `Prolog.Testing` |
 | `samples/AotAcceptance` | The NativeAOT acceptance sample |
 
 ## Common tasks
@@ -260,6 +263,27 @@ $ dotnet publish HelloProlog -c Release -r osx-arm64 -p:PublishAot=true
 
 **Nothing is published to NuGet yet** — package identity is still an open decision. The commands above
 are verified against a local feed built by `dotnet pack`.
+
+## Testing Prolog
+
+A `.dplproj` with `<DotPrologTestProject>true</DotPrologTestProject>` builds a test host. Any
+zero-arity predicate named `test_*` is a test — it passes if it can be proved:
+
+```prolog
+test_tier_boundaries :-
+    tier(1000, gold),
+    tier(999, silver).
+```
+```console
+$ dotnet run --project PricingTests
+  total: 5   failed: 1   succeeded: 4
+```
+
+Each test runs in a fresh engine, so one cannot see clauses another asserted.
+
+**`dotnet test` does not drive this yet.** On the .NET 10 SDK its VSTest bridge is gone, and the
+Microsoft.Testing.Platform mode is a repository-wide `global.json` switch that breaks the xunit
+projects in this repository. Run the host directly until that is resolved.
 
 ## Building from source
 
