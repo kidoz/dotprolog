@@ -161,6 +161,7 @@ public static class CoreBuiltins
 
         TextBuiltins.Register(registry);
         SortBuiltins.Register(registry);
+        FormatBuiltins.Register(registry);
         DatabaseBuiltins.Register(registry);
         ControlPredicates.Install(program);
     }
