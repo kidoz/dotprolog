@@ -160,6 +160,7 @@ public static class CoreBuiltins
         registry.RegisterNondeterministic("between", 3, static machine => Between(machine, long.MinValue), Between);
 
         TextBuiltins.Register(registry);
+        SortBuiltins.Register(registry);
         DatabaseBuiltins.Register(registry);
         ControlPredicates.Install(program);
     }
