@@ -1,0 +1,31 @@
+<Project>
+    <!--
+      DotProlog.Sdk — additive, not a replacement. A .dplproj still uses Microsoft.NET.Sdk and adds
+      this on top, the same shape DotPython.Sdk uses:
+
+          <Project Sdk="Microsoft.NET.Sdk">
+            <Sdk Name="DotProlog.Sdk" />
+
+      Inside this repository the samples import Sdk.props and Sdk.targets by path instead, so that
+      nothing has to resolve an SDK package that has not been published.
+    -->
+
+    <PropertyGroup>
+        <!--
+          The .NET SDK picks language targets from the project extension, and it has never heard of
+          .dplproj. What a .dplproj ultimately compiles is the generated C# facade, so it builds with
+          the C# targets; without this the build fails looking for CreateManifestResourceNames.
+        -->
+        <Language Condition="'$(Language)' == ''">C#</Language>
+        <DefaultLanguageSourceExtension Condition="'$(DefaultLanguageSourceExtension)' == ''">.cs</DefaultLanguageSourceExtension>
+        <LanguageTargets Condition="'$(LanguageTargets)' == ''">$(MSBuildToolsPath)\Microsoft.CSharp.targets</LanguageTargets>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <!-- The type name generated for the module; defaults to the project name. -->
+        <DotPrologClrTypeName Condition="'$(DotPrologClrTypeName)' == ''">$(MSBuildProjectName)</DotPrologClrTypeName>
+
+        <!-- Prolog sources and contracts are picked up automatically, like .cs files are. -->
+        <EnableDefaultPrologItems Condition="'$(EnableDefaultPrologItems)' == ''">true</EnableDefaultPrologItems>
+    </PropertyGroup>
+</Project>

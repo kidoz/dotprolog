@@ -38,6 +38,10 @@ dotnet_diagnostic.CA1515.severity = none
 # CA2007 is a library rule, and it contradicts xUnit1030: xUnit needs its synchronization context.
 dotnet_diagnostic.CA2007.severity = none
 
+[src/Prolog.Build.Tasks/**.cs]
+# MSBuild binds task parameters by property and requires arrays for item lists, so CA1819 cannot apply.
+dotnet_diagnostic.CA1819.severity = none
+
 [benchmarks/**.cs]
 # BenchmarkDotNet requires public benchmark classes and settable [Params] properties.
 dotnet_diagnostic.CA1515.severity = none

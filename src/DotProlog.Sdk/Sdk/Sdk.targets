@@ -1,0 +1,66 @@
+<Project>
+    <PropertyGroup>
+        <!--
+          BaseIntermediateOutputPath rather than IntermediateOutputPath: the latter is not defined
+          until Microsoft.Common.CurrentVersion.targets runs, which is after this file is imported,
+          and reading it too early silently writes the facade into the project directory. The
+          generated text depends only on the .pl and .dpli, so one copy under obj/ serves every
+          configuration.
+        -->
+        <DotPrologGeneratedPath Condition="'$(DotPrologGeneratedPath)' == ''"
+            >$(BaseIntermediateOutputPath)prolog\</DotPrologGeneratedPath>
+    </PropertyGroup>
+
+    <ItemGroup Condition="'$(EnableDefaultPrologItems)' == 'true'">
+        <PrologCompile Include="**\*.pl" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
+        <PrologContract Include="**\*.dpli" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
+    </ItemGroup>
+
+    <!--
+      DotPrologTasksAssembly is set by the consumer inside this repository, and by the SDK package
+      itself once one is published.
+    -->
+    <UsingTask TaskName="Prolog.Build.Tasks.GeneratePrologFacade" AssemblyFile="$(DotPrologTasksAssembly)" />
+
+    <!--
+      The facade has to exist before the C# compiler runs, which is why this is hooked ahead of
+      CoreCompile rather than as a post-build step.
+    -->
+    <Target
+        Name="GeneratePrologFacade"
+        BeforeTargets="BeforeCompile;CoreCompile"
+        Inputs="@(PrologCompile);@(PrologContract)"
+        Outputs="$(DotPrologGeneratedPath)$(DotPrologClrTypeName)Module.g.cs"
+    >
+        <Error
+            Condition="'$(DotPrologTasksAssembly)' == ''"
+            Text="DotPrologTasksAssembly is not set, so the facade generator cannot be loaded."
+        />
+
+        <MakeDir Directories="$(DotPrologGeneratedPath)" />
+
+        <GeneratePrologFacade
+            Sources="@(PrologCompile)"
+            Contracts="@(PrologContract)"
+            OutputPath="$(DotPrologGeneratedPath)"
+            RootNamespace="$(RootNamespace)"
+        >
+            <Output TaskParameter="GeneratedFiles" ItemName="DotPrologGeneratedCompile" />
+        </GeneratePrologFacade>
+
+        <ItemGroup>
+            <Compile Include="@(DotPrologGeneratedCompile)" />
+            <FileWrites Include="@(DotPrologGeneratedCompile)" />
+        </ItemGroup>
+    </Target>
+
+    <!--
+      Incremental builds skip the target above when nothing changed, so the generated file still has
+      to reach the compiler.
+    -->
+    <Target Name="IncludePrologFacade" BeforeTargets="BeforeCompile;CoreCompile" DependsOnTargets="GeneratePrologFacade">
+        <ItemGroup>
+            <Compile Include="$(DotPrologGeneratedPath)**\*.g.cs" Exclude="@(Compile)" />
+        </ItemGroup>
+    </Target>
+</Project>
