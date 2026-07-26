@@ -194,7 +194,7 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 | Terms | atoms, variables, integers, floats, double-quoted code lists, lists, structures |
 | Control | `,/2`, `;/2`, `->/2`, `*->/2`, `\+/1`, `!/0`, `call/1..8`, `once/1`, `ignore/1`, `not/1`, `true/0`, `fail/0` |
 | Exceptions | `throw/1`, `catch/3`, with catchable ISO `error/2` terms |
-| All solutions | `findall/3`, `forall/2`, `aggregate_all/3` (`count`, `bag`, `set`, `sum`, `max`, `min`) |
+| All solutions | `findall/3`, `bagof/3`, `setof/3`, `forall/2`, `aggregate_all/3` (`count`, `bag`, `set`, `sum`, `max`, `min`) |
 | Database | `assertz/1`, `asserta/1`, `retract/1`, `clause/2`, `retractall/1`, `abolish/1`, `:- dynamic` |
 | Ranges | `between/3` |
 | Loading | `consult/1`, `ensure_loaded/1` at run time |
@@ -256,14 +256,27 @@ operator can use it. The reader and the writer share one table per engine, so no
 two engines in the same process.
 
 Predicates written in Prolog rather than C# live in a standard library that every engine loads at
-construction, which costs about 190 µs. A consulted file that defines one of them replaces it
+construction, which costs about 220 µs. A consulted file that defines one of them replaces it
 outright, so a program is free to write its own `member/2` without inheriting extra solutions.
 
 There is no string type: an atom is the only text term. The SWI-Prolog string predicates are absent
 rather than aliased to their atom counterparts, because aliasing would let portable code compile
 here and then behave differently.
 
-Not yet implemented: modules, DCGs, streams and file I/O, `bagof/3`, and `setof/3`.
+`bagof/3` and `setof/3` group their solutions by whichever of the goal's variables are free —
+those the caller can still see — and offer one group per binding of them. A variable is made
+existential with `^/2`, and one occurring only under `\+` is never free, since negation proves a
+goal but cannot bind anything. Both fail when the goal has no solutions, where `findall/3` returns
+`[]`.
+
+```prolog
+class(peter, a).  class(ann, b).  class(pat, a).
+
+?- bagof(N, class(N, C), L).     % C = a, L = [peter,pat] ;  C = b, L = [ann]
+?- bagof(N, C^class(N, C), L).   % L = [peter,ann,pat]
+```
+
+Not yet implemented: modules, DCGs, and streams and file I/O.
 
 One known deviation: a cut inside a goal reached through `call/1` is local to that goal and prunes nothing in the meta-call, so `call((a, !, b))` behaves as `call((a, b))` — which also means `findall(X, (goal(X), !), L)` does not stop at the first solution.
 
