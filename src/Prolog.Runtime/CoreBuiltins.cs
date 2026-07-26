@@ -180,6 +180,7 @@ public static class CoreBuiltins
         registry.Register("$add_args", 3, AddArguments);
 
         TextBuiltins.Register(registry);
+        OperatorBuiltins.Register(registry);
         SortBuiltins.Register(registry);
         FormatBuiltins.Register(registry);
         DatabaseBuiltins.Register(registry);

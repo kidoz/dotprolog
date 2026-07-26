@@ -48,6 +48,9 @@ public sealed class TermReader
             SyntaxTerm? clause = reader.ReadClause();
             if (clause is not null)
             {
+                // An operator declaration has to take effect before the next clause is read, or the
+                // file that declares an operator could not then use it.
+                reader.ApplyOperatorDirective(clause);
                 clauses.Add(clause);
             }
         }
@@ -72,6 +75,72 @@ public sealed class TermReader
         }
 
         return new ParseResult(term is null ? [] : [term], diagnostics);
+    }
+
+    /// <summary>
+    /// Applies <c>:- op(Priority, Type, Name)</c> to the table being read with.
+    /// </summary>
+    /// <remarks>
+    /// The directive is still returned and still runs as a goal when the unit is loaded, which is
+    /// what keeps the run-time table in step when a program is read once and loaded into an engine
+    /// whose table is a different instance. Applying it twice is harmless: it sets the same entry.
+    /// </remarks>
+    private void ApplyOperatorDirective(SyntaxTerm clause)
+    {
+        if (
+            clause is not CompoundTerm { Name: ":-", Arity: 1 } directive
+            || directive.Arguments[0] is not CompoundTerm { Name: "op", Arity: 3 } declaration
+            || declaration.Arguments[0] is not IntegerTerm priority
+            || declaration.Arguments[1] is not AtomTerm type
+            || priority.Value is < 0 or > 1200
+        )
+        {
+            return;
+        }
+
+        OperatorType? specifier = type.Name switch
+        {
+            "xfx" => OperatorType.Xfx,
+            "xfy" => OperatorType.Xfy,
+            "yfx" => OperatorType.Yfx,
+            "fy" => OperatorType.Fy,
+            "fx" => OperatorType.Fx,
+            "xf" => OperatorType.Xf,
+            "yf" => OperatorType.Yf,
+            _ => null,
+        };
+
+        if (specifier is null)
+        {
+            return;
+        }
+
+        // A malformed declaration is left alone here and reported when it runs as a goal, so that
+        // there is one place that decides what op/3 rejects.
+        foreach (SyntaxTerm name in NamesOf(declaration.Arguments[2]))
+        {
+            if (name is AtomTerm { Name: not "," } atom)
+            {
+                _operators.Define((int)priority.Value, specifier.Value, atom.Name);
+            }
+        }
+    }
+
+    /// <summary>The names of an <c>op/3</c> declaration, which may be one atom or a list of them.</summary>
+    private static IEnumerable<SyntaxTerm> NamesOf(SyntaxTerm names)
+    {
+        SyntaxTerm current = names;
+
+        while (current is CompoundTerm { Name: ".", Arity: 2 } cons)
+        {
+            yield return cons.Arguments[0];
+            current = cons.Arguments[1];
+        }
+
+        if (current is not AtomTerm { Name: "[]" })
+        {
+            yield return current;
+        }
     }
 
     private SyntaxTerm? ReadClause()

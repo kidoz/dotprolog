@@ -44,6 +44,18 @@ public sealed class OperatorTable
     /// <summary>Whether <paramref name="name"/> has any operator definition.</summary>
     public bool IsOperator(string name) => _prefix.ContainsKey(name) || _infixOrPostfix.ContainsKey(name);
 
+    /// <summary>
+    /// Every definition, ordered by name and then by specifier. The order is fixed rather than
+    /// insertion-dependent so that <c>current_op/3</c> enumerates the same way every run.
+    /// </summary>
+    public PrologOperator[] All() =>
+        [
+            .. _prefix
+                .Values.Concat(_infixOrPostfix.Values)
+                .OrderBy(entry => entry.Name, StringComparer.Ordinal)
+                .ThenBy(entry => entry.Type),
+        ];
+
     /// <summary>The highest priority of any definition for <paramref name="name"/>, or zero if it is not an operator.</summary>
     public int MaxPriority(string name)
     {

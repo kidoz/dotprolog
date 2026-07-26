@@ -40,9 +40,9 @@ public sealed class PrologEngine : IRuntimeCompiler
         }
     }
 
-    private static IReadOnlyList<SyntaxTerm> ReadOrThrow(string source, string fileName)
+    private IReadOnlyList<SyntaxTerm> ReadOrThrow(string source, string fileName)
     {
-        ParseResult parsed = TermReader.ReadProgram(source, fileName);
+        ParseResult parsed = TermReader.ReadProgram(source, fileName, Program.Operators);
         if (!parsed.Success)
         {
             throw new PrologException($"The {fileName} library failed to parse: {string.Join("; ", parsed.Diagnostics)}");
@@ -78,7 +78,7 @@ public sealed class PrologEngine : IRuntimeCompiler
     {
         ArgumentNullException.ThrowIfNull(text);
 
-        ParseResult parsed = TermReader.ReadProgram(text, fileName);
+        ParseResult parsed = TermReader.ReadProgram(text, fileName, Program.Operators);
         if (!parsed.Success)
         {
             return new LoadResult(parsed.Diagnostics, [], []);
@@ -145,7 +145,7 @@ public sealed class PrologEngine : IRuntimeCompiler
     {
         ArgumentNullException.ThrowIfNull(goalText);
 
-        ParseResult parsed = TermReader.ReadTerm(goalText);
+        ParseResult parsed = TermReader.ReadTerm(goalText, operators: Program.Operators);
         if (!parsed.Success || parsed.Clauses.Count == 0)
         {
             diagnostics = parsed.Diagnostics;
@@ -173,7 +173,7 @@ public sealed class PrologEngine : IRuntimeCompiler
     {
         ArgumentNullException.ThrowIfNull(goalText);
 
-        ParseResult parsed = TermReader.ReadTerm(goalText);
+        ParseResult parsed = TermReader.ReadTerm(goalText, operators: Program.Operators);
         if (!parsed.Success || parsed.Clauses.Count == 0)
         {
             throw new PrologException($"The goal did not parse: {string.Join("; ", parsed.Diagnostics)}");
