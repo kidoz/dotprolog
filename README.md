@@ -78,6 +78,8 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 |---|---|
 | Terms | atoms, variables, integers, floats, double-quoted code lists, lists, structures |
 | Control | `,/2`, `;/2`, `->/2`, `*->/2`, `\+/1`, `!/0`, `call/1`, `not/1`, `true/0`, `fail/0` |
+| Exceptions | `throw/1`, `catch/3`, with catchable ISO `error/2` terms |
+| All solutions | `findall/3`, `forall/2` |
 | Unification | `=/2`, `\=/2` |
 | Arithmetic | `is/2`, `=:=/2`, `=\=/2`, `</2`, `>/2`, `=</2`, `>=/2` |
 | Standard order | `==/2`, `\==/2`, `@</2`, `@>/2`, `@=</2`, `@>=/2`, `compare/3` |
@@ -90,9 +92,20 @@ Control constructs are compiled in place inside a clause body, so cut scopes the
 
 ```prolog
 sign(N, S) :- ( N < 0 -> S = negative ; N =:= 0 -> S = zero ; S = positive ).
+
+safe_divide(X, Y, R) :-
+    catch(R is X / Y, error(evaluation_error(zero_divisor), _), R = undefined).
+
+item(1).
+item(2).
+item(3).
+
+squares(L) :- findall(S, (item(N), S is N * N), L).   % L = [1,4,9]
 ```
 
-Not yet implemented: modules, DCGs, exceptions (`throw/1`, `catch/3`), streams and file I/O, dynamic predicates, runtime `consult/1`, `findall/3`, `bagof/3`, `setof/3`, and `call/N` for N above one.
+Every error the engine raises is a catchable `error(Formal, Context)` term, so `existence_error`, `type_error`, `instantiation_error`, and `evaluation_error` can all be handled in Prolog rather than aborting the run.
+
+Not yet implemented: modules, DCGs, streams and file I/O, dynamic predicates, runtime `consult/1`, `bagof/3`, `setof/3`, `copy_term/2`, and `call/N` for N above one.
 
 One known deviation: a cut inside a goal reached through `call/1` is local to that goal and prunes nothing in the meta-call, so `call((a, !, b))` behaves as `call((a, b))`.
 
