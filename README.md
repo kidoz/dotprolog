@@ -65,6 +65,45 @@ PrologValue[]? result = host.CallOnce(
 
 This works from F# and VB the same way. One engine runs one goal at a time and is not thread-safe.
 
+## Prolog as a referenced project
+
+`samples/PricingRules` is a `.dplproj` holding ordinary ISO Prolog plus a contract declaring its .NET
+surface. `samples/PricingConsole` is a plain C# app that references it:
+
+```xml
+<ProjectReference Include="..\PricingRules\PricingRules.dplproj" />
+```
+```prolog
+% pricing.dpli — modes and determinism live here, so pricing.pl stays portable
+:- clr_module('Pricing').
+:- clr_export(discount/3, det, [in(price, float), in(percent, integer), out(result, float)]).
+:- clr_export(in_catalogue/1, semidet, [in(item, atom)]).
+:- clr_export(bundle/2, nondet, [in(items, list(atom)), out(bundle, list(atom))]).
+```
+```csharp
+IPricingModule pricing = PricingModule.Create();
+
+pricing.Discount(100.0, 15);          // 85
+pricing.InCatalogue("widget");        // true
+foreach (var b in pricing.Bundle(["widget", "gadget"])) { /* streamed */ }
+```
+
+The facade is generated during the build, before the C# compiler runs. Nothing in the consuming code
+mentions the engine, a goal, or a term — which is why the same reference works from F# and VB with no
+extra work.
+
+```console
+$ dotnet run --project samples/PricingConsole
+100 less 15% = 85
+total 1200 is gold
+widget in catalogue: True
+bundles of [widget, gadget]:
+  [widget, gadget]
+  [widget]
+  [gadget]
+  []
+```
+
 ## Repository layout
 
 | Path | What it is |
@@ -72,10 +111,15 @@ This works from F# and VB the same way. One engine runs one goal at a time and i
 | `src/Prolog.Syntax` | Lexer, ISO operator table, operator-precedence reader, diagnostics |
 | `src/Prolog.Runtime` | Tagged terms, heap, trail, choice points, bytecode VM, builtins |
 | `src/Prolog.Compiler` | Clause and directive lowering to bytecode, consult and embedding API |
+| `src/Prolog.CodeGen.CSharp` | `.dpli` contract reader and C# facade generator |
+| `src/Prolog.Build.Tasks` | MSBuild task that runs the generator |
+| `src/DotProlog.Sdk` | MSBuild props and targets for `.dplproj` |
 | `src/Prolog.DotNetTool` | The `dotnet prolog` command |
 | `tests/` | Unit tests per component, plus end-to-end execution tests |
 | `benchmarks/` | BenchmarkDotNet suite for the reader, compiler, and engine |
-| `samples/HelloProlog` | The sample above |
+| `samples/HelloProlog` | The Hello World sample |
+| `samples/PricingRules`, `samples/PricingConsole` | A `.dplproj` and the C# app that references it |
+| `samples/AotAcceptance` | The NativeAOT acceptance sample |
 
 ## Common tasks
 
