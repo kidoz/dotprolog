@@ -1,5 +1,17 @@
 <Project>
     <PropertyGroup>
+        <!--
+          A test project hosts Microsoft.Testing.Platform, which is an executable, so setting
+          DotPrologTestProject implies OutputType Exe.
+        -->
+        <OutputType Condition="'$(DotPrologTestProject)' == 'true'">Exe</OutputType>
+
+        <!--
+          Tells `dotnet test` to run the project as a Microsoft.Testing.Platform host rather than
+          looking for a VSTest adapter it will never find.
+        -->
+        <GenerateProgramFile Condition="'$(DotPrologTestProject)' == 'true'">false</GenerateProgramFile>
+
         <!-- An application gets a generated entry point; a library only gets its facade. -->
         <_DotPrologGenerateEntryPoint Condition="'$(OutputType)' == 'Exe'">true</_DotPrologGenerateEntryPoint>
         <_DotPrologGenerateEntryPoint Condition="'$(_DotPrologGenerateEntryPoint)' == ''">false</_DotPrologGenerateEntryPoint>
@@ -59,6 +71,7 @@
             OutputPath="$(DotPrologGeneratedPath)"
             RootNamespace="$(RootNamespace)"
             GenerateEntryPoint="$(_DotPrologGenerateEntryPoint)"
+            GenerateTestHost="$(DotPrologTestProject)"
         >
             <Output TaskParameter="GeneratedFiles" ItemName="DotPrologGeneratedCompile" />
         </GeneratePrologFacade>

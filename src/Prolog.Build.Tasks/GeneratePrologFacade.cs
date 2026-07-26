@@ -35,6 +35,9 @@ public sealed class GeneratePrologFacade : Task
     /// <summary>Whether to generate an entry point, set by the SDK when the project builds an application.</summary>
     public bool GenerateEntryPoint { get; set; }
 
+    /// <summary>Whether that entry point should host the test platform rather than run the program.</summary>
+    public bool GenerateTestHost { get; set; }
+
     /// <summary>The generated C# files, to be added to <c>Compile</c>.</summary>
     [Output]
     public ITaskItem[] GeneratedFiles { get; private set; } = [];
@@ -65,7 +68,12 @@ public sealed class GeneratePrologFacade : Task
             }
 
             string entryPoint = Path.Combine(OutputPath, $"{EntryPointGenerator.TypeName}.g.cs");
-            WriteIfChanged(entryPoint, EntryPointGenerator.Generate(RootNamespace, sources));
+            WriteIfChanged(
+                entryPoint,
+                GenerateTestHost
+                    ? EntryPointGenerator.GenerateTestHost(RootNamespace, sources)
+                    : EntryPointGenerator.Generate(RootNamespace, sources)
+            );
             generated.Add(new TaskItem(entryPoint));
         }
 
