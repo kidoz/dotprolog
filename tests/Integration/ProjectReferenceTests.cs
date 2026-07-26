@@ -140,6 +140,41 @@ public sealed class ProjectReferenceTests
         );
     }
 
+    [Fact]
+    public async Task APrologTestProjectDiscoversAndRunsItsTests()
+    {
+        // The test host is a Microsoft.Testing.Platform application, so it is exercised by running it.
+        // `dotnet test` cannot drive it yet: MTP mode is a repository-wide global.json switch that
+        // breaks the xunit projects here, and VSTest mode is gone on the .NET 10 SDK.
+        Assert.SkipUnless(
+            Environment.GetEnvironmentVariable(OptInVariable) == "1",
+            $"Set {OptInVariable}=1 to run the toolchain integration tests."
+        );
+
+        string project = Path.Combine(RepositoryLayout.Root, "samples", "PricingTests");
+
+        (int taskExit, string taskLog) = await Run(
+            "dotnet",
+            ["build", Path.Combine(RepositoryLayout.Root, "src", "Prolog.Build.Tasks"), "--nologo"]
+        );
+
+        Assert.True(taskExit == 0, $"Building the task failed:\n{taskLog}");
+
+        (int buildExit, string buildLog) = await Run("dotnet", ["build", project, "--nologo"]);
+        Assert.True(buildExit == 0, $"Building PricingTests failed:\n{buildLog}");
+
+        (int listExit, string listLog) = await Run("dotnet", ["run", "--project", project, "--no-build", "--", "--list-tests"]);
+        Assert.True(listExit == 0, $"Listing tests failed:\n{listLog}");
+        Assert.Contains("test_discount_reduces_price", listLog, StringComparison.Ordinal);
+        Assert.Contains("found 4 test(s)", listLog, StringComparison.Ordinal);
+
+        (int runExit, string runLog) = await Run("dotnet", ["run", "--project", project, "--no-build"]);
+
+        Assert.True(runExit == 0, $"Running the tests failed:\n{runLog}");
+        Assert.Contains("succeeded: 4", runLog, StringComparison.Ordinal);
+        Assert.Contains("failed: 0", runLog, StringComparison.Ordinal);
+    }
+
     private static async Task<(int ExitCode, string Log)> Run(string fileName, string[] arguments)
     {
         var start = new ProcessStartInfo(fileName)

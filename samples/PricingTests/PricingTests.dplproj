@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <Import Project="..\..\src\DotProlog.Sdk\Sdk\Sdk.props" />
+
+    <PropertyGroup>
+        <!-- Makes this a test project: the SDK generates a test host instead of a program. -->
+        <DotPrologTestProject>true</DotPrologTestProject>
+
+        <TargetFramework>net10.0</TargetFramework>
+        <RootNamespace>PricingTests</RootNamespace>
+        <IsPackable>false</IsPackable>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
+        <DotPrologTasksAssembly>$(MSBuildThisFileDirectory)..\..\src\Prolog.Build.Tasks\bin\$(Configuration)\net10.0\Prolog.Build.Tasks.dll</DotPrologTasksAssembly>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\Prolog.Testing\Prolog.Testing.csproj" />
+        <ProjectReference Include="..\..\src\Prolog.Build.Tasks\Prolog.Build.Tasks.csproj" ReferenceOutputAssembly="false" />
+    </ItemGroup>
+
+    <Import Project="..\..\src\DotProlog.Sdk\Sdk\Sdk.targets" />
+
+</Project>

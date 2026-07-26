@@ -25,6 +25,7 @@
         <Project Path="samples/PricingVisualBasic/PricingVisualBasic.vbproj" />
         <!-- .dplproj is not an extension the solution format knows, so its type is stated. -->
         <Project Path="samples/PricingRules/PricingRules.dplproj" Type="C#" />
+        <Project Path="samples/PricingTests/PricingTests.dplproj" Type="C#" />
     </Folder>
     <Folder Name="/benchmarks/">
         <Project Path="benchmarks/Prolog.Benchmarks/Prolog.Benchmarks.csproj" />
