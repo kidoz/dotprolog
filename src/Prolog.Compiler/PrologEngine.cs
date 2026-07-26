@@ -23,6 +23,24 @@ public sealed class PrologEngine
         Program = new BytecodeProgram();
         CoreBuiltins.RegisterAll(Program);
         Machine = new Machine(Program);
+
+        LoadResult bootstrap = new ProgramLoader(Program).Load(ReadOrThrow(BootstrapLibrary.Source, "bootstrap"), "bootstrap");
+
+        if (!bootstrap.Success)
+        {
+            throw new PrologException($"The bootstrap library failed to compile: {string.Join("; ", bootstrap.Diagnostics)}");
+        }
+    }
+
+    private static IReadOnlyList<SyntaxTerm> ReadOrThrow(string source, string fileName)
+    {
+        ParseResult parsed = TermReader.ReadProgram(source, fileName);
+        if (!parsed.Success)
+        {
+            throw new PrologException($"The {fileName} library failed to parse: {string.Join("; ", parsed.Diagnostics)}");
+        }
+
+        return parsed.Clauses;
     }
 
     /// <summary>The program this engine loads into.</summary>

@@ -22,6 +22,9 @@ internal sealed class ClauseCompiler
     private int _slotCount;
     private bool _failed;
 
+    /// <summary>Environment slot holding the barrier a <c>!</c> should cut to, or -1 for the clause barrier.</summary>
+    private int _cutSlot = -1;
+
     internal ClauseCompiler(BytecodeProgram program, ConstantPool constants, List<Diagnostic> diagnostics, string? fileName)
     {
         _program = program;
@@ -50,27 +53,44 @@ internal sealed class ClauseCompiler
 
         CompileHead(head);
 
-        List<SyntaxTerm> goals = [];
-        if (body is not null)
-        {
-            FlattenConjunction(body, goals);
-        }
-
-        if (goals.Count == 0)
+        if (body is null)
         {
             _program.Emit(OpCode.Deallocate);
             _program.Emit(OpCode.Proceed);
         }
         else
         {
-            for (int i = 0; i < goals.Count; i++)
-            {
-                CompileGoal(goals[i], isLast: i == goals.Count - 1);
-            }
+            CompileSequence(body, isTail: true);
         }
 
         _program.Patch(slotCountOperand, _slotCount);
         return _failed ? -1 : start;
+    }
+
+    /// <summary>
+    /// Compiles a conjunction of goals. When <paramref name="isTail"/> is set, the last goal returns
+    /// from the clause; otherwise control falls through to whatever follows.
+    /// </summary>
+    private void CompileSequence(SyntaxTerm body, bool isTail)
+    {
+        List<SyntaxTerm> goals = [];
+        FlattenConjunction(body, goals);
+
+        if (goals.Count == 0)
+        {
+            if (isTail)
+            {
+                _program.Emit(OpCode.Deallocate);
+                _program.Emit(OpCode.Proceed);
+            }
+
+            return;
+        }
+
+        for (int i = 0; i < goals.Count; i++)
+        {
+            CompileGoal(goals[i], isLast: isTail && i == goals.Count - 1);
+        }
     }
 
     private void CompileHead(SyntaxTerm head)
@@ -156,23 +176,25 @@ internal sealed class ClauseCompiler
     {
         if (goal is AtomTerm { Name: "!" })
         {
-            _program.Emit(OpCode.Cut);
-            if (isLast)
+            // A cut inside the condition of if-then-else is local to that condition; everywhere else
+            // it prunes the whole clause.
+            if (_cutSlot < 0)
             {
-                _program.Emit(OpCode.Deallocate);
-                _program.Emit(OpCode.Proceed);
+                _program.Emit(OpCode.Cut);
+            }
+            else
+            {
+                _program.Emit(OpCode.CutTo, _cutSlot);
             }
 
+            EmitReturnIfLast(isLast);
             return;
         }
 
-        if (goal is VariableTerm)
+        // A variable goal is a meta-call: 'p :- X' means the same as 'p :- call(X)'.
+        if (goal is VariableTerm variableGoal)
         {
-            Report(
-                CompilerDiagnosticIds.UnsupportedGoal,
-                "A variable goal requires call/1, which this release does not provide.",
-                goal.Span
-            );
+            EmitMetaCall(variableGoal, isLast);
             return;
         }
 
@@ -185,13 +207,8 @@ internal sealed class ClauseCompiler
         string name = goal is CompoundTerm compound ? compound.Name : ((AtomTerm)goal).Name;
         int arity = goal is CompoundTerm withArguments ? withArguments.Arity : 0;
 
-        if (name is ";" or "->" or "*->" or "\\+" && arity is 1 or 2)
+        if (goal is CompoundTerm control && CompileControlConstruct(control, name, isLast))
         {
-            Report(
-                CompilerDiagnosticIds.UnsupportedGoal,
-                $"The control construct {name}/{arity} is not compiled by this release.",
-                goal.Span
-            );
             return;
         }
 
@@ -210,12 +227,7 @@ internal sealed class ClauseCompiler
         if (_program.Builtins.TryGetId(functorId, out int builtinId))
         {
             _program.Emit(OpCode.CallBuiltin, builtinId, arity);
-            if (isLast)
-            {
-                _program.Emit(OpCode.Deallocate);
-                _program.Emit(OpCode.Proceed);
-            }
-
+            EmitReturnIfLast(isLast);
             return;
         }
 
@@ -228,6 +240,212 @@ internal sealed class ClauseCompiler
         }
 
         _program.Emit(OpCode.Call, functorId, arity);
+    }
+
+    /// <summary>
+    /// Compiles <c>;/2</c>, <c>-&gt;/2</c>, <c>*-&gt;/2</c>, <c>\+/1</c>, and <c>call/1</c> in place
+    /// rather than as calls, and reports whether it did. Compiling them inline is what gives cut its
+    /// correct scope: the condition of if-then-else gets its own barrier, while the branches stay
+    /// transparent to a cut that should prune the whole clause.
+    /// </summary>
+    private bool CompileControlConstruct(CompoundTerm goal, string name, bool isLast)
+    {
+        switch (name)
+        {
+            case "," when goal.Arity == 2:
+                CompileSequence(goal, isLast);
+                return true;
+
+            case "call" when goal.Arity == 1:
+                EmitMetaCall(goal.Arguments[0], isLast);
+                return true;
+
+            case ";" when goal.Arity == 2:
+                CreateVariablesBeforeBranching(goal);
+                CompileDisjunction(goal.Arguments[0], goal.Arguments[1], isLast);
+                return true;
+
+            case "->" when goal.Arity == 2:
+                // A bare if-then fails when its condition fails.
+                CreateVariablesBeforeBranching(goal);
+                CompileIfThenElse(goal.Arguments[0], goal.Arguments[1], elseGoal: null, soft: false, isLast);
+                return true;
+
+            case "*->" when goal.Arity == 2:
+                // A bare soft-cut if-then is just a conjunction: every solution of the condition is kept.
+                CompileSequence(new CompoundTerm(",", [goal.Arguments[0], goal.Arguments[1]], goal.Span), isLast);
+                return true;
+
+            case "\\+" when goal.Arity == 1:
+                CreateVariablesBeforeBranching(goal);
+                CompileNegation(goal.Arguments[0], isLast);
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    private void CompileDisjunction(SyntaxTerm left, SyntaxTerm right, bool isLast)
+    {
+        // '(C -> T ; E)' and '(C *-> T ; E)' are single constructs, not a disjunction of two goals.
+        if (left is CompoundTerm { Name: "->", Arity: 2 } ifThen)
+        {
+            CompileIfThenElse(ifThen.Arguments[0], ifThen.Arguments[1], right, soft: false, isLast);
+            return;
+        }
+
+        if (left is CompoundTerm { Name: "*->", Arity: 2 } softIfThen)
+        {
+            CompileIfThenElse(softIfThen.Arguments[0], softIfThen.Arguments[1], right, soft: true, isLast);
+            return;
+        }
+
+        int slot = AllocateTemporary();
+        int alternative = _program.Emit(OpCode.TryBranch, slot, 0) + 2;
+
+        CompileSequence(left, isTail: false);
+        int end = _program.Emit(OpCode.Jump, 0) + 1;
+
+        _program.Patch(alternative, _program.CodeLength);
+        _program.Emit(OpCode.TrustMe);
+        CompileSequence(right, isTail: false);
+
+        _program.Patch(end, _program.CodeLength);
+        EmitReturnIfLast(isLast);
+    }
+
+    private void CompileIfThenElse(SyntaxTerm condition, SyntaxTerm then, SyntaxTerm? elseGoal, bool soft, bool isLast)
+    {
+        int slot = AllocateTemporary();
+        int conditionSlot = AllocateTemporary();
+        int alternative = _program.Emit(OpCode.TryBranch, slot, 0) + 2;
+        _program.Emit(OpCode.MarkBarrier, conditionSlot);
+
+        CompileCondition(condition, conditionSlot);
+
+        // A hard commit discards the condition's own alternatives; a soft cut keeps them and only
+        // removes the branch to the else goal.
+        _program.Emit(soft ? OpCode.SoftCut : OpCode.CutTo, slot);
+        CompileSequence(then, isTail: false);
+        int end = _program.Emit(OpCode.Jump, 0) + 1;
+
+        _program.Patch(alternative, _program.CodeLength);
+        _program.Emit(OpCode.TrustMe);
+
+        if (elseGoal is null)
+        {
+            _program.Emit(OpCode.Fail);
+        }
+        else
+        {
+            CompileSequence(elseGoal, isTail: false);
+        }
+
+        _program.Patch(end, _program.CodeLength);
+        EmitReturnIfLast(isLast);
+    }
+
+    private void CompileNegation(SyntaxTerm goal, bool isLast)
+    {
+        int slot = AllocateTemporary();
+        int goalSlot = AllocateTemporary();
+        int alternative = _program.Emit(OpCode.TryBranch, slot, 0) + 2;
+        _program.Emit(OpCode.MarkBarrier, goalSlot);
+
+        CompileCondition(goal, goalSlot);
+
+        // The goal succeeded, so '\+ Goal' fails — and backtracking undoes the goal's bindings.
+        _program.Emit(OpCode.CutTo, slot);
+        _program.Emit(OpCode.Fail);
+
+        _program.Patch(alternative, _program.CodeLength);
+        _program.Emit(OpCode.TrustMe);
+        EmitReturnIfLast(isLast);
+    }
+
+    /// <summary>
+    /// Creates every variable <paramref name="construct"/> mentions for the first time, before the
+    /// construct pushes its choice point.
+    /// </summary>
+    /// <remarks>
+    /// A variable created inside a branch lives above that branch's choice point, so backtracking
+    /// into a later branch truncates the heap out from under the environment slot still naming it.
+    /// Creating it first also makes bindings to it older than the choice point, which is what gets
+    /// them trailed and therefore undone.
+    /// </remarks>
+    private void CreateVariablesBeforeBranching(SyntaxTerm construct)
+    {
+        List<SyntaxTerm> work = [construct];
+
+        while (work.Count > 0)
+        {
+            SyntaxTerm term = work[^1];
+            work.RemoveAt(work.Count - 1);
+
+            switch (term)
+            {
+                // An anonymous variable is never read back, so each occurrence can stay branch-local.
+                case VariableTerm { IsAnonymous: false } variable when !_slots.ContainsKey(variable.Name):
+                {
+                    int slot = AllocateTemporary();
+                    _slots[variable.Name] = slot;
+                    _program.Emit(OpCode.InitVariable, slot);
+                    break;
+                }
+
+                case CompoundTerm compound:
+                    work.AddRange(compound.Arguments);
+                    break;
+
+                default:
+                    break;
+            }
+        }
+    }
+
+    /// <summary>Compiles a goal whose cut is local to it: the condition of if-then-else, or of negation.</summary>
+    private void CompileCondition(SyntaxTerm condition, int slot)
+    {
+        int enclosing = _cutSlot;
+        _cutSlot = slot;
+        CompileSequence(condition, isTail: false);
+        _cutSlot = enclosing;
+    }
+
+    private void EmitMetaCall(SyntaxTerm goal, bool isLast)
+    {
+        switch (goal)
+        {
+            case VariableTerm variable:
+            {
+                bool isFirst = ResolveSlot(variable, out int slot);
+                _program.Emit(isFirst ? OpCode.PutVariable : OpCode.PutValue, slot, 0);
+                break;
+            }
+
+            case CompoundTerm nested:
+                BuildStructure(nested, OpCode.PutStructureArgument, 0);
+                break;
+
+            default:
+                _program.Emit(OpCode.PutConstant, ConstantIndexOf(goal), 0);
+                break;
+        }
+
+        _program.Emit(OpCode.MetaCall);
+        EmitReturnIfLast(isLast);
+    }
+
+    private void EmitReturnIfLast(bool isLast)
+    {
+        if (!isLast)
+        {
+            return;
+        }
+
+        _program.Emit(OpCode.Deallocate);
+        _program.Emit(OpCode.Proceed);
     }
 
     private void EmitArguments(CompoundTerm goal)

@@ -189,9 +189,9 @@ public sealed class ExecutionTests
     }
 
     [Fact]
-    public void ControlConstructsThatAreNotYetCompiledAreReportedNotIgnored()
+    public void AGoalThatIsNotCallableIsReportedNotIgnored()
     {
-        (_, _, IReadOnlyList<Diagnostic> diagnostics) = PrologTestHost.Execute("p :- q ; r.");
+        (_, _, IReadOnlyList<Diagnostic> diagnostics) = PrologTestHost.Execute("p :- 42.");
 
         Assert.Equal(CompilerDiagnosticIds.UnsupportedGoal, Assert.Single(diagnostics).Id);
     }
