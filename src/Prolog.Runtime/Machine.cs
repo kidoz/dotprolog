@@ -51,6 +51,8 @@ public sealed class Machine
     private int _argumentCount;
     private bool _halted;
     private bool _forceTrail;
+    private bool _solutionPending;
+    private int _currentBuiltin = -1;
     private readonly int _callFunctor;
     private readonly List<Collection> _collections = [];
     private int _collectDepth;
@@ -98,12 +100,50 @@ public sealed class Machine
 
         _pc = entryAddress;
         _continuation = BytecodeProgram.TopLevelReturnAddress;
+        return Dispatch();
+    }
 
+    /// <summary>
+    /// Asks the goal proved by the last <see cref="Run"/> or <see cref="Redo"/> for another solution.
+    /// </summary>
+    /// <remarks>
+    /// Reaching a solution leaves the machine intact — the choice-point stack, heap, and trail are all
+    /// still live — so a further answer is exactly one backtrack away. This is what lets a host
+    /// enumerate solutions instead of collecting them with <c>findall/3</c> from inside Prolog.
+    /// </remarks>
+    /// <returns>
+    /// <see cref="RunResult.Success"/> for another solution, or <see cref="RunResult.Failure"/> when
+    /// the goal is exhausted or the last run did not succeed.
+    /// </returns>
+    public RunResult Redo()
+    {
+        if (!_solutionPending || !Backtrack())
+        {
+            _solutionPending = false;
+            return RunResult.Failure;
+        }
+
+        return Dispatch();
+    }
+
+    /// <summary>Whether the goal in progress could still have another solution.</summary>
+    public bool HasAlternatives => _solutionPending && _b > 0;
+
+    /// <summary>
+    /// The term holding a host query's variables, set by <c>'$bindings'/1</c>. It is built before the
+    /// query's first choice point, so it survives every backtrack the query makes.
+    /// </summary>
+    public Cell QueryBindings { get; set; }
+
+    private RunResult Dispatch()
+    {
         while (true)
         {
             try
             {
-                return Execute();
+                RunResult result = Execute();
+                _solutionPending = result == RunResult.Success;
+                return result;
             }
             catch (PrologException error) when (error.HasBall && HasCatchFrame())
             {
@@ -111,6 +151,7 @@ public sealed class Machine
                 // UnwindToCatch reports it and the ball continues out to the host.
                 if (!UnwindToCatch(error))
                 {
+                    _solutionPending = false;
                     throw;
                 }
             }
@@ -164,7 +205,13 @@ public sealed class Machine
                 {
                     int builtinId = code[_pc++];
                     _argumentCount = code[_pc++];
+                    _currentBuiltin = builtinId;
                     proved = _program.Builtins.Implementation(builtinId)(this);
+
+                    // assertz/1 and consult/1 append to the program, which can replace these arrays.
+                    // Addresses stay valid because the program is only ever appended to.
+                    code = _program.Code;
+                    constants = _program.Constants;
                     break;
                 }
 
@@ -212,7 +259,52 @@ public sealed class Machine
 
                 case OpCode.MetaCall:
                     proved = MetaCall();
+                    code = _program.Code;
+                    constants = _program.Constants;
                     break;
+
+                case OpCode.EnterDynamic:
+                    proved = EnterDynamic(code[_pc++]);
+                    break;
+
+                case OpCode.RedoBuiltin:
+                {
+                    // The choice point is still on top; pop it, then let the builtin offer another
+                    // solution and push a fresh choice point if it has more after that.
+                    ChoicePoint point = _choicePoints[_b - 1];
+                    _b--;
+                    _savedTop = _choicePoints[_b].ArgumentBase;
+
+                    _currentBuiltin = point.BuiltinId;
+                    _pc = point.BuiltinResume;
+                    proved = _program.Builtins.Retry(point.BuiltinId)(this, point.BuiltinState);
+
+                    code = _program.Code;
+                    constants = _program.Constants;
+                    break;
+                }
+
+                case OpCode.NextClause:
+                {
+                    // Reached through a choice point's alternative, so that choice point is still on top.
+                    ChoicePoint point = _choicePoints[_b - 1];
+                    DynamicClause clause = point.NextClause!;
+                    DynamicClause? following = DynamicPredicate.FirstVisible(clause.Next, point.ClauseGeneration);
+
+                    if (following is null)
+                    {
+                        _b--;
+                        _savedTop = _choicePoints[_b].ArgumentBase;
+                        _choicePoints[_b].NextClause = null;
+                    }
+                    else
+                    {
+                        _choicePoints[_b - 1].NextClause = following;
+                    }
+
+                    _pc = clause.CodeAddress;
+                    break;
+                }
 
                 case OpCode.PushCatch:
                 {
@@ -437,8 +529,38 @@ public sealed class Machine
     /// <summary>Returns the heap cell at <paramref name="address"/>.</summary>
     public Cell HeapAt(int address) => _heap[address];
 
+    /// <summary>The current trail position, for a builtin that wants to undo a trial unification.</summary>
+    public int TrailMark => _tr;
+
+    /// <summary>Undoes every binding trailed since <paramref name="mark"/>.</summary>
+    public void UndoTo(int mark) => UndoTrail(mark);
+
     /// <summary>Pushes a fresh unbound variable onto the heap and returns its cell.</summary>
     public Cell CreateVariable() => NewVariable();
+
+    /// <summary>
+    /// Offers a further solution from the builtin currently executing. Call this before returning
+    /// <see langword="true"/>; on backtracking the builtin's retry delegate runs with
+    /// <paramref name="state"/>, and may call this again to offer another.
+    /// </summary>
+    /// <param name="state">Opaque value handed back to the retry delegate.</param>
+    public void PushRetry(long state)
+    {
+        if (_currentBuiltin < 0)
+        {
+            throw new PrologException("PushRetry was called outside a builtin.");
+        }
+
+        int resume = _pc;
+        int builtin = _currentBuiltin;
+
+        PushChoicePoint(BytecodeProgram.RedoBuiltinAddress);
+
+        ref ChoicePoint point = ref _choicePoints[_b - 1];
+        point.BuiltinId = builtin;
+        point.BuiltinResume = resume;
+        point.BuiltinState = state;
+    }
 
     /// <summary>Wraps <paramref name="term"/> as a thrown ball, detached from the heap.</summary>
     /// <param name="term">The term being thrown.</param>
@@ -497,6 +619,34 @@ public sealed class Machine
 
     /// <summary>Writes a cell at an address reserved by <see cref="ReserveHeap"/>.</summary>
     internal void WriteHeap(int address, Cell cell) => _heap[address] = cell;
+
+    /// <summary>
+    /// Enters a dynamic predicate. The generation is snapshotted here, so the clauses this call sees
+    /// are fixed even if the goal it runs asserts or retracts.
+    /// </summary>
+    private bool EnterDynamic(int functorId)
+    {
+        DynamicPredicate predicate = _program.FindDynamic(functorId) ?? throw PrologErrors.UndefinedProcedure(this, functorId);
+
+        int generation = _program.Generation;
+        DynamicClause? clause = DynamicPredicate.FirstVisible(predicate.First, generation);
+        if (clause is null)
+        {
+            return false;
+        }
+
+        DynamicClause? following = DynamicPredicate.FirstVisible(clause.Next, generation);
+        if (following is not null)
+        {
+            PushChoicePoint(BytecodeProgram.NextClauseAddress);
+            ref ChoicePoint point = ref _choicePoints[_b - 1];
+            point.NextClause = following;
+            point.ClauseGeneration = generation;
+        }
+
+        _pc = clause.CodeAddress;
+        return true;
+    }
 
     private bool HasCatchFrame()
     {
@@ -657,6 +807,7 @@ public sealed class Machine
 
         if (_program.Builtins.TryGetId(functorId, out int builtinId))
         {
+            _currentBuiltin = builtinId;
             return _program.Builtins.Implementation(builtinId)(this);
         }
 
@@ -767,6 +918,8 @@ public sealed class Machine
         _argumentCount = 0;
         _halted = false;
         _forceTrail = false;
+        _solutionPending = false;
+        _currentBuiltin = -1;
         _collectDepth = 0;
         ExitCode = 0;
     }
@@ -919,6 +1072,8 @@ public sealed class Machine
         point.CatchRecovery = -1;
         point.CatcherSlot = 0;
         point.CatchActive = false;
+        point.NextClause = null;
+        point.ClauseGeneration = 0;
 
         _savedTop += _argumentCount;
         _b++;

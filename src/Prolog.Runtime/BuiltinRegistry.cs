@@ -8,6 +8,7 @@ public sealed class BuiltinRegistry
 {
     private readonly SymbolTable _symbols;
     private readonly List<PrologBuiltin> _implementations = [];
+    private readonly List<PrologRetry?> _retries = [];
     private readonly List<string> _names = [];
     private readonly Dictionary<int, int> _idByFunctor = [];
 
@@ -27,8 +28,23 @@ public sealed class BuiltinRegistry
         int functorId = _symbols.InternFunctor(name, arity);
         int id = _implementations.Count;
         _implementations.Add(implementation);
+        _retries.Add(null);
         _names.Add($"{name}/{arity}");
         _idByFunctor[functorId] = id;
+        return id;
+    }
+
+    /// <summary>
+    /// Registers a native predicate that can yield more than one solution. The first call runs
+    /// <paramref name="implementation"/>; each redo runs <paramref name="retry"/>. Either may call
+    /// <see cref="Machine.PushRetry(long)"/> to offer a further solution.
+    /// </summary>
+    public int RegisterNondeterministic(string name, int arity, PrologBuiltin implementation, PrologRetry retry)
+    {
+        ArgumentNullException.ThrowIfNull(retry);
+
+        int id = Register(name, arity, implementation);
+        _retries[id] = retry;
         return id;
     }
 
@@ -39,4 +55,7 @@ public sealed class BuiltinRegistry
     public string NameOf(int builtinId) => _names[builtinId];
 
     internal PrologBuiltin Implementation(int builtinId) => _implementations[builtinId];
+
+    internal PrologRetry Retry(int builtinId) =>
+        _retries[builtinId] ?? throw new PrologException($"{_names[builtinId]} is not a nondeterministic builtin.");
 }

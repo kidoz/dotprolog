@@ -52,4 +52,22 @@ internal struct ChoicePoint
 
     /// <summary>Depth of the <c>findall/3</c> collection stack to restore.</summary>
     public int CollectDepth;
+
+    /// <summary>
+    /// The next clause to try for a dynamic predicate. Held as a reference rather than an index
+    /// because <c>asserta/1</c> can prepend a clause while this choice point is still in flight.
+    /// </summary>
+    public DynamicClause? NextClause;
+
+    /// <summary>Clause generation the call started at, which fixes the clauses it can see.</summary>
+    public int ClauseGeneration;
+
+    /// <summary>Identifier of the builtin to resume, for a nondeterministic native predicate.</summary>
+    public int BuiltinId;
+
+    /// <summary>Address to continue at once that builtin yields another solution.</summary>
+    public int BuiltinResume;
+
+    /// <summary>Opaque state the builtin carries from one solution to the next.</summary>
+    public long BuiltinState;
 }

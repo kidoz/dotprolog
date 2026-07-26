@@ -144,7 +144,72 @@ public static class CoreBuiltins
 
         registry.Register("$collect_end", 1, static machine => machine.Unify(machine.Argument(0), machine.EndCollect()));
 
+        // Records where a host query's variables live, so each solution can be read back. The engine
+        // compiles '$bindings'(v(V1, ..., Vn)) as the first goal of a query it was handed.
+        registry.Register(
+            "$bindings",
+            1,
+            static machine =>
+            {
+                machine.QueryBindings = machine.Argument(0);
+                return true;
+            }
+        );
+
+        // between/3 is the simplest nondeterministic native predicate, and the clearest example of one.
+        registry.RegisterNondeterministic("between", 3, static machine => Between(machine, long.MinValue), Between);
+
+        DatabaseBuiltins.Register(registry);
         ControlPredicates.Install(program);
+    }
+
+    /// <summary>
+    /// <c>between(Low, High, X)</c>: unifies X with each integer from Low to High in turn.
+    /// </summary>
+    /// <param name="machine">The machine.</param>
+    /// <param name="next">
+    /// The value to try, or <see cref="long.MinValue"/> on the first call, which means "start at Low".
+    /// </param>
+    private static bool Between(Machine machine, long next)
+    {
+        Cell low = machine.Argument(0);
+        Cell high = machine.Argument(1);
+
+        if (low.Tag == CellTag.Reference || high.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        if (low.Tag != CellTag.Integer)
+        {
+            throw PrologErrors.Type(machine, "integer", low);
+        }
+
+        if (high.Tag != CellTag.Integer)
+        {
+            throw PrologErrors.Type(machine, "integer", high);
+        }
+
+        long value = next == long.MinValue ? low.Integer : next;
+        Cell target = machine.Argument(2);
+
+        // With X already bound, between/3 is a range check with no solutions to enumerate.
+        if (target.Tag == CellTag.Integer)
+        {
+            return target.Integer >= low.Integer && target.Integer <= high.Integer;
+        }
+
+        if (value > high.Integer)
+        {
+            return false;
+        }
+
+        if (value < high.Integer)
+        {
+            machine.PushRetry(value + 1);
+        }
+
+        return machine.Unify(target, Cell.Integer60(value));
     }
 
     private static int CompareArguments(Machine machine) =>

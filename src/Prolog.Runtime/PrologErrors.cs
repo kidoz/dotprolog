@@ -51,6 +51,25 @@ public static class PrologErrors
         return Build(machine, formal, $"existence_error(procedure, {machine.Symbols.DescribeFunctor(functorId)})");
     }
 
+    /// <summary>An operation is not allowed: <c>permission_error(Operation, Type, Name/Arity)</c>.</summary>
+    public static PrologException Permission(Machine machine, string operation, string type, int functorId)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+
+        Functor functor = machine.Symbols.GetFunctor(functorId);
+        Cell indicator = machine.CreateStructure(
+            machine.Symbols.InternFunctor("/", 2),
+            [Cell.Atom(functor.NameAtom), Cell.Integer60(functor.Arity)]
+        );
+
+        Cell formal = machine.CreateStructure(
+            machine.Symbols.InternFunctor("permission_error", 3),
+            [Cell.Atom(machine.Symbols.InternAtom(operation)), Cell.Atom(machine.Symbols.InternAtom(type)), indicator]
+        );
+
+        return Build(machine, formal, $"permission_error({operation}, {type}, {machine.Symbols.DescribeFunctor(functorId)})");
+    }
+
     /// <summary>An arithmetic operation could not produce a value: <c>evaluation_error(What)</c>.</summary>
     public static PrologException Evaluation(Machine machine, string what)
     {

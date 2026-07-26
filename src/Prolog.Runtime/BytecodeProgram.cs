@@ -20,12 +20,19 @@ public sealed class BytecodeProgram
     /// </summary>
     public const int PopAndFailAddress = 1;
 
+    /// <summary>The address a dynamic predicate's choice point resumes at to try its next clause.</summary>
+    public const int NextClauseAddress = 3;
+
+    /// <summary>The address a nondeterministic builtin's choice point resumes at.</summary>
+    public const int RedoBuiltinAddress = 4;
+
     private const int Undefined = -1;
 
     private int[] _code = new int[1024];
     private Cell[] _constants = new Cell[64];
     private int[] _entryPoints = new int[64];
     private int _constantCount;
+    private readonly Dictionary<int, DynamicPredicate> _dynamicPredicates = [];
 
     /// <summary>Creates an empty program with its own symbol table and builtin registry.</summary>
     public BytecodeProgram()
@@ -36,7 +43,9 @@ public sealed class BytecodeProgram
         _code[TopLevelReturnAddress] = (int)OpCode.Stop;
         _code[PopAndFailAddress] = (int)OpCode.TrustMe;
         _code[PopAndFailAddress + 1] = (int)OpCode.Fail;
-        CodeLength = 3;
+        _code[NextClauseAddress] = (int)OpCode.NextClause;
+        _code[RedoBuiltinAddress] = (int)OpCode.RedoBuiltin;
+        CodeLength = 5;
     }
 
     /// <summary>The atoms, functors, and floats this program refers to.</summary>
@@ -65,6 +74,51 @@ public sealed class BytecodeProgram
 
     /// <summary>Whether <paramref name="functorId"/> has a definition.</summary>
     public bool IsDefined(int functorId) => EntryPointOf(functorId) != Undefined;
+
+    /// <summary>
+    /// The current clause generation. A goal snapshots this when it starts, and then sees exactly the
+    /// clauses that existed at that moment — the logical update view.
+    /// </summary>
+    public int Generation { get; private set; }
+
+    /// <summary>Advances the clause generation and returns the new value.</summary>
+    public int NextGeneration() => ++Generation;
+
+    /// <summary>The compiler used by <c>assertz/1</c> and <c>consult/1</c>, installed by the host.</summary>
+    public IRuntimeCompiler? RuntimeCompiler { get; set; }
+
+    /// <summary>Whether <paramref name="functorId"/> is a dynamic predicate.</summary>
+    public bool IsDynamic(int functorId) => _dynamicPredicates.ContainsKey(functorId);
+
+    /// <summary>
+    /// Returns the dynamic predicate for <paramref name="functorId"/>, declaring it if necessary.
+    /// Declaring emits a one-instruction trampoline and points the predicate's entry at it.
+    /// </summary>
+    /// <exception cref="PrologException">A static predicate of that name and arity already exists.</exception>
+    internal DynamicPredicate DeclareDynamic(int functorId)
+    {
+        if (_dynamicPredicates.TryGetValue(functorId, out DynamicPredicate? existing))
+        {
+            return existing;
+        }
+
+        if (IsDefined(functorId))
+        {
+            throw new PrologException($"permission_error(modify, static_procedure, {Symbols.DescribeFunctor(functorId)})");
+        }
+
+        int trampoline = CodeLength;
+        Emit(OpCode.EnterDynamic, functorId);
+
+        var predicate = new DynamicPredicate { FunctorId = functorId, TrampolineAddress = trampoline };
+        _dynamicPredicates[functorId] = predicate;
+        DefinePredicate(functorId, trampoline);
+        return predicate;
+    }
+
+    /// <summary>Returns the dynamic predicate for <paramref name="functorId"/>, or <see langword="null"/>.</summary>
+    internal DynamicPredicate? FindDynamic(int functorId) =>
+        _dynamicPredicates.TryGetValue(functorId, out DynamicPredicate? predicate) ? predicate : null;
 
     /// <summary>Appends an instruction with no operands and returns its address.</summary>
     public int Emit(OpCode opCode) => EmitWord((int)opCode);

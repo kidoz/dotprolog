@@ -136,6 +136,24 @@ public enum OpCode
     /// <summary>Operands: functor identifier, slot. Begin building a structure in an environment slot.</summary>
     PutStructureSlot,
 
+    /// <summary>
+    /// Operand: functor identifier. Trampoline for a dynamic predicate: pick the first clause visible
+    /// to this call and push a choice point if any later clause is visible too.
+    /// </summary>
+    EnterDynamic,
+
+    /// <summary>
+    /// Resume a dynamic predicate at the clause its choice point recorded. Reached only through that
+    /// choice point's alternative.
+    /// </summary>
+    NextClause,
+
+    /// <summary>
+    /// Ask a nondeterministic builtin for its next solution, using the state its choice point
+    /// recorded. Reached only through that choice point's alternative.
+    /// </summary>
+    RedoBuiltin,
+
     /// <summary>Fail unconditionally, forcing backtracking.</summary>
     Fail,
 }
