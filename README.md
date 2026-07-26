@@ -53,6 +53,16 @@ Answers are produced on demand and marshalled into plain .NET objects as they ar
 var first = engine.Query("between(1, 1000000000, X)").Solutions().Take(4);
 ```
 
+Predicates can also be called directly with .NET values, which is the surface the planned `.dplproj` facades will be generated against:
+
+```csharp
+var host = new PrologHost(engine.Machine);
+PrologPredicate discount = host.Bind("discount", 3);
+
+PrologValue[]? result = host.CallOnce(
+    discount, PrologInput.Float(100.0), PrologInput.Integer(10), PrologInput.Output);
+```
+
 This works from F# and VB the same way. One engine runs one goal at a time and is not thread-safe.
 
 ## Repository layout
