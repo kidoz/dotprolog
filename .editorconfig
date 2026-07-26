@@ -1,0 +1,42 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.pl]
+indent_size = 4
+
+[*.cs]
+# CSharpier owns layout; these keep the IDE from fighting it.
+max_line_length = 130
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_style_qualification_for_field = false:warning
+dotnet_style_qualification_for_property = false:warning
+dotnet_style_qualification_for_method = false:warning
+dotnet_style_qualification_for_event = false:warning
+
+# Prolog's own type names are 'atom', 'integer', and 'float'. Renaming CellTag.Integer or
+# Cell.Float to satisfy CA1720 would make the engine harder to read, not easier.
+dotnet_diagnostic.CA1720.severity = none
+
+[src/Prolog.Runtime/CellTag.cs]
+# CellTag is a byte on purpose: it is packed into a term cell, not used as a public flags enum.
+dotnet_diagnostic.CA1028.severity = none
+
+[tests/**.cs]
+# Test methods are discovered by the runner, and xUnit theory data is often duplicated by design.
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1515.severity = none
+
+[benchmarks/**.cs]
+# BenchmarkDotNet requires public benchmark classes and settable [Params] properties.
+dotnet_diagnostic.CA1515.severity = none
+dotnet_diagnostic.CA1051.severity = none

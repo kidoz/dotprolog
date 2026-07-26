@@ -1,0 +1,14 @@
+<Project>
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>14.0</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <AnalysisMode>AllEnabledByDefault</AnalysisMode>
+        <Deterministic>true</Deterministic>
+        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+        <InvariantGlobalization>true</InvariantGlobalization>
+        <RepositoryRoot>$(MSBuildThisFileDirectory)</RepositoryRoot>
+    </PropertyGroup>
+</Project>

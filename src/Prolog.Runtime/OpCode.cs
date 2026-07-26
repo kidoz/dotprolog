@@ -1,0 +1,84 @@
+namespace Prolog.Runtime;
+
+/// <summary>
+/// The bytecode instruction set executed by <see cref="Machine"/>. Instructions are a WAM-derived
+/// set specialised for this engine: every clause variable lives on the heap and is addressed through
+/// an environment slot (<c>Y</c>), while <c>X</c> registers are used only to pass arguments.
+/// </summary>
+public enum OpCode
+{
+    /// <summary>Return control to the host with the current goal proved. Occupies address zero.</summary>
+    Stop = 0,
+
+    /// <summary>Push an environment with the operand's number of variable slots.</summary>
+    Allocate,
+
+    /// <summary>Pop the current environment, restoring the saved continuation.</summary>
+    Deallocate,
+
+    /// <summary>Operands: functor identifier, arity. Save the continuation and jump to the predicate.</summary>
+    Call,
+
+    /// <summary>Operands: functor identifier, arity. Jump to the predicate without saving a continuation.</summary>
+    Execute,
+
+    /// <summary>Operands: builtin identifier, arity. Invoke a deterministic native predicate in place.</summary>
+    CallBuiltin,
+
+    /// <summary>Return to the saved continuation.</summary>
+    Proceed,
+
+    /// <summary>Discard every choice point created since the current predicate was entered.</summary>
+    Cut,
+
+    /// <summary>Operand: address. Push a choice point whose alternative is the operand.</summary>
+    TryMeElse,
+
+    /// <summary>Operand: address. Retarget the current choice point's alternative to the operand.</summary>
+    RetryMeElse,
+
+    /// <summary>Pop the current choice point; the clause that follows is the last alternative.</summary>
+    TrustMe,
+
+    /// <summary>Operands: slot, argument register. Copy the argument into a fresh environment slot.</summary>
+    GetVariable,
+
+    /// <summary>Operands: slot, argument register. Unify the argument with a bound environment slot.</summary>
+    GetValue,
+
+    /// <summary>Operands: constant index, argument register. Unify the argument with a constant.</summary>
+    GetConstant,
+
+    /// <summary>Operands: functor identifier, argument register. Match or build a compound term.</summary>
+    GetStructureArgument,
+
+    /// <summary>Operands: functor identifier, slot. Match or build a compound term held in a slot.</summary>
+    GetStructureSlot,
+
+    /// <summary>Operand: slot. Read or write the next argument of the current structure.</summary>
+    UnifyVariable,
+
+    /// <summary>Operand: slot. Unify or emit the next argument of the current structure.</summary>
+    UnifyValue,
+
+    /// <summary>Operand: constant index. Match or emit the next argument of the current structure.</summary>
+    UnifyConstant,
+
+    /// <summary>Operands: slot, argument register. Create a fresh variable in both.</summary>
+    PutVariable,
+
+    /// <summary>Operands: slot, argument register. Copy a slot into an argument register.</summary>
+    PutValue,
+
+    /// <summary>Operands: constant index, argument register. Load a constant into an argument register.</summary>
+    PutConstant,
+
+    /// <summary>Operands: functor identifier, argument register. Begin building a structure in a register.</summary>
+    PutStructureArgument,
+
+    /// <summary>Operands: functor identifier, slot. Begin building a structure in an environment slot.</summary>
+    PutStructureSlot,
+
+    /// <summary>Fail unconditionally, forcing backtracking.</summary>
+    Fail,
+}

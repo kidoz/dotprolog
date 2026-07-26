@@ -1,0 +1,16 @@
+<Solution>
+    <Folder Name="/src/">
+        <Project Path="src/Prolog.Compiler/Prolog.Compiler.csproj" />
+        <Project Path="src/Prolog.DotNetTool/Prolog.DotNetTool.csproj" />
+        <Project Path="src/Prolog.Runtime/Prolog.Runtime.csproj" />
+        <Project Path="src/Prolog.Syntax/Prolog.Syntax.csproj" />
+    </Folder>
+    <Folder Name="/tests/">
+        <Project Path="tests/Prolog.Compiler.Tests/Prolog.Compiler.Tests.csproj" />
+        <Project Path="tests/Prolog.Runtime.Tests/Prolog.Runtime.Tests.csproj" />
+        <Project Path="tests/Prolog.Syntax.Tests/Prolog.Syntax.Tests.csproj" />
+    </Folder>
+    <Folder Name="/benchmarks/">
+        <Project Path="benchmarks/Prolog.Benchmarks/Prolog.Benchmarks.csproj" />
+    </Folder>
+</Solution>

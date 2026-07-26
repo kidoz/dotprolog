@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <RootNamespace>Prolog.Compiler</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Prolog.Runtime\Prolog.Runtime.csproj" />
+        <ProjectReference Include="..\Prolog.Syntax\Prolog.Syntax.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="Prolog.Compiler.Tests" />
+    </ItemGroup>
+</Project>

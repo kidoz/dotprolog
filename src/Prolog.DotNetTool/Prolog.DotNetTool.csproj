@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <RootNamespace>Prolog.DotNetTool</RootNamespace>
+        <AssemblyName>dotnet-prolog</AssemblyName>
+        <ToolCommandName>dotnet-prolog</ToolCommandName>
+        <PublishAot>false</PublishAot>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Prolog.Compiler\Prolog.Compiler.csproj" />
+    </ItemGroup>
+</Project>
