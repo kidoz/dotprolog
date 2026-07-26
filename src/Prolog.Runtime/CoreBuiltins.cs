@@ -159,6 +159,7 @@ public static class CoreBuiltins
         // between/3 is the simplest nondeterministic native predicate, and the clearest example of one.
         registry.RegisterNondeterministic("between", 3, static machine => Between(machine, long.MinValue), Between);
 
+        TextBuiltins.Register(registry);
         DatabaseBuiltins.Register(registry);
         ControlPredicates.Install(program);
     }
