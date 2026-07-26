@@ -210,6 +210,7 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 | Integers | `succ/2`, `plus/3` |
 | Output | `write/1`, `writeq/1`, `print/1`, `writeln/1`, `write_canonical/1`, `write_term/2`, `nl/0`, `format/1,2,3`, `tab/1` |
 | Operators | `op/3`, `current_op/3` |
+| Grammars | `-->/2` with `{}/1`, `!`, `\+`, pushback lists; `phrase/2`, `phrase/3` |
 | Directives | `:- Goal`, `:- initialization(Goal)`, `halt/0`, `halt/1` |
 
 Control constructs are compiled in place inside a clause body, so cut scopes the way ISO specifies: opaque in the condition of if-then-else, transparent in its branches, clause-scoped elsewhere. A bootstrap library written in Prolog makes the same constructs reachable when a goal is assembled at run time and passed to `call/1`.
@@ -276,7 +277,25 @@ class(peter, a).  class(ann, b).  class(pat, a).
 ?- bagof(N, C^class(N, C), L).   % L = [peter,ann,pat]
 ```
 
-Not yet implemented: modules, DCGs, and streams and file I/O.
+A definite clause grammar is translated into ordinary clauses when it is loaded — each non-terminal
+gains the list before it and the list after it — so nothing about the engine knows that grammars
+exist. `{Goal}` escapes to a plain goal, `!` is a cut, `\+` consumes nothing, and a pushback list
+rewrites the input that the rules after it will see.
+
+```prolog
+digits([D|T]) --> digit(D), digits(T).
+digits([D])   --> digit(D).
+digit(D)      --> [D], { D >= 0'0, D =< 0'9 }.
+
+number(N)     --> digits(Ds), { number_codes(N, Ds) }.
+
+?- phrase(number(N), "427", Rest).   % N = 427, Rest = []
+```
+
+`phrase/2` and `phrase/3` walk the control constructs themselves, so a body assembled at run time
+works as well as one written as a rule. A rule asserted with `assertz/1` is translated too.
+
+Not yet implemented: modules, and streams and file I/O.
 
 One known deviation: a cut inside a goal reached through `call/1` is local to that goal and prunes nothing in the meta-call, so `call((a, !, b))` behaves as `call((a, b))` — which also means `findall(X, (goal(X), !), L)` does not stop at the first solution.
 
