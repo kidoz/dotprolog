@@ -122,7 +122,7 @@ public sealed class DynamicPredicateTests
             """
         );
 
-        Assert.Equal("permission_error(modify,static_procedure,/(fixed,1))\n", output);
+        Assert.Equal("permission_error(modify,static_procedure,fixed/1)\n", output);
     }
 
     [Fact]

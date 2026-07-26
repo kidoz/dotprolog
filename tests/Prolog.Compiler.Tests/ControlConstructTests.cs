@@ -184,6 +184,6 @@ public sealed class ControlConstructTests
             """
         );
 
-        Assert.Equal("/(/(positive,negative),zero)\n", output);
+        Assert.Equal("positive/negative/zero\n", output);
     }
 }

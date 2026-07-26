@@ -112,11 +112,11 @@ public sealed class ExceptionTests
     // write/1 is canonical until the writer learns the operator table, so a predicate indicator
     // comes out as '/(nowhere,1)' rather than 'nowhere/1'.
     [Theory]
-    [InlineData("nowhere(1)", "existence_error(procedure,/(nowhere,1))")]
+    [InlineData("nowhere(1)", "existence_error(procedure,nowhere/1)")]
     [InlineData("X is 1 // 0", "evaluation_error(zero_divisor)")]
     [InlineData("X is Y + 1", "instantiation_error")]
-    [InlineData("atom_length(x, y, z)", "existence_error(procedure,/(atom_length,3))")]
-    [InlineData("X is foo + 1", "type_error(evaluable,/(foo,0))")]
+    [InlineData("atom_length(x, y, z)", "existence_error(procedure,atom_length/3)")]
+    [InlineData("X is foo + 1", "type_error(evaluable,foo/0)")]
     [InlineData("T =.. []", "domain_error(non_empty_list,[])")]
     public void EngineErrorsAreCatchable(string goal, string expected)
     {

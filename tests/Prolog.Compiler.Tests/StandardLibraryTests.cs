@@ -4,10 +4,6 @@ namespace Prolog.Compiler.Tests;
 /// The library predicates every engine gets: text conversions, the list library, sorting, and
 /// aggregation.
 /// </summary>
-/// <remarks>
-/// Expected output is canonical, because <c>write/1</c> still is: a pair prints as <c>-(a,1)</c>
-/// rather than <c>a-1</c> until the writer learns the operator table.
-/// </remarks>
 public sealed class StandardLibraryTests
 {
     [Theory]
@@ -59,18 +55,15 @@ public sealed class StandardLibraryTests
 
     [Fact]
     public void AtomConcatEnumeratesEverySplit() =>
-        Assert.Equal(
-            "[-(,abc),-(a,bc),-(ab,c),-(abc,)]",
-            PrologTestHost.RunGoal("findall(A-B, atom_concat(A, B, abc), L), write(L)")
-        );
+        Assert.Equal("[-abc,a-bc,ab-c,abc-]", PrologTestHost.RunGoal("findall(A-B, atom_concat(A, B, abc), L), write(L)"));
 
     [Theory]
-    [InlineData("sub_atom(hello, 1, 3, A, S), write(S/A)", "/(ell,1)")]
+    [InlineData("sub_atom(hello, 1, 3, A, S), write(S/A)", "ell/1")]
     [InlineData("findall(S, sub_atom(abc, _, 2, _, S), L), write(L)", "[ab,bc]")]
     [InlineData("findall(B, sub_atom(banana, B, _, _, an), L), write(L)", "[1,3]")]
     [InlineData("findall(S, sub_atom(ab, _, _, _, S), L), write(L)", "[,a,ab,,b,]")]
     [InlineData("sub_atom(hello, 0, 2, _, S), write(S)", "he")]
-    [InlineData("sub_atom(hello, B, 2, 0, S), write(B/S)", "/(3,lo)")]
+    [InlineData("sub_atom(hello, B, 2, 0, S), write(B/S)", "3/lo")]
     public void FindsSubAtoms(string goal, string expected) => Assert.Equal(expected, PrologTestHost.RunGoal(goal));
 
     [Theory]
@@ -85,7 +78,7 @@ public sealed class StandardLibraryTests
     [InlineData("length([a, b, c], N), write(N)", "3")]
     [InlineData("length(L, 2), write(L)", "[_G2,_G9]")]
     [InlineData("append([a], [b], L), write(L)", "[a,b]")]
-    [InlineData("findall(X-Y, append(X, Y, [a, b]), L), write(L)", "[-([],[a,b]),-([a],[b]),-([a,b],[])]")]
+    [InlineData("findall(X-Y, append(X, Y, [a, b]), L), write(L)", "[[]-[a,b],[a]-[b],[a,b]-[]]")]
     [InlineData("reverse([a, b, c], L), write(L)", "[c,b,a]")]
     [InlineData("nth0(1, [a, b, c], E), write(E)", "b")]
     [InlineData("nth1(1, [a, b, c], E), write(E)", "a")]
@@ -107,7 +100,7 @@ public sealed class StandardLibraryTests
     [InlineData("list_to_set([a, b, a, c], S), write(S)", "[a,b,c]")]
     [InlineData("flatten([a, [b, [c, []]]], F), write(F)", "[a,b,c]")]
     [InlineData("findall(P, permutation([a, b], P), L), write(L)", "[[a,b],[b,a]]")]
-    [InlineData("pairs_keys_values([a-1, b-2], K, V), write(K/V)", "/([a,b],[1,2])")]
+    [InlineData("pairs_keys_values([a-1, b-2], K, V), write(K/V)", "[a,b]/[1,2]")]
     [InlineData("pairs_keys([a-1, b-2], K), write(K)", "[a,b]")]
     [InlineData("pairs_values([a-1, b-2], V), write(V)", "[1,2]")]
     public void ProvidesTheListLibrary(string goal, string expected) => Assert.Equal(expected, PrologTestHost.RunGoal(goal));
@@ -123,13 +116,13 @@ public sealed class StandardLibraryTests
     [InlineData("sort(0, @>=, [1, 2, 2, 3], L), write(L)", "[3,2,2,1]")]
     [InlineData("sort(0, @>, [1, 2, 2, 3], L), write(L)", "[3,2,1]")]
     [InlineData("sort(2, @<, [f(1, b), f(2, a)], L), write(L)", "[f(2,a),f(1,b)]")]
-    [InlineData("keysort([b-1, a-2, b-0], L), write(L)", "[-(a,2),-(b,1),-(b,0)]")]
+    [InlineData("keysort([b-1, a-2, b-0], L), write(L)", "[a-2,b-1,b-0]")]
     [InlineData("predsort(compare, [c, a, b], L), write(L)", "[a,b,c]")]
     public void Sorts(string goal, string expected) => Assert.Equal(expected, PrologTestHost.RunGoal(goal));
 
     [Fact]
     public void KeysortLeavesEqualKeysInTheirOriginalOrder() =>
-        Assert.Equal("[-(a,1),-(a,2),-(a,3)]", PrologTestHost.RunGoal("keysort([a-1, a-2, a-3], L), write(L)"));
+        Assert.Equal("[a-1,a-2,a-3]", PrologTestHost.RunGoal("keysort([a-1, a-2, a-3], L), write(L)"));
 
     [Fact]
     public void PredsortDropsElementsItsOrderCallsEqual()
@@ -152,7 +145,7 @@ public sealed class StandardLibraryTests
     [InlineData("maplist(atom, [a, b]), write(yes)", "yes")]
     [InlineData("include(integer, [a, 1, b, 2], L), write(L)", "[1,2]")]
     [InlineData("exclude(integer, [a, 1, b], L), write(L)", "[a,b]")]
-    [InlineData("partition(integer, [a, 1, b], I, E), write(I/E)", "/([1],[a,b])")]
+    [InlineData("partition(integer, [a, 1, b], I, E), write(I/E)", "[1]/[a,b]")]
     [InlineData("foldl(plus, [1, 2, 3], 0, S), write(S)", "6")]
     [InlineData("once(member(X, [a, b])), write(X)", "a")]
     [InlineData("ignore(fail), write(yes)", "yes")]

@@ -6,8 +6,8 @@ namespace Prolog.Runtime;
 /// <remarks>
 /// Every factory returns an exception carrying both a Prolog term, for <c>catch/3</c> to unify
 /// against, and a readable message for a host that lets the error escape. The two are built
-/// separately on purpose: the message uses a compact spelling that does not depend on the term
-/// writer, which is still canonical and would render <c>foo/1</c> as <c>/(foo,1)</c>.
+/// separately so that constructing an error never depends on the operator table: an error raised
+/// while the table is being changed still has to describe itself.
 /// </remarks>
 public static class PrologErrors
 {

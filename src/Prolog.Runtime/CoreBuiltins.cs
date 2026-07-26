@@ -90,6 +90,18 @@ public static class CoreBuiltins
             }
         );
 
+        registry.Register(
+            "write_canonical",
+            1,
+            static machine =>
+            {
+                TermWriter.Write(machine, machine.Argument(0), machine.Output, quoted: true, ignoreOperators: true);
+                return true;
+            }
+        );
+
+        registry.Register("write_term", 2, static machine => WriteTerm(machine, term: 0, options: 1));
+
         registry.Register("=", 2, static machine => machine.Unify(machine.Argument(0), machine.Argument(1)));
 
         registry.Register(
@@ -172,6 +184,55 @@ public static class CoreBuiltins
         FormatBuiltins.Register(registry);
         DatabaseBuiltins.Register(registry);
         ControlPredicates.Install(program);
+    }
+
+    /// <summary>
+    /// <c>write_term(+Term, +Options)</c>, supporting <c>quoted/1</c> and <c>ignore_ops/1</c>.
+    /// </summary>
+    /// <remarks>
+    /// An unrecognised option is a <c>domain_error</c> rather than something silently ignored: an
+    /// option that does nothing is worse than one that says it is not there.
+    /// </remarks>
+    private static bool WriteTerm(Machine machine, int term, int options)
+    {
+        bool quoted = false;
+        bool ignoreOperators = false;
+
+        foreach (Cell element in TermList.ReadProper(machine, machine.Argument(options)))
+        {
+            Cell option = machine.Dereference(element);
+
+            if (option.Tag == CellTag.Reference)
+            {
+                throw PrologErrors.Instantiation(machine);
+            }
+
+            if (option.Tag != CellTag.Structure || machine.Symbols.ArityOf(machine.HeapAt(option.Index).Index) != 1)
+            {
+                throw PrologErrors.Domain(machine, "write_option", option);
+            }
+
+            Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(option.Index).Index);
+            Cell value = machine.Dereference(machine.HeapAt(option.Index + 1));
+            bool enabled = value.Tag == CellTag.Atom && machine.Symbols.AtomName(value.Index) == "true";
+
+            switch (machine.Symbols.AtomName(functor.NameAtom))
+            {
+                case "quoted":
+                    quoted = enabled;
+                    break;
+
+                case "ignore_ops":
+                    ignoreOperators = enabled;
+                    break;
+
+                default:
+                    throw PrologErrors.Domain(machine, "write_option", option);
+            }
+        }
+
+        TermWriter.Write(machine, machine.Argument(term), machine.Output, quoted, ignoreOperators);
+        return true;
     }
 
     /// <summary><c>succ(?Int, ?Successor)</c> over the natural numbers, in either direction.</summary>

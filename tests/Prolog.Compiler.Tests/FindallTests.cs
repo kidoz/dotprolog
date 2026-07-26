@@ -46,7 +46,7 @@ public sealed class FindallTests
             """
         );
 
-        Assert.Equal("[-(1,2),-(1,3),-(2,3)]\n", output);
+        Assert.Equal("[1-2,1-3,2-3]\n", output);
     }
 
     [Fact]
@@ -91,7 +91,7 @@ public sealed class FindallTests
             """
         );
 
-        Assert.Equal("[-(1,[1,2]),-(2,[1,2])]\n", output);
+        Assert.Equal("[1-[1,2],2-[1,2]]\n", output);
     }
 
     [Fact]

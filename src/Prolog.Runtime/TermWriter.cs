@@ -3,46 +3,71 @@ using System.Globalization;
 namespace Prolog.Runtime;
 
 /// <summary>
-/// Renders a term to text. Traversal is iterative over an explicit work stack, so a deeply nested
-/// term cannot exhaust the CLR stack.
+/// Renders a term to text, honouring the operator table so that <c>+(1, 2)</c> is written
+/// <c>1+2</c>. Traversal is iterative over an explicit work stack, so a deeply nested term cannot
+/// exhaust the CLR stack.
 /// </summary>
 /// <remarks>
-/// Output is canonical apart from list notation: operators are written in functional form
-/// (<c>+(1, 2)</c>, not <c>1+2</c>) until the writer learns the operator table.
+/// <para>
+/// Two things decide the output. **Priority** decides brackets: a term written where an argument of
+/// priority at most <c>N</c> is expected gets brackets when its own priority exceeds <c>N</c>, which
+/// is what keeps <c>(1+2)*3</c> from being written as <c>1+2*3</c>.
+/// </para>
+/// <para>
+/// **Token separation** decides spaces. Rather than a table of which operators need spaces around
+/// them, the writer remembers the last character it wrote and inserts a space when that character
+/// and the next would otherwise lex as one token — two symbol characters, two alphanumerics, or a
+/// sign directly before a digit. That is what writes <c>1+2</c> tightly but <c>1 - -2</c> and
+/// <c>a mod b</c> apart, without listing a single operator by name.
+/// </para>
 /// </remarks>
 public static class TermWriter
 {
-    private const string SymbolCharacters = "+-*/\\^<>=~:.?@#&$";
+    internal const string SymbolCharacters = "+-*/\\^<>=~:.?@#&$";
+
+    /// <summary>The priority an argument of a compound term or a list element may have.</summary>
+    private const int ArgumentPriority = 999;
+
+    /// <summary>The priority of a whole term.</summary>
+    private const int TopPriority = 1200;
 
     /// <summary>Writes <paramref name="term"/> to <paramref name="output"/>.</summary>
     /// <param name="machine">Machine owning the heap the term lives on.</param>
     /// <param name="term">The term to write.</param>
     /// <param name="output">Destination.</param>
     /// <param name="quoted">Whether atoms are quoted so the output can be read back, as <c>writeq/1</c> does.</param>
-    public static void Write(Machine machine, Cell term, TextWriter output, bool quoted = false)
+    /// <param name="ignoreOperators">
+    /// Whether to write every compound term in functional notation, as <c>write_canonical/1</c> does.
+    /// </param>
+    public static void Write(Machine machine, Cell term, TextWriter output, bool quoted = false, bool ignoreOperators = false)
     {
         ArgumentNullException.ThrowIfNull(machine);
         ArgumentNullException.ThrowIfNull(output);
 
-        List<WriteItem> work = [new WriteItem(WriteItemKind.Term, term, null)];
+        var writer = new Emitter(output);
+        List<Item> work = [Item.OfTerm(term, TopPriority)];
 
         while (work.Count > 0)
         {
-            WriteItem item = work[^1];
+            Item item = work[^1];
             work.RemoveAt(work.Count - 1);
 
             switch (item.Kind)
             {
-                case WriteItemKind.Text:
-                    output.Write(item.Text);
+                case ItemKind.Text:
+                    writer.Write(item.Literal!);
                     break;
 
-                case WriteItemKind.ListTail:
-                    WriteListTail(machine, item.Cell, output, work);
+                case ItemKind.ListTail:
+                    WriteListTail(machine, item.Cell, work);
+                    break;
+
+                case ItemKind.PrefixGuard:
+                    writer.GuardAfterPrefixOperator(sign: item.MaxPriority != 0);
                     break;
 
                 default:
-                    WriteTerm(machine, item.Cell, output, quoted, work);
+                    WriteTerm(machine, item, output: writer, quoted, ignoreOperators, work);
                     break;
             }
         }
@@ -52,26 +77,26 @@ public static class TermWriter
     /// <param name="machine">Machine owning the heap the term lives on.</param>
     /// <param name="term">The term to render.</param>
     /// <param name="quoted">Whether atoms are quoted so the output can be read back.</param>
-    public static string ToDisplayString(Machine machine, Cell term, bool quoted = false)
+    /// <param name="ignoreOperators">Whether to write every compound term in functional notation.</param>
+    public static string ToDisplayString(Machine machine, Cell term, bool quoted = false, bool ignoreOperators = false)
     {
         using var writer = new StringWriter(CultureInfo.InvariantCulture);
-        Write(machine, term, writer, quoted);
+        Write(machine, term, writer, quoted, ignoreOperators);
         return writer.ToString();
     }
 
-    private static void WriteTerm(Machine machine, Cell cell, TextWriter output, bool quoted, List<WriteItem> work)
+    private static void WriteTerm(Machine machine, Item item, Emitter output, bool quoted, bool ignoreOperators, List<Item> work)
     {
-        cell = machine.Dereference(cell);
+        Cell cell = machine.Dereference(item.Cell);
 
         switch (cell.Tag)
         {
             case CellTag.Reference:
-                output.Write("_G");
-                output.Write(cell.Index.ToString(CultureInfo.InvariantCulture));
+                output.Write($"_G{cell.Index.ToString(CultureInfo.InvariantCulture)}");
                 return;
 
             case CellTag.Atom:
-                WriteAtom(machine.Symbols.AtomName(cell.Index), output, quoted);
+                WriteAtom(machine, cell.Index, item.MaxPriority, output, quoted, ignoreOperators);
                 return;
 
             case CellTag.Integer:
@@ -79,7 +104,7 @@ public static class TermWriter
                 return;
 
             case CellTag.Float:
-                WriteFloat(machine.Symbols.GetFloat(cell.Index), output);
+                output.Write(FloatText(machine.Symbols.GetFloat(cell.Index)));
                 return;
 
             case CellTag.Structure:
@@ -95,92 +120,197 @@ public static class TermWriter
 
         if (functorId == machine.Symbols.ListFunctor)
         {
-            output.Write('[');
-            work.Add(new WriteItem(WriteItemKind.ListTail, machine.HeapAt(cell.Index + 2), null));
-            work.Add(new WriteItem(WriteItemKind.Term, machine.HeapAt(cell.Index + 1), null));
+            output.Write("[");
+            work.Add(Item.OfListTail(machine.HeapAt(cell.Index + 2)));
+            work.Add(Item.OfTerm(machine.HeapAt(cell.Index + 1), ArgumentPriority));
             return;
         }
 
-        WriteAtom(machine.Symbols.AtomName(functor.NameAtom), output, quoted);
-        output.Write('(');
-        work.Add(new WriteItem(WriteItemKind.Text, default, ")"));
+        string name = machine.Symbols.AtomName(functor.NameAtom);
+
+        if (!ignoreOperators)
+        {
+            // {}/1 is written in its own notation, which is not an operator but is read as one shape.
+            if (functor.Arity == 1 && functor.NameAtom == machine.Symbols.Curly)
+            {
+                output.Write("{");
+                work.Add(Item.OfText("}"));
+                work.Add(Item.OfTerm(machine.HeapAt(cell.Index + 1), TopPriority));
+                return;
+            }
+
+            if (TryWriteOperator(machine, cell, functor, name, item.MaxPriority, output, quoted, work))
+            {
+                return;
+            }
+        }
+
+        WriteAtomText(name, output, quoted);
+        output.Write("(");
+        work.Add(Item.OfText(")"));
+
         for (int i = functor.Arity; i >= 1; i--)
         {
-            work.Add(new WriteItem(WriteItemKind.Term, machine.HeapAt(cell.Index + i), null));
+            work.Add(Item.OfTerm(machine.HeapAt(cell.Index + i), ArgumentPriority));
             if (i > 1)
             {
-                work.Add(new WriteItem(WriteItemKind.Text, default, ","));
+                work.Add(Item.OfText(","));
             }
         }
     }
 
-    private static void WriteListTail(Machine machine, Cell cell, TextWriter output, List<WriteItem> work)
+    /// <summary>
+    /// Writes a compound term in operator notation when its functor has a matching definition, and
+    /// reports whether it did.
+    /// </summary>
+    private static bool TryWriteOperator(
+        Machine machine,
+        Cell cell,
+        Functor functor,
+        string name,
+        int maxPriority,
+        Emitter output,
+        bool quoted,
+        List<Item> work
+    )
+    {
+        OperatorTable operators = machine.Operators;
+
+        if (functor.Arity == 2 && operators.TryGetInfixOrPostfix(name, out PrologOperator infix) && infix.IsInfix)
+        {
+            bool bracket = infix.Priority > maxPriority;
+            if (bracket)
+            {
+                output.Write("(");
+                work.Add(Item.OfText(")"));
+            }
+
+            // Pushed in reverse: right argument, then the operator, then the left.
+            work.Add(Item.OfTerm(machine.HeapAt(cell.Index + 2), infix.RightPriority));
+            work.Add(Item.OfText(OperatorText(name, quoted)));
+            work.Add(Item.OfTerm(machine.HeapAt(cell.Index + 1), infix.LeftPriority));
+            return true;
+        }
+
+        if (functor.Arity == 1 && operators.TryGetPrefix(name, out PrologOperator prefix))
+        {
+            bool bracket = prefix.Priority > maxPriority;
+            if (bracket)
+            {
+                output.Write("(");
+                work.Add(Item.OfText(")"));
+            }
+
+            work.Add(Item.OfTerm(machine.HeapAt(cell.Index + 1), prefix.RightPriority));
+            work.Add(Item.OfPrefixGuard(sign: name is "-" or "+"));
+            work.Add(Item.OfText(OperatorText(name, quoted)));
+            return true;
+        }
+
+        if (functor.Arity == 1 && operators.TryGetInfixOrPostfix(name, out PrologOperator postfix) && postfix.IsPostfix)
+        {
+            bool bracket = postfix.Priority > maxPriority;
+            if (bracket)
+            {
+                output.Write("(");
+                work.Add(Item.OfText(")"));
+            }
+
+            work.Add(Item.OfText(OperatorText(name, quoted)));
+            work.Add(Item.OfTerm(machine.HeapAt(cell.Index + 1), postfix.LeftPriority));
+            return true;
+        }
+
+        return false;
+    }
+
+    private static void WriteListTail(Machine machine, Cell cell, List<Item> work)
     {
         cell = machine.Dereference(cell);
 
         if (cell.Tag == CellTag.Atom && cell.Index == machine.Symbols.EmptyList)
         {
-            output.Write(']');
+            work.Add(Item.OfText("]"));
             return;
         }
 
         if (cell.Tag == CellTag.Structure && machine.HeapAt(cell.Index).Index == machine.Symbols.ListFunctor)
         {
-            output.Write(',');
-            work.Add(new WriteItem(WriteItemKind.ListTail, machine.HeapAt(cell.Index + 2), null));
-            work.Add(new WriteItem(WriteItemKind.Term, machine.HeapAt(cell.Index + 1), null));
+            work.Add(Item.OfListTail(machine.HeapAt(cell.Index + 2)));
+            work.Add(Item.OfTerm(machine.HeapAt(cell.Index + 1), ArgumentPriority));
+            work.Add(Item.OfText(","));
             return;
         }
 
-        output.Write('|');
-        work.Add(new WriteItem(WriteItemKind.Text, default, "]"));
-        work.Add(new WriteItem(WriteItemKind.Term, cell, null));
+        work.Add(Item.OfText("]"));
+        work.Add(Item.OfTerm(cell, ArgumentPriority));
+        work.Add(Item.OfText("|"));
     }
 
-    private static void WriteFloat(double value, TextWriter output)
+    /// <summary>
+    /// Writes an atom, bracketing it when it is an operator whose priority exceeds what the position
+    /// allows — which is what makes <c>f((:-))</c> read back as the atom rather than as a syntax error.
+    /// </summary>
+    private static void WriteAtom(Machine machine, int atomId, int maxPriority, Emitter output, bool quoted, bool ignoreOperators)
+    {
+        string name = machine.Symbols.AtomName(atomId);
+
+        if (!ignoreOperators && machine.Operators.MaxPriority(name) > maxPriority)
+        {
+            output.Write("(");
+            WriteAtomText(name, output, quoted);
+            output.Write(")");
+            return;
+        }
+
+        WriteAtomText(name, output, quoted);
+    }
+
+    private static string FloatText(double value)
     {
         string text = value.ToString("R", CultureInfo.InvariantCulture);
-        output.Write(text);
 
         // A Prolog float must be readable back as a float, so it always carries a decimal point.
-        if (!text.Contains('.', StringComparison.Ordinal) && !text.Contains('e', StringComparison.OrdinalIgnoreCase))
-        {
-            output.Write(".0");
-        }
+        return text.Contains('.', StringComparison.Ordinal) || text.Contains('e', StringComparison.OrdinalIgnoreCase)
+            ? text
+            : text + ".0";
     }
 
-    private static void WriteAtom(string name, TextWriter output, bool quoted)
+    /// <summary>
+    /// An operator's name as it appears between or before its arguments.
+    /// </summary>
+    /// <remarks>
+    /// The comma is the exception to quoting. As an atom it needs quotes — <c>f(',')</c> is the only
+    /// way to pass it as an argument — but as an operator it must be bare, because <c>a','b</c> does
+    /// not read back as a conjunction while <c>a,b</c> does.
+    /// </remarks>
+    private static string OperatorText(string name, bool quoted) => name == "," ? "," : QuotedAtomText(name, quoted);
+
+    private static void WriteAtomText(string name, Emitter output, bool quoted) => output.Write(QuotedAtomText(name, quoted));
+
+    private static string QuotedAtomText(string name, bool quoted)
     {
         if (!quoted || !NeedsQuotes(name))
         {
-            output.Write(name);
-            return;
+            return name;
         }
 
-        output.Write('\'');
+        var quotedText = new System.Text.StringBuilder(name.Length + 2);
+        quotedText.Append('\'');
+
         foreach (char c in name)
         {
-            switch (c)
+            _ = c switch
             {
-                case '\'':
-                    output.Write("\\'");
-                    break;
-                case '\\':
-                    output.Write("\\\\");
-                    break;
-                case '\n':
-                    output.Write("\\n");
-                    break;
-                case '\t':
-                    output.Write("\\t");
-                    break;
-                default:
-                    output.Write(c);
-                    break;
-            }
+                '\'' => quotedText.Append("\\'"),
+                '\\' => quotedText.Append("\\\\"),
+                '\n' => quotedText.Append("\\n"),
+                '\t' => quotedText.Append("\\t"),
+                _ => quotedText.Append(c),
+            };
         }
 
-        output.Write('\'');
+        return quotedText.Append('\'').ToString();
     }
 
     private static bool NeedsQuotes(string name)
@@ -219,12 +349,101 @@ public static class TermWriter
         return false;
     }
 
-    private enum WriteItemKind
+    /// <summary>
+    /// Writes text while keeping adjacent tokens apart.
+    /// </summary>
+    /// <remarks>
+    /// The whole rule is here: a space goes in whenever the character just written and the one about
+    /// to be written would lex as a single token. Without it <c>1 - -2</c> would be written
+    /// <c>1--2</c>, which reads back as <c>1</c> and the operator <c>--</c>, and <c>a mod b</c> would
+    /// become <c>amodb</c>.
+    /// </remarks>
+    private sealed class Emitter(TextWriter output)
+    {
+        private char _last;
+        private bool _afterPrefix;
+        private bool _afterSign;
+
+        internal void Write(string text)
+        {
+            if (text.Length == 0)
+            {
+                return;
+            }
+
+            if (NeedsSeparator(_last, text[0]) || NeedsPrefixSeparator(text[0]))
+            {
+                output.Write(' ');
+            }
+
+            _afterPrefix = false;
+            _afterSign = false;
+            output.Write(text);
+            _last = text[^1];
+        }
+
+        /// <summary>
+        /// Says that what comes next is the argument of a prefix operator, which the characters
+        /// alone cannot tell from an infix one.
+        /// </summary>
+        /// <param name="sign">Whether the operator was <c>-</c> or <c>+</c>.</param>
+        /// <remarks>
+        /// Two things go wrong without this. An operator directly followed by <c>(</c> reads as
+        /// functor notation, so <c>\+(a,b)</c> is the binary term rather than negation applied to a
+        /// conjunction. And a sign directly followed by a digit reads as a negative number, so
+        /// <c>-(1)</c> written as <c>-1</c> comes back as the integer.
+        /// </remarks>
+        internal void GuardAfterPrefixOperator(bool sign)
+        {
+            _afterPrefix = true;
+            _afterSign = sign;
+        }
+
+        private bool NeedsPrefixSeparator(char next) => (_afterPrefix && next == '(') || (_afterSign && char.IsAsciiDigit(next));
+
+        private static bool NeedsSeparator(char last, char next)
+        {
+            if (last == '\0')
+            {
+                return false;
+            }
+
+            if (IsSymbol(last) && IsSymbol(next))
+            {
+                return true;
+            }
+
+            if (IsAlphanumeric(last) && IsAlphanumeric(next))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsSymbol(char c) => SymbolCharacters.Contains(c, StringComparison.Ordinal);
+
+        private static bool IsAlphanumeric(char c) => c == '_' || char.IsLetterOrDigit(c);
+    }
+
+    private enum ItemKind
     {
         Term,
         Text,
         ListTail,
+        PrefixGuard,
     }
 
-    private readonly record struct WriteItem(WriteItemKind Kind, Cell Cell, string? Text);
+    private readonly record struct Item(ItemKind Kind, Cell Cell, string? Literal, int MaxPriority)
+    {
+        internal static Item OfTerm(Cell cell, int maxPriority) => new(ItemKind.Term, cell, null, maxPriority);
+
+        internal static Item OfText(string text) => new(ItemKind.Text, default, text, 0);
+
+        internal static Item OfListTail(Cell cell) => new(ItemKind.ListTail, cell, null, 0);
+
+        /// <summary>A marker between a prefix operator and its argument. <c>MaxPriority</c> carries
+        /// whether the operator was a sign, which is the only extra bit the marker needs.</summary>
+        internal static Item OfPrefixGuard(bool sign) => new(ItemKind.PrefixGuard, default, null, sign ? 1 : 0);
+    }
 }

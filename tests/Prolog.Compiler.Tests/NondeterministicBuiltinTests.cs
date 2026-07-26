@@ -85,7 +85,11 @@ public sealed class NondeterministicBuiltinTests
     [Fact]
     public void ClauseMatchesARuleBody()
     {
-        Assert.Equal(">(_G", PrologTestHost.RunGoal("assertz((big(N) :- N > 5)), clause(big(_), B), write(B)")[..4]);
+        Assert.EndsWith(
+            ">5",
+            PrologTestHost.RunGoal("assertz((big(N) :- N > 5)), clause(big(_), B), write(B)"),
+            StringComparison.Ordinal
+        );
     }
 
     [Fact]
@@ -106,7 +110,7 @@ public sealed class NondeterministicBuiltinTests
     public void NestedNondeterministicBuiltinsEnumerateThePairs()
     {
         Assert.Equal(
-            "[-(1,1),-(1,2),-(2,1),-(2,2)]\n",
+            "[1-1,1-2,2-1,2-2]\n",
             PrologTestHost.RunGoal("findall(X-Y, (between(1, 2, X), between(1, 2, Y)), L), write(L), nl")
         );
     }
