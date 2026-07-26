@@ -1,0 +1,15 @@
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+
+# IDE state — also a forbidden generated path for the standards validator
+.idea/
+
+# Python tooling artifacts under .agents/tools
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
