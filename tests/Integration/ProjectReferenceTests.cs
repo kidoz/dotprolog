@@ -166,12 +166,12 @@ public sealed class ProjectReferenceTests
         (int listExit, string listLog) = await Run("dotnet", ["run", "--project", project, "--no-build", "--", "--list-tests"]);
         Assert.True(listExit == 0, $"Listing tests failed:\n{listLog}");
         Assert.Contains("test_discount_reduces_price", listLog, StringComparison.Ordinal);
-        Assert.Contains("found 4 test(s)", listLog, StringComparison.Ordinal);
+        Assert.Contains("found 7 test(s)", listLog, StringComparison.Ordinal);
 
         (int runExit, string runLog) = await Run("dotnet", ["run", "--project", project, "--no-build"]);
 
         Assert.True(runExit == 0, $"Running the tests failed:\n{runLog}");
-        Assert.Contains("succeeded: 4", runLog, StringComparison.Ordinal);
+        Assert.Contains("succeeded: 7", runLog, StringComparison.Ordinal);
         Assert.Contains("failed: 0", runLog, StringComparison.Ordinal);
     }
 
