@@ -208,7 +208,8 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 | Higher order | `maplist/2..5`, `foldl/4,5`, `include/3`, `exclude/3`, `partition/4` |
 | Sorting | `sort/2`, `sort/4`, `msort/2`, `keysort/2`, `predsort/3` |
 | Integers | `succ/2`, `plus/3` |
-| Output | `write/1`, `writeq/1`, `print/1`, `writeln/1`, `nl/0`, `format/1,2,3`, `tab/1` |
+| Output | `write/1`, `writeq/1`, `print/1`, `writeln/1`, `write_canonical/1`, `write_term/2`, `nl/0`, `format/1,2,3`, `tab/1` |
+| Operators | `op/3`, `current_op/3` |
 | Directives | `:- Goal`, `:- initialization(Goal)`, `halt/0`, `halt/1` |
 
 Control constructs are compiled in place inside a clause body, so cut scopes the way ISO specifies: opaque in the condition of if-then-else, transparent in its branches, clause-scoped elsewhere. A bootstrap library written in Prolog makes the same constructs reachable when a goal is assembled at run time and passed to `call/1`.
@@ -237,6 +238,23 @@ total(Rows, Total) :- aggregate_all(sum(Q), member(_-Q, Rows), Total).
 initials(Name, Initial) :- sub_atom(Name, 0, 1, _, Initial).
 ```
 
+Terms are written in operator notation, and what `writeq/1` produces reads back as the same term —
+brackets and spacing are decided by priority and by whether two adjacent tokens would otherwise lex
+as one. `write_canonical/1` and `write_term/2` with `ignore_ops(true)` opt out.
+
+```prolog
+:- op(700, xfx, likes).
+
+fact(alice likes bob).      % read with the operator declared just above
+
+?- fact(F), write(F).       % alice likes bob
+?- write_canonical(1+2*3).  % +(1,*(2,3))
+```
+
+An `:- op/3` directive takes effect while the file is still being read, so the file that declares an
+operator can use it. The reader and the writer share one table per engine, so nothing leaks between
+two engines in the same process.
+
 Predicates written in Prolog rather than C# live in a standard library that every engine loads at
 construction, which costs about 190 µs. A consulted file that defines one of them replaces it
 outright, so a program is free to write its own `member/2` without inheriting extra solutions.
@@ -245,11 +263,9 @@ There is no string type: an atom is the only text term. The SWI-Prolog string pr
 rather than aliased to their atom counterparts, because aliasing would let portable code compile
 here and then behave differently.
 
-Not yet implemented: modules, DCGs, streams and file I/O, `bagof/3`, `setof/3`, `op/3`, and
-user-defined operators.
+Not yet implemented: modules, DCGs, streams and file I/O, `bagof/3`, and `setof/3`.
 
-Two known deviations. `write/1` is canonical apart from list notation, so `1+2` prints as `+(1,2)`
-until the writer learns the operator table. And a cut inside a goal reached through `call/1` is local to that goal and prunes nothing in the meta-call, so `call((a, !, b))` behaves as `call((a, b))` — which also means `findall(X, (goal(X), !), L)` does not stop at the first solution.
+One known deviation: a cut inside a goal reached through `call/1` is local to that goal and prunes nothing in the meta-call, so `call((a, !, b))` behaves as `call((a, b))` — which also means `findall(X, (goal(X), !), L)` does not stop at the first solution.
 
 DotProlog does not claim ISO or SWI-Prolog compatibility. It will not claim it until published conformance tests verify it.
 
