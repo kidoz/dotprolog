@@ -1,4 +1,4 @@
-namespace Prolog.Syntax;
+namespace Prolog.Runtime;
 
 /// <summary>
 /// The operator definitions in force while reading. A table starts from the ISO default set and can

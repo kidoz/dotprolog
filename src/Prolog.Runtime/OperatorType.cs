@@ -1,4 +1,4 @@
-namespace Prolog.Syntax;
+namespace Prolog.Runtime;
 
 /// <summary>The ISO operator specifiers.</summary>
 public enum OperatorType

@@ -1,3 +1,5 @@
+using Prolog.Runtime;
+
 namespace Prolog.Syntax;
 
 /// <summary>

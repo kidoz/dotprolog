@@ -1,4 +1,4 @@
-namespace Prolog.Syntax;
+namespace Prolog.Runtime;
 
 /// <summary>A single operator definition, as installed by <c>op/3</c>.</summary>
 /// <param name="Priority">Priority in 1..1200; lower binds tighter.</param>

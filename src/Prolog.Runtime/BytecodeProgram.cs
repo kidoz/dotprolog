@@ -54,6 +54,12 @@ public sealed class BytecodeProgram
     /// <summary>The native predicates this program may call.</summary>
     public BuiltinRegistry Builtins { get; }
 
+    /// <summary>
+    /// The operators in force. Reading and writing share one table, so an <c>op/3</c> run at any
+    /// point changes how later text is both parsed and printed.
+    /// </summary>
+    public OperatorTable Operators { get; } = new();
+
     /// <summary>Number of instruction words emitted so far; also the address of the next emit.</summary>
     public int CodeLength { get; private set; }
 

@@ -79,6 +79,9 @@ public sealed class Machine
     /// <summary>The program's symbol table.</summary>
     public SymbolTable Symbols => _symbols;
 
+    /// <summary>The operators in force, which the term writer reads and <c>op/3</c> changes.</summary>
+    public OperatorTable Operators => _program.Operators;
+
     /// <summary>Proves the goal <c>name/arity</c>, which must be a defined predicate taking no arguments.</summary>
     /// <exception cref="PrologException">The predicate is not defined.</exception>
     public RunResult Solve(int functorId)
