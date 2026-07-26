@@ -25,14 +25,18 @@ public sealed class PrologEngine : IRuntimeCompiler
         Machine = new Machine(Program);
         Program.RuntimeCompiler = this;
 
-        LoadResult bootstrap = new ProgramLoader(Program, Machine).Load(
-            ReadOrThrow(BootstrapLibrary.Source, "bootstrap"),
-            "bootstrap"
-        );
+        LoadLibrary(BootstrapLibrary.Source, "bootstrap");
+        LoadLibrary(StandardLibrary.Source, "library");
+    }
 
-        if (!bootstrap.Success)
+    /// <summary>Compiles one of the built-in libraries, which must not fail.</summary>
+    private void LoadLibrary(string source, string name)
+    {
+        LoadResult loaded = new ProgramLoader(Program, Machine).Load(ReadOrThrow(source, name), name);
+
+        if (!loaded.Success)
         {
-            throw new PrologException($"The bootstrap library failed to compile: {string.Join("; ", bootstrap.Diagnostics)}");
+            throw new PrologException($"The {name} library failed to compile: {string.Join("; ", loaded.Diagnostics)}");
         }
     }
 
