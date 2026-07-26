@@ -14,4 +14,10 @@ public static class CompilerDiagnosticIds
 
     /// <summary>A predicate or compound term exceeds the maximum supported arity.</summary>
     public const string ArityTooLarge = "DPL1004";
+
+    /// <summary>A <c>:- dynamic</c> declaration names something other than a predicate indicator.</summary>
+    public const string InvalidDynamicDeclaration = "DPL1005";
+
+    /// <summary>A <c>:- dynamic</c> declaration was read by a loader with no machine to load into.</summary>
+    public const string DynamicNotAvailable = "DPL1006";
 }

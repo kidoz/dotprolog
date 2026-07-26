@@ -67,6 +67,11 @@ public sealed class OperatorTable
         Define(1200, OperatorType.Xfx, "-->");
         Define(1200, OperatorType.Fx, ":-");
         Define(1200, OperatorType.Fx, "?-");
+        foreach (string name in (string[])["dynamic", "discontiguous", "initialization", "module", "use_module"])
+        {
+            Define(1150, OperatorType.Fx, name);
+        }
+
         Define(1100, OperatorType.Xfy, ";");
         Define(1100, OperatorType.Xfy, "|");
         Define(1050, OperatorType.Xfy, "->");
