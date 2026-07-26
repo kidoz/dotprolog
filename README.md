@@ -90,7 +90,20 @@ foreach (var b in pricing.Bundle(["widget", "gadget"])) { /* streamed */ }
 
 The facade is generated during the build, before the C# compiler runs. Nothing in the consuming code
 mentions the engine, a goal, or a term — which is why the same reference works from F# and VB with no
-extra work.
+extra work. That is checked rather than assumed: `samples/PricingFSharp` and
+`samples/PricingVisualBasic` consume the same `.dplproj`, and the integration test builds and runs all
+three.
+
+The generated surface follows Microsoft's [F# component design
+guidelines](https://learn.microsoft.com/en-us/dotnet/fsharp/style-guide/component-design-guidelines)
+for "vanilla .NET" libraries: the `TryGetValue` pattern for `semidet` predicates with outputs, a named
+record rather than a tuple for several outputs, collection interfaces rather than concrete types, null
+checks at the boundary, and a `CancellationToken` on anything that streams. A predicate whose name
+reads poorly in C# can be renamed in the contract, the equivalent of F#'s `[<CompiledName>]`:
+
+```prolog
+:- clr_export(nrev/2, det, [in(l, list(atom)), out(r, list(atom))], 'NaiveReverse').
+```
 
 ```console
 $ dotnet run --project samples/PricingConsole
@@ -118,7 +131,8 @@ bundles of [widget, gadget]:
 | `tests/` | Unit tests per component, plus end-to-end execution tests |
 | `benchmarks/` | BenchmarkDotNet suite for the reader, compiler, and engine |
 | `samples/HelloProlog` | The Hello World sample |
-| `samples/PricingRules`, `samples/PricingConsole` | A `.dplproj` and the C# app that references it |
+| `samples/PricingRules` | A `.dplproj`: Prolog rules plus their `.dpli` contract |
+| `samples/PricingConsole`, `samples/PricingFSharp`, `samples/PricingVisualBasic` | C#, F#, and VB apps referencing it |
 | `samples/AotAcceptance` | The NativeAOT acceptance sample |
 
 ## Common tasks
