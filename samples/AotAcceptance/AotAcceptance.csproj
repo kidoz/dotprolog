@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <RootNamespace>AotAcceptance</RootNamespace>
+        <IsPackable>false</IsPackable>
+
+        <!-- The point of this sample: prove the runtime-consult path survives NativeAOT. -->
+        <PublishAot>true</PublishAot>
+        <InvariantGlobalization>true</InvariantGlobalization>
+        <TrimMode>full</TrimMode>
+
+        <!-- Any trimming or AOT warning is an acceptance failure, not advice. -->
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+        <EnableAotAnalyzer>true</EnableAotAnalyzer>
+        <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\Prolog.Compiler\Prolog.Compiler.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="acceptance.pl" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+</Project>

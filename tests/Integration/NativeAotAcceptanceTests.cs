@@ -1,0 +1,104 @@
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+
+namespace Integration.Tests;
+
+/// <summary>
+/// The NativeAOT acceptance check from the product scope, run end to end: publish the sample as a
+/// native executable, confirm the build raised no trimming or AOT warnings, then run the binary and
+/// check it consulted a Prolog file, enumerated solutions, and changed its clause database.
+/// </summary>
+/// <remarks>
+/// Publishing takes tens of seconds and needs a native toolchain, so this is opt-in. Set
+/// <c>DOTPROLOG_RUN_AOT_TESTS=1</c> to run it; CI does.
+/// </remarks>
+public sealed class NativeAotAcceptanceTests
+{
+    private const string OptInVariable = "DOTPROLOG_RUN_AOT_TESTS";
+
+    [Fact]
+    public async Task PublishedExecutableConsultsAndUpdatesAtRunTime()
+    {
+        Assert.SkipUnless(
+            Environment.GetEnvironmentVariable(OptInVariable) == "1",
+            $"Set {OptInVariable}=1 to run the NativeAOT acceptance test."
+        );
+
+        string output = Path.Combine(Path.GetTempPath(), $"dotprolog-aot-{Environment.ProcessId}");
+        Directory.CreateDirectory(output);
+
+        try
+        {
+            (int exitCode, string log) = await RunAsync(
+                "dotnet",
+                [
+                    "publish",
+                    Path.Combine(RepositoryLayout.Root, "samples", "AotAcceptance", "AotAcceptance.csproj"),
+                    "-c",
+                    "Release",
+                    "-r",
+                    RuntimeInformation.RuntimeIdentifier,
+                    "-p:PublishAot=true",
+                    "-o",
+                    output,
+                    "--nologo",
+                ],
+                RepositoryLayout.Root
+            );
+
+            Assert.True(exitCode == 0, $"Publish failed:\n{log}");
+
+            // The scope requires no unresolved trimming or AOT warnings, not merely a successful build.
+            Assert.DoesNotContain("warning IL", log, StringComparison.Ordinal);
+            Assert.DoesNotContain("AOT analysis", log, StringComparison.Ordinal);
+
+            string executable = Path.Combine(output, OperatingSystem.IsWindows() ? "AotAcceptance.exe" : "AotAcceptance");
+            Assert.True(File.Exists(executable), $"No published executable at {executable}.");
+
+            // No managed assemblies should ship beside it; only the native image and debug artefacts.
+            Assert.Empty(Directory.GetFiles(output, "*.dll"));
+
+            (int runExit, string runLog) = await RunAsync(executable, [], output);
+
+            Assert.True(runExit == 0, $"Published executable failed:\n{runLog}");
+            Assert.Equal(
+                [
+                    "Hello from NativeAOT!",
+                    "colours(3)",
+                    "[red,green,blue]",
+                    "[first,second,third]",
+                    "[first,third]",
+                    "caught",
+                    "done",
+                ],
+                runLog.ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            );
+        }
+        finally
+        {
+            Directory.Delete(output, recursive: true);
+        }
+    }
+
+    private static async Task<(int ExitCode, string Log)> RunAsync(string fileName, string[] arguments, string workingDirectory)
+    {
+        var start = new ProcessStartInfo(fileName)
+        {
+            WorkingDirectory = workingDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+
+        foreach (string argument in arguments)
+        {
+            start.ArgumentList.Add(argument);
+        }
+
+        using Process process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {fileName}.");
+        Task<string> standardOutput = process.StandardOutput.ReadToEndAsync();
+        Task<string> standardError = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+
+        return (process.ExitCode, await standardOutput + await standardError);
+    }
+}

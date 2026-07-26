@@ -35,6 +35,8 @@ dotnet_diagnostic.CA1028.severity = none
 # Test methods are discovered by the runner, and xUnit theory data is often duplicated by design.
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA1515.severity = none
+# CA2007 is a library rule, and it contradicts xUnit1030: xUnit needs its synchronization context.
+dotnet_diagnostic.CA2007.severity = none
 
 [benchmarks/**.cs]
 # BenchmarkDotNet requires public benchmark classes and settable [Params] properties.

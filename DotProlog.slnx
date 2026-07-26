@@ -6,9 +6,13 @@
         <Project Path="src/Prolog.Syntax/Prolog.Syntax.csproj" />
     </Folder>
     <Folder Name="/tests/">
+        <Project Path="tests/Integration/Integration.Tests.csproj" />
         <Project Path="tests/Prolog.Compiler.Tests/Prolog.Compiler.Tests.csproj" />
         <Project Path="tests/Prolog.Runtime.Tests/Prolog.Runtime.Tests.csproj" />
         <Project Path="tests/Prolog.Syntax.Tests/Prolog.Syntax.Tests.csproj" />
+    </Folder>
+    <Folder Name="/samples/">
+        <Project Path="samples/AotAcceptance/AotAcceptance.csproj" />
     </Folder>
     <Folder Name="/benchmarks/">
         <Project Path="benchmarks/Prolog.Benchmarks/Prolog.Benchmarks.csproj" />
