@@ -104,6 +104,40 @@ public sealed class Machine
     }
 
     /// <summary>
+    /// Clears the machine so that argument terms can be built for a following <see cref="Call"/>.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Run"/> resets the machine itself, which wipes the heap — so a host cannot build
+    /// arguments and then run. Calling a predicate is therefore three steps: reset here, build the
+    /// arguments with <see cref="CreateVariable"/> and friends, then <see cref="Call"/>.
+    /// </remarks>
+    public void BeginCall() => ResetState();
+
+    /// <summary>
+    /// Calls <paramref name="functorId"/> with arguments already built on the heap since
+    /// <see cref="BeginCall"/>. Further solutions come from <see cref="Redo"/>.
+    /// </summary>
+    /// <exception cref="PrologException">The predicate is not defined, or a ball went uncaught.</exception>
+    public RunResult Call(int functorId, ReadOnlySpan<Cell> arguments)
+    {
+        if (arguments.Length >= ArgumentRegisterCount)
+        {
+            throw PrologErrors.Representation(this, "max_arity");
+        }
+
+        for (int i = 0; i < arguments.Length; i++)
+        {
+            _x[i] = arguments[i];
+        }
+
+        _argumentCount = arguments.Length;
+        _continuation = BytecodeProgram.TopLevelReturnAddress;
+        _b0 = 0;
+        _pc = EntryPointOf(functorId);
+        return Dispatch();
+    }
+
+    /// <summary>
     /// Asks the goal proved by the last <see cref="Run"/> or <see cref="Redo"/> for another solution.
     /// </summary>
     /// <remarks>
