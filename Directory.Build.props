@@ -1,5 +1,11 @@
 <Project>
     <PropertyGroup>
+        <Authors>Aleksandr Pavlov</Authors>
+        <Copyright>Copyright (c) 2026 Aleksandr Pavlov</Copyright>
+        <Product>DotProlog</Product>
+    </PropertyGroup>
+
+    <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <LangVersion>14.0</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
