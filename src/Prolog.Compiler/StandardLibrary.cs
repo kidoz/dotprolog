@@ -236,6 +236,87 @@ internal static class StandardLibrary
         '$predmerge_step'('>', A, As, B, Bs, P, [B|R]) :- '$predmerge'([A|As], Bs, P, R).
         '$predmerge_step'('=', A, As, _, Bs, P, [A|R]) :- '$predmerge'(As, Bs, P, R).
 
+        % --- bagof/3 and setof/3 ---------------------------------------------------
+        % Unlike findall/3 these fail when the goal has no solutions, and they group
+        % the solutions by the goal's free variables, offering one group per binding
+        % of those variables on backtracking.
+
+        % V^Goal called directly is just Goal; the qualifier only means something to
+        % the free-variable walk below.
+        ^(_, Goal) :- call(Goal).
+
+        bagof(Template, Goal, Bag) :-
+            term_variables(Template, Bound),
+            '$free_variables'(Goal, Bound, [], Reversed),
+            reverse(Reversed, Witness),
+            '$bagof'(Witness, Template, Goal, Bag).
+
+        setof(Template, Goal, Set) :-
+            bagof(Template, Goal, Bag),
+            sort(Bag, Set).
+
+        % With nothing free, there is one group and no binding to report.
+        '$bagof'([], Template, Goal, Bag) :-
+            !,
+            findall(Template, Goal, Bag),
+            Bag \== [].
+
+        % Otherwise each solution is collected under its witness, and keysort brings
+        % equal witnesses together so that one pass can group them.
+        '$bagof'(Witness, Template, Goal, Bag) :-
+            findall(Witness-Template, Goal, Pairs),
+            Pairs \== [],
+            keysort(Pairs, Sorted),
+            '$group_pairs'(Sorted, Groups),
+            member(Witness-Bag, Groups).
+
+        '$group_pairs'([], []).
+        '$group_pairs'([K-V|T], [K-[V|Vs]|Groups]) :-
+            '$same_key'(K, T, Vs, Rest),
+            '$group_pairs'(Rest, Groups).
+
+        '$same_key'(K, [K1-V|T], Vs, Rest) :-
+            K == K1,
+            !,
+            Vs = [V|Vs1],
+            '$same_key'(K, T, Vs1, Rest).
+        '$same_key'(_, Rest, [], Rest).
+
+        % The free variables of a goal are those a solution can bind and the caller
+        % can therefore see grouped. Control constructs are walked into so that a
+        % variable's position inside one is what decides. A variable occurring only
+        % under \+ is not free: negation proves a goal, it never binds anything.
+        '$free_variables'(Goal, _, Free, Free) :- var(Goal), !.
+        '$free_variables'(Quantified^Goal, Bound, Free0, Free) :-
+            !,
+            term_variables(Quantified, Vars),
+            append(Vars, Bound, Bound1),
+            '$free_variables'(Goal, Bound1, Free0, Free).
+        '$free_variables'(\+ _, _, Free, Free) :- !.
+        '$free_variables'((A, B), Bound, Free0, Free) :-
+            !,
+            '$free_variables'(A, Bound, Free0, Free1),
+            '$free_variables'(B, Bound, Free1, Free).
+        '$free_variables'((A ; B), Bound, Free0, Free) :-
+            !,
+            '$free_variables'(A, Bound, Free0, Free1),
+            '$free_variables'(B, Bound, Free1, Free).
+        '$free_variables'((A -> B), Bound, Free0, Free) :-
+            !,
+            '$free_variables'(A, Bound, Free0, Free1),
+            '$free_variables'(B, Bound, Free1, Free).
+        '$free_variables'(Goal, Bound, Free0, Free) :-
+            term_variables(Goal, Vars),
+            '$add_free'(Vars, Bound, Free0, Free).
+
+        '$add_free'([], _, Free, Free).
+        '$add_free'([V|Vs], Bound, Free0, Free) :-
+            (   '$memberchk_eq'(V, Bound) -> Free1 = Free0
+            ;   '$memberchk_eq'(V, Free0) -> Free1 = Free0
+            ;   Free1 = [V|Free0]
+            ),
+            '$add_free'(Vs, Bound, Free1, Free).
+
         % --- Aggregation -----------------------------------------------------------
 
         aggregate_all(count, Goal, Count) :-
