@@ -109,6 +109,37 @@ public sealed class ProjectReferenceTests
         );
     }
 
+    [Fact]
+    public async Task APrologProjectCanBeAnApplicationRatherThanALibrary()
+    {
+        // A .dplproj with OutputType Exe gets a generated entry point that runs its goals, so Prolog
+        // is a language you can write a program in and not only a library other languages call.
+        Assert.SkipUnless(
+            Environment.GetEnvironmentVariable(OptInVariable) == "1",
+            $"Set {OptInVariable}=1 to run the toolchain integration tests."
+        );
+
+        string project = Path.Combine(RepositoryLayout.Root, "samples", "GreetingApp");
+
+        (int taskExit, string taskLog) = await Run(
+            "dotnet",
+            ["build", Path.Combine(RepositoryLayout.Root, "src", "Prolog.Build.Tasks"), "--nologo"]
+        );
+
+        Assert.True(taskExit == 0, $"Building the task failed:\n{taskLog}");
+
+        (int buildExit, string buildLog) = await Run("dotnet", ["build", project, "--nologo"]);
+        Assert.True(buildExit == 0, $"Building GreetingApp failed:\n{buildLog}");
+
+        (int runExit, string output) = await Run("dotnet", ["run", "--project", project, "--no-build"]);
+        Assert.True(runExit == 0, $"Running GreetingApp failed:\n{output}");
+
+        Assert.Equal(
+            ["Hello, world!", "Hello, prolog!", "Hello, dotnet!"],
+            output.ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
+        );
+    }
+
     private static async Task<(int ExitCode, string Log)> Run(string fileName, string[] arguments)
     {
         var start = new ProcessStartInfo(fileName)

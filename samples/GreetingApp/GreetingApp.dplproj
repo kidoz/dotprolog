@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- A published SDK would be `<Sdk Name="DotProlog.Sdk" />`; imported by path inside this repo. -->
+    <Import Project="..\..\src\DotProlog.Sdk\Sdk\Sdk.props" />
+
+    <PropertyGroup>
+        <!-- Exe is what makes the SDK generate an entry point that runs the program's goals. -->
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <RootNamespace>GreetingApp</RootNamespace>
+        <IsPackable>false</IsPackable>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
+        <DotPrologTasksAssembly>$(MSBuildThisFileDirectory)..\..\src\Prolog.Build.Tasks\bin\$(Configuration)\net10.0\Prolog.Build.Tasks.dll</DotPrologTasksAssembly>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\Prolog.Compiler\Prolog.Compiler.csproj" />
+        <ProjectReference Include="..\..\src\Prolog.Build.Tasks\Prolog.Build.Tasks.csproj" ReferenceOutputAssembly="false" />
+    </ItemGroup>
+
+    <Import Project="..\..\src\DotProlog.Sdk\Sdk\Sdk.targets" />
+
+</Project>
