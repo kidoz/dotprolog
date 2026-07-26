@@ -30,7 +30,7 @@ internal static class TermBuiltins
             static machine => machine.Argument(0).Tag is CellTag.Atom or CellTag.Integer or CellTag.Float
         );
         registry.Register("callable", 1, static machine => machine.Argument(0).Tag is CellTag.Atom or CellTag.Structure);
-        registry.Register("is_list", 1, static machine => IsProperList(machine, machine.Argument(0)));
+        registry.Register("is_list", 1, static machine => TermList.IsProper(machine, machine.Argument(0)));
         registry.Register("ground", 1, static machine => IsGround(machine, machine.Argument(0)));
     }
 
@@ -66,9 +66,68 @@ internal static class TermBuiltins
     {
         registry.Register("functor", 3, Functor3);
         registry.Register("arg", 3, Arg3);
+        registry.Register("copy_term", 2, CopyTerm);
+        registry.Register("term_variables", 2, TermVariables);
 
         int emptyList = symbols.EmptyList;
         registry.Register("=..", 2, machine => Univ(machine, emptyList));
+    }
+
+    /// <summary>
+    /// <c>copy_term(+Term, -Copy)</c>: the same term with every variable renamed apart.
+    /// </summary>
+    /// <remarks>
+    /// The copy goes out through a <see cref="TermBuffer"/> and straight back onto the heap, which is
+    /// the same machinery <c>findall/3</c> uses to carry a solution across backtracking. Sharing it
+    /// means the two agree about what copying a term means.
+    /// </remarks>
+    private static bool CopyTerm(Machine machine)
+    {
+        var buffer = new TermBuffer();
+        int root = buffer.Copy(machine, machine.Argument(0));
+        int origin = buffer.Materialize(machine);
+        return machine.Unify(machine.Argument(1), machine.HeapAt(origin + root));
+    }
+
+    /// <summary>
+    /// <c>term_variables(+Term, -Variables)</c>: the term's distinct unbound variables, in the order
+    /// a left-to-right walk first reaches them.
+    /// </summary>
+    private static bool TermVariables(Machine machine)
+    {
+        List<Cell> found = [];
+        HashSet<int> seen = [];
+        List<Cell> work = [machine.Argument(0)];
+
+        while (work.Count > 0)
+        {
+            Cell cell = machine.Dereference(work[^1]);
+            work.RemoveAt(work.Count - 1);
+
+            if (cell.Tag == CellTag.Reference)
+            {
+                if (seen.Add(cell.Index))
+                {
+                    found.Add(cell);
+                }
+
+                continue;
+            }
+
+            if (cell.Tag != CellTag.Structure)
+            {
+                continue;
+            }
+
+            // Pushed in reverse so the leftmost argument is walked first.
+            int arity = machine.Symbols.ArityOf(machine.HeapAt(cell.Index).Index);
+            for (int i = arity; i >= 1; i--)
+            {
+                work.Add(machine.HeapAt(cell.Index + i));
+            }
+        }
+
+        return machine.Unify(machine.Argument(1), TermList.Build(machine, CollectionsMarshal.AsSpan(found)));
     }
 
     private static int Order(Machine machine) => TermOrder.Compare(machine, machine.Argument(0), machine.Argument(1));
@@ -180,7 +239,7 @@ internal static class TermBuiltins
         }
 
         List<Cell> elements = [];
-        if (!TryReadList(machine, machine.Argument(1), elements, emptyList))
+        if (!TermList.IsEmpty(machine, TermList.Read(machine, machine.Argument(1), elements)))
         {
             throw PrologErrors.Instantiation(machine);
         }
@@ -209,31 +268,6 @@ internal static class TermBuiltins
 
         int functorId = machine.Symbols.InternFunctor(head.Index, elements.Count - 1);
         return machine.Unify(term, machine.CreateStructure(functorId, CollectionsMarshal.AsSpan(elements)[1..]));
-    }
-
-    private static bool TryReadList(Machine machine, Cell list, List<Cell> elements, int emptyList)
-    {
-        Cell cell = machine.Dereference(list);
-
-        while (cell.Tag == CellTag.Structure && machine.HeapAt(cell.Index).Index == machine.Symbols.ListFunctor)
-        {
-            elements.Add(machine.HeapAt(cell.Index + 1));
-            cell = machine.Dereference(machine.HeapAt(cell.Index + 2));
-        }
-
-        return cell.Tag == CellTag.Atom && cell.Index == emptyList;
-    }
-
-    private static bool IsProperList(Machine machine, Cell list)
-    {
-        Cell cell = machine.Dereference(list);
-
-        while (cell.Tag == CellTag.Structure && machine.HeapAt(cell.Index).Index == machine.Symbols.ListFunctor)
-        {
-            cell = machine.Dereference(machine.HeapAt(cell.Index + 2));
-        }
-
-        return cell.Tag == CellTag.Atom && cell.Index == machine.Symbols.EmptyList;
     }
 
     private static bool IsGround(Machine machine, Cell term)
