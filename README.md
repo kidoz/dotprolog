@@ -72,9 +72,27 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 
 ## What the language supports today
 
-Facts and rules; unification; backtracking; cut; conjunction; atoms, variables, integers, floats, strings, lists, and structures; integer and float arithmetic through `is/2` and the arithmetic comparisons; `write/1`, `writeq/1`, `writeln/1`, `nl/0`, `=/2`, `true/0`, `fail/0`, `halt/0`, `halt/1`; `:- Goal` directives and `:- initialization(Goal)`.
+| Area | Predicates |
+|---|---|
+| Terms | atoms, variables, integers, floats, double-quoted code lists, lists, structures |
+| Control | `,/2`, `;/2`, `->/2`, `*->/2`, `\+/1`, `!/0`, `call/1`, `not/1`, `true/0`, `fail/0` |
+| Unification | `=/2`, `\=/2` |
+| Arithmetic | `is/2`, `=:=/2`, `=\=/2`, `</2`, `>/2`, `=</2`, `>=/2` |
+| Standard order | `==/2`, `\==/2`, `@</2`, `@>/2`, `@=</2`, `@>=/2`, `compare/3` |
+| Term inspection | `functor/3`, `arg/3`, `=../2` |
+| Type tests | `var/1`, `nonvar/1`, `atom/1`, `number/1`, `integer/1`, `float/1`, `atomic/1`, `compound/1`, `callable/1`, `is_list/1`, `ground/1` |
+| Output | `write/1`, `writeq/1`, `print/1`, `writeln/1`, `nl/0` |
+| Directives | `:- Goal`, `:- initialization(Goal)`, `halt/0`, `halt/1` |
 
-Not yet implemented, and reported as a `DPL1002` diagnostic rather than silently accepted: `;/2`, `->/2`, `\+/1`, `call/1`, modules, DCGs, exceptions, streams, dynamic predicates, and `findall/3`.
+Control constructs are compiled in place inside a clause body, so cut scopes the way ISO specifies: opaque in the condition of if-then-else, transparent in its branches, clause-scoped elsewhere. A bootstrap library written in Prolog makes the same constructs reachable when a goal is assembled at run time and passed to `call/1`.
+
+```prolog
+sign(N, S) :- ( N < 0 -> S = negative ; N =:= 0 -> S = zero ; S = positive ).
+```
+
+Not yet implemented: modules, DCGs, exceptions (`throw/1`, `catch/3`), streams and file I/O, dynamic predicates, runtime `consult/1`, `findall/3`, `bagof/3`, `setof/3`, and `call/N` for N above one.
+
+One known deviation: a cut inside a goal reached through `call/1` is local to that goal and prunes nothing in the meta-call, so `call((a, !, b))` behaves as `call((a, b))`.
 
 DotProlog does not claim ISO or SWI-Prolog compatibility. It will not claim it until published conformance tests verify it.
 
