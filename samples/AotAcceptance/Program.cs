@@ -27,10 +27,7 @@ internal static class Program
 
         count_solutions(Goal, Template, N) :-
             findall(Template, Goal, L),
-            length_of(L, N).
-
-        length_of([], 0).
-        length_of([_|T], N) :- length_of(T, M), N is M + 1.
+            length(L, N).
         """;
 
     private static int Main(string[] args)
@@ -65,6 +62,14 @@ internal static class Program
                 findall(S2, stored(S2), After), write(After), nl,
 
                 catch(no_such_predicate, error(existence_error(procedure, _), _), write(caught)), nl,
+
+                % The standard library is compiled at engine construction, so it has to survive
+                % trimming and work in a native image like everything else here.
+                msort([c, a, b], Sorted), write(Sorted), nl,
+                maplist(upcase_atom, Sorted, Upper), write(Upper), nl,
+                aggregate_all(sum(N), member(N, [1, 2, 3]), Sum),
+                format("sum=~d~n", [Sum]),
+                format(atom(Aligned), "~w~t~8|~d", [row, 7]), write(Aligned), nl,
 
                 write(done), nl.
             """;

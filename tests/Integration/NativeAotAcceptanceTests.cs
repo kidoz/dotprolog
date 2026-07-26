@@ -69,6 +69,10 @@ public sealed class NativeAotAcceptanceTests
                     "[first,second,third]",
                     "[first,third]",
                     "caught",
+                    "[a,b,c]",
+                    "[A,B,C]",
+                    "sum=6",
+                    "row     7",
                     "done",
                 ],
                 runLog.ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
