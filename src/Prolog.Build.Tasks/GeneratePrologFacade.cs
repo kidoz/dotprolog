@@ -32,6 +32,9 @@ public sealed class GeneratePrologFacade : Task
     /// <summary>Namespace used when a contract does not declare one.</summary>
     public string RootNamespace { get; set; } = "Prolog.Generated";
 
+    /// <summary>Whether to generate an entry point, set by the SDK when the project builds an application.</summary>
+    public bool GenerateEntryPoint { get; set; }
+
     /// <summary>The generated C# files, to be added to <c>Compile</c>.</summary>
     [Output]
     public ITaskItem[] GeneratedFiles { get; private set; } = [];
@@ -39,14 +42,32 @@ public sealed class GeneratePrologFacade : Task
     /// <inheritdoc />
     public override bool Execute()
     {
-        if (Contracts.Length == 0)
+        if (Contracts.Length == 0 && !GenerateEntryPoint)
         {
-            Log.LogError("No PrologContract item was supplied, so there is no .NET surface to generate.");
+            Log.LogError(
+                "A Prolog library needs a PrologContract item declaring its .NET surface. "
+                    + "Set OutputType to Exe to build an application instead."
+            );
+
             return false;
         }
 
         Directory.CreateDirectory(OutputPath);
         List<ITaskItem> generated = [];
+
+        if (GenerateEntryPoint)
+        {
+            var sources = new List<(string Name, string Text)>();
+            foreach (ITaskItem source in Sources)
+            {
+                string path = source.GetMetadata("FullPath");
+                sources.Add((Path.GetFileName(path), File.ReadAllText(path)));
+            }
+
+            string entryPoint = Path.Combine(OutputPath, $"{EntryPointGenerator.TypeName}.g.cs");
+            WriteIfChanged(entryPoint, EntryPointGenerator.Generate(RootNamespace, sources));
+            generated.Add(new TaskItem(entryPoint));
+        }
 
         foreach (ITaskItem contractItem in Contracts)
         {

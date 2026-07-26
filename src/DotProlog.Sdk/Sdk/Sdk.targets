@@ -1,5 +1,14 @@
 <Project>
     <PropertyGroup>
+        <!-- An application gets a generated entry point; a library only gets its facade. -->
+        <_DotPrologGenerateEntryPoint Condition="'$(OutputType)' == 'Exe'">true</_DotPrologGenerateEntryPoint>
+        <_DotPrologGenerateEntryPoint Condition="'$(_DotPrologGenerateEntryPoint)' == ''">false</_DotPrologGenerateEntryPoint>
+
+        <StartupObject Condition="'$(_DotPrologGenerateEntryPoint)' == 'true' and '$(StartupObject)' == ''"
+            >$(RootNamespace).PrologProgram</StartupObject>
+    </PropertyGroup>
+
+    <PropertyGroup>
         <!--
           BaseIntermediateOutputPath rather than IntermediateOutputPath: the latter is not defined
           until Microsoft.Common.CurrentVersion.targets runs, which is after this file is imported,
@@ -30,7 +39,7 @@
         Name="GeneratePrologFacade"
         BeforeTargets="BeforeCompile;CoreCompile"
         Inputs="@(PrologCompile);@(PrologContract)"
-        Outputs="$(DotPrologGeneratedPath)$(DotPrologClrTypeName)Module.g.cs"
+        Outputs="$(DotPrologGeneratedPath).generated"
     >
         <Error
             Condition="'$(DotPrologTasksAssembly)' == ''"
@@ -44,6 +53,7 @@
             Contracts="@(PrologContract)"
             OutputPath="$(DotPrologGeneratedPath)"
             RootNamespace="$(RootNamespace)"
+            GenerateEntryPoint="$(_DotPrologGenerateEntryPoint)"
         >
             <Output TaskParameter="GeneratedFiles" ItemName="DotPrologGeneratedCompile" />
         </GeneratePrologFacade>
@@ -51,6 +61,15 @@
         <ItemGroup>
             <Compile Include="@(DotPrologGeneratedCompile)" />
             <FileWrites Include="@(DotPrologGeneratedCompile)" />
+        </ItemGroup>
+
+        <!--
+          Stamped only after the task succeeds. Writing it first would leave a stamp behind when
+          generation failed, and the next build would skip generation and fail on missing code.
+        -->
+        <Touch Files="$(DotPrologGeneratedPath).generated" AlwaysCreate="true" />
+        <ItemGroup>
+            <FileWrites Include="$(DotPrologGeneratedPath).generated" />
         </ItemGroup>
     </Target>
 
