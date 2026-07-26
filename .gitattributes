@@ -1,0 +1,14 @@
+# CSharpier is configured for LF, and the formatting check runs on Linux. Pinning line endings keeps
+# a Windows checkout from failing that check, and keeps Prolog sources byte-identical everywhere.
+*.cs        text eol=lf
+*.pl        text eol=lf
+*.csproj    text eol=lf
+*.props     text eol=lf
+*.targets   text eol=lf
+*.slnx      text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+*.yml       text eol=lf
+*.editorconfig text eol=lf
+justfile    text eol=lf
+LICENSE     text eol=lf
