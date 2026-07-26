@@ -305,7 +305,12 @@ public static class FacadeGenerator
     /// </summary>
     private static string MethodName(ContractExport export) => export.ClrName ?? Pascal(export.PredicateName);
 
-    private static string Field(ContractExport export) => $"_{Camel(export.PredicateName)}{export.Arity}";
+    /// <summary>
+    /// The backing field for a predicate. It uses the unescaped name: a field already begins with an
+    /// underscore, so it can never collide with a keyword, and an <c>@</c> would land in the middle
+    /// of the identifier — <c>_@double2</c> does not compile.
+    /// </summary>
+    private static string Field(ContractExport export) => $"_{LowerFirst(Pascal(export.PredicateName))}{export.Arity}";
 
     private static string Lower(Determinism determinism) => determinism.ToString().ToLowerInvariant();
 
@@ -330,12 +335,14 @@ public static class FacadeGenerator
         return text.Length == 0 ? "Predicate" : text.ToString();
     }
 
+    /// <summary>A parameter or local name, escaped with <c>@</c> when it collides with a keyword.</summary>
     private static string Camel(string name)
     {
-        string pascal = Pascal(name);
-        string camel = char.ToLowerInvariant(pascal[0]) + pascal[1..];
+        string camel = LowerFirst(Pascal(name));
         return SyntaxFacts.IsKeyword(camel) ? "@" + camel : camel;
     }
+
+    private static string LowerFirst(string name) => char.ToLowerInvariant(name[0]) + name[1..];
 
     private static string Literal(string value) =>
         $"\"{value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal).Replace("\r", "\\r", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal)}\"";

@@ -180,6 +180,26 @@ public sealed class GeneratedFacadeTests
     }
 
     [Fact]
+    public void APredicateNamedAfterACSharpKeywordStillGenerates()
+    {
+        // 'double' is a keyword: the parameter form needs an @ escape, the field form must not have
+        // one, because '_@double2' is not a legal identifier.
+        ContractReadResult contract = ContractReader.Read(
+            ":- clr_module('Maths').\n:- clr_export(double/2, det, [in(double, integer), out(result, integer)]).",
+            "Generated.Maths",
+            "maths.dpli"
+        );
+
+        Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
+
+        string source = FacadeGenerator.Generate(contract.Contract!, "double(X, Y) :- Y is X * 2.", "maths.pl");
+
+        Assert.Contains("_double2;", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("_@", source, StringComparison.Ordinal);
+        Assert.Contains("long @double", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PrologNamesBecomeIdiomaticCSharpNames()
     {
         string source = FacadeGenerator.Generate(ReadContract(), PrologSource, "pricing.pl");
