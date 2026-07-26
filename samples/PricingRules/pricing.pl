@@ -1,7 +1,7 @@
 % A small rule set, written as ordinary ISO Prolog. Nothing here is .NET-specific:
 % the C# surface is declared separately, in pricing.dpli.
 
-:- module(pricing, [discount/3, tier/2, in_catalogue/1, bundle/2]).
+:- module(pricing, [discount/3, tier/2, in_catalogue/1, bundle/2, stock_level/2]).
 
 discount(Price, Percent, Result) :-
     Result is Price - (Price * Percent / 100).
@@ -9,6 +9,9 @@ discount(Price, Percent, Result) :-
 tier(Total, gold)   :- Total >= 1000, !.
 tier(Total, silver) :- Total >= 500, !.
 tier(_, bronze).
+
+stock_level(widget, 7).
+stock_level(gadget, 0).
 
 in_catalogue(widget).
 in_catalogue(gadget).

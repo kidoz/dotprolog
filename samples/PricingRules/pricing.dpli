@@ -7,3 +7,7 @@
 :- clr_export(tier/2, det, [in(total, integer), out(tier, atom)]).
 :- clr_export(in_catalogue/1, semidet, [in(item, atom)]).
 :- clr_export(bundle/2, nondet, [in(items, list(atom)), out(bundle, list(atom))]).
+
+% semidet with an output becomes bool TryStockLevel(string, out long) — the TryGetValue pattern
+% the .NET design guidelines call for, rather than a nullable or an exception.
+:- clr_export(stock_level/2, semidet, [in(item, atom), out(level, integer)]).

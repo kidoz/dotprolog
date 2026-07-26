@@ -17,6 +17,8 @@
     <Folder Name="/samples/">
         <Project Path="samples/AotAcceptance/AotAcceptance.csproj" />
         <Project Path="samples/PricingConsole/PricingConsole.csproj" />
+        <Project Path="samples/PricingFSharp/PricingFSharp.fsproj" />
+        <Project Path="samples/PricingVisualBasic/PricingVisualBasic.vbproj" />
         <!-- .dplproj is not an extension the solution format knows, so its type is stated. -->
         <Project Path="samples/PricingRules/PricingRules.dplproj" Type="C#" />
     </Folder>

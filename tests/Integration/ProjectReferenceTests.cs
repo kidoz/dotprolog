@@ -68,6 +68,47 @@ public sealed class ProjectReferenceTests
         );
     }
 
+    [Theory]
+    [InlineData("PricingFSharp", "F#")]
+    [InlineData("PricingVisualBasic", "VB")]
+    public async Task OtherDotNetLanguagesCallTheSameProjectTheSameWay(string sample, string prefix)
+    {
+        // The claim that F# and VB need no extra work is only worth making if it is checked. Adding
+        // the F# project is also what caught a repository-wide LangVersion that only C# accepts.
+        Assert.SkipUnless(
+            Environment.GetEnvironmentVariable(OptInVariable) == "1",
+            $"Set {OptInVariable}=1 to run the toolchain integration tests."
+        );
+
+        string project = Path.Combine(RepositoryLayout.Root, "samples", sample);
+
+        (int taskExit, string taskLog) = await Run(
+            "dotnet",
+            ["build", Path.Combine(RepositoryLayout.Root, "src", "Prolog.Build.Tasks"), "--nologo"]
+        );
+
+        Assert.True(taskExit == 0, $"Building the task failed:\n{taskLog}");
+
+        (int buildExit, string buildLog) = await Run("dotnet", ["build", project, "--nologo"]);
+        Assert.True(buildExit == 0, $"Building {sample} failed:\n{buildLog}");
+
+        (int runExit, string output) = await Run("dotnet", ["run", "--project", project, "--no-build"]);
+        Assert.True(runExit == 0, $"Running {sample} failed:\n{output}");
+
+        string[] lines = output.ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.Equal(
+            [
+                $"{prefix}: 100 less 15% = 85",
+                $"{prefix}: tier of 1200 is gold",
+                $"{prefix}: widget in catalogue: {(prefix == "F#" ? "true" : "True")}",
+                $"{prefix}: bundles: widget+gadget, widget, gadget, ",
+                $"{prefix}: widget stock is 7",
+            ],
+            lines
+        );
+    }
+
     private static async Task<(int ExitCode, string Log)> Run(string fileName, string[] arguments)
     {
         var start = new ProcessStartInfo(fileName)
