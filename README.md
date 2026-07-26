@@ -6,7 +6,10 @@ A Prolog language implementation for .NET 10, written in C# 14.
 
 The goal is a first-class Prolog experience on the .NET SDK, the way C# and F# have one: `.dplproj` projects, a `plc` compiler, `dotnet prolog`, `dotnet new` templates, and NativeAOT publishing.
 
-**Status: early.** The runtime-consult path works end to end — Prolog source is read, compiled to bytecode, and executed by the engine. The build-time path that generates C#, the MSBuild SDK, templates, and packaging are not built yet.
+**Status: early, but usable.** `dotnet new prolog-console` through `dotnet publish -p:PublishAot=true`
+works today. What is missing: `dotnet test` on a `.dplproj`, the `plc` compiler, and generating IL for
+predicate bodies — a `.dplproj` currently embeds its Prolog source and compiles it to bytecode at
+startup. Nothing is published to NuGet: package identity is still an open decision.
 
 ## Hello, world
 
@@ -53,7 +56,7 @@ Answers are produced on demand and marshalled into plain .NET objects as they ar
 var first = engine.Query("between(1, 1000000000, X)").Solutions().Take(4);
 ```
 
-Predicates can also be called directly with .NET values, which is the surface the planned `.dplproj` facades will be generated against:
+Predicates can also be called directly with .NET values. This is the surface the generated `.dplproj` facades sit on:
 
 ```csharp
 var host = new PrologHost(engine.Machine);
@@ -126,13 +129,15 @@ bundles of [widget, gadget]:
 | `src/Prolog.Compiler` | Clause and directive lowering to bytecode, consult and embedding API |
 | `src/Prolog.CodeGen.CSharp` | `.dpli` contract reader and C# facade generator |
 | `src/Prolog.Build.Tasks` | MSBuild task that runs the generator |
-| `src/DotProlog.Sdk` | MSBuild props and targets for `.dplproj` |
+| `src/DotProlog.Sdk` | The `DotProlog.Sdk` MSBuild SDK package |
+| `src/Prolog.Templates` | `dotnet new prolog-console` and `prolog-lib` |
 | `src/Prolog.DotNetTool` | The `dotnet prolog` command |
 | `tests/` | Unit tests per component, plus end-to-end execution tests |
 | `benchmarks/` | BenchmarkDotNet suite for the reader, compiler, and engine |
 | `samples/HelloProlog` | The Hello World sample |
 | `samples/PricingRules` | A `.dplproj`: Prolog rules plus their `.dpli` contract |
 | `samples/PricingConsole`, `samples/PricingFSharp`, `samples/PricingVisualBasic` | C#, F#, and VB apps referencing it |
+| `samples/GreetingApp` | A Prolog application built from a `.dplproj` |
 | `samples/AotAcceptance` | The NativeAOT acceptance sample |
 
 ## Common tasks
@@ -228,6 +233,33 @@ Diagnostic identifiers are stable and product-specific: `DPL0xxx` from the reade
 ```text
 hello.pl(4,12): error DPL0005: Expected '.' to end the clause but found 'b'.
 ```
+
+## Starting a project
+
+```console
+$ dotnet new install Prolog.Templates
+$ dotnet new prolog-console -n HelloProlog
+$ dotnet run --project HelloProlog
+Hello from Prolog on .NET!
+```
+
+`prolog-console` builds a Prolog program as a .NET application; `prolog-lib` builds a rule set as a
+typed library for C#, F#, and VB. A project pins the SDK on the element itself, so no `global.json` is
+needed:
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+  <Sdk Name="DotProlog.Sdk" Version="1.0.0" />
+```
+
+A `.dplproj` publishes with NativeAOT like any other project:
+
+```console
+$ dotnet publish HelloProlog -c Release -r osx-arm64 -p:PublishAot=true
+```
+
+**Nothing is published to NuGet yet** — package identity is still an open decision. The commands above
+are verified against a local feed built by `dotnet pack`.
 
 ## Building from source
 
