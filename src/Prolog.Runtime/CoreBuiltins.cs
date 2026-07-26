@@ -108,6 +108,43 @@ public static class CoreBuiltins
         registry.Register(">=", 2, static machine => CompareArguments(machine) >= 0);
 
         TermBuiltins.Register(registry, program.Symbols);
+
+        registry.Register(
+            "throw",
+            1,
+            static machine =>
+            {
+                Cell ball = machine.Argument(0);
+                throw ball.Tag == CellTag.Reference
+                    ? PrologErrors.Instantiation(machine)
+                    : machine.CreateBall(ball, TermWriter.ToDisplayString(machine, ball, quoted: true));
+            }
+        );
+
+        // The three halves of findall/3's failure-driven loop; see the bootstrap library.
+        registry.Register(
+            "$collect_begin",
+            0,
+            static machine =>
+            {
+                machine.BeginCollect();
+                return true;
+            }
+        );
+
+        registry.Register(
+            "$collect_add",
+            1,
+            static machine =>
+            {
+                machine.AddCollected(machine.Argument(0));
+                return true;
+            }
+        );
+
+        registry.Register("$collect_end", 1, static machine => machine.Unify(machine.Argument(0), machine.EndCollect()));
+
+        ControlPredicates.Install(program);
     }
 
     private static int CompareArguments(Machine machine) =>

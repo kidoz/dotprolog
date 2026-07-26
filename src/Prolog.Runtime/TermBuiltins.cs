@@ -94,12 +94,12 @@ internal static class TermBuiltins
 
         if (name.Tag == CellTag.Reference || arity.Tag == CellTag.Reference)
         {
-            throw new PrologException("instantiation_error");
+            throw PrologErrors.Instantiation(machine);
         }
 
         if (arity.Tag != CellTag.Integer)
         {
-            throw new PrologException("type_error(integer, _)");
+            throw PrologErrors.Type(machine, "integer", arity);
         }
 
         if (arity.Integer == 0)
@@ -109,12 +109,12 @@ internal static class TermBuiltins
 
         if (name.Tag != CellTag.Atom)
         {
-            throw new PrologException("type_error(atom, _)");
+            throw PrologErrors.Type(machine, "atom", name);
         }
 
         if (arity.Integer >= Machine.ArgumentRegisterCount)
         {
-            throw new PrologException($"representation_error(max_arity) for arity {arity.Integer}");
+            throw PrologErrors.Representation(machine, "max_arity");
         }
 
         var arguments = new Cell[(int)arity.Integer];
@@ -135,17 +135,17 @@ internal static class TermBuiltins
         if (index.Tag == CellTag.Reference)
         {
             // The nondeterministic form of arg/3 needs a builtin that can create choice points.
-            throw new PrologException("instantiation_error");
+            throw PrologErrors.Instantiation(machine);
         }
 
         if (index.Tag != CellTag.Integer)
         {
-            throw new PrologException("type_error(integer, _)");
+            throw PrologErrors.Type(machine, "integer", index);
         }
 
         if (term.Tag != CellTag.Structure)
         {
-            throw new PrologException("type_error(compound, _)");
+            throw PrologErrors.Type(machine, "compound", term);
         }
 
         int arity = machine.Symbols.ArityOf(machine.HeapAt(term.Index).Index);
@@ -182,12 +182,12 @@ internal static class TermBuiltins
         List<Cell> elements = [];
         if (!TryReadList(machine, machine.Argument(1), elements, emptyList))
         {
-            throw new PrologException("instantiation_error");
+            throw PrologErrors.Instantiation(machine);
         }
 
         if (elements.Count == 0)
         {
-            throw new PrologException("domain_error(non_empty_list, [])");
+            throw PrologErrors.Domain(machine, "non_empty_list", machine.Argument(1));
         }
 
         Cell head = machine.Dereference(elements[0]);
@@ -199,12 +199,12 @@ internal static class TermBuiltins
 
         if (head.Tag != CellTag.Atom)
         {
-            throw new PrologException("type_error(atom, _)");
+            throw PrologErrors.Type(machine, "atom", head);
         }
 
         if (elements.Count - 1 >= Machine.ArgumentRegisterCount)
         {
-            throw new PrologException($"representation_error(max_arity) for arity {elements.Count - 1}");
+            throw PrologErrors.Representation(machine, "max_arity");
         }
 
         int functorId = machine.Symbols.InternFunctor(head.Index, elements.Count - 1);

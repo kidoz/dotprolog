@@ -52,6 +52,8 @@ public sealed class Machine
     private bool _halted;
     private bool _forceTrail;
     private readonly int _callFunctor;
+    private readonly List<Collection> _collections = [];
+    private int _collectDepth;
 
     /// <summary>Creates a machine that executes <paramref name="program"/>.</summary>
     public Machine(BytecodeProgram program)
@@ -82,24 +84,44 @@ public sealed class Machine
         int entry = _program.EntryPointOf(functorId);
         if (entry < 0)
         {
-            throw new PrologException($"existence_error(procedure, {_symbols.DescribeFunctor(functorId)})");
+            throw PrologErrors.UndefinedProcedure(this, functorId);
         }
 
         return Run(entry);
     }
 
     /// <summary>Runs the instruction stream from <paramref name="entryAddress"/> until it stops.</summary>
-    /// <exception cref="PrologException">A called predicate is not defined.</exception>
+    /// <exception cref="PrologException">A goal threw a ball that no <c>catch/3</c> handles.</exception>
     public RunResult Run(int entryAddress)
     {
         ResetState();
 
+        _pc = entryAddress;
+        _continuation = BytecodeProgram.TopLevelReturnAddress;
+
+        while (true)
+        {
+            try
+            {
+                return Execute();
+            }
+            catch (PrologException error) when (error.HasBall && HasCatchFrame())
+            {
+                // Re-enter the dispatch loop at the recovery goal. If no catcher matches after all,
+                // UnwindToCatch reports it and the ball continues out to the host.
+                if (!UnwindToCatch(error))
+                {
+                    throw;
+                }
+            }
+        }
+    }
+
+    private RunResult Execute()
+    {
         // Cached for the dispatch loop; the program is not mutated while a goal is running.
         int[] code = _program.Code;
         Cell[] constants = _program.Constants;
-
-        _pc = entryAddress;
-        _continuation = BytecodeProgram.TopLevelReturnAddress;
 
         while (true)
         {
@@ -191,6 +213,62 @@ public sealed class Machine
                 case OpCode.MetaCall:
                     proved = MetaCall();
                     break;
+
+                case OpCode.PushCatch:
+                {
+                    int catcherSlot = code[_pc++];
+                    int recovery = code[_pc++];
+                    int savedArity = _argumentCount;
+                    _argumentCount = 0;
+
+                    // The frame fails through on ordinary backtracking; only a throw uses the recovery.
+                    PushChoicePoint(BytecodeProgram.PopAndFailAddress);
+                    _argumentCount = savedArity;
+
+                    ref ChoicePoint frame = ref _choicePoints[_b - 1];
+                    frame.CatchRecovery = recovery;
+                    frame.CatcherSlot = catcherSlot;
+                    frame.CatchActive = true;
+                    break;
+                }
+
+                case OpCode.PopCatch:
+                {
+                    int index = (int)_stack[_e + FrameHeaderSize + code[_pc++]].Integer;
+                    int reactivate = code[_pc++];
+
+                    if (index >= _b)
+                    {
+                        break;
+                    }
+
+                    if (index == _b - 1)
+                    {
+                        // The goal was deterministic, so the frame is simply gone.
+                        _b--;
+                        _savedTop = _choicePoints[_b].ArgumentBase;
+                        break;
+                    }
+
+                    // The goal left alternatives. Keep the frame for a redo, but out of scope until then.
+                    _choicePoints[index].CatchActive = false;
+                    int savedArity = _argumentCount;
+                    _argumentCount = 0;
+                    PushChoicePoint(reactivate);
+                    _argumentCount = savedArity;
+                    break;
+                }
+
+                case OpCode.ReactivateCatch:
+                {
+                    int index = (int)_stack[_e + FrameHeaderSize + code[_pc++]].Integer;
+                    if (index < _b)
+                    {
+                        _choicePoints[index].CatchActive = true;
+                    }
+
+                    break;
+                }
 
                 case OpCode.TryMeElse:
                     PushChoicePoint(code[_pc++]);
@@ -362,6 +440,138 @@ public sealed class Machine
     /// <summary>Pushes a fresh unbound variable onto the heap and returns its cell.</summary>
     public Cell CreateVariable() => NewVariable();
 
+    /// <summary>Wraps <paramref name="term"/> as a thrown ball, detached from the heap.</summary>
+    /// <param name="term">The term being thrown.</param>
+    /// <param name="description">Readable text for a host that lets the ball escape.</param>
+    public PrologException CreateBall(Cell term, string description)
+    {
+        var ball = new TermBuffer();
+        int root = ball.Copy(this, term);
+        return new PrologException(description, ball, root);
+    }
+
+    /// <summary>Starts collecting solutions, as <c>findall/3</c> does.</summary>
+    internal void BeginCollect()
+    {
+        if (_collectDepth == _collections.Count)
+        {
+            _collections.Add(new Collection());
+        }
+
+        Collection collection = _collections[_collectDepth++];
+        collection.Buffer.Clear();
+        collection.Roots.Clear();
+    }
+
+    /// <summary>Copies one solution into the innermost collection.</summary>
+    internal void AddCollected(Cell term)
+    {
+        Collection collection = _collections[_collectDepth - 1];
+        collection.Roots.Add(collection.Buffer.Copy(this, term));
+    }
+
+    /// <summary>Ends the innermost collection and returns its solutions as a list.</summary>
+    internal Cell EndCollect()
+    {
+        Collection collection = _collections[--_collectDepth];
+        int origin = collection.Buffer.Materialize(this);
+
+        Cell list = Cell.Atom(_symbols.EmptyList);
+        for (int i = collection.Roots.Count - 1; i >= 0; i--)
+        {
+            Cell element = _heap[origin + collection.Roots[i]];
+            list = CreateStructure(_symbols.ListFunctor, [element, list]);
+        }
+
+        return list;
+    }
+
+    /// <summary>Reserves <paramref name="count"/> contiguous heap cells and returns the first address.</summary>
+    internal int ReserveHeap(int count)
+    {
+        EnsureHeap(count);
+        int origin = _h;
+        _h += count;
+        return origin;
+    }
+
+    /// <summary>Writes a cell at an address reserved by <see cref="ReserveHeap"/>.</summary>
+    internal void WriteHeap(int address, Cell cell) => _heap[address] = cell;
+
+    private bool HasCatchFrame()
+    {
+        for (int i = _b - 1; i >= 0; i--)
+        {
+            if (_choicePoints[i].CatchRecovery >= 0 && _choicePoints[i].CatchActive)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Unwinds to the innermost <c>catch/3</c> frame whose catcher unifies with the ball, and points
+    /// execution at its recovery goal. Reports whether such a frame was found.
+    /// </summary>
+    private bool UnwindToCatch(PrologException error)
+    {
+        while (_b > 0)
+        {
+            int index = _b - 1;
+            if (_choicePoints[index].CatchRecovery < 0 || !_choicePoints[index].CatchActive)
+            {
+                _b--;
+                continue;
+            }
+
+            ChoicePoint frame = _choicePoints[index];
+
+            // Pop the catch frame itself: a ball is caught at most once by the same catch/3.
+            _b = index;
+            UndoTrail(frame.TrailTop);
+            _h = frame.HeapTop;
+            _savedTop = frame.ArgumentBase + frame.ArgumentCount;
+            _argumentCount = frame.ArgumentCount;
+            _stackTop = frame.StackTop;
+            _e = frame.Environment;
+            _continuation = frame.Continuation;
+            _b0 = frame.CutBarrier;
+            _collectDepth = frame.CollectDepth;
+
+            // Rebuild the ball above the restored heap top, then try the catcher against it.
+            int origin = error.Ball!.Materialize(this);
+            Cell ball = _heap[origin + error.BallRoot];
+            Cell catcher = _stack[frame.Environment + FrameHeaderSize + frame.CatcherSlot];
+
+            int mark = _tr;
+            bool previous = _forceTrail;
+            _forceTrail = true;
+            bool matched = Unify(catcher, ball);
+            _forceTrail = previous;
+
+            if (matched)
+            {
+                _pc = frame.CatchRecovery;
+                return true;
+            }
+
+            // This catcher does not apply; drop the ball copy and keep unwinding.
+            UndoTrail(mark);
+            _h = frame.HeapTop;
+        }
+
+        return false;
+    }
+
+    private sealed class Collection
+    {
+        internal TermBuffer Buffer { get; } = new();
+
+        internal List<int> Roots { get; } = [];
+    }
+
     /// <summary>Builds a compound term on the heap from <paramref name="arguments"/> and returns its cell.</summary>
     public Cell CreateStructure(int functorId, ReadOnlySpan<Cell> arguments)
     {
@@ -437,10 +647,10 @@ public sealed class Machine
                 break;
 
             case CellTag.Reference:
-                throw new PrologException("instantiation_error");
+                throw PrologErrors.Instantiation(this);
 
             default:
-                throw new PrologException($"type_error(callable, {TermWriter.ToDisplayString(this, goal, quoted: true)})");
+                throw PrologErrors.Type(this, "callable", goal);
         }
 
         _argumentCount = arity;
@@ -557,6 +767,7 @@ public sealed class Machine
         _argumentCount = 0;
         _halted = false;
         _forceTrail = false;
+        _collectDepth = 0;
         ExitCode = 0;
     }
 
@@ -565,7 +776,7 @@ public sealed class Machine
         int entry = _program.EntryPointOf(functorId);
         if (entry < 0)
         {
-            throw new PrologException($"existence_error(procedure, {_symbols.DescribeFunctor(functorId)})");
+            throw PrologErrors.UndefinedProcedure(this, functorId);
         }
 
         return entry;
@@ -704,6 +915,10 @@ public sealed class Machine
         point.Environment = _e;
         point.Continuation = _continuation;
         point.CutBarrier = _b0;
+        point.CollectDepth = _collectDepth;
+        point.CatchRecovery = -1;
+        point.CatcherSlot = 0;
+        point.CatchActive = false;
 
         _savedTop += _argumentCount;
         _b++;
@@ -726,6 +941,7 @@ public sealed class Machine
         _e = point.Environment;
         _continuation = point.Continuation;
         _b0 = point.CutBarrier;
+        _collectDepth = point.CollectDepth;
         _pc = point.Alternative;
         return true;
     }

@@ -63,6 +63,24 @@ public enum OpCode
     /// </summary>
     MetaCall,
 
+    /// <summary>
+    /// Operands: catcher slot, recovery address. Push a <c>catch/3</c> frame. On ordinary
+    /// backtracking the frame simply pops; a thrown ball that unifies with the catcher resumes at the
+    /// recovery address.
+    /// </summary>
+    PushCatch,
+
+    /// <summary>
+    /// Operands: frame-index slot, reactivation address. Take the catch frame out of scope now that
+    /// its goal has succeeded. If the frame is the newest choice point it is simply popped; otherwise
+    /// the goal left alternatives, so the frame is deactivated and a choice point is pushed that
+    /// reactivates it should execution backtrack into the goal.
+    /// </summary>
+    PopCatch,
+
+    /// <summary>Operand: frame-index slot. Bring a deactivated catch frame back into scope.</summary>
+    ReactivateCatch,
+
     /// <summary>Operand: address. Push a choice point whose alternative is the operand.</summary>
     TryMeElse,
 

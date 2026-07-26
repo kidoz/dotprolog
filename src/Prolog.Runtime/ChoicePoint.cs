@@ -32,4 +32,24 @@ internal struct ChoicePoint
 
     /// <summary>Cut barrier to restore.</summary>
     public int CutBarrier;
+
+    /// <summary>
+    /// Address of the recovery code when this is a <c>catch/3</c> frame, or -1 when it is an ordinary
+    /// choice point. A catch frame is a choice point so that it is discarded on backtracking and
+    /// restored on unwinding by the same bookkeeping as everything else.
+    /// </summary>
+    public int CatchRecovery;
+
+    /// <summary>Environment slot holding the catcher term, for a catch frame.</summary>
+    public int CatcherSlot;
+
+    /// <summary>
+    /// Whether a catch frame is currently in scope. It is cleared once the guarded goal succeeds, so
+    /// a later throw outside <c>catch/3</c> is not caught by it, and set again if execution
+    /// backtracks into the goal.
+    /// </summary>
+    public bool CatchActive;
+
+    /// <summary>Depth of the <c>findall/3</c> collection stack to restore.</summary>
+    public int CollectDepth;
 }

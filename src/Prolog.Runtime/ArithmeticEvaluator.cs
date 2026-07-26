@@ -28,16 +28,16 @@ public static class ArithmeticEvaluator
                 return PrologNumber.FromReal(machine.Symbols.GetFloat(cell.Index));
 
             case CellTag.Reference:
-                throw new PrologException("instantiation_error");
+                throw PrologErrors.Instantiation(machine);
 
             case CellTag.Atom:
-                return EvaluateConstant(machine.Symbols.AtomName(cell.Index));
+                return EvaluateConstant(machine, machine.Symbols.AtomName(cell.Index));
 
             case CellTag.Structure:
                 break;
 
             default:
-                throw new PrologException("type_error(evaluable, _)");
+                throw PrologErrors.Type(machine, "evaluable", cell);
         }
 
         int functorId = machine.HeapAt(cell.Index).Index;
@@ -46,15 +46,15 @@ public static class ArithmeticEvaluator
 
         return functor.Arity switch
         {
-            1 => EvaluateUnary(name, Evaluate(machine, machine.HeapAt(cell.Index + 1)), machine.Symbols, functorId),
+            1 => EvaluateUnary(name, Evaluate(machine, machine.HeapAt(cell.Index + 1)), machine, functorId),
             2 => EvaluateBinary(
                 name,
                 Evaluate(machine, machine.HeapAt(cell.Index + 1)),
                 Evaluate(machine, machine.HeapAt(cell.Index + 2)),
-                machine.Symbols,
+                machine,
                 functorId
             ),
-            _ => throw Unevaluable(machine.Symbols, functorId),
+            _ => throw Unevaluable(machine, functorId),
         };
     }
 
@@ -71,7 +71,7 @@ public static class ArithmeticEvaluator
 
         if (!Cell.FitsInteger(number.Integer))
         {
-            throw new PrologException($"evaluation_error(int_overflow) for {number.Integer}");
+            throw PrologErrors.Evaluation(machine, "int_overflow");
         }
 
         return Cell.Integer60(number.Integer);
@@ -88,7 +88,7 @@ public static class ArithmeticEvaluator
         return left.AsDouble.CompareTo(right.AsDouble);
     }
 
-    private static PrologNumber EvaluateConstant(string name) =>
+    private static PrologNumber EvaluateConstant(Machine machine, string name) =>
         name switch
         {
             "pi" => PrologNumber.FromReal(Math.PI),
@@ -97,10 +97,10 @@ public static class ArithmeticEvaluator
             "nan" => PrologNumber.FromReal(double.NaN),
             "max_tagged_integer" => PrologNumber.FromInteger(Cell.MaxInteger),
             "min_tagged_integer" => PrologNumber.FromInteger(Cell.MinInteger),
-            _ => throw new PrologException($"type_error(evaluable, {name}/0)"),
+            _ => throw PrologErrors.NotEvaluable(machine, name, 0),
         };
 
-    private static PrologNumber EvaluateUnary(string name, PrologNumber value, SymbolTable symbols, int functorId) =>
+    private static PrologNumber EvaluateUnary(string name, PrologNumber value, Machine machine, int functorId) =>
         name switch
         {
             "+" => value,
@@ -117,16 +117,10 @@ public static class ArithmeticEvaluator
             "floor" => PrologNumber.FromInteger((long)Math.Floor(value.AsDouble)),
             "ceiling" => PrologNumber.FromInteger((long)Math.Ceiling(value.AsDouble)),
             "sqrt" => PrologNumber.FromReal(Math.Sqrt(value.AsDouble)),
-            _ => throw Unevaluable(symbols, functorId),
+            _ => throw Unevaluable(machine, functorId),
         };
 
-    private static PrologNumber EvaluateBinary(
-        string name,
-        PrologNumber left,
-        PrologNumber right,
-        SymbolTable symbols,
-        int functorId
-    )
+    private static PrologNumber EvaluateBinary(string name, PrologNumber left, PrologNumber right, Machine machine, int functorId)
     {
         bool real = left.IsFloat || right.IsFloat;
 
@@ -153,7 +147,7 @@ public static class ArithmeticEvaluator
                     return PrologNumber.FromReal(left.AsDouble / right.AsDouble);
                 }
 
-                ThrowIfZero(right.Integer);
+                ThrowIfZero(machine, right.Integer);
 
                 // Integer division yields an integer only when it is exact; otherwise it yields a float.
                 return left.Integer % right.Integer == 0
@@ -161,19 +155,19 @@ public static class ArithmeticEvaluator
                     : PrologNumber.FromReal((double)left.Integer / right.Integer);
 
             case "//":
-                RequireIntegers(real);
-                ThrowIfZero(right.Integer);
+                RequireIntegers(machine, real);
+                ThrowIfZero(machine, right.Integer);
                 return PrologNumber.FromInteger(left.Integer / right.Integer);
 
             case "div":
-                RequireIntegers(real);
-                ThrowIfZero(right.Integer);
+                RequireIntegers(machine, real);
+                ThrowIfZero(machine, right.Integer);
                 return PrologNumber.FromInteger((long)Math.Floor((double)left.Integer / right.Integer));
 
             case "mod":
             {
-                RequireIntegers(real);
-                ThrowIfZero(right.Integer);
+                RequireIntegers(machine, real);
+                ThrowIfZero(machine, right.Integer);
                 long remainder = left.Integer % right.Integer;
                 return PrologNumber.FromInteger(
                     remainder != 0 && (remainder < 0) != (right.Integer < 0) ? remainder + right.Integer : remainder
@@ -181,8 +175,8 @@ public static class ArithmeticEvaluator
             }
 
             case "rem":
-                RequireIntegers(real);
-                ThrowIfZero(right.Integer);
+                RequireIntegers(machine, real);
+                ThrowIfZero(machine, right.Integer);
                 return PrologNumber.FromInteger(left.Integer % right.Integer);
 
             case "min":
@@ -200,38 +194,38 @@ public static class ArithmeticEvaluator
                     return PrologNumber.FromReal(Math.Pow(left.AsDouble, right.AsDouble));
                 }
 
-                return PrologNumber.FromInteger(IntegerPower(left.Integer, right.Integer));
+                return PrologNumber.FromInteger(IntegerPower(machine, left.Integer, right.Integer));
 
             case ">>":
-                RequireIntegers(real);
+                RequireIntegers(machine, real);
                 return PrologNumber.FromInteger(left.Integer >> (int)right.Integer);
 
             case "<<":
-                RequireIntegers(real);
+                RequireIntegers(machine, real);
                 return PrologNumber.FromInteger(left.Integer << (int)right.Integer);
 
             case "/\\":
-                RequireIntegers(real);
+                RequireIntegers(machine, real);
                 return PrologNumber.FromInteger(left.Integer & right.Integer);
 
             case "\\/":
-                RequireIntegers(real);
+                RequireIntegers(machine, real);
                 return PrologNumber.FromInteger(left.Integer | right.Integer);
 
             case "xor":
-                RequireIntegers(real);
+                RequireIntegers(machine, real);
                 return PrologNumber.FromInteger(left.Integer ^ right.Integer);
 
             default:
-                throw Unevaluable(symbols, functorId);
+                throw Unevaluable(machine, functorId);
         }
     }
 
-    private static long IntegerPower(long value, long exponent)
+    private static long IntegerPower(Machine machine, long value, long exponent)
     {
         if (exponent < 0)
         {
-            throw new PrologException("type_error(float, integer_power_with_negative_exponent)");
+            throw PrologErrors.Type(machine, "float", Cell.Integer60(exponent));
         }
 
         long result = 1;
@@ -243,22 +237,25 @@ public static class ArithmeticEvaluator
         return result;
     }
 
-    private static void RequireIntegers(bool isReal)
+    private static void RequireIntegers(Machine machine, bool isReal)
     {
         if (isReal)
         {
-            throw new PrologException("type_error(integer, float)");
+            throw PrologErrors.Type(machine, "integer", Cell.Atom(machine.Symbols.InternAtom("float")));
         }
     }
 
-    private static void ThrowIfZero(long divisor)
+    private static void ThrowIfZero(Machine machine, long divisor)
     {
         if (divisor == 0)
         {
-            throw new PrologException("evaluation_error(zero_divisor)");
+            throw PrologErrors.Evaluation(machine, "zero_divisor");
         }
     }
 
-    private static PrologException Unevaluable(SymbolTable symbols, int functorId) =>
-        new($"type_error(evaluable, {symbols.DescribeFunctor(functorId)})");
+    private static PrologException Unevaluable(Machine machine, int functorId)
+    {
+        Functor functor = machine.Symbols.GetFunctor(functorId);
+        return PrologErrors.NotEvaluable(machine, machine.Symbols.AtomName(functor.NameAtom), functor.Arity);
+    }
 }

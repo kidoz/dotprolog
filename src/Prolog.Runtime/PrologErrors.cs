@@ -1,0 +1,112 @@
+namespace Prolog.Runtime;
+
+/// <summary>
+/// Builds the ISO error terms the engine raises, each of the shape <c>error(Formal, Context)</c>.
+/// </summary>
+/// <remarks>
+/// Every factory returns an exception carrying both a Prolog term, for <c>catch/3</c> to unify
+/// against, and a readable message for a host that lets the error escape. The two are built
+/// separately on purpose: the message uses a compact spelling that does not depend on the term
+/// writer, which is still canonical and would render <c>foo/1</c> as <c>/(foo,1)</c>.
+/// </remarks>
+public static class PrologErrors
+{
+    /// <summary>A term that should have been instantiated was not.</summary>
+    public static PrologException Instantiation(Machine machine)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+        return Build(machine, Cell.Atom(machine.Symbols.InternAtom("instantiation_error")), "instantiation_error");
+    }
+
+    /// <summary>A term was the wrong type: <c>type_error(Expected, Culprit)</c>.</summary>
+    public static PrologException Type(Machine machine, string expected, Cell culprit)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+        return Binary(machine, "type_error", expected, culprit);
+    }
+
+    /// <summary>A term was the right type but an unacceptable value: <c>domain_error(Domain, Culprit)</c>.</summary>
+    public static PrologException Domain(Machine machine, string domain, Cell culprit)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+        return Binary(machine, "domain_error", domain, culprit);
+    }
+
+    /// <summary>A predicate has no definition: <c>existence_error(procedure, Name/Arity)</c>.</summary>
+    public static PrologException UndefinedProcedure(Machine machine, int functorId)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+
+        Functor functor = machine.Symbols.GetFunctor(functorId);
+        Cell indicator = machine.CreateStructure(
+            machine.Symbols.InternFunctor("/", 2),
+            [Cell.Atom(functor.NameAtom), Cell.Integer60(functor.Arity)]
+        );
+
+        Cell formal = machine.CreateStructure(
+            machine.Symbols.InternFunctor("existence_error", 2),
+            [Cell.Atom(machine.Symbols.InternAtom("procedure")), indicator]
+        );
+
+        return Build(machine, formal, $"existence_error(procedure, {machine.Symbols.DescribeFunctor(functorId)})");
+    }
+
+    /// <summary>An arithmetic operation could not produce a value: <c>evaluation_error(What)</c>.</summary>
+    public static PrologException Evaluation(Machine machine, string what)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+        return Unary(machine, "evaluation_error", what);
+    }
+
+    /// <summary>An implementation limit was reached: <c>representation_error(Flag)</c>.</summary>
+    public static PrologException Representation(Machine machine, string flag)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+        return Unary(machine, "representation_error", flag);
+    }
+
+    /// <summary>A term is not evaluable as arithmetic: <c>type_error(evaluable, Name/Arity)</c>.</summary>
+    public static PrologException NotEvaluable(Machine machine, string name, int arity)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+
+        Cell indicator = machine.CreateStructure(
+            machine.Symbols.InternFunctor("/", 2),
+            [Cell.Atom(machine.Symbols.InternAtom(name)), Cell.Integer60(arity)]
+        );
+
+        Cell formal = machine.CreateStructure(
+            machine.Symbols.InternFunctor("type_error", 2),
+            [Cell.Atom(machine.Symbols.InternAtom("evaluable")), indicator]
+        );
+
+        return Build(machine, formal, $"type_error(evaluable, {name}/{arity})");
+    }
+
+    private static PrologException Unary(Machine machine, string kind, string argument)
+    {
+        Cell formal = machine.CreateStructure(
+            machine.Symbols.InternFunctor(kind, 1),
+            [Cell.Atom(machine.Symbols.InternAtom(argument))]
+        );
+
+        return Build(machine, formal, $"{kind}({argument})");
+    }
+
+    private static PrologException Binary(Machine machine, string kind, string first, Cell culprit)
+    {
+        Cell formal = machine.CreateStructure(
+            machine.Symbols.InternFunctor(kind, 2),
+            [Cell.Atom(machine.Symbols.InternAtom(first)), culprit]
+        );
+
+        return Build(machine, formal, $"{kind}({first}, {TermWriter.ToDisplayString(machine, culprit, quoted: true)})");
+    }
+
+    private static PrologException Build(Machine machine, Cell formal, string description)
+    {
+        Cell error = machine.CreateStructure(machine.Symbols.InternFunctor("error", 2), [formal, machine.CreateVariable()]);
+
+        return machine.CreateBall(error, description);
+    }
+}
