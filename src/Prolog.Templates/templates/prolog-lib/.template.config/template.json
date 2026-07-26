@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Aleksandr Pavlov",
+  "classifications": [ "Library", "Prolog" ],
+  "identity": "DotProlog.Library",
+  "name": "Prolog Class Library",
+  "shortName": "prolog-lib",
+  "description": "A Prolog rule set exposed to C#, F#, and VB as a typed .NET library.",
+  "tags": { "language": "Prolog", "type": "project" },
+  "sourceName": "PrologLibrary",
+  "preferNameDirectory": true,
+  "symbols": {
+    "DotPrologVersion": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "1.0.0",
+      "replaces": "DOTPROLOG_VERSION",
+      "description": "Version of the DotProlog SDK and libraries to reference."
+    }
+  }
+}

@@ -1,0 +1,10 @@
+% The .NET surface of rules.pl. Determinism decides each method's shape:
+%   det     -> returns its output
+%   semidet -> returns bool, or bool TryX(..., out T) when it has one
+%   nondet  -> returns IEnumerable<T>, streamed as the caller pulls
+
+:- clr_module('Rules').
+
+:- clr_export(double/2, det, [in(value, integer), out(result, integer)]).
+:- clr_export(positive/1, semidet, [in(value, integer)]).
+:- clr_export(upto/2, nondet, [in(limit, integer), out(value, integer)]).

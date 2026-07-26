@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Aleksandr Pavlov",
+  "classifications": [ "Console", "Prolog" ],
+  "identity": "DotProlog.Console",
+  "name": "Prolog Console Application",
+  "shortName": "prolog-console",
+  "description": "A Prolog program built as a .NET application.",
+  "tags": { "language": "Prolog", "type": "project" },
+  "sourceName": "PrologConsole",
+  "preferNameDirectory": true,
+  "symbols": {
+    "DotPrologVersion": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "1.0.0",
+      "replaces": "DOTPROLOG_VERSION",
+      "description": "Version of the DotProlog SDK and libraries to reference."
+    }
+  }
+}
