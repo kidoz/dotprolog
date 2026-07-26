@@ -47,6 +47,10 @@ dotnet_diagnostic.CA1819.severity = none
 dotnet_diagnostic.CA1819.severity = none
 
 [benchmarks/**.cs]
+# BenchmarkDotNet discovers [Benchmark] methods on an instance, so one that happens to touch no
+# field still cannot be static.
+dotnet_diagnostic.CA1822.severity = none
+
 # BenchmarkDotNet requires public benchmark classes and settable [Params] properties.
 dotnet_diagnostic.CA1515.severity = none
 dotnet_diagnostic.CA1051.severity = none
