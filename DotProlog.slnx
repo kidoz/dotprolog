@@ -7,6 +7,7 @@
         <Project Path="src/Prolog.DotNetTool/Prolog.DotNetTool.csproj" />
         <Project Path="src/Prolog.Runtime/Prolog.Runtime.csproj" />
         <Project Path="src/Prolog.Templates/Prolog.Templates.csproj" />
+        <Project Path="src/Prolog.Testing/Prolog.Testing.csproj" />
         <Project Path="src/Prolog.Syntax/Prolog.Syntax.csproj" />
     </Folder>
     <Folder Name="/tests/">

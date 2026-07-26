@@ -42,6 +42,10 @@ dotnet_diagnostic.CA2007.severity = none
 # MSBuild binds task parameters by property and requires arrays for item lists, so CA1819 cannot apply.
 dotnet_diagnostic.CA1819.severity = none
 
+[src/Prolog.Testing/**.cs]
+# IDataProducer.DataTypesProduced is declared as Type[] by the platform, so CA1819 cannot apply.
+dotnet_diagnostic.CA1819.severity = none
+
 [benchmarks/**.cs]
 # BenchmarkDotNet requires public benchmark classes and settable [Params] properties.
 dotnet_diagnostic.CA1515.severity = none
