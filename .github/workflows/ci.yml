@@ -44,6 +44,11 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: dotnet csharpier check .
 
+      # MSBuild loads the facade generator as a task while building the .dplproj sample, so the task
+      # assembly has to exist before the solution build reaches that project.
+      - name: Build the facade generator task
+        run: dotnet build src/Prolog.Build.Tasks -c Release -p:ContinuousIntegrationBuild=true
+
       # ContinuousIntegrationBuild makes the build deterministic and Source Link paths correct. It is
       # deliberately not set in Directory.Build.props, where it would break debugging a working tree.
       - name: Build

@@ -1,0 +1,9 @@
+% The .NET surface of pricing.pl. Modes and determinism live here so the .pl stays portable.
+
+:- clr_module('Pricing').
+:- clr_namespace('PricingRules').
+
+:- clr_export(discount/3, det, [in(price, float), in(percent, integer), out(result, float)]).
+:- clr_export(tier/2, det, [in(total, integer), out(tier, atom)]).
+:- clr_export(in_catalogue/1, semidet, [in(item, atom)]).
+:- clr_export(bundle/2, nondet, [in(items, list(atom)), out(bundle, list(atom))]).

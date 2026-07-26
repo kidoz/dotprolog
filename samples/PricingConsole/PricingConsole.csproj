@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <RootNamespace>PricingConsole</RootNamespace>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- An ordinary ProjectReference across languages, exactly as it would be to an .fsproj. -->
+        <ProjectReference Include="..\PricingRules\PricingRules.dplproj" />
+    </ItemGroup>
+</Project>

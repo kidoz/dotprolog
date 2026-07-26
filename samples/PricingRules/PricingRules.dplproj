@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!--
+      A published SDK would be referenced as `<Sdk Name="DotProlog.Sdk" />`. Importing by path keeps
+      this sample building inside the repository, where no SDK package has been produced yet.
+    -->
+    <Import Project="..\..\src\DotProlog.Sdk\Sdk\Sdk.props" />
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <RootNamespace>PricingRules</RootNamespace>
+        <DotPrologClrTypeName>Pricing</DotPrologClrTypeName>
+        <IsPackable>false</IsPackable>
+
+        <!-- Generated code carries no XML documentation of its own. -->
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+        <!-- A packaged SDK would ship the task beside its targets; in-repo it is the built output. -->
+        <DotPrologTasksAssembly>$(MSBuildThisFileDirectory)..\..\src\Prolog.Build.Tasks\bin\$(Configuration)\net10.0\Prolog.Build.Tasks.dll</DotPrologTasksAssembly>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- A packaged SDK would inject this as a PackageReference. -->
+        <ProjectReference Include="..\..\src\Prolog.Compiler\Prolog.Compiler.csproj" />
+
+        <!-- Builds the task before this project needs it; its assembly is loaded by MSBuild, not referenced. -->
+        <ProjectReference Include="..\..\src\Prolog.Build.Tasks\Prolog.Build.Tasks.csproj" ReferenceOutputAssembly="false" />
+    </ItemGroup>
+
+    <Import Project="..\..\src\DotProlog.Sdk\Sdk\Sdk.targets" />
+
+</Project>

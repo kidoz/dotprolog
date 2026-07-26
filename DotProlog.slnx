@@ -1,5 +1,6 @@
 <Solution>
     <Folder Name="/src/">
+        <Project Path="src/Prolog.Build.Tasks/Prolog.Build.Tasks.csproj" />
         <Project Path="src/Prolog.CodeGen.CSharp/Prolog.CodeGen.CSharp.csproj" />
         <Project Path="src/Prolog.Compiler/Prolog.Compiler.csproj" />
         <Project Path="src/Prolog.DotNetTool/Prolog.DotNetTool.csproj" />
@@ -15,6 +16,9 @@
     </Folder>
     <Folder Name="/samples/">
         <Project Path="samples/AotAcceptance/AotAcceptance.csproj" />
+        <Project Path="samples/PricingConsole/PricingConsole.csproj" />
+        <!-- .dplproj is not an extension the solution format knows, so its type is stated. -->
+        <Project Path="samples/PricingRules/PricingRules.dplproj" Type="C#" />
     </Folder>
     <Folder Name="/benchmarks/">
         <Project Path="benchmarks/Prolog.Benchmarks/Prolog.Benchmarks.csproj" />
