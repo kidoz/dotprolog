@@ -62,7 +62,7 @@ public static class ContractReader
                     declaredNamespace = name.Name;
                     break;
 
-                case CompoundTerm { Name: "clr_export", Arity: 3 } export:
+                case CompoundTerm { Name: "clr_export", Arity: 3 or 4 } export:
                 {
                     ContractExport? read = ReadExport(export, diagnostics, fileName);
                     if (read is not null)
@@ -98,11 +98,48 @@ public static class ContractReader
             return new ContractReadResult(null, diagnostics);
         }
 
+        RejectClashingSignatures(exports, diagnostics, fileName);
+
         var contract = new ModuleContract(typeName, declaredNamespace ?? defaultNamespace, exports);
         return new ContractReadResult(
             diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error) ? null : contract,
             diagnostics
         );
+    }
+
+    /// <summary>
+    /// Rejects two exports that would generate the same method name and parameter types.
+    /// </summary>
+    /// <remarks>
+    /// A predicate exported in more than one mode gets one method per mode, and overloading sorts most
+    /// of them out. Two modes with the same input types do clash, though — <c>append(+,-,+)</c> and
+    /// <c>append(-,+,+)</c> both take two lists — and the fix is to name one of them with
+    /// <c>clr_export/4</c>. Catching it here makes that a contract error rather than a compile error
+    /// in code the author never wrote.
+    /// </remarks>
+    private static void RejectClashingSignatures(List<ContractExport> exports, List<Diagnostic> diagnostics, string? fileName)
+    {
+        HashSet<string> seen = new(StringComparer.Ordinal);
+
+        foreach (ContractExport export in exports)
+        {
+            string name = export.ClrName ?? export.PredicateName;
+            string signature = $"{name}({string.Join(",", export.Inputs.Select(input => input.Type.ClrTypeName))})";
+
+            if (seen.Add(signature))
+            {
+                continue;
+            }
+
+            Report(
+                diagnostics,
+                CodeGenDiagnosticIds.DuplicateMethodSignature,
+                $"{export.PredicateName}/{export.Arity} would generate a method that another export already generates. "
+                    + "Give one of them a name with clr_export/4.",
+                SourceSpan.None,
+                fileName
+            );
+        }
     }
 
     private static ContractExport? ReadExport(CompoundTerm export, List<Diagnostic> diagnostics, string? fileName)
@@ -186,7 +223,26 @@ public static class ContractReader
             return null;
         }
 
-        return new ContractExport(name.Name, (int)arity.Value, determinism, arguments);
+        string? clrName = null;
+        if (export.Arity == 4)
+        {
+            if (export.Arguments[3] is not AtomTerm alias)
+            {
+                Report(
+                    diagnostics,
+                    CodeGenDiagnosticIds.InvalidClrName,
+                    "The fourth argument of clr_export/4 must be an atom naming the generated method.",
+                    export.Arguments[3].Span,
+                    fileName
+                );
+
+                return null;
+            }
+
+            clrName = alias.Name;
+        }
+
+        return new ContractExport(name.Name, (int)arity.Value, determinism, arguments, clrName);
     }
 
     private static ContractArgument? ReadArgument(SyntaxTerm term, List<Diagnostic> diagnostics, string? fileName)

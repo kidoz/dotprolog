@@ -156,6 +156,64 @@ public sealed class ContractReaderTests
     }
 
     [Fact]
+    public void ClrExportFourNamesTheGeneratedMethod()
+    {
+        ModuleContract contract = ReadValid(
+            ":- clr_module('M').\n:- clr_export(nrev/2, det, [in(l, list(atom)), out(r, list(atom))], 'NaiveReverse')."
+        );
+
+        Assert.Equal("NaiveReverse", contract.Exports[0].ClrName);
+    }
+
+    [Fact]
+    public void AGeneratedNameThatIsNotAnAtomIsRejected()
+    {
+        Assert.Equal(
+            CodeGenDiagnosticIds.InvalidClrName,
+            ErrorId(":- clr_module('M').\n:- clr_export(p/1, det, [out(v, atom)], 42).")
+        );
+    }
+
+    [Fact]
+    public void TwoModesWithDifferentInputsOverloadCleanly()
+    {
+        // append(+,+,-) and append(+,-,-) take different numbers of inputs, so C# overloading covers it.
+        ModuleContract contract = ReadValid(
+            """
+            :- clr_module('M').
+            :- clr_export(append/3, det, [in(a, list(atom)), in(b, list(atom)), out(c, list(atom))]).
+            :- clr_export(append/3, nondet, [in(c, list(atom)), out(a, list(atom)), out(b, list(atom))]).
+            """
+        );
+
+        Assert.Equal(2, contract.Exports.Count);
+    }
+
+    [Fact]
+    public void TwoModesWithTheSameInputsAreRejectedUnlessOneIsRenamed()
+    {
+        // Both take two lists, so both would generate the same C# method.
+        const string Clashing = """
+            :- clr_module('M').
+            :- clr_export(append/3, nondet, [in(a, list(atom)), out(b, list(atom)), in(c, list(atom))]).
+            :- clr_export(append/3, nondet, [out(a, list(atom)), in(b, list(atom)), in(c, list(atom))]).
+            """;
+
+        Assert.Equal(CodeGenDiagnosticIds.DuplicateMethodSignature, ErrorId(Clashing));
+
+        // Naming one of them resolves it, which is what clr_export/4 is for.
+        ModuleContract resolved = ReadValid(
+            """
+            :- clr_module('M').
+            :- clr_export(append/3, nondet, [in(a, list(atom)), out(b, list(atom)), in(c, list(atom))], 'AppendLeft').
+            :- clr_export(append/3, nondet, [out(a, list(atom)), in(b, list(atom)), in(c, list(atom))]).
+            """
+        );
+
+        Assert.Equal("AppendLeft", resolved.Exports[0].ClrName);
+    }
+
+    [Fact]
     public void ReaderDiagnosticsSurfaceFromTheContractItself()
     {
         ContractReadResult result = Read(":- clr_module('M')\n:- clr_export(p/1, det, [out(v, atom)]).");

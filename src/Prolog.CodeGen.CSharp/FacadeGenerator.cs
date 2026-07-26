@@ -164,6 +164,8 @@ public static class FacadeGenerator
         text.AppendLine(CultureInfo.InvariantCulture, $"    public {Signature(export)}");
         text.AppendLine("    {");
 
+        AppendNullGuards(text, export);
+
         if (export.IsStreaming)
         {
             text.AppendLine(
@@ -171,6 +173,7 @@ public static class FacadeGenerator
                 $"        foreach (global::Prolog.Runtime.PrologValue[] __outputs in _host.CallAll({call}))"
             );
             text.AppendLine("        {");
+            text.AppendLine("            cancellationToken.ThrowIfCancellationRequested();");
             text.AppendLine(CultureInfo.InvariantCulture, $"            yield return {ResultExpression(export)};");
             text.AppendLine("        }");
         }
@@ -210,6 +213,38 @@ public static class FacadeGenerator
         text.AppendLine("    }");
     }
 
+    /// <summary>
+    /// Emits a null check for every reference-typed input.
+    /// </summary>
+    /// <remarks>
+    /// The F# component design guidelines call for checking null at a vanilla .NET API boundary,
+    /// because callers in other languages use null far more freely than the implementation language
+    /// does. Without this a null list fails somewhere inside the marshalling instead of naming the
+    /// parameter that was wrong.
+    /// </remarks>
+    private static void AppendNullGuards(StringBuilder text, ContractExport export)
+    {
+        bool wrote = false;
+
+        foreach (ContractArgument input in export.Inputs.Where(input => IsReferenceType(input.Type)))
+        {
+            text.AppendLine(
+                CultureInfo.InvariantCulture,
+                $"        global::System.ArgumentNullException.ThrowIfNull({Camel(input.Name)});"
+            );
+
+            wrote = true;
+        }
+
+        if (wrote)
+        {
+            text.AppendLine();
+        }
+    }
+
+    private static bool IsReferenceType(ContractType type) =>
+        type.Kind is ContractTypeKind.Atom or ContractTypeKind.List or ContractTypeKind.Term;
+
     private static string Signature(ContractExport export)
     {
         string parameters = string.Join(", ", export.Inputs.Select(input => $"{input.Type.ClrTypeName} {Camel(input.Name)}"));
@@ -218,7 +253,11 @@ public static class FacadeGenerator
 
         if (export.IsStreaming)
         {
-            return $"global::System.Collections.Generic.IEnumerable<{ResultTypeExpression(export)}> {name}({parameters})";
+            // A streaming call can enumerate for as long as the caller keeps pulling, so it has to be
+            // possible to stop it. .NET expects that to be a CancellationToken.
+            string before = parameters.Length == 0 ? string.Empty : ", ";
+            return $"global::System.Collections.Generic.IEnumerable<{ResultTypeExpression(export)}> {name}({parameters}{before}"
+                + "global::System.Threading.CancellationToken cancellationToken = default)";
         }
 
         if (!export.Outputs.Any())
@@ -260,7 +299,11 @@ public static class FacadeGenerator
 
     private static string ResultTypeName(ContractExport export) => $"{MethodName(export)}Result";
 
-    private static string MethodName(ContractExport export) => Pascal(export.PredicateName);
+    /// <summary>
+    /// The generated method name: the contract's own if it gave one, otherwise the predicate name in
+    /// .NET casing. This is the equivalent of F#'s <c>[CompiledName]</c>.
+    /// </summary>
+    private static string MethodName(ContractExport export) => export.ClrName ?? Pascal(export.PredicateName);
 
     private static string Field(ContractExport export) => $"_{Camel(export.PredicateName)}{export.Arity}";
 

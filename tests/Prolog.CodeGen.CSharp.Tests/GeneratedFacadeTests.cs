@@ -146,7 +146,8 @@ public sealed class GeneratedFacadeTests
     {
         object module = CreateModule(out Type type);
 
-        var colours = (IEnumerable<string>)Call(module, type, "Colour")!;
+        // Streaming methods take a CancellationToken, which reflection must supply explicitly.
+        var colours = (IEnumerable<string>)Call(module, type, "Colour", CancellationToken.None)!;
 
         Assert.Equal(["red", "green", "blue"], colours);
     }
@@ -156,8 +157,7 @@ public sealed class GeneratedFacadeTests
     {
         object module = CreateModule(out Type type);
 
-        // The array is one argument, not two: params would otherwise spread it.
-        var splits = (System.Collections.IEnumerable)Call(module, type, "Split", (object)SplitInput)!;
+        var splits = (System.Collections.IEnumerable)Call(module, type, "Split", SplitInput, CancellationToken.None)!;
         List<string> shapes = [];
 
         foreach (object split in splits)

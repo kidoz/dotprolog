@@ -26,4 +26,10 @@ public static class CodeGenDiagnosticIds
 
     /// <summary>A <c>det</c> export declares no outputs, so its C# signature would have no result.</summary>
     public const string DeterministicExportNeedsOutput = "DPL2008";
+
+    /// <summary>The generated method name given to <c>clr_export/4</c> is not an atom.</summary>
+    public const string InvalidClrName = "DPL2009";
+
+    /// <summary>Two exports would generate the same method name and parameter list.</summary>
+    public const string DuplicateMethodSignature = "DPL2010";
 }
