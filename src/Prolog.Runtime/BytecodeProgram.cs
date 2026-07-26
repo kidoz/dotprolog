@@ -11,6 +11,15 @@ public sealed class BytecodeProgram
     /// <summary>The address of the instruction that returns control to the host.</summary>
     public const int TopLevelReturnAddress = 0;
 
+    /// <summary>
+    /// The address of a <see cref="OpCode.TrustMe"/> followed by a <see cref="OpCode.Fail"/>. A soft
+    /// cut retargets a choice point here so that reaching it discards that choice point and keeps
+    /// backtracking, without having to remove it from the middle of the stack. The
+    /// <see cref="OpCode.TrustMe"/> is what makes this terminate: a bare failure would land on the
+    /// same choice point again forever.
+    /// </summary>
+    public const int PopAndFailAddress = 1;
+
     private const int Undefined = -1;
 
     private int[] _code = new int[1024];
@@ -24,8 +33,10 @@ public sealed class BytecodeProgram
         Symbols = new SymbolTable();
         Builtins = new BuiltinRegistry(Symbols);
         Array.Fill(_entryPoints, Undefined);
-        _code[0] = (int)OpCode.Stop;
-        CodeLength = 1;
+        _code[TopLevelReturnAddress] = (int)OpCode.Stop;
+        _code[PopAndFailAddress] = (int)OpCode.TrustMe;
+        _code[PopAndFailAddress + 1] = (int)OpCode.Fail;
+        CodeLength = 3;
     }
 
     /// <summary>The atoms, functors, and floats this program refers to.</summary>

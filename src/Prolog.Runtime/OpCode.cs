@@ -31,6 +31,38 @@ public enum OpCode
     /// <summary>Discard every choice point created since the current predicate was entered.</summary>
     Cut,
 
+    /// <summary>
+    /// Operands: slot, address. Record the current choice-point depth in the slot, then push a
+    /// choice point whose alternative is the address. Used for control constructs inside a clause
+    /// body, which need their own barrier without disturbing the argument registers.
+    /// </summary>
+    TryBranch,
+
+    /// <summary>
+    /// Operand: slot. Record the current choice-point depth in the slot without pushing anything.
+    /// A cut inside the condition of if-then-else or negation cuts to this, so it prunes only the
+    /// choice points the condition itself created.
+    /// </summary>
+    MarkBarrier,
+
+    /// <summary>Operand: address. Continue execution at the address.</summary>
+    Jump,
+
+    /// <summary>Operand: slot. Discard every choice point created since the branch recorded in the slot.</summary>
+    CutTo,
+
+    /// <summary>
+    /// Operand: slot. Neutralise just the choice point recorded in the slot, leaving any created
+    /// since it intact. This is the soft cut behind <c>*-&gt;/2</c>.
+    /// </summary>
+    SoftCut,
+
+    /// <summary>
+    /// Call the goal held in argument register zero, resolving its functor at run time. This is
+    /// <c>call/1</c>; it dispatches to a builtin in place, or jumps to a predicate as <see cref="Call"/> does.
+    /// </summary>
+    MetaCall,
+
     /// <summary>Operand: address. Push a choice point whose alternative is the operand.</summary>
     TryMeElse,
 
@@ -66,6 +98,13 @@ public enum OpCode
 
     /// <summary>Operands: slot, argument register. Create a fresh variable in both.</summary>
     PutVariable,
+
+    /// <summary>
+    /// Operand: slot. Create a fresh variable in the slot alone. Used to bring a variable into
+    /// existence before a control construct's choice point, so that backtracking into a later branch
+    /// cannot discard the heap cell the slot refers to.
+    /// </summary>
+    InitVariable,
 
     /// <summary>Operands: slot, argument register. Copy a slot into an argument register.</summary>
     PutValue,

@@ -1,0 +1,267 @@
+using System.Runtime.InteropServices;
+
+namespace Prolog.Runtime;
+
+/// <summary>
+/// Type tests, standard-order comparison, and term construction and inspection. Registered
+/// explicitly by <see cref="CoreBuiltins.RegisterAll"/>, like every other native predicate.
+/// </summary>
+internal static class TermBuiltins
+{
+    internal static void Register(BuiltinRegistry registry, SymbolTable symbols)
+    {
+        RegisterTypeTests(registry);
+        RegisterComparisons(registry, symbols);
+        RegisterInspection(registry, symbols);
+    }
+
+    private static void RegisterTypeTests(BuiltinRegistry registry)
+    {
+        registry.Register("var", 1, static machine => machine.Argument(0).Tag == CellTag.Reference);
+        registry.Register("nonvar", 1, static machine => machine.Argument(0).Tag != CellTag.Reference);
+        registry.Register("atom", 1, static machine => machine.Argument(0).Tag == CellTag.Atom);
+        registry.Register("integer", 1, static machine => machine.Argument(0).Tag == CellTag.Integer);
+        registry.Register("float", 1, static machine => machine.Argument(0).Tag == CellTag.Float);
+        registry.Register("number", 1, static machine => machine.Argument(0).Tag is CellTag.Integer or CellTag.Float);
+        registry.Register("compound", 1, static machine => machine.Argument(0).Tag == CellTag.Structure);
+        registry.Register(
+            "atomic",
+            1,
+            static machine => machine.Argument(0).Tag is CellTag.Atom or CellTag.Integer or CellTag.Float
+        );
+        registry.Register("callable", 1, static machine => machine.Argument(0).Tag is CellTag.Atom or CellTag.Structure);
+        registry.Register("is_list", 1, static machine => IsProperList(machine, machine.Argument(0)));
+        registry.Register("ground", 1, static machine => IsGround(machine, machine.Argument(0)));
+    }
+
+    private static void RegisterComparisons(BuiltinRegistry registry, SymbolTable symbols)
+    {
+        registry.Register("==", 2, static machine => Order(machine) == 0);
+        registry.Register("\\==", 2, static machine => Order(machine) != 0);
+        registry.Register("@<", 2, static machine => Order(machine) < 0);
+        registry.Register("@>", 2, static machine => Order(machine) > 0);
+        registry.Register("@=<", 2, static machine => Order(machine) <= 0);
+        registry.Register("@>=", 2, static machine => Order(machine) >= 0);
+        registry.Register("\\=", 2, static machine => !machine.CanUnify(machine.Argument(0), machine.Argument(1)));
+
+        int less = symbols.InternAtom("<");
+        int equal = symbols.InternAtom("=");
+        int greater = symbols.InternAtom(">");
+        registry.Register(
+            "compare",
+            3,
+            machine =>
+            {
+                int order = TermOrder.Compare(machine, machine.Argument(1), machine.Argument(2));
+                int atom =
+                    order < 0 ? less
+                    : order > 0 ? greater
+                    : equal;
+                return machine.Unify(machine.Argument(0), Cell.Atom(atom));
+            }
+        );
+    }
+
+    private static void RegisterInspection(BuiltinRegistry registry, SymbolTable symbols)
+    {
+        registry.Register("functor", 3, Functor3);
+        registry.Register("arg", 3, Arg3);
+
+        int emptyList = symbols.EmptyList;
+        registry.Register("=..", 2, machine => Univ(machine, emptyList));
+    }
+
+    private static int Order(Machine machine) => TermOrder.Compare(machine, machine.Argument(0), machine.Argument(1));
+
+    private static bool Functor3(Machine machine)
+    {
+        Cell term = machine.Argument(0);
+
+        if (term.Tag != CellTag.Reference)
+        {
+            if (term.Tag == CellTag.Structure)
+            {
+                Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(term.Index).Index);
+                return machine.Unify(machine.Argument(1), Cell.Atom(functor.NameAtom))
+                    && machine.Unify(machine.Argument(2), Cell.Integer60(functor.Arity));
+            }
+
+            return machine.Unify(machine.Argument(1), term) && machine.Unify(machine.Argument(2), Cell.Integer60(0));
+        }
+
+        Cell name = machine.Argument(1);
+        Cell arity = machine.Argument(2);
+
+        if (name.Tag == CellTag.Reference || arity.Tag == CellTag.Reference)
+        {
+            throw new PrologException("instantiation_error");
+        }
+
+        if (arity.Tag != CellTag.Integer)
+        {
+            throw new PrologException("type_error(integer, _)");
+        }
+
+        if (arity.Integer == 0)
+        {
+            return machine.Unify(term, name);
+        }
+
+        if (name.Tag != CellTag.Atom)
+        {
+            throw new PrologException("type_error(atom, _)");
+        }
+
+        if (arity.Integer >= Machine.ArgumentRegisterCount)
+        {
+            throw new PrologException($"representation_error(max_arity) for arity {arity.Integer}");
+        }
+
+        var arguments = new Cell[(int)arity.Integer];
+        for (int i = 0; i < arguments.Length; i++)
+        {
+            arguments[i] = machine.CreateVariable();
+        }
+
+        int functorId = machine.Symbols.InternFunctor(name.Index, arguments.Length);
+        return machine.Unify(term, machine.CreateStructure(functorId, arguments));
+    }
+
+    private static bool Arg3(Machine machine)
+    {
+        Cell index = machine.Argument(0);
+        Cell term = machine.Argument(1);
+
+        if (index.Tag == CellTag.Reference)
+        {
+            // The nondeterministic form of arg/3 needs a builtin that can create choice points.
+            throw new PrologException("instantiation_error");
+        }
+
+        if (index.Tag != CellTag.Integer)
+        {
+            throw new PrologException("type_error(integer, _)");
+        }
+
+        if (term.Tag != CellTag.Structure)
+        {
+            throw new PrologException("type_error(compound, _)");
+        }
+
+        int arity = machine.Symbols.ArityOf(machine.HeapAt(term.Index).Index);
+        if (index.Integer < 1 || index.Integer > arity)
+        {
+            return false;
+        }
+
+        return machine.Unify(machine.Argument(2), machine.HeapAt(term.Index + (int)index.Integer));
+    }
+
+    private static bool Univ(Machine machine, int emptyList)
+    {
+        Cell term = machine.Argument(0);
+
+        if (term.Tag != CellTag.Reference)
+        {
+            if (term.Tag == CellTag.Structure)
+            {
+                Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(term.Index).Index);
+                var items = new Cell[functor.Arity + 1];
+                items[0] = Cell.Atom(functor.NameAtom);
+                for (int i = 0; i < functor.Arity; i++)
+                {
+                    items[i + 1] = machine.HeapAt(term.Index + 1 + i);
+                }
+
+                return machine.Unify(machine.Argument(1), machine.CreateList(items, Cell.Atom(emptyList)));
+            }
+
+            return machine.Unify(machine.Argument(1), machine.CreateList([term], Cell.Atom(emptyList)));
+        }
+
+        List<Cell> elements = [];
+        if (!TryReadList(machine, machine.Argument(1), elements, emptyList))
+        {
+            throw new PrologException("instantiation_error");
+        }
+
+        if (elements.Count == 0)
+        {
+            throw new PrologException("domain_error(non_empty_list, [])");
+        }
+
+        Cell head = machine.Dereference(elements[0]);
+
+        if (elements.Count == 1)
+        {
+            return machine.Unify(term, head);
+        }
+
+        if (head.Tag != CellTag.Atom)
+        {
+            throw new PrologException("type_error(atom, _)");
+        }
+
+        if (elements.Count - 1 >= Machine.ArgumentRegisterCount)
+        {
+            throw new PrologException($"representation_error(max_arity) for arity {elements.Count - 1}");
+        }
+
+        int functorId = machine.Symbols.InternFunctor(head.Index, elements.Count - 1);
+        return machine.Unify(term, machine.CreateStructure(functorId, CollectionsMarshal.AsSpan(elements)[1..]));
+    }
+
+    private static bool TryReadList(Machine machine, Cell list, List<Cell> elements, int emptyList)
+    {
+        Cell cell = machine.Dereference(list);
+
+        while (cell.Tag == CellTag.Structure && machine.HeapAt(cell.Index).Index == machine.Symbols.ListFunctor)
+        {
+            elements.Add(machine.HeapAt(cell.Index + 1));
+            cell = machine.Dereference(machine.HeapAt(cell.Index + 2));
+        }
+
+        return cell.Tag == CellTag.Atom && cell.Index == emptyList;
+    }
+
+    private static bool IsProperList(Machine machine, Cell list)
+    {
+        Cell cell = machine.Dereference(list);
+
+        while (cell.Tag == CellTag.Structure && machine.HeapAt(cell.Index).Index == machine.Symbols.ListFunctor)
+        {
+            cell = machine.Dereference(machine.HeapAt(cell.Index + 2));
+        }
+
+        return cell.Tag == CellTag.Atom && cell.Index == machine.Symbols.EmptyList;
+    }
+
+    private static bool IsGround(Machine machine, Cell term)
+    {
+        List<Cell> work = [term];
+
+        while (work.Count > 0)
+        {
+            Cell cell = machine.Dereference(work[^1]);
+            work.RemoveAt(work.Count - 1);
+
+            if (cell.Tag == CellTag.Reference)
+            {
+                return false;
+            }
+
+            if (cell.Tag != CellTag.Structure)
+            {
+                continue;
+            }
+
+            int arity = machine.Symbols.ArityOf(machine.HeapAt(cell.Index).Index);
+            for (int i = 1; i <= arity; i++)
+            {
+                work.Add(machine.HeapAt(cell.Index + i));
+            }
+        }
+
+        return true;
+    }
+}

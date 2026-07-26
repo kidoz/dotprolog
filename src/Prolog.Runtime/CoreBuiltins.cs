@@ -106,6 +106,8 @@ public static class CoreBuiltins
         registry.Register(">", 2, static machine => CompareArguments(machine) > 0);
         registry.Register("=<", 2, static machine => CompareArguments(machine) <= 0);
         registry.Register(">=", 2, static machine => CompareArguments(machine) >= 0);
+
+        TermBuiltins.Register(registry, program.Symbols);
     }
 
     private static int CompareArguments(Machine machine) =>

@@ -50,6 +50,8 @@ public sealed class Machine
     private bool _writeMode;
     private int _argumentCount;
     private bool _halted;
+    private bool _forceTrail;
+    private readonly int _callFunctor;
 
     /// <summary>Creates a machine that executes <paramref name="program"/>.</summary>
     public Machine(BytecodeProgram program)
@@ -57,6 +59,7 @@ public sealed class Machine
         ArgumentNullException.ThrowIfNull(program);
         _program = program;
         _symbols = program.Symbols;
+        _callFunctor = _symbols.InternFunctor("call", 1);
         Output = Console.Out;
     }
 
@@ -149,6 +152,44 @@ public sealed class Machine
 
                 case OpCode.Cut:
                     CutTo((int)_stack[_e + FrameCutBarrier].Integer);
+                    break;
+
+                case OpCode.CutTo:
+                    CutTo((int)_stack[_e + FrameHeaderSize + code[_pc++]].Integer);
+                    break;
+
+                case OpCode.SoftCut:
+                {
+                    int barrier = (int)_stack[_e + FrameHeaderSize + code[_pc++]].Integer;
+                    if (barrier < _b)
+                    {
+                        _choicePoints[barrier].Alternative = BytecodeProgram.PopAndFailAddress;
+                    }
+
+                    break;
+                }
+
+                case OpCode.MarkBarrier:
+                    _stack[_e + FrameHeaderSize + code[_pc++]] = Cell.Integer60(_b);
+                    break;
+
+                case OpCode.Jump:
+                    _pc = code[_pc];
+                    break;
+
+                case OpCode.TryBranch:
+                {
+                    // A branch barrier needs no argument registers: each branch reloads its own.
+                    _stack[_e + FrameHeaderSize + code[_pc++]] = Cell.Integer60(_b);
+                    int savedArity = _argumentCount;
+                    _argumentCount = 0;
+                    PushChoicePoint(code[_pc++]);
+                    _argumentCount = savedArity;
+                    break;
+                }
+
+                case OpCode.MetaCall:
+                    proved = MetaCall();
                     break;
 
                 case OpCode.TryMeElse:
@@ -255,6 +296,10 @@ public sealed class Machine
                     break;
                 }
 
+                case OpCode.InitVariable:
+                    _stack[_e + FrameHeaderSize + code[_pc++]] = NewVariable();
+                    break;
+
                 case OpCode.PutValue:
                 {
                     int slot = code[_pc++];
@@ -313,6 +358,103 @@ public sealed class Machine
 
     /// <summary>Returns the heap cell at <paramref name="address"/>.</summary>
     public Cell HeapAt(int address) => _heap[address];
+
+    /// <summary>Pushes a fresh unbound variable onto the heap and returns its cell.</summary>
+    public Cell CreateVariable() => NewVariable();
+
+    /// <summary>Builds a compound term on the heap from <paramref name="arguments"/> and returns its cell.</summary>
+    public Cell CreateStructure(int functorId, ReadOnlySpan<Cell> arguments)
+    {
+        EnsureHeap(1 + arguments.Length);
+        int address = _h;
+        _heap[_h++] = Cell.Functor(functorId);
+        foreach (Cell argument in arguments)
+        {
+            _heap[_h++] = argument;
+        }
+
+        return Cell.Structure(address);
+    }
+
+    /// <summary>Builds a list from <paramref name="items"/> ending in <paramref name="tail"/>.</summary>
+    public Cell CreateList(ReadOnlySpan<Cell> items, Cell tail)
+    {
+        Cell result = tail;
+        for (int i = items.Length - 1; i >= 0; i--)
+        {
+            result = CreateStructure(_symbols.ListFunctor, [items[i], result]);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Reports whether two terms unify, leaving no bindings behind. Bindings made during the attempt
+    /// are trailed unconditionally and undone before returning, which is what <c>\=/2</c> needs.
+    /// </summary>
+    public bool CanUnify(Cell left, Cell right)
+    {
+        int trailMark = _tr;
+        bool previous = _forceTrail;
+        _forceTrail = true;
+        bool unified = Unify(left, right);
+        _forceTrail = previous;
+        UndoTrail(trailMark);
+        return unified;
+    }
+
+    /// <summary>
+    /// Resolves the goal in argument register zero and transfers control to it. Chains of
+    /// <c>call/1</c> wrappers are unwrapped first, so <c>call(call(G))</c> costs nothing extra.
+    /// </summary>
+    private bool MetaCall()
+    {
+        Cell goal = Dereference(_x[0]);
+
+        while (goal.Tag == CellTag.Structure && _heap[goal.Index].Index == _callFunctor)
+        {
+            goal = Dereference(_heap[goal.Index + 1]);
+        }
+
+        int functorId;
+        int arity;
+
+        switch (goal.Tag)
+        {
+            case CellTag.Atom:
+                functorId = _symbols.InternFunctor(goal.Index, 0);
+                arity = 0;
+                break;
+
+            case CellTag.Structure:
+                functorId = _heap[goal.Index].Index;
+                arity = _symbols.ArityOf(functorId);
+                for (int i = 0; i < arity; i++)
+                {
+                    _x[i] = _heap[goal.Index + 1 + i];
+                }
+
+                break;
+
+            case CellTag.Reference:
+                throw new PrologException("instantiation_error");
+
+            default:
+                throw new PrologException($"type_error(callable, {TermWriter.ToDisplayString(this, goal, quoted: true)})");
+        }
+
+        _argumentCount = arity;
+
+        if (_program.Builtins.TryGetId(functorId, out int builtinId))
+        {
+            return _program.Builtins.Implementation(builtinId)(this);
+        }
+
+        _continuation = _pc;
+        _b0 = _b;
+        _pc = EntryPointOf(functorId);
+        return true;
+    }
 
     /// <summary>Requests that the current run stop with <paramref name="exitCode"/>, as <c>halt/1</c> does.</summary>
     public void RequestHalt(int exitCode)
@@ -414,6 +556,7 @@ public sealed class Machine
         _structureArgument = 0;
         _argumentCount = 0;
         _halted = false;
+        _forceTrail = false;
         ExitCode = 0;
     }
 
@@ -515,8 +658,9 @@ public sealed class Machine
     {
         _heap[address] = value;
 
-        // Only bindings older than the newest choice point need undoing; younger cells vanish with the heap.
-        if (_b > 0 && address < _choicePoints[_b - 1].HeapTop)
+        // Only bindings older than the newest choice point need undoing; younger cells vanish with the
+        // heap. A tentative unification suspends that reasoning and trails everything.
+        if (_forceTrail || (_b > 0 && address < _choicePoints[_b - 1].HeapTop))
         {
             if (_tr == _trail.Length)
             {
