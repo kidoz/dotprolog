@@ -2,6 +2,8 @@
 
 A Prolog language implementation for .NET 10, written in C# 14.
 
+<https://github.com/kidoz/dotprolog>
+
 The goal is a first-class Prolog experience on the .NET SDK, the way C# and F# have one: `.dplproj` projects, a `plc` compiler, `dotnet prolog`, `dotnet new` templates, and NativeAOT publishing.
 
 **Status: early.** The runtime-consult path works end to end — Prolog source is read, compiled to bytecode, and executed by the engine. The build-time path that generates C#, the MSBuild SDK, templates, and packaging are not built yet.
@@ -104,6 +106,18 @@ Diagnostic identifiers are stable and product-specific: `DPL0xxx` from the reade
 hello.pl(4,12): error DPL0005: Expected '.' to end the clause but found 'b'.
 ```
 
-## Requirements
+## Building from source
 
-.NET SDK 10.0 or later. Everything else restores from NuGet.
+```console
+$ git clone https://github.com/kidoz/dotprolog.git
+$ cd dotprolog
+$ just check          # format-check, build, and test
+```
+
+.NET SDK 10.0 or later is the only requirement; everything else restores from NuGet.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE).
+
+Author: Aleksandr Pavlov &lt;ckidoz@gmail.com&gt;

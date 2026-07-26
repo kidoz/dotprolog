@@ -6,4 +6,30 @@
         <IsAotCompatible>true</IsAotCompatible>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
+
+    <PropertyGroup>
+        <!-- Package identity is still open; see the product scope's open decisions. Only the terms
+             that are settled are declared here. -->
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageProjectUrl>https://github.com/kidoz/dotprolog</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/kidoz/dotprolog</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <!-- Source Link. The .NET SDK has carried the GitHub provider since .NET 8, so this needs
+             settings rather than a package reference. Set ContinuousIntegrationBuild in CI, not
+             here: it makes builds deterministic but rewrites local paths, which breaks debugging
+             a working tree. -->
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="$(RepositoryRoot)LICENSE" Pack="true" PackagePath="" Visible="false" />
+        <None Include="$(RepositoryRoot)README.md" Pack="true" PackagePath="" Visible="false" />
+    </ItemGroup>
 </Project>
