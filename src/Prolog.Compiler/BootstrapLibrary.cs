@@ -45,5 +45,17 @@ internal static class BootstrapLibrary
         % call(!) is defined to behave as true: the cut is local to the call, and there is
         % nothing inside it to prune.
         !.
+
+        % findall/3 as a failure-driven loop. '$collect_begin' opens a solution buffer that
+        % survives backtracking, '$collect_add' copies one solution into it, and
+        % '$collect_end' materialises the lot as a list. The loop reaches '$collect_end'
+        % through the ';' branch, because the first branch always fails.
+        findall(Template, Goal, Bag) :-
+            '$collect_begin',
+            ( call(Goal), '$collect_add'(Template), fail ; true ),
+            '$collect_end'(Bag).
+
+        forall(Condition, Action) :-
+            \+ ( call(Condition), \+ call(Action) ).
         """;
 }
