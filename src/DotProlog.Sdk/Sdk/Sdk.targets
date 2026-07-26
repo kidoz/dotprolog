@@ -25,10 +25,15 @@
         <PrologContract Include="**\*.dpli" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
     </ItemGroup>
 
-    <!--
-      DotPrologTasksAssembly is set by the consumer inside this repository, and by the SDK package
-      itself once one is published.
-    -->
+    <PropertyGroup>
+        <!--
+          Inside the SDK package the generator sits beside these targets, at ../tasks/. A consumer
+          building against the repository sets DotPrologTasksAssembly itself, and that wins.
+        -->
+        <DotPrologTasksAssembly Condition="'$(DotPrologTasksAssembly)' == ''"
+            >$(MSBuildThisFileDirectory)..\tasks\net10.0\Prolog.Build.Tasks.dll</DotPrologTasksAssembly>
+    </PropertyGroup>
+
     <UsingTask TaskName="Prolog.Build.Tasks.GeneratePrologFacade" AssemblyFile="$(DotPrologTasksAssembly)" />
 
     <!--
@@ -42,8 +47,8 @@
         Outputs="$(DotPrologGeneratedPath).generated"
     >
         <Error
-            Condition="'$(DotPrologTasksAssembly)' == ''"
-            Text="DotPrologTasksAssembly is not set, so the facade generator cannot be loaded."
+            Condition="!Exists('$(DotPrologTasksAssembly)')"
+            Text="The facade generator was not found at $(DotPrologTasksAssembly)."
         />
 
         <MakeDir Directories="$(DotPrologGeneratedPath)" />

@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <!--
+          An MSBuild SDK package: it carries no assemblies of its own, only the props and targets
+          that `<Sdk Name="DotProlog.Sdk" />` resolves to, plus the facade generator they load.
+        -->
+        <PackageType>MSBuildSdk</PackageType>
+        <IncludeBuildOutput>false</IncludeBuildOutput>
+        <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+        <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+        <GenerateDocumentationFile>false</GenerateDocumentationFile>
+        <IsAotCompatible>false</IsAotCompatible>
+
+        <!-- No assemblies of our own means no symbols; an empty .snupkg fails pack with NU5017. -->
+        <IncludeSymbols>false</IncludeSymbols>
+
+        <!--
+          NU5128: no lib/ folder, and NU5100: assemblies outside it. Both are correct for an SDK
+          package — the task assemblies are loaded by MSBuild, never referenced by consuming code.
+        -->
+        <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
+
+        <PrologTasksOutput>$(MSBuildThisFileDirectory)..\Prolog.Build.Tasks\bin\$(Configuration)\net10.0\</PrologTasksOutput>
+        <TargetsForTfmSpecificContentInPackage>
+            $(TargetsForTfmSpecificContentInPackage);PackPrologSdkContent
+        </TargetsForTfmSpecificContentInPackage>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- Builds the generator before this package needs its output; not referenced as an assembly. -->
+        <ProjectReference Include="..\Prolog.Build.Tasks\Prolog.Build.Tasks.csproj" ReferenceOutputAssembly="false" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!--
+          Declared as ordinary pack items rather than only in the target below: pack counts content
+          during evaluation, and a package whose every file comes from a target trips NU5017.
+          MSBuild resolves `<Sdk Name="X" />` to Sdk/Sdk.props and Sdk/Sdk.targets in the package.
+        -->
+        <None Include="Sdk\Sdk.props" Pack="true" PackagePath="Sdk\" />
+        <None Include="Sdk\Sdk.targets" Pack="true" PackagePath="Sdk\" />
+    </ItemGroup>
+
+    <Target Name="PackPrologSdkContent">
+        <ItemGroup>
+            <!-- The generator and everything it needs, loaded by Sdk.targets through a UsingTask. -->
+            <_PrologTaskAssembly Include="$(PrologTasksOutput)*.dll" />
+            <TfmSpecificPackageFile Include="@(_PrologTaskAssembly)" PackagePath="tasks\net10.0\%(Filename)%(Extension)" />
+        </ItemGroup>
+
+        <Error
+            Condition="'@(_PrologTaskAssembly)' == ''"
+            Text="No task assemblies were found in $(PrologTasksOutput); build Prolog.Build.Tasks first."
+        />
+    </Target>
+</Project>
