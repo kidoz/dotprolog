@@ -192,18 +192,23 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 | Area | Predicates |
 |---|---|
 | Terms | atoms, variables, integers, floats, double-quoted code lists, lists, structures |
-| Control | `,/2`, `;/2`, `->/2`, `*->/2`, `\+/1`, `!/0`, `call/1`, `not/1`, `true/0`, `fail/0` |
+| Control | `,/2`, `;/2`, `->/2`, `*->/2`, `\+/1`, `!/0`, `call/1..8`, `once/1`, `ignore/1`, `not/1`, `true/0`, `fail/0` |
 | Exceptions | `throw/1`, `catch/3`, with catchable ISO `error/2` terms |
-| All solutions | `findall/3`, `forall/2` |
+| All solutions | `findall/3`, `forall/2`, `aggregate_all/3` (`count`, `bag`, `set`, `sum`, `max`, `min`) |
 | Database | `assertz/1`, `asserta/1`, `retract/1`, `clause/2`, `retractall/1`, `abolish/1`, `:- dynamic` |
 | Ranges | `between/3` |
 | Loading | `consult/1`, `ensure_loaded/1` at run time |
 | Unification | `=/2`, `\=/2` |
 | Arithmetic | `is/2`, `=:=/2`, `=\=/2`, `</2`, `>/2`, `=</2`, `>=/2` |
 | Standard order | `==/2`, `\==/2`, `@</2`, `@>/2`, `@=</2`, `@>=/2`, `compare/3` |
-| Term inspection | `functor/3`, `arg/3`, `=../2` |
+| Term inspection | `functor/3`, `arg/3`, `=../2`, `copy_term/2`, `term_variables/2` |
 | Type tests | `var/1`, `nonvar/1`, `atom/1`, `number/1`, `integer/1`, `float/1`, `atomic/1`, `compound/1`, `callable/1`, `is_list/1`, `ground/1` |
-| Output | `write/1`, `writeq/1`, `print/1`, `writeln/1`, `nl/0` |
+| Text | `atom_length/2`, `atom_chars/2`, `atom_codes/2`, `number_chars/2`, `number_codes/2`, `char_code/2`, `atom_number/2`, `atom_concat/3`, `sub_atom/5`, `atomic_list_concat/2,3`, `upcase_atom/2`, `downcase_atom/2` |
+| Lists | `length/2`, `append/3`, `member/2`, `memberchk/2`, `nth0/3`, `nth1/3`, `last/2`, `reverse/2`, `select/3`, `selectchk/3`, `subtract/3`, `intersection/3`, `union/3`, `delete/3`, `list_to_set/2`, `permutation/2`, `flatten/2`, `numlist/3`, `sum_list/2`, `max_list/2`, `min_list/2`, `max_member/2`, `min_member/2`, `pairs_keys_values/3`, `pairs_keys/2`, `pairs_values/2` |
+| Higher order | `maplist/2..5`, `foldl/4,5`, `include/3`, `exclude/3`, `partition/4` |
+| Sorting | `sort/2`, `sort/4`, `msort/2`, `keysort/2`, `predsort/3` |
+| Integers | `succ/2`, `plus/3` |
+| Output | `write/1`, `writeq/1`, `print/1`, `writeln/1`, `nl/0`, `format/1,2,3`, `tab/1` |
 | Directives | `:- Goal`, `:- initialization(Goal)`, `halt/0`, `halt/1` |
 
 Control constructs are compiled in place inside a clause body, so cut scopes the way ISO specifies: opaque in the condition of if-then-else, transparent in its branches, clause-scoped elsewhere. A bootstrap library written in Prolog makes the same constructs reachable when a goal is assembled at run time and passed to `call/1`.
@@ -223,9 +228,28 @@ squares(L) :- findall(S, (item(N), S is N * N), L).   % L = [1,4,9]
 
 Every error the engine raises is a catchable `error(Formal, Context)` term, so `existence_error`, `type_error`, `instantiation_error`, and `evaluation_error` can all be handled in Prolog rather than aborting the run.
 
-Not yet implemented: modules, DCGs, streams and file I/O, `bagof/3`, `setof/3`, `copy_term/2`, and `call/N` for N above one.
+```prolog
+report(Rows) :-
+    forall(member(Name-Qty, Rows), format("~w~t~12|~t~d~4+~n", [Name, Qty])).
 
-One known deviation: a cut inside a goal reached through `call/1` is local to that goal and prunes nothing in the meta-call, so `call((a, !, b))` behaves as `call((a, b))`.
+total(Rows, Total) :- aggregate_all(sum(Q), member(_-Q, Rows), Total).
+
+initials(Name, Initial) :- sub_atom(Name, 0, 1, _, Initial).
+```
+
+Predicates written in Prolog rather than C# live in a standard library that every engine loads at
+construction, which costs about 190 µs. A consulted file that defines one of them replaces it
+outright, so a program is free to write its own `member/2` without inheriting extra solutions.
+
+There is no string type: an atom is the only text term. The SWI-Prolog string predicates are absent
+rather than aliased to their atom counterparts, because aliasing would let portable code compile
+here and then behave differently.
+
+Not yet implemented: modules, DCGs, streams and file I/O, `bagof/3`, `setof/3`, `op/3`, and
+user-defined operators.
+
+Two known deviations. `write/1` is canonical apart from list notation, so `1+2` prints as `+(1,2)`
+until the writer learns the operator table. And a cut inside a goal reached through `call/1` is local to that goal and prunes nothing in the meta-call, so `call((a, !, b))` behaves as `call((a, b))` — which also means `findall(X, (goal(X), !), L)` does not stop at the first solution.
 
 DotProlog does not claim ISO or SWI-Prolog compatibility. It will not claim it until published conformance tests verify it.
 
