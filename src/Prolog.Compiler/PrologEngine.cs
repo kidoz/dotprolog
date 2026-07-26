@@ -93,6 +93,27 @@ public sealed class PrologEngine : IRuntimeCompiler
     }
 
     /// <summary>
+    /// Consults <paramref name="text"/> and throws if it does not compile, with the diagnostics in the
+    /// message.
+    /// </summary>
+    /// <remarks>
+    /// This exists for generated facades: it keeps their loading path to one line and means the
+    /// generated assembly needs only <c>Prolog.Runtime</c> and <c>Prolog.Compiler</c>, never
+    /// <c>Prolog.Syntax</c> for the diagnostic type.
+    /// </remarks>
+    /// <param name="text">Prolog source.</param>
+    /// <param name="fileName">File name used in diagnostics.</param>
+    /// <exception cref="PrologException">The source did not compile.</exception>
+    public void ConsultOrThrow(string text, string fileName)
+    {
+        LoadResult loaded = ConsultText(text, fileName);
+        if (!loaded.Success)
+        {
+            throw new PrologException($"{fileName} did not compile: {string.Join("; ", loaded.Diagnostics)}");
+        }
+    }
+
+    /// <summary>
     /// Runs the directives and then the <c>initialization/1</c> goals collected by earlier consults,
     /// clearing the queue. A goal that merely fails produces a warning and does not stop the rest;
     /// <c>halt/0</c> and <c>halt/1</c> stop immediately.

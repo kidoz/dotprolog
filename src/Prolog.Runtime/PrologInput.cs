@@ -60,6 +60,23 @@ public readonly record struct PrologInput
         return new PrologInput(PrologInputKind.Compound, name, 0, 0, arguments);
     }
 
+    /// <summary>Passes a term that was marshalled out of an earlier call.</summary>
+    public static PrologInput FromValue(PrologValue value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+
+        return value switch
+        {
+            PrologAtom atom => Atom(atom.Name),
+            PrologInteger integer => Integer(integer.Value),
+            PrologFloat real => Float(real.Value),
+            PrologCompound compound => Compound(compound.Name, [.. compound.Arguments.Select(FromValue)]),
+
+            // A variable that was unbound when it was marshalled goes back as a fresh one.
+            _ => Output,
+        };
+    }
+
     /// <summary>Materialises this argument on <paramref name="machine"/>'s heap.</summary>
     /// <remarks>Only valid between <see cref="Machine.BeginCall"/> and <see cref="Machine.Call"/>.</remarks>
     public Cell Build(Machine machine)
