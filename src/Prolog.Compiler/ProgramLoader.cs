@@ -60,6 +60,16 @@ public sealed class ProgramLoader
                     continue;
                 }
 
+                // Declarations the reader accepts so that portable Prolog loads, but which this
+                // release does not act on. ':- module/2' matters most: a file written to be loadable
+                // by other Prolog systems starts with it, and raising existence_error for it would
+                // make every such file unusable. The module system is not implemented, so the export
+                // list is documentation only and nothing is hidden or namespaced.
+                if (IsAcceptedDeclaration(directive.Arguments[0]))
+                {
+                    continue;
+                }
+
                 CompileDirective(directive.Arguments[0], diagnostics, directives, initialization, fileName);
                 continue;
             }
@@ -109,6 +119,18 @@ public sealed class ProgramLoader
 
         return new LoadResult(diagnostics, directives, initialization);
     }
+
+    /// <summary>
+    /// Whether a directive is one the loader accepts and ignores, rather than running as a goal.
+    /// </summary>
+    private static bool IsAcceptedDeclaration(SyntaxTerm goal) =>
+        goal switch
+        {
+            CompoundTerm { Name: "module", Arity: 2 } => true,
+            CompoundTerm { Name: "discontiguous", Arity: 1 } => true,
+            CompoundTerm { Name: "set_prolog_flag", Arity: 2 } => true,
+            _ => false,
+        };
 
     /// <summary>Handles <c>:- dynamic Name/Arity</c>, a comma sequence of them, or a list of them.</summary>
     private void DeclareDynamic(SyntaxTerm indicators, HashSet<int> declared, List<Diagnostic> diagnostics, string? fileName)

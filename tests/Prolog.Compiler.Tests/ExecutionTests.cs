@@ -196,6 +196,46 @@ public sealed class ExecutionTests
         Assert.Equal(CompilerDiagnosticIds.UnsupportedGoal, Assert.Single(diagnostics).Id);
     }
 
+    [Theory]
+    [InlineData(":- module(shapes, [square/2]).")]
+    [InlineData(":- discontiguous square/2.")]
+    [InlineData(":- set_prolog_flag(double_quotes, codes).")]
+    public void PortableDeclarationsAreAcceptedRatherThanRun(string declaration)
+    {
+        // A file written to load in any Prolog system opens with declarations this release does not
+        // act on. Running them as goals would raise existence_error and make the file unusable.
+        string output = PrologTestHost.Run(
+            $"""
+            {declaration}
+
+            square(N, S) :- S is N * N.
+
+            :- initialization((square(7, S), write(S), nl)).
+            """
+        );
+
+        Assert.Equal("49\n", output);
+    }
+
+    [Fact]
+    public void AModuleExportListIsNotEnforced()
+    {
+        // The module system is not implemented, so an export list is documentation: a predicate the
+        // list omits is still callable. This test records that, so the change is visible when modules land.
+        string output = PrologTestHost.Run(
+            """
+            :- module(shapes, [square/2]).
+
+            square(N, S) :- S is N * N.
+            hidden(secret).
+
+            :- initialization((hidden(X), write(X), nl)).
+            """
+        );
+
+        Assert.Equal("secret\n", output);
+    }
+
     [Fact]
     public void ReaderDiagnosticsSurfaceThroughConsult()
     {
