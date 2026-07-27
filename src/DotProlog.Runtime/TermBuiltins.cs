@@ -161,6 +161,18 @@ internal static class TermBuiltins
             throw PrologErrors.Type(machine, "integer", arity);
         }
 
+        if (arity.Integer < 0)
+        {
+            throw PrologErrors.Domain(machine, "not_less_than_zero", arity);
+        }
+
+        // A compound Name is not atomic at all, which the standard separates from a Name that is
+        // atomic but cannot be a functor because it is a number.
+        if (name.Tag == CellTag.Structure)
+        {
+            throw PrologErrors.Type(machine, "atomic", name);
+        }
+
         if (arity.Integer == 0)
         {
             return machine.Unify(term, name);
@@ -254,6 +266,11 @@ internal static class TermBuiltins
         if (elements.Count == 1)
         {
             return machine.Unify(term, head);
+        }
+
+        if (head.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
         }
 
         if (head.Tag != CellTag.Atom)
