@@ -1,0 +1,231 @@
+% Conformance cases derived from ISO/IEC 13211-1:1995, clause 8 (built-in predicates).
+%
+% Each case names the clause it comes from, a goal, and what the standard says that goal does:
+%
+%   success            the goal succeeds
+%   failure            the goal fails
+%   error(Formal)      the goal raises error(Formal, _)
+%
+% This is our own encoding of the standard, not a third-party suite. It is written as ordinary
+% Prolog so it can be run against another system for comparison.
+
+% --- 8.2 Unification ---------------------------------------------------------
+iso_case('8.2.1', (_X = 1), success).
+iso_case('8.2.1', (1 = 2), failure).
+iso_case('8.2.1', (f(X1, b) = f(a, Y1)), success).
+iso_case('8.2.1', (f(a) = g(a)), failure).
+iso_case('8.2.2', \+ (_X \= _Y), success).
+iso_case('8.2.2', (1 \= 2), success).
+
+% --- 8.3 Type testing --------------------------------------------------------
+iso_case('8.3.1', var(_), success).
+iso_case('8.3.1', var(foo), failure).
+iso_case('8.3.2', atom(atom), success).
+iso_case('8.3.2', atom([]), success).
+iso_case('8.3.2', atom(1), failure).
+iso_case('8.3.2', atom(f(a)), failure).
+iso_case('8.3.3', integer(3), success).
+iso_case('8.3.3', integer(3.3), failure).
+iso_case('8.3.4', float(3.3), success).
+iso_case('8.3.4', float(3), failure).
+iso_case('8.3.5', atomic(atom), success).
+iso_case('8.3.5', atomic(1), success).
+iso_case('8.3.5', atomic(f(a)), failure).
+iso_case('8.3.5', atomic(_), failure).
+iso_case('8.3.6', compound(f(a)), success).
+iso_case('8.3.6', compound([a]), success).
+iso_case('8.3.6', compound(a), failure).
+iso_case('8.3.7', nonvar(33.3), success).
+iso_case('8.3.7', nonvar(_), failure).
+iso_case('8.3.8', number(3), success).
+iso_case('8.3.8', number(3.3), success).
+iso_case('8.3.8', number(a), failure).
+iso_case('8.3.9', callable(a), success).
+iso_case('8.3.9', callable(f(a)), success).
+iso_case('8.3.9', callable(1), failure).
+
+% --- 8.4 Term comparison -----------------------------------------------------
+iso_case('8.4.1', (1 == 1), success).
+iso_case('8.4.1', (1 \== 1), failure).
+iso_case('8.4.1', (aardvark @< zebra), success).
+iso_case('8.4.1', (short @< short), failure).
+iso_case('8.4.1', (foo(a, b) @< north(a)), failure).
+iso_case('8.4.1', (1.0 @< 1), success).
+iso_case('8.4.2', compare(<, 1, 2), success).
+iso_case('8.4.2', compare(=, 1, 1), success).
+iso_case('8.4.2', compare(>, 2, 1), success).
+
+% --- 8.5 Term creation and decomposition -------------------------------------
+iso_case('8.5.1', functor(foo(a, b, c), foo, 3), success).
+iso_case('8.5.1', functor(foo, foo, 0), success).
+iso_case('8.5.1', functor([_|_], '.', 2), success).
+iso_case('8.5.1', functor(1, 1, 0), success).
+iso_case('8.5.1', functor(_, _, _), error(instantiation_error)).
+iso_case('8.5.1', functor(_, foo, _), error(instantiation_error)).
+iso_case('8.5.1', functor(_, foo, a), error(type_error(integer, a))).
+iso_case('8.5.1', functor(_, _, 1), error(instantiation_error)).
+iso_case('8.5.1', functor(_, foo(a), 1), error(type_error(atomic, foo(a)))).
+iso_case('8.5.2', arg(1, foo(a, b), a), success).
+iso_case('8.5.2', arg(3, foo(a, b), _), failure).
+iso_case('8.5.2', arg(0, foo(a, b), _), failure).
+iso_case('8.5.2', arg(_, foo(a), _), error(instantiation_error)).
+iso_case('8.5.2', arg(a, foo(a), _), error(type_error(integer, a))).
+iso_case('8.5.2', arg(1, atom, _), error(type_error(compound, atom))).
+iso_case('8.5.3', (foo(a, b) =.. [foo, a, b]), success).
+iso_case('8.5.3', (foo =.. [foo]), success).
+iso_case('8.5.3', (1 =.. [1]), success).
+iso_case('8.5.3', ([a] =.. ['.', a, []]), success).
+iso_case('8.5.3', (_ =.. _), error(instantiation_error)).
+iso_case('8.5.3', (_ =.. [foo, a | _]), error(instantiation_error)).
+iso_case('8.5.3', (_ =.. [_, a]), error(instantiation_error)).
+iso_case('8.5.3', (_ =.. [foo(a), a]), error(type_error(atom, foo(a)))).
+iso_case('8.5.3', (_ =.. []), error(domain_error(non_empty_list, []))).
+iso_case('8.5.4', copy_term(_, _), success).
+iso_case('8.5.4', copy_term(a, a), success).
+iso_case('8.5.4', copy_term(a, b), failure).
+iso_case('8.5.4', (copy_term(f(X2, X2), f(A2, B2)), A2 == B2), success).
+
+% --- 8.6 Arithmetic evaluation -----------------------------------------------
+iso_case('8.6.1', (X3 is 3 + 11, X3 =:= 14), success).
+iso_case('8.6.1', (X4 is 3.5 - 0.5, X4 =:= 3.0), success).
+iso_case('8.6.1', (_ is foo), error(type_error(evaluable, foo/0))).
+iso_case('8.6.1', (_ is _), error(instantiation_error)).
+iso_case('8.6.1', (_ is 1 + a), error(type_error(evaluable, a/0))).
+iso_case('8.6.1', (_ is 1 // 0), error(evaluation_error(zero_divisor))).
+iso_case('8.6.1', (foo is 1 + 1), failure).
+
+% --- 8.7 Arithmetic comparison -----------------------------------------------
+iso_case('8.7.1', (0 =:= 0.0), success).
+iso_case('8.7.1', (1 =\= 2), success).
+iso_case('8.7.1', (1 < 2), success).
+iso_case('8.7.1', (2 =< 2), success).
+iso_case('8.7.1', (3 > 2), success).
+iso_case('8.7.1', (3 >= 3), success).
+iso_case('8.7.1', (_ < 1), error(instantiation_error)).
+iso_case('8.7.1', (a < 1), error(type_error(evaluable, a/0))).
+
+% --- 8.8 Clause retrieval and information ------------------------------------
+iso_case('8.8.1', clause(_, _), error(instantiation_error)).
+iso_case('8.8.1', clause(_, b), error(instantiation_error)).
+iso_case('8.8.1', clause(4, _), error(type_error(callable, 4))).
+
+% --- 8.9 Clause creation and destruction -------------------------------------
+iso_case('8.9.1', assertz(iso_scratch(1)), success).
+iso_case('8.9.1', assertz(_), error(instantiation_error)).
+iso_case('8.9.1', assertz(4), error(type_error(callable, 4))).
+iso_case('8.9.1', assertz((iso_scratch(_) :- 4)), error(type_error(callable, 4))).
+iso_case('8.9.2', asserta(iso_scratch(0)), success).
+iso_case('8.9.2', asserta(_), error(instantiation_error)).
+iso_case('8.9.3', retract(_), error(instantiation_error)).
+iso_case('8.9.3', retract(iso_absent(_)), failure).
+
+% --- 8.10 All solutions ------------------------------------------------------
+iso_case('8.10.1', findall(X5, member(X5, [1, 2]), [1, 2]), success).
+iso_case('8.10.1', findall(_, fail, []), success).
+iso_case('8.10.1', findall(_, _, _), error(instantiation_error)).
+iso_case('8.10.1', findall(_, 4, _), error(type_error(callable, 4))).
+iso_case('8.10.2', bagof(X6, member(X6, [1, 2]), [1, 2]), success).
+iso_case('8.10.2', bagof(_, fail, _), failure).
+iso_case('8.10.3', setof(X7, member(X7, [2, 1, 2]), [1, 2]), success).
+iso_case('8.10.3', setof(_, fail, _), failure).
+
+% --- 8.11 Stream selection ---------------------------------------------------
+iso_case('8.11.1', (current_output(S1), S1 == S1), success).
+iso_case('8.11.2', (current_input(S2), S2 == S2), success).
+
+% --- 8.14 Term input and output ----------------------------------------------
+iso_case('8.14.2', write_canonical([1, 2, 3]), success).
+iso_case('8.14.2', write_canonical('a b'), success).
+iso_case('8.14.3', (op(30, xfy, iso_op), current_op(30, xfy, iso_op)), success).
+iso_case('8.14.3', op(_, xfy, iso_bad), error(instantiation_error)).
+iso_case('8.14.3', op(30, _, iso_bad), error(instantiation_error)).
+iso_case('8.14.3', op(a, xfy, iso_bad), error(type_error(integer, a))).
+iso_case('8.14.3', op(30, a, iso_bad), error(domain_error(operator_specifier, a))).
+iso_case('8.14.3', op(1300, xfx, iso_bad), error(domain_error(operator_priority, 1300))).
+iso_case('8.14.3', op(30, xfy, 0), error(type_error(atom, 0))).
+iso_case('8.14.3', op(30, xfx, ','), error(permission_error(modify, operator, ','/2))).
+
+% --- 8.15 Logic and control --------------------------------------------------
+iso_case('8.15.1', \+ true, failure).
+iso_case('8.15.1', \+ fail, success).
+iso_case('8.15.1', \+ _, error(instantiation_error)).
+iso_case('8.15.1', \+ 4, error(type_error(callable, 4))).
+iso_case('8.15.2', once(!), success).
+iso_case('8.15.2', once(fail), failure).
+iso_case('8.15.3', (repeat_guard(0) -> true ; true), success).
+iso_case('8.15.3', call(!), success).
+iso_case('8.15.3', call(fail), failure).
+iso_case('8.15.3', call(_), error(instantiation_error)).
+iso_case('8.15.3', call(4), error(type_error(callable, 4))).
+iso_case('8.15.3', call((fail, 4)), error(type_error(callable, (fail, 4)))).
+
+% --- 8.16 Atomic term processing ---------------------------------------------
+iso_case('8.16.1', atom_length(abcde, 5), success).
+iso_case('8.16.1', atom_length('', 0), success).
+iso_case('8.16.1', atom_length(_, _), error(instantiation_error)).
+iso_case('8.16.1', atom_length(1.23, _), success).
+iso_case('8.16.2', atom_concat(hello, ' world', 'hello world'), success).
+iso_case('8.16.2', (atom_concat(T1, ' world', 'hello world'), T1 == hello), success).
+iso_case('8.16.2', findall(_-_, atom_concat(_, _, abc), L1), success).
+iso_case('8.16.2', atom_concat(_, _, _), error(instantiation_error)).
+iso_case('8.16.3', sub_atom(abracadabra, 0, 5, _, abrac), success).
+iso_case('8.16.3', (sub_atom(abracadabra, _, 5, 0, S3), S3 == dabra), success).
+iso_case('8.16.3', sub_atom(_, _, _, _, _), error(instantiation_error)).
+iso_case('8.16.4', atom_chars('', []), success).
+iso_case('8.16.4', atom_chars([], ['[', ']']), success).
+iso_case('8.16.4', atom_chars(abc, [a, b, c]), success).
+iso_case('8.16.4', (atom_chars(A3, [a, b, c]), A3 == abc), success).
+iso_case('8.16.4', atom_chars(_, _), error(instantiation_error)).
+iso_case('8.16.5', atom_codes(abc, [0'a, 0'b, 0'c]), success).
+iso_case('8.16.5', atom_codes(_, _), error(instantiation_error)).
+iso_case('8.16.6', char_code(a, 0'a), success).
+iso_case('8.16.6', (char_code(C1, 0'a), C1 == a), success).
+iso_case('8.16.6', char_code(_, _), error(instantiation_error)).
+iso_case('8.16.7', number_chars(33, ['3', '3']), success).
+iso_case('8.16.7', (number_chars(N1, ['3', '3']), N1 == 33), success).
+iso_case('8.16.7', number_chars(_, [a]), error(syntax_error(illegal_number))).
+iso_case('8.16.8', number_codes(33, [0'3, 0'3]), success).
+iso_case('8.16.8', number_codes(_, [0'a]), error(syntax_error(illegal_number))).
+
+% --- 8.17 Implementation defined hooks ---------------------------------------
+iso_case('8.17.1', (catch(throw(ball), Ball, true), Ball == ball), success).
+iso_case('8.17.1', catch(true, _, fail), success).
+iso_case('8.17.1', throw(_), error(instantiation_error)).
+
+% Used by 8.15.3; a goal that is defined so the case tests control flow, not existence.
+repeat_guard(0).
+
+% --- Runner ------------------------------------------------------------------
+% Writes one line per case: PASS or FAIL with what was expected and what happened.
+% Running the suite in Prolog keeps it portable to another system for comparison.
+
+run_conformance :-
+    forall(iso_case(Id, Goal, Expected), run_case(Id, Goal, Expected)),
+    aggregate_all(count, iso_case(_, _, _), Total),
+    format("cases ~d~n", [Total]).
+
+run_case(Id, Goal, Expected) :-
+    outcome(Goal, Actual),
+    (   matches(Expected, Actual)
+    ->  format("PASS ~w~n", [Id])
+    ;   format("FAIL ~w | expected ~q | got ~q~n", [Id, Expected, Actual])
+    ).
+
+% A case is run once: a second solution is of no interest, and leaving a choice
+% point behind would let a later case backtrack into this one.
+% Whatever the goal writes is captured rather than left to interleave with the
+% report, which would make a case like write_canonical/1 unreadable to a harness.
+outcome(Goal, Actual) :-
+    catch(
+        ( with_output_to(atom(_), Goal) -> Actual = success ; Actual = failure ),
+        Ball,
+        ball_outcome(Ball, Actual)
+    ).
+
+ball_outcome(error(Formal, _), error(Formal)) :- !.
+ball_outcome(Ball, thrown(Ball)).
+
+% The context of an error is implementation defined, so only the formal part is
+% compared; anything else has to match exactly.
+matches(error(Formal), error(Actual)) :- !, Formal == Actual.
+matches(Expected, Actual) :- Expected == Actual.
