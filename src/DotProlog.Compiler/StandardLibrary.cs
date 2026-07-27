@@ -22,7 +22,6 @@ internal static class StandardLibrary
     internal const string Source = """
         % --- Meta-call -------------------------------------------------------------
         % call/2..8 append their extra arguments to the goal and meta-call the result.
-        % The cut deviation call/1 documents applies to these too.
 
         call(G, A) :- '$add_args'(G, [A], Goal), call(Goal).
         call(G, A, B) :- '$add_args'(G, [A, B], Goal), call(Goal).

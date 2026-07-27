@@ -900,6 +900,16 @@ public sealed class Machine
         // never reach the 4.
         RequireCallable(goal, goal);
 
+        if (IsControlGoal(goal) && _program.RuntimeCompiler is not null)
+        {
+            int entry = _program.RuntimeCompiler.CompileControlGoal(this, goal, _x, out int controlArity);
+            _argumentCount = controlArity;
+            _continuation = _pc;
+            _b0 = _b;
+            _pc = entry;
+            return true;
+        }
+
         int functorId;
         int arity;
 
@@ -939,6 +949,22 @@ public sealed class Machine
         _b0 = _b;
         _pc = EntryPointOf(functorId);
         return true;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="goal"/> needs the clause compiler's inline control lowering to give
+    /// cuts reached through <c>call/1</c> their ISO meta-call scope.
+    /// </summary>
+    private bool IsControlGoal(Cell goal)
+    {
+        if (goal.Tag != CellTag.Structure)
+        {
+            return false;
+        }
+
+        Functor functor = _symbols.GetFunctor(_heap[goal.Index].Index);
+        string name = _symbols.AtomName(functor.NameAtom);
+        return (functor.Arity == 2 && name is "," or ";" or "->" or "*->") || (functor.Arity == 1 && name == "\\+");
     }
 
     /// <summary>Requests that the current run stop with <paramref name="exitCode"/>, as <c>halt/1</c> does.</summary>

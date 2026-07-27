@@ -117,20 +117,45 @@ public sealed class MetaCallTests
     }
 
     [Fact]
-    public void CutInsideAMetaCalledGoalDoesNotPruneTheMetaCall()
+    public void CutInsideAMetaCalledGoalCommitsWithinTheMetaCall()
     {
-        // Documented deviation: a cut inside a goal reached through call/1 prunes nothing, so this
-        // still yields both solutions. Reaching ISO behaviour needs a call barrier the engine lacks.
         string output = PrologTestHost.Run(
             """
             q(1).
             q(2).
 
-            :- initialization(( G = ( q(X), ! ), call(G), X = 2, write(X), nl )).
+            :- initialization((
+                G = ( q(X), ! ),
+                ( call(G), X = 2 -> write(open) ; write(committed) ),
+                nl
+            )).
+            """
+        );
+
+        Assert.Equal("committed\n", output);
+    }
+
+    [Fact]
+    public void MetaCalledCutDoesNotPruneTheCallersAlternatives()
+    {
+        string output = PrologTestHost.Run(
+            """
+            q(1).
+            q(2).
+
+            pick(X) :- q(X), call((!, true)).
+
+            :- initialization(( pick(X), X = 2, write(X), nl )).
             """
         );
 
         Assert.Equal("2\n", output);
+    }
+
+    [Fact]
+    public void RuntimeLoweringPreservesDistinctVariablesAndAliasing()
+    {
+        Assert.Equal("2\n", PrologTestHost.RunGoal("G = (X = Y, (Y = 1 ; Y = 2)), call(G), X = 2, write(Y), nl"));
     }
 
     [Fact]

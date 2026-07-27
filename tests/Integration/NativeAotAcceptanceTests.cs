@@ -66,6 +66,7 @@ public sealed class NativeAotAcceptanceTests
                     "Hello from NativeAOT!",
                     "colours(3)",
                     "[red,green,blue]",
+                    "[first]",
                     "[first,second,third]",
                     "[first,third]",
                     "caught",

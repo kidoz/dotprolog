@@ -79,9 +79,7 @@ public sealed class ControlConstructTests
     [Fact]
     public void ACutInTheLeftBranchOfADisjunctionPrunesTheRightOne()
     {
-        // Written in a clause body the cut is transparent to ;/2, so it removes the alternative and
-        // the whole goal fails. Reached through call/1 it is local and the alternative survives,
-        // which is the deviation COMPATIBILITY.md records and the conformance suite pins.
+        // The cut is transparent to ;/2, so it removes the alternative and the whole goal fails.
         string output = PrologTestHost.Run(
             """
             p :- ( !, fail ; true ).
@@ -94,8 +92,8 @@ public sealed class ControlConstructTests
     }
 
     [Fact]
-    public void TheSameDisjunctionSucceedsWhenItIsMetaCalled() =>
-        Assert.Equal("succeeded", PrologTestHost.RunGoal("( call(( !, fail ; true )) -> write(succeeded) ; write(failed) )"));
+    public void TheSameDisjunctionFailsWhenItIsMetaCalled() =>
+        Assert.Equal("failed", PrologTestHost.RunGoal("( call(( !, fail ; true )) -> write(succeeded) ; write(failed) )"));
 
     [Fact]
     public void CutInsideAConditionStillPrunesTheConditionsOwnAlternatives()

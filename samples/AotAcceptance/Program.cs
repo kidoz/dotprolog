@@ -54,6 +54,11 @@ internal static class Program
 
                 findall(C, colour(C), Cs), write(Cs), nl,
 
+                % Meta-called control is lowered to VM bytecode after startup. Its cut must commit
+                % inside the meta-call without relying on JIT compilation.
+                findall(X, call((member(X, [first, second]), !)), Committed),
+                write(Committed), nl,
+
                 assertz(stored(second)),
                 assertz(stored(third)),
                 findall(S, stored(S), Before), write(Before), nl,

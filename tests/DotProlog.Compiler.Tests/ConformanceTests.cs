@@ -12,24 +12,9 @@ namespace DotProlog.Compiler.Tests;
 /// its own test framework. So this measures the engine against the standard as we read it, which is
 /// worth more than nothing and less than external verification. <c>COMPATIBILITY.md</c> says so.
 /// </para>
-/// <para>
-/// A case that fails is listed in <see cref="KnownFailures"/> with the reason. That makes both
-/// directions visible: a new failure fails this test, and fixing a known one fails it too until the
-/// list is updated.
-/// </para>
 /// </remarks>
 public sealed class ConformanceTests
 {
-    /// <summary>Cases known not to pass, each with why it is acceptable for now.</summary>
-    private static readonly Dictionary<string, string> KnownFailures = new(StringComparer.Ordinal)
-    {
-        // call((!, fail ; true)). The suite runs every case through call/1, and a cut inside a
-        // meta-called goal is local to it here, so it does not prune the disjunction's
-        // alternative. Written as a clause body the same goal fails correctly, which a test in
-        // ControlConstructTests pins. Closing this needs a call barrier the engine does not have.
-        ["FAIL 7.8.4"] = "cut inside a meta-called goal is local; see COMPATIBILITY.md",
-    };
-
     [Fact]
     public void EveryConformanceCaseBehavesAsTheStandardSays()
     {
@@ -53,19 +38,7 @@ public sealed class ConformanceTests
             .Single();
 
         Assert.Equal(cases, lines.Count(line => line.StartsWith("PASS ", StringComparison.Ordinal)) + failures.Length);
-
-        string[] unexpected = [.. failures.Where(failure => !KnownFailures.Keys.Any(failure.Contains))];
-        Assert.True(unexpected.Length == 0, $"Conformance regressed:\n{string.Join("\n", unexpected)}");
-
-        string[] fixedUp =
-        [
-            .. KnownFailures.Keys.Where(known => !failures.Any(failure => failure.Contains(known, StringComparison.Ordinal))),
-        ];
-
-        Assert.True(
-            fixedUp.Length == 0,
-            $"These no longer fail and should be removed from KnownFailures: {string.Join(", ", fixedUp)}"
-        );
+        Assert.True(failures.Length == 0, $"Conformance regressed:\n{string.Join("\n", failures)}");
     }
 
     private static string RepositoryRoot()

@@ -12,6 +12,18 @@ namespace DotProlog.Runtime;
 public interface IRuntimeCompiler
 {
     /// <summary>
+    /// Compiles a control term reached through <c>call/1</c> as an anonymous bytecode clause.
+    /// </summary>
+    /// <param name="machine">Machine owning the heap the term and its variables live on.</param>
+    /// <param name="goal">The callable control term.</param>
+    /// <param name="arguments">
+    /// Destination for the original heap variables that become arguments of the anonymous clause.
+    /// </param>
+    /// <param name="argumentCount">Number of cells written to <paramref name="arguments"/>.</param>
+    /// <returns>The bytecode address of the anonymous clause.</returns>
+    int CompileControlGoal(Machine machine, Cell goal, Span<Cell> arguments, out int argumentCount);
+
+    /// <summary>
     /// Compiles a clause term into the program and returns the address of its code.
     /// </summary>
     /// <param name="machine">Machine owning the heap the term lives on.</param>

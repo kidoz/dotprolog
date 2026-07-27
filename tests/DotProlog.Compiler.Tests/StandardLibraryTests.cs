@@ -110,6 +110,16 @@ public sealed class StandardLibraryTests
         Assert.Equal("[0,1,2,3]", PrologTestHost.RunGoal("findall(N, (between(0, 3, N), length(_, N)), L), write(L)"));
 
     [Theory]
+    [InlineData("findall(N, between(0, 3, N), L), write(L)")]
+    [InlineData("findall(N, (between(0, 3, N), true), L), write(L)")]
+    [InlineData("findall(N, (between(0, 3, N), X = N), L), write(L)")]
+    [InlineData("findall(N, (between(0, 3, N), X = []), L), write(L)")]
+    [InlineData("findall(N, (between(0, 3, N), X = f(N)), L), write(L)")]
+    [InlineData("findall(N, (between(0, 3, N), length(X, N)), L), write(L)")]
+    public void MetaCalledConjunctionPreservesEveryNondeterministicAnswer(string goal) =>
+        Assert.Equal("[0,1,2,3]", PrologTestHost.RunGoal(goal));
+
+    [Theory]
     [InlineData("msort([c, a, b, a], L), write(L)", "[a,a,b,c]")]
     [InlineData("sort([c, a, b, a], L), write(L)", "[a,b,c]")]
     [InlineData("sort([2, 1.0, 1], L), write(L)", "[1.0,1,2]")]

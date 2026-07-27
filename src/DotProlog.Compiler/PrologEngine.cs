@@ -264,6 +264,54 @@ public sealed class PrologEngine : IRuntimeCompiler
 
     /// <inheritdoc />
     /// <remarks>
+    /// This is the meta-called-control path. The anonymous clause receives the original live
+    /// variables as arguments, so compiling the body in place preserves both aliasing and ISO cut
+    /// scope without adding control state to the runtime machine.
+    /// </remarks>
+    public int CompileControlGoal(Machine machine, Cell goal, Span<Cell> arguments, out int argumentCount)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+
+        var variables = new Dictionary<string, Cell>(StringComparer.Ordinal);
+        SyntaxTerm body = TermReifier.ToSyntax(machine, goal, variables);
+        string[] names = CollectVariableNames(body);
+
+        if (names.Length >= Machine.ArgumentRegisterCount || names.Length > arguments.Length)
+        {
+            throw PrologErrors.Representation(machine, "max_arity");
+        }
+
+        var headArguments = new SyntaxTerm[names.Length];
+        for (int i = 0; i < names.Length; i++)
+        {
+            string name = names[i];
+            headArguments[i] = new VariableTerm(name, SourceSpan.None);
+            arguments[i] = variables[name];
+        }
+
+        SyntaxTerm head =
+            headArguments.Length == 0
+                ? new AtomTerm("$meta_control", SourceSpan.None)
+                : new CompoundTerm("$meta_control", headArguments, SourceSpan.None);
+
+        // Keep the anonymous frame alive until the whole meta-call returns. A choice point created
+        // by an earlier subgoal restores this frame on redo; tail-executing the last subgoal would
+        // otherwise let that subgoal reuse stack space still named by the choice point.
+        var completion = new CompoundTerm("call", [new AtomTerm("true", SourceSpan.None)], SourceSpan.None);
+        body = new CompoundTerm(",", [body, completion], SourceSpan.None);
+
+        List<Diagnostic> diagnostics = [];
+        var compiler = new ClauseCompiler(Program, new ConstantPool(Program), diagnostics, null);
+        int address = compiler.Compile(head, body);
+        argumentCount = names.Length;
+
+        return address < 0
+            ? throw new PrologException($"The meta-called control term did not compile: {string.Join("; ", diagnostics)}")
+            : address;
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
     /// This is the <c>assertz/1</c> path. It compiles into the same program the goal is running from,
     /// which is only safe because the program is append-only and the dispatch loop refreshes its
     /// cached arrays after every builtin.

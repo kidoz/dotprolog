@@ -15,14 +15,30 @@ internal static class TermReifier
     /// Variables are named after their heap address, which keeps repeated occurrences of the same
     /// variable sharing a name.
     /// </summary>
-    internal static SyntaxTerm ToSyntax(Machine machine, Cell term)
+    internal static SyntaxTerm ToSyntax(Machine machine, Cell term) => ToSyntaxCore(machine, term, null);
+
+    /// <summary>
+    /// Rebuilds a heap term as a <see cref="SyntaxTerm"/> and records each distinct live variable by
+    /// the generated name used in that syntax tree.
+    /// </summary>
+    internal static SyntaxTerm ToSyntax(Machine machine, Cell term, Dictionary<string, Cell> variables)
+    {
+        ArgumentNullException.ThrowIfNull(variables);
+        return ToSyntaxCore(machine, term, variables);
+    }
+
+    private static SyntaxTerm ToSyntaxCore(Machine machine, Cell term, Dictionary<string, Cell>? variables)
     {
         Cell cell = machine.Dereference(term);
 
         switch (cell.Tag)
         {
             case CellTag.Reference:
-                return new VariableTerm(string.Create(CultureInfo.InvariantCulture, $"_G{cell.Index}"), SourceSpan.None);
+            {
+                string name = string.Create(CultureInfo.InvariantCulture, $"_G{cell.Index}");
+                variables?.TryAdd(name, cell);
+                return new VariableTerm(name, SourceSpan.None);
+            }
 
             case CellTag.Atom:
                 return new AtomTerm(machine.Symbols.AtomName(cell.Index), SourceSpan.None);
@@ -39,7 +55,7 @@ internal static class TermReifier
                 var arguments = new SyntaxTerm[functor.Arity];
                 for (int i = 0; i < functor.Arity; i++)
                 {
-                    arguments[i] = ToSyntax(machine, machine.HeapAt(cell.Index + 1 + i));
+                    arguments[i] = ToSyntaxCore(machine, machine.HeapAt(cell.Index + 1 + i), variables);
                 }
 
                 return new CompoundTerm(machine.Symbols.AtomName(functor.NameAtom), arguments, SourceSpan.None);
