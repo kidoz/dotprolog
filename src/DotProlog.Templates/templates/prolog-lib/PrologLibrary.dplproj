@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <Sdk Name="DotProlog.Sdk" Version="DOTPROLOG_VERSION" />
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <RootNamespace>PrologLibrary</RootNamespace>
+
+        <!-- Names the generated interface and class: IRulesModule and RulesModule. -->
+        <DotPrologClrTypeName>Rules</DotPrologClrTypeName>
+
+        <!-- Generated code carries no XML documentation of its own. -->
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="DotProlog.Compiler" Version="DOTPROLOG_VERSION" />
+    </ItemGroup>
+
+</Project>

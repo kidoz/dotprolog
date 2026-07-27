@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <RootNamespace>DotProlog.Runtime</RootNamespace>
+
+    </PropertyGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="DotProlog.Compiler" />
+        <InternalsVisibleTo Include="DotProlog.Runtime.Tests" />
+    </ItemGroup>
+</Project>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <RootNamespace>DotProlog.CodeGen.CSharp</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\DotProlog.Compiler\DotProlog.Compiler.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="DotProlog.CodeGen.CSharp.Tests" />
+    </ItemGroup>
+</Project>

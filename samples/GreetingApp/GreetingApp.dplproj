@@ -10,12 +10,12 @@
         <RootNamespace>GreetingApp</RootNamespace>
         <IsPackable>false</IsPackable>
         <NoWarn>$(NoWarn);CS1591</NoWarn>
-        <DotPrologTasksAssembly>$(MSBuildThisFileDirectory)..\..\src\Prolog.Build.Tasks\bin\$(Configuration)\net10.0\Prolog.Build.Tasks.dll</DotPrologTasksAssembly>
+        <DotPrologTasksAssembly>$(MSBuildThisFileDirectory)..\..\src\DotProlog.Build.Tasks\bin\$(Configuration)\net10.0\DotProlog.Build.Tasks.dll</DotPrologTasksAssembly>
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\Prolog.Compiler\Prolog.Compiler.csproj" />
-        <ProjectReference Include="..\..\src\Prolog.Build.Tasks\Prolog.Build.Tasks.csproj" ReferenceOutputAssembly="false" />
+        <ProjectReference Include="..\..\src\DotProlog.Compiler\DotProlog.Compiler.csproj" />
+        <ProjectReference Include="..\..\src\DotProlog.Build.Tasks\DotProlog.Build.Tasks.csproj" ReferenceOutputAssembly="false" />
     </ItemGroup>
 
     <Import Project="..\..\src\DotProlog.Sdk\Sdk\Sdk.targets" />

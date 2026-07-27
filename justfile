@@ -25,7 +25,7 @@ test configuration="Debug":
 
 # Consult and run a Prolog file: `just run path/to/file.pl`.
 run file:
-    dotnet run --project src/Prolog.DotNetTool -- run {{file}}
+    dotnet run --project src/DotProlog.Tool -- run {{file}}
 
 # Run the Hello World sample.
 hello:
@@ -44,7 +44,7 @@ check: format-check build test
 
 # Run the BenchmarkDotNet suite; pass a filter, e.g. `just bench '*Engine*'`.
 bench filter="*":
-    dotnet run -c Release --project benchmarks/Prolog.Benchmarks -- --filter '{{filter}}'
+    dotnet run -c Release --project benchmarks/DotProlog.Benchmarks -- --filter '{{filter}}'
 
 # Delete build outputs.
 clean:

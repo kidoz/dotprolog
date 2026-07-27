@@ -1,21 +1,21 @@
 <Solution>
     <Folder Name="/src/">
         <Project Path="src/DotProlog.Sdk/DotProlog.Sdk.csproj" />
-        <Project Path="src/Prolog.Build.Tasks/Prolog.Build.Tasks.csproj" />
-        <Project Path="src/Prolog.CodeGen.CSharp/Prolog.CodeGen.CSharp.csproj" />
-        <Project Path="src/Prolog.Compiler/Prolog.Compiler.csproj" />
-        <Project Path="src/Prolog.DotNetTool/Prolog.DotNetTool.csproj" />
-        <Project Path="src/Prolog.Runtime/Prolog.Runtime.csproj" />
-        <Project Path="src/Prolog.Templates/Prolog.Templates.csproj" />
-        <Project Path="src/Prolog.Testing/Prolog.Testing.csproj" />
-        <Project Path="src/Prolog.Syntax/Prolog.Syntax.csproj" />
+        <Project Path="src/DotProlog.Build.Tasks/DotProlog.Build.Tasks.csproj" />
+        <Project Path="src/DotProlog.CodeGen.CSharp/DotProlog.CodeGen.CSharp.csproj" />
+        <Project Path="src/DotProlog.Compiler/DotProlog.Compiler.csproj" />
+        <Project Path="src/DotProlog.Tool/DotProlog.Tool.csproj" />
+        <Project Path="src/DotProlog.Runtime/DotProlog.Runtime.csproj" />
+        <Project Path="src/DotProlog.Templates/DotProlog.Templates.csproj" />
+        <Project Path="src/DotProlog.Testing/DotProlog.Testing.csproj" />
+        <Project Path="src/DotProlog.Syntax/DotProlog.Syntax.csproj" />
     </Folder>
     <Folder Name="/tests/">
         <Project Path="tests/Integration/Integration.Tests.csproj" />
-        <Project Path="tests/Prolog.CodeGen.CSharp.Tests/Prolog.CodeGen.CSharp.Tests.csproj" />
-        <Project Path="tests/Prolog.Compiler.Tests/Prolog.Compiler.Tests.csproj" />
-        <Project Path="tests/Prolog.Runtime.Tests/Prolog.Runtime.Tests.csproj" />
-        <Project Path="tests/Prolog.Syntax.Tests/Prolog.Syntax.Tests.csproj" />
+        <Project Path="tests/DotProlog.CodeGen.CSharp.Tests/DotProlog.CodeGen.CSharp.Tests.csproj" />
+        <Project Path="tests/DotProlog.Compiler.Tests/DotProlog.Compiler.Tests.csproj" />
+        <Project Path="tests/DotProlog.Runtime.Tests/DotProlog.Runtime.Tests.csproj" />
+        <Project Path="tests/DotProlog.Syntax.Tests/DotProlog.Syntax.Tests.csproj" />
     </Folder>
     <Folder Name="/samples/">
         <Project Path="samples/AotAcceptance/AotAcceptance.csproj" />
@@ -28,6 +28,6 @@
         <Project Path="samples/PricingTests/PricingTests.dplproj" Type="C#" />
     </Folder>
     <Folder Name="/benchmarks/">
-        <Project Path="benchmarks/Prolog.Benchmarks/Prolog.Benchmarks.csproj" />
+        <Project Path="benchmarks/DotProlog.Benchmarks/DotProlog.Benchmarks.csproj" />
     </Folder>
 </Solution>

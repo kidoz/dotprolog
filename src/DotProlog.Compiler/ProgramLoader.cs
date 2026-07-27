@@ -1,0 +1,696 @@
+using DotProlog.Runtime;
+using DotProlog.Syntax;
+
+namespace DotProlog.Compiler;
+
+/// <summary>
+/// Lowers read clauses into a <see cref="BytecodeProgram"/>: groups clauses by predicate, chains the
+/// alternatives with try/retry/trust, and compiles directives into anonymous goal blocks.
+/// </summary>
+/// <remarks>
+/// Directives are collected while reading and run after the whole unit is compiled, not at the point
+/// they appear. That differs from consulting a file clause by clause, and only matters for a
+/// directive that depends on clauses defined earlier in the same file being callable before later
+/// ones are read.
+/// </remarks>
+public sealed class ProgramLoader
+{
+    private readonly BytecodeProgram _program;
+    private readonly ConstantPool _constants;
+    private readonly Machine? _machine;
+    private readonly ModuleTable _modules;
+
+    /// <summary>Creates a loader that appends to <paramref name="program"/>.</summary>
+    /// <param name="program">The program to load into.</param>
+    /// <param name="machine">
+    /// Machine used to build the clause terms a dynamic predicate needs for <c>retract/1</c>. Without
+    /// one, a <c>:- dynamic</c> declaration is reported rather than honoured.
+    /// </param>
+    /// <param name="modules">
+    /// The program's modules. Without one, every file loads into <c>user</c>, which is what a caller
+    /// that only wants to compile a term wants.
+    /// </param>
+    public ProgramLoader(BytecodeProgram program, Machine? machine = null, ModuleTable? modules = null)
+    {
+        ArgumentNullException.ThrowIfNull(program);
+        _program = program;
+        _constants = new ConstantPool(program);
+        _machine = machine;
+        _modules = modules ?? new ModuleTable();
+    }
+
+    /// <summary>Lowers <paramref name="clauses"/> into the program.</summary>
+    /// <param name="clauses">Clauses and directives in source order.</param>
+    /// <param name="fileName">File name used in diagnostics, when known.</param>
+    public LoadResult Load(IReadOnlyList<SyntaxTerm> clauses, string? fileName = null)
+    {
+        ArgumentNullException.ThrowIfNull(clauses);
+
+        List<Diagnostic> diagnostics = [];
+        List<int> directives = [];
+        List<int> initialization = [];
+
+        // Reading happens in two passes. The first settles which module the unit belongs to and what
+        // it defines; only then can a call in a body be told from one to somewhere else.
+        var unit = new LoadUnit();
+        Collect(clauses, unit, diagnostics, fileName);
+
+        var resolver = new ModuleResolver(_modules, unit.Module, unit.Defines);
+        List<int> predicateOrder = [];
+        Dictionary<int, List<(SyntaxTerm Head, SyntaxTerm? Body)>> predicates = [];
+
+        foreach ((SyntaxTerm head, SyntaxTerm? body) in unit.Clauses)
+        {
+            SyntaxTerm resolvedHead = resolver.ResolveHead(head);
+            SyntaxTerm? resolvedBody = body is null ? null : resolver.ResolveGoal(body);
+
+            if (!TryGetHeadFunctor(resolvedHead, out int functorId))
+            {
+                Report(
+                    diagnostics,
+                    CompilerDiagnosticIds.InvalidClauseHead,
+                    "A clause head must be an atom or a compound term.",
+                    head.Span,
+                    fileName
+                );
+                continue;
+            }
+
+            if (!predicates.TryGetValue(functorId, out List<(SyntaxTerm, SyntaxTerm?)>? bucket))
+            {
+                bucket = [];
+                predicates[functorId] = bucket;
+                predicateOrder.Add(functorId);
+            }
+
+            bucket.Add((resolvedHead, resolvedBody));
+        }
+
+        foreach (SyntaxTerm goal in unit.Directives)
+        {
+            CompileDirective(resolver.ResolveGoal(goal), diagnostics, directives, initialization, fileName);
+        }
+
+        HashSet<int> dynamicPredicates = DeclareDynamicPredicates(unit, resolver, diagnostics, fileName);
+
+        foreach (int functorId in predicateOrder)
+        {
+            if (dynamicPredicates.Contains(functorId))
+            {
+                EmitDynamicClauses(functorId, predicates[functorId], diagnostics, fileName);
+                continue;
+            }
+
+            EmitPredicate(functorId, predicates[functorId], diagnostics, fileName);
+        }
+
+        PublishExports(unit);
+        Module = unit.Module;
+        return new LoadResult(diagnostics, directives, initialization);
+    }
+
+    /// <summary>The module the last load declared, or <c>user</c>.</summary>
+    public string Module { get; private set; } = ModuleTable.UserModule;
+
+    /// <summary>
+    /// Makes each exported predicate reachable by its plain name as well as its qualified one.
+    /// </summary>
+    /// <remarks>
+    /// This is what keeps a generated facade, the command line tool, and a program that simply
+    /// consults a module working without knowing modules exist. The plain name is only claimed when
+    /// nothing else has it, so the first module to export a name gets it and a second one is reached
+    /// by qualifying it or by importing it.
+    /// </remarks>
+    private void PublishExports(LoadUnit unit)
+    {
+        if (unit.Module == ModuleTable.UserModule)
+        {
+            return;
+        }
+
+        foreach (PredicateIndicator export in _modules.ExportsOf(unit.Module))
+        {
+            if (!unit.Defines.Contains(export))
+            {
+                continue;
+            }
+
+            int qualified = _program.Symbols.InternFunctor(ModuleTable.QualifiedName(unit.Module, export.Name), export.Arity);
+
+            _program.AliasPredicate(_program.Symbols.InternFunctor(export.Name, export.Arity), qualified);
+        }
+    }
+
+    /// <summary>Runs the first pass: declarations, and the set of predicates the unit defines.</summary>
+    private void Collect(IReadOnlyList<SyntaxTerm> clauses, LoadUnit unit, List<Diagnostic> diagnostics, string? fileName)
+    {
+        foreach (SyntaxTerm clause in clauses)
+        {
+            if (clause is CompoundTerm { Name: ":-", Arity: 1 } directive)
+            {
+                SyntaxTerm goal = directive.Arguments[0];
+
+                switch (goal)
+                {
+                    case CompoundTerm { Name: "module", Arity: 2 } declaration:
+                        DeclareModule(declaration, unit, diagnostics, fileName);
+                        continue;
+
+                    case CompoundTerm { Name: "use_module", Arity: 1 or 2 } import:
+                        UseModule(import, unit, diagnostics, fileName);
+                        continue;
+
+                    case CompoundTerm { Name: "meta_predicate", Arity: 1 } meta:
+                        DeclareMeta(meta.Arguments[0], diagnostics, fileName);
+                        continue;
+
+                    // A dynamic declaration changes how later clauses are stored, so it is collected
+                    // here and acted on once the module is known.
+                    case CompoundTerm { Name: "dynamic", Arity: 1 } dynamic:
+                        unit.Dynamic.Add(dynamic.Arguments[0]);
+
+                        // A dynamic predicate belongs to the module whether or not the file holds a
+                        // clause of it, so a call to it resolves the same way as one with clauses.
+                        foreach (SyntaxTerm indicator in Indicators(dynamic.Arguments[0]))
+                        {
+                            if (TryIndicator(indicator, out PredicateIndicator declared))
+                            {
+                                unit.Defines.Add(declared);
+                            }
+                        }
+
+                        continue;
+
+                    default:
+                        break;
+                }
+
+                if (IsAcceptedDeclaration(goal))
+                {
+                    continue;
+                }
+
+                unit.Directives.Add(goal);
+                continue;
+            }
+
+            SyntaxTerm head = clause;
+            SyntaxTerm? body = null;
+
+            // A grammar rule becomes an ordinary clause before anything else looks at it, so the
+            // rest of the loader and the whole compiler never learn that DCGs exist.
+            if (clause is CompoundTerm { Name: "-->", Arity: 2 } grammarRule)
+            {
+                if (!DcgTranslator.TryTranslate(grammarRule, diagnostics, fileName, out head, out SyntaxTerm translated))
+                {
+                    continue;
+                }
+
+                body = translated;
+            }
+            else if (clause is CompoundTerm { Name: ":-", Arity: 2 } rule)
+            {
+                head = rule.Arguments[0];
+                body = rule.Arguments[1];
+            }
+
+            switch (head)
+            {
+                case AtomTerm atom:
+                    unit.Defines.Add(new PredicateIndicator(atom.Name, 0));
+                    break;
+
+                case CompoundTerm compound:
+                    unit.Defines.Add(new PredicateIndicator(compound.Name, compound.Arity));
+                    break;
+
+                default:
+                    Report(
+                        diagnostics,
+                        CompilerDiagnosticIds.InvalidClauseHead,
+                        "A clause head must be an atom or a compound term.",
+                        head.Span,
+                        fileName
+                    );
+                    continue;
+            }
+
+            unit.Clauses.Add((head, body));
+        }
+    }
+
+    private void DeclareModule(CompoundTerm declaration, LoadUnit unit, List<Diagnostic> diagnostics, string? fileName)
+    {
+        if (declaration.Arguments[0] is not AtomTerm name)
+        {
+            Report(
+                diagnostics,
+                CompilerDiagnosticIds.InvalidModuleDeclaration,
+                "A module name must be an atom.",
+                declaration.Span,
+                fileName
+            );
+            return;
+        }
+
+        unit.Module = name.Name;
+        List<PredicateIndicator> exports = [];
+
+        foreach (SyntaxTerm export in Indicators(declaration.Arguments[1]))
+        {
+            if (TryIndicator(export, out PredicateIndicator indicator))
+            {
+                exports.Add(indicator);
+                continue;
+            }
+
+            Report(
+                diagnostics,
+                CompilerDiagnosticIds.InvalidModuleDeclaration,
+                "An export must be Name/Arity or Name//Arity.",
+                export.Span,
+                fileName
+            );
+        }
+
+        _modules.Declare(name.Name, exports);
+    }
+
+    /// <summary>Loads the file a <c>use_module</c> names and imports what it exports.</summary>
+    private void UseModule(CompoundTerm import, LoadUnit unit, List<Diagnostic> diagnostics, string? fileName)
+    {
+        if (import.Arguments[0] is not AtomTerm file)
+        {
+            Report(
+                diagnostics,
+                CompilerDiagnosticIds.InvalidModuleDeclaration,
+                "use_module needs a file name.",
+                import.Span,
+                fileName
+            );
+            return;
+        }
+
+        string? path = ResolvePath(file.Name, fileName);
+        if (path is null)
+        {
+            Report(
+                diagnostics,
+                CompilerDiagnosticIds.ModuleNotFound,
+                $"No file for use_module({file.Name}).",
+                import.Span,
+                fileName
+            );
+            return;
+        }
+
+        string? loaded = _modules.LoadedModuleOf(path);
+        if (loaded is null)
+        {
+            if (_program.RuntimeCompiler is null || _machine is null)
+            {
+                Report(
+                    diagnostics,
+                    CompilerDiagnosticIds.ModuleNotFound,
+                    "use_module needs an engine to load the file into.",
+                    import.Span,
+                    fileName
+                );
+                return;
+            }
+
+            _modules.BeginLoad(path);
+            _program.RuntimeCompiler.ConsultFile(_machine, path);
+            loaded = _modules.LoadedModuleOf(path) ?? ModuleTable.UserModule;
+        }
+
+        // An explicit import list narrows what is taken; without one, everything the module exports
+        // is imported, which is what use_module/1 means.
+        IEnumerable<PredicateIndicator> wanted = _modules.ExportsOf(loaded);
+
+        if (import.Arity == 2)
+        {
+            List<PredicateIndicator> listed = [];
+            foreach (SyntaxTerm item in Indicators(import.Arguments[1]))
+            {
+                if (TryIndicator(item, out PredicateIndicator indicator))
+                {
+                    listed.Add(indicator);
+                }
+            }
+
+            wanted = listed;
+        }
+
+        foreach (PredicateIndicator indicator in wanted)
+        {
+            _modules.Import(unit.Module, indicator, loaded);
+        }
+    }
+
+    /// <summary>Finds the file a <c>use_module</c> names, relative to the file that asked for it.</summary>
+    private static string? ResolvePath(string name, string? fileName)
+    {
+        string directory = fileName is null
+            ? Directory.GetCurrentDirectory()
+            : (Path.GetDirectoryName(Path.GetFullPath(fileName)) ?? ".");
+
+        foreach (string candidate in (string[])[name, name + ".pl"])
+        {
+            string absolute = Path.IsPathRooted(candidate) ? candidate : Path.Combine(directory, candidate);
+            if (File.Exists(absolute))
+            {
+                return Path.GetFullPath(absolute);
+            }
+        }
+
+        return null;
+    }
+
+    private void DeclareMeta(SyntaxTerm specification, List<Diagnostic> diagnostics, string? fileName)
+    {
+        foreach (SyntaxTerm item in Indicators(specification))
+        {
+            if (item is not CompoundTerm spec)
+            {
+                Report(
+                    diagnostics,
+                    CompilerDiagnosticIds.InvalidModuleDeclaration,
+                    "A meta_predicate specification must be a compound term.",
+                    item.Span,
+                    fileName
+                );
+                continue;
+            }
+
+            List<(int Position, int Extra)> arguments = [];
+            for (int i = 0; i < spec.Arity; i++)
+            {
+                // An integer says the argument is a closure gaining that many arguments; ':' says it
+                // is module-sensitive but not called here. Anything else is an ordinary argument.
+                switch (spec.Arguments[i])
+                {
+                    case IntegerTerm count when count.Value >= 0:
+                        arguments.Add((i, (int)count.Value));
+                        break;
+
+                    case AtomTerm { Name: ":" }:
+                        arguments.Add((i, 1));
+                        break;
+
+                    default:
+                        break;
+                }
+            }
+
+            _modules.DeclareMeta(spec.Name, spec.Arity, arguments);
+        }
+    }
+
+    /// <summary>Acts on the unit's dynamic declarations, now that the module is known.</summary>
+    private HashSet<int> DeclareDynamicPredicates(
+        LoadUnit unit,
+        ModuleResolver resolver,
+        List<Diagnostic> diagnostics,
+        string? fileName
+    )
+    {
+        HashSet<int> declared = [];
+
+        foreach (SyntaxTerm indicators in unit.Dynamic)
+        {
+            DeclareDynamic(indicators, declared, diagnostics, fileName, unit.Module);
+        }
+
+        _ = resolver;
+        return declared;
+    }
+
+    /// <summary>The items of a comma sequence or a list, which is how these declarations are written.</summary>
+    private static IEnumerable<SyntaxTerm> Indicators(SyntaxTerm term)
+    {
+        switch (term)
+        {
+            case CompoundTerm { Name: ",", Arity: 2 } sequence:
+                foreach (SyntaxTerm item in Indicators(sequence.Arguments[0]))
+                {
+                    yield return item;
+                }
+
+                foreach (SyntaxTerm item in Indicators(sequence.Arguments[1]))
+                {
+                    yield return item;
+                }
+
+                break;
+
+            case CompoundTerm { Name: ".", Arity: 2 } cons:
+                yield return cons.Arguments[0];
+
+                foreach (SyntaxTerm item in Indicators(cons.Arguments[1]))
+                {
+                    yield return item;
+                }
+
+                break;
+
+            case AtomTerm { Name: "[]" }:
+                break;
+
+            default:
+                yield return term;
+                break;
+        }
+    }
+
+    /// <summary>Reads <c>Name/Arity</c>, or <c>Name//Arity</c> which names a grammar rule.</summary>
+    private static bool TryIndicator(SyntaxTerm term, out PredicateIndicator indicator)
+    {
+        indicator = default;
+
+        if (term is not CompoundTerm { Arity: 2 } slash || slash.Name is not ("/" or "//"))
+        {
+            return false;
+        }
+
+        if (slash.Arguments[0] is not AtomTerm name || slash.Arguments[1] is not IntegerTerm arity)
+        {
+            return false;
+        }
+
+        // A grammar rule is compiled with two extra arguments, so that is what its predicate is.
+        indicator = new PredicateIndicator(name.Name, (int)arity.Value + (slash.Name == "//" ? 2 : 0));
+        return true;
+    }
+
+    /// <summary>What one unit of loading knows about itself.</summary>
+    private sealed class LoadUnit
+    {
+        internal string Module { get; set; } = ModuleTable.UserModule;
+
+        internal HashSet<PredicateIndicator> Defines { get; } = [];
+
+        internal List<(SyntaxTerm Head, SyntaxTerm? Body)> Clauses { get; } = [];
+
+        internal List<SyntaxTerm> Directives { get; } = [];
+
+        internal List<SyntaxTerm> Dynamic { get; } = [];
+    }
+
+    /// <summary>
+    /// Whether a directive is one the loader accepts and ignores, rather than running as a goal.
+    /// </summary>
+    /// <remarks>
+    /// <c>discontiguous/1</c> is ignored because clauses are grouped by predicate before they are
+    /// emitted, so a predicate whose clauses are scattered through a file already works.
+    /// </remarks>
+    private static bool IsAcceptedDeclaration(SyntaxTerm goal) =>
+        goal switch
+        {
+            CompoundTerm { Name: "discontiguous", Arity: 1 } => true,
+            CompoundTerm { Name: "set_prolog_flag", Arity: 2 } => true,
+            _ => false,
+        };
+
+    /// <summary>Handles <c>:- dynamic Name/Arity</c>, a comma sequence of them, or a list of them.</summary>
+    private void DeclareDynamic(
+        SyntaxTerm indicators,
+        HashSet<int> declared,
+        List<Diagnostic> diagnostics,
+        string? fileName,
+        string module
+    )
+    {
+        List<SyntaxTerm> pending = [indicators];
+
+        while (pending.Count > 0)
+        {
+            SyntaxTerm term = pending[^1];
+            pending.RemoveAt(pending.Count - 1);
+
+            switch (term)
+            {
+                case CompoundTerm { Name: ",", Arity: 2 } or CompoundTerm { Name: ".", Arity: 2 }:
+                    pending.AddRange(((CompoundTerm)term).Arguments);
+                    continue;
+
+                case AtomTerm { Name: "[]" }:
+                    continue;
+
+                case CompoundTerm { Name: "/", Arity: 2 } indicator
+                    when indicator.Arguments[0] is AtomTerm name && indicator.Arguments[1] is IntegerTerm arity:
+                {
+                    if (_machine is null)
+                    {
+                        Report(
+                            diagnostics,
+                            CompilerDiagnosticIds.DynamicNotAvailable,
+                            "A dynamic declaration needs a machine to load into.",
+                            term.Span,
+                            fileName
+                        );
+                        continue;
+                    }
+
+                    int functorId = _program.Symbols.InternFunctor(
+                        ModuleTable.QualifiedName(module, name.Name),
+                        (int)arity.Value
+                    );
+                    _program.DeclareDynamic(functorId);
+                    declared.Add(functorId);
+                    continue;
+                }
+
+                default:
+                    Report(
+                        diagnostics,
+                        CompilerDiagnosticIds.InvalidDynamicDeclaration,
+                        "Expected a predicate indicator of the form Name/Arity.",
+                        term.Span,
+                        fileName
+                    );
+                    continue;
+            }
+        }
+    }
+
+    /// <summary>Compiles each clause of a dynamic predicate separately and adds it to the database.</summary>
+    private void EmitDynamicClauses(
+        int functorId,
+        List<(SyntaxTerm Head, SyntaxTerm? Body)> clauses,
+        List<Diagnostic> diagnostics,
+        string? fileName
+    )
+    {
+        DynamicPredicate predicate = _program.DeclareDynamic(functorId);
+        Machine machine = _machine!;
+        int rule = _program.Symbols.InternFunctor(":-", 2);
+
+        foreach ((SyntaxTerm head, SyntaxTerm? body) in clauses)
+        {
+            var compiler = new ClauseCompiler(_program, _constants, diagnostics, fileName);
+            int address = compiler.Compile(head, body);
+            if (address < 0)
+            {
+                continue;
+            }
+
+            // retract/1 matches against the clause as a term, so keep a detached copy of it.
+            Dictionary<string, Cell> variables = [];
+            Cell headCell = TermReifier.ToHeap(machine, head, variables);
+            Cell bodyCell = body is null ? Cell.Atom(machine.Symbols.True) : TermReifier.ToHeap(machine, body, variables);
+
+            var term = new TermBuffer();
+            int root = term.Copy(machine, machine.CreateStructure(rule, [headCell, bodyCell]));
+
+            predicate.Append(
+                new DynamicClause
+                {
+                    CodeAddress = address,
+                    Term = term,
+                    TermRoot = root,
+                    Birth = _program.Generation,
+                }
+            );
+        }
+    }
+
+    private static void Report(List<Diagnostic> diagnostics, string id, string message, SourceSpan span, string? fileName) =>
+        diagnostics.Add(new Diagnostic(id, DiagnosticSeverity.Error, message, span, fileName));
+
+    private void CompileDirective(
+        SyntaxTerm goal,
+        List<Diagnostic> diagnostics,
+        List<int> directives,
+        List<int> initialization,
+        string? fileName
+    )
+    {
+        bool deferred = goal is CompoundTerm { Name: "initialization", Arity: 1 };
+        SyntaxTerm actual = deferred ? ((CompoundTerm)goal).Arguments[0] : goal;
+
+        var compiler = new ClauseCompiler(_program, _constants, diagnostics, fileName);
+        int address = compiler.Compile(new AtomTerm("$directive", actual.Span), actual);
+        if (address < 0)
+        {
+            return;
+        }
+
+        (deferred ? initialization : directives).Add(address);
+    }
+
+    private void EmitPredicate(
+        int functorId,
+        List<(SyntaxTerm Head, SyntaxTerm? Body)> clauses,
+        List<Diagnostic> diagnostics,
+        string? fileName
+    )
+    {
+        int entry = _program.CodeLength;
+        int pendingAlternative = -1;
+
+        for (int i = 0; i < clauses.Count; i++)
+        {
+            if (clauses.Count > 1)
+            {
+                if (i == 0)
+                {
+                    pendingAlternative = _program.Emit(OpCode.TryMeElse, 0) + 1;
+                }
+                else if (i < clauses.Count - 1)
+                {
+                    _program.Patch(pendingAlternative, _program.CodeLength);
+                    pendingAlternative = _program.Emit(OpCode.RetryMeElse, 0) + 1;
+                }
+                else
+                {
+                    _program.Patch(pendingAlternative, _program.CodeLength);
+                    _program.Emit(OpCode.TrustMe);
+                }
+            }
+
+            var compiler = new ClauseCompiler(_program, _constants, diagnostics, fileName);
+            compiler.Compile(clauses[i].Head, clauses[i].Body);
+        }
+
+        _program.DefinePredicate(functorId, entry);
+    }
+
+    private bool TryGetHeadFunctor(SyntaxTerm head, out int functorId)
+    {
+        switch (head)
+        {
+            case AtomTerm atom:
+                functorId = _program.Symbols.InternFunctor(atom.Name, 0);
+                return true;
+
+            case CompoundTerm compound:
+                functorId = _program.Symbols.InternFunctor(compound.Name, compound.Arity);
+                return true;
+
+            default:
+                functorId = -1;
+                return false;
+        }
+    }
+}

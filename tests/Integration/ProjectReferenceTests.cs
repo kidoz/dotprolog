@@ -28,7 +28,7 @@ public sealed class ProjectReferenceTests
         // The task assembly is loaded by MSBuild, so it has to exist before the sample builds.
         (int taskExit, string taskLog) = await Run(
             "dotnet",
-            ["build", Path.Combine(RepositoryLayout.Root, "src", "Prolog.Build.Tasks"), "--nologo"]
+            ["build", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
         );
 
         Assert.True(taskExit == 0, $"Building the task failed:\n{taskLog}");
@@ -84,7 +84,7 @@ public sealed class ProjectReferenceTests
 
         (int taskExit, string taskLog) = await Run(
             "dotnet",
-            ["build", Path.Combine(RepositoryLayout.Root, "src", "Prolog.Build.Tasks"), "--nologo"]
+            ["build", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
         );
 
         Assert.True(taskExit == 0, $"Building the task failed:\n{taskLog}");
@@ -123,7 +123,7 @@ public sealed class ProjectReferenceTests
 
         (int taskExit, string taskLog) = await Run(
             "dotnet",
-            ["build", Path.Combine(RepositoryLayout.Root, "src", "Prolog.Build.Tasks"), "--nologo"]
+            ["build", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
         );
 
         Assert.True(taskExit == 0, $"Building the task failed:\n{taskLog}");
@@ -155,7 +155,7 @@ public sealed class ProjectReferenceTests
 
         (int taskExit, string taskLog) = await Run(
             "dotnet",
-            ["build", Path.Combine(RepositoryLayout.Root, "src", "Prolog.Build.Tasks"), "--nologo"]
+            ["build", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
         );
 
         Assert.True(taskExit == 0, $"Building the task failed:\n{taskLog}");

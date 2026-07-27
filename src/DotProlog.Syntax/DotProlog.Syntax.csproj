@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <RootNamespace>DotProlog.Syntax</RootNamespace>
+
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!--
+          The operator table is shared language state, not reader-private state: op/3 mutates it at
+          run time and the term writer reads it, so it lives in the runtime and the reader takes it
+          from there.
+        -->
+        <ProjectReference Include="..\DotProlog.Runtime\DotProlog.Runtime.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="DotProlog.Syntax.Tests" />
+    </ItemGroup>
+</Project>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <RootNamespace>DotProlog.CodeGen.CSharp.Tests</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- The generated facade is compiled in-process, so a test proves it builds and runs
+             rather than only asserting on the text. -->
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\DotProlog.CodeGen.CSharp\DotProlog.CodeGen.CSharp.csproj" />
+    </ItemGroup>
+</Project>

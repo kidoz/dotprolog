@@ -20,7 +20,7 @@
         -->
         <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
 
-        <PrologTasksOutput>$(MSBuildThisFileDirectory)..\Prolog.Build.Tasks\bin\$(Configuration)\net10.0\</PrologTasksOutput>
+        <PrologTasksOutput>$(MSBuildThisFileDirectory)..\DotProlog.Build.Tasks\bin\$(Configuration)\net10.0\</PrologTasksOutput>
         <TargetsForTfmSpecificContentInPackage>
             $(TargetsForTfmSpecificContentInPackage);PackPrologSdkContent
         </TargetsForTfmSpecificContentInPackage>
@@ -28,7 +28,7 @@
 
     <ItemGroup>
         <!-- Builds the generator before this package needs its output; not referenced as an assembly. -->
-        <ProjectReference Include="..\Prolog.Build.Tasks\Prolog.Build.Tasks.csproj" ReferenceOutputAssembly="false" />
+        <ProjectReference Include="..\DotProlog.Build.Tasks\DotProlog.Build.Tasks.csproj" ReferenceOutputAssembly="false" />
     </ItemGroup>
 
     <ItemGroup>
@@ -50,7 +50,7 @@
 
         <Error
             Condition="'@(_PrologTaskAssembly)' == ''"
-            Text="No task assemblies were found in $(PrologTasksOutput); build Prolog.Build.Tasks first."
+            Text="No task assemblies were found in $(PrologTasksOutput); build DotProlog.Build.Tasks first."
         />
     </Target>
 </Project>

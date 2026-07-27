@@ -1,6 +1,6 @@
-using Prolog.Compiler;
-using Prolog.Runtime;
-using Prolog.Syntax;
+using DotProlog.Compiler;
+using DotProlog.Runtime;
+using DotProlog.Syntax;
 
 namespace AotAcceptance;
 

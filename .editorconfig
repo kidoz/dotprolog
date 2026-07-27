@@ -31,7 +31,7 @@ dotnet_diagnostic.CA1720.severity = none
 # bytes. CA1711 reserves the suffix for the latter; PrologStream is the name the language uses.
 dotnet_diagnostic.CA1711.severity = none
 
-[src/Prolog.Runtime/CellTag.cs]
+[src/DotProlog.Runtime/CellTag.cs]
 # CellTag is a byte on purpose: it is packed into a term cell, not used as a public flags enum.
 dotnet_diagnostic.CA1028.severity = none
 
@@ -42,11 +42,11 @@ dotnet_diagnostic.CA1515.severity = none
 # CA2007 is a library rule, and it contradicts xUnit1030: xUnit needs its synchronization context.
 dotnet_diagnostic.CA2007.severity = none
 
-[src/Prolog.Build.Tasks/**.cs]
+[src/DotProlog.Build.Tasks/**.cs]
 # MSBuild binds task parameters by property and requires arrays for item lists, so CA1819 cannot apply.
 dotnet_diagnostic.CA1819.severity = none
 
-[src/Prolog.Testing/**.cs]
+[src/DotProlog.Testing/**.cs]
 # IDataProducer.DataTypesProduced is declared as Type[] by the platform, so CA1819 cannot apply.
 dotnet_diagnostic.CA1819.severity = none
 

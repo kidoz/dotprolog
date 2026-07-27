@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <RootNamespace>DotProlog.Build.Tasks</RootNamespace>
+
+        <!-- An MSBuild task assembly is loaded by MSBuild, not referenced by user code. -->
+        <IsAotCompatible>false</IsAotCompatible>
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- Provided by the MSBuild that loads this task, so it must not be copied alongside it. -->
+        <PackageReference Include="Microsoft.Build.Utilities.Core" Version="18.8.2" ExcludeAssets="runtime" PrivateAssets="all" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\DotProlog.CodeGen.CSharp\DotProlog.CodeGen.CSharp.csproj" />
+    </ItemGroup>
+</Project>

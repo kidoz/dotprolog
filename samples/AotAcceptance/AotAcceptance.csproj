@@ -17,7 +17,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\Prolog.Compiler\Prolog.Compiler.csproj" />
+        <ProjectReference Include="..\..\src\DotProlog.Compiler\DotProlog.Compiler.csproj" />
     </ItemGroup>
 
     <ItemGroup>
