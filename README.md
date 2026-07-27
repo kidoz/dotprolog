@@ -211,6 +211,8 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 | Output | `write/1`, `writeq/1`, `print/1`, `writeln/1`, `write_canonical/1`, `write_term/2`, `nl/0`, `format/1,2,3`, `tab/1` |
 | Operators | `op/3`, `current_op/3` |
 | Grammars | `-->/2` with `{}/1`, `!`, `\+`, pushback lists; `phrase/2`, `phrase/3` |
+| Streams | `open/3,4`, `close/1`, `current_input/1`, `current_output/1`, `set_input/1`, `set_output/1`, `at_end_of_stream/0,1`, `flush_output/0,1` |
+| Reading | `read/1,2`, `read_term/2,3`, `get_char/1,2`, `peek_char/1,2`, `put_char/1,2`, `read_term_from_atom/3`, `term_to_atom/2` |
 | Directives | `:- Goal`, `:- initialization(Goal)`, `halt/0`, `halt/1` |
 
 Control constructs are compiled in place inside a clause body, so cut scopes the way ISO specifies: opaque in the condition of if-then-else, transparent in its branches, clause-scoped elsewhere. A bootstrap library written in Prolog makes the same constructs reachable when a goal is assembled at run time and passed to `call/1`.
@@ -295,7 +297,27 @@ number(N)     --> digits(Ds), { number_codes(N, Ds) }.
 `phrase/2` and `phrase/3` walk the control constructs themselves, so a body assembled at run time
 works as well as one written as a rule. A rule asserted with `assertz/1` is translated too.
 
-Not yet implemented: modules, and streams and file I/O.
+Streams carry terms and characters, not bytes. `read/1` pulls text a line at a time until the lexer
+finds a clause terminator, so a term can be read from a console as soon as it is complete rather
+than after the input ends — a full stop inside `'a. b'`, inside `3.14`, or inside `=..` is not one.
+An incomplete clause at end of input is a catchable `syntax_error(unexpected_end_of_file)` rather
+than a silently truncated term.
+
+```prolog
+main :-
+    read_term(T, []),
+    ( T == end_of_file -> true
+    ; format("got ~q~n", [T]), main ).
+
+?- with_output_to(atom(A), write(1+2)).      % A = '1+2'
+?- open('data.pl', read, S), read(S, T), close(S).
+```
+
+`Machine.Output` remains what an embedding host sets, and it is `user_output` specifically — a
+program that redirects itself with `set_output/1` or `with_output_to/2` cannot detach the host from
+the stream it handed in. `halt/0` flushes and closes whatever the program opened.
+
+Not yet implemented: modules.
 
 One known deviation: a cut inside a goal reached through `call/1` is local to that goal and prunes nothing in the meta-call, so `call((a, !, b))` behaves as `call((a, b))` — which also means `findall(X, (goal(X), !), L)` does not stop at the first solution.
 
