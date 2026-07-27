@@ -79,6 +79,13 @@ internal static class Program
                 % A grammar consulted from the external file, translated inside the native image.
                 phrase(number(N), "427"), write(N), nl,
 
+                % Streams: a file written, read back as a term, and output captured — all of which
+                % need the reader, which a native image has to carry with it.
+                with_output_to(atom(Captured), write(captured(1+2))),
+                open('dotprolog-aot.tmp', write, Out), write(Out, Captured), write(Out, ' .'), close(Out),
+                open('dotprolog-aot.tmp', read, In), read(In, Read), close(In),
+                write(Read), nl,
+
                 write(done), nl.
             """;
 
