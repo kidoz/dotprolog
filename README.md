@@ -213,6 +213,7 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 | Grammars | `-->/2` with `{}/1`, `!`, `\+`, pushback lists; `phrase/2`, `phrase/3` |
 | Streams | `open/3,4`, `close/1`, `current_input/1`, `current_output/1`, `set_input/1`, `set_output/1`, `at_end_of_stream/0,1`, `flush_output/0,1` |
 | Reading | `read/1,2`, `read_term/2,3`, `get_char/1,2`, `peek_char/1,2`, `put_char/1,2`, `read_term_from_atom/3`, `term_to_atom/2` |
+| Modules | `:- module/2`, `use_module/1,2`, `:- meta_predicate/1`, `Module:Goal` |
 | Directives | `:- Goal`, `:- initialization(Goal)`, `halt/0`, `halt/1` |
 
 Control constructs are compiled in place inside a clause body, so cut scopes the way ISO specifies: opaque in the condition of if-then-else, transparent in its branches, clause-scoped elsewhere. A bootstrap library written in Prolog makes the same constructs reachable when a goal is assembled at run time and passed to `call/1`.
@@ -317,7 +318,35 @@ main :-
 program that redirects itself with `set_output/1` or `with_output_to/2` cannot detach the host from
 the stream it handed in. `halt/0` flushes and closes whatever the program opened.
 
-Not yet implemented: modules.
+A file that declares a module keeps to itself everything its export list omits. A predicate `p/1`
+in module `m` is compiled under the name `m:p`, and a call inside `m` to something `m` defines is
+rewritten to that name — so two files can each have a `helper/1` without ever meeting. Anything the
+module does not define falls through to the global name, which is how the standard library and
+`user` stay reachable.
+
+```prolog
+:- module(shapes, [describe/1]).
+
+describe(N) :- helper(N).        % shapes' own helper/1
+helper(N) :- write(area(N)).     % not exported, so not visible outside
+```
+
+```prolog
+:- use_module(shapes).
+
+helper(N) :- write(mine(N)).     % a different helper/1 entirely
+
+?- describe(4).                  % area(4)
+?- shapes:helper(9).             % area(9), reached by qualifying
+```
+
+An exported predicate is also given its plain name when nothing else has claimed it, which is what
+lets a generated facade, `dotnet prolog run`, and an embedding host call it without knowing modules
+exist. A goal that is only known at run time carries its module and is resolved when called, so a
+closure handed to `maplist/3` finds the predicate it meant. `:- meta_predicate f(0, +, -)` says
+which of a predicate's own arguments are goals.
+
+Nothing in the engine knows modules exist: resolution is a rewrite performed while loading.
 
 One known deviation: a cut inside a goal reached through `call/1` is local to that goal and prunes nothing in the meta-call, so `call((a, !, b))` behaves as `call((a, b))` — which also means `findall(X, (goal(X), !), L)` does not stop at the first solution.
 
