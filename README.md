@@ -438,6 +438,21 @@ just pack        # every package into ./artifacts, with SHA256SUMS
 `Prolog.NET`, which this project's brief originally proposed, is taken on NuGet by an unrelated
 WAM-based .NET Prolog. `DotProlog.*` is what shipped instead.
 
+Releasing is a tag. `.github/workflows/release.yml` runs on `v*`, re-runs every CI gate against the
+tagged commit, checks the tag agrees with `VersionPrefix`, publishes native binaries for Linux,
+Windows, and macOS, packs with checksums and an SBOM, opens a GitHub release whose notes are the
+changelog section for that version, and only then pushes to NuGet — from a separate job in a
+`release` environment, so a required reviewer can stand between the tag and the feed.
+
+```bash
+# 1. Move the version's changelog heading from "unreleased" to today's date.
+# 2. Set VersionPrefix in Directory.Build.props if the version is changing.
+# 3. Commit, then:
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+Nothing is published yet, and nothing publishes without `NUGET_API_KEY` being set.
+
 ## Licence
 
 MIT — see [LICENSE](LICENSE).
