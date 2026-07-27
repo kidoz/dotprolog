@@ -19,4 +19,16 @@
         <InvariantGlobalization>true</InvariantGlobalization>
         <RepositoryRoot>$(MSBuildThisFileDirectory)</RepositoryRoot>
     </PropertyGroup>
+
+    <PropertyGroup Label="Publishing">
+        <VersionPrefix>0.1.0</VersionPrefix>
+
+        <!--
+          Publishing is opt-in. Tests, benchmarks, samples, and the projects that exist only to be
+          bundled inside the SDK package are not packages, and defaulting to false means a new
+          project has to say so before it can be published by accident. The metadata every package
+          shares lives in src/Directory.Build.props.
+        -->
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
 </Project>

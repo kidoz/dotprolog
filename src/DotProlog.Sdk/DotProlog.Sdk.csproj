@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
+        <IsPackable>true</IsPackable>
         <!--
           An MSBuild SDK package: it carries no assemblies of its own, only the props and targets
           that `<Sdk Name="DotProlog.Sdk" />` resolves to, plus the facade generator they load.

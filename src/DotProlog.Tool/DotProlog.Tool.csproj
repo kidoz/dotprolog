@@ -6,7 +6,13 @@
         <ToolCommandName>dotnet-prolog</ToolCommandName>
         <PublishAot>false</PublishAot>
 
+        <!-- Without this the tool packs as an ordinary library and cannot be installed. -->
+        <PackAsTool>true</PackAsTool>
 
+        <IsPackable>true</IsPackable>
+        <PackageId>DotProlog.Tool</PackageId>
+        <Title>DotProlog command line tool</Title>
+        <Description>The `dotnet prolog` command: consults and runs a Prolog file.</Description>
     </PropertyGroup>
 
     <ItemGroup>

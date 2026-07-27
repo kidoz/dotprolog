@@ -2,6 +2,10 @@
     <PropertyGroup>
         <RootNamespace>DotProlog.Runtime</RootNamespace>
 
+        <IsPackable>true</IsPackable>
+        <PackageId>DotProlog.Runtime</PackageId>
+        <Title>DotProlog runtime</Title>
+        <Description>The bytecode virtual machine a DotProlog program runs on: tagged cells, unification, backtracking, and the builtin predicates. NativeAOT-compatible.</Description>
     </PropertyGroup>
 
     <ItemGroup>

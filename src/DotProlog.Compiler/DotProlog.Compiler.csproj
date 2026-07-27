@@ -2,6 +2,10 @@
     <PropertyGroup>
         <RootNamespace>DotProlog.Compiler</RootNamespace>
 
+        <IsPackable>true</IsPackable>
+        <PackageId>DotProlog.Compiler</PackageId>
+        <Title>DotProlog compiler and engine</Title>
+        <Description>Compiles Prolog to bytecode and runs it. This is the package to reference to embed Prolog in a .NET application.</Description>
     </PropertyGroup>
 
     <ItemGroup>

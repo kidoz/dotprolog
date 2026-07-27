@@ -2,6 +2,10 @@
     <PropertyGroup>
         <RootNamespace>DotProlog.Syntax</RootNamespace>
 
+        <IsPackable>true</IsPackable>
+        <PackageId>DotProlog.Syntax</PackageId>
+        <Title>DotProlog reader</Title>
+        <Description>The DotProlog lexer and operator-precedence term reader, with diagnostics that carry source spans.</Description>
     </PropertyGroup>
 
     <ItemGroup>

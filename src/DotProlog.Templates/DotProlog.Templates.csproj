@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
+        <IsPackable>true</IsPackable>
         <!-- A template package carries content only; nothing here is compiled or referenced. -->
         <PackageType>Template</PackageType>
         <IncludeBuildOutput>false</IncludeBuildOutput>

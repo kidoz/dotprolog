@@ -2,6 +2,10 @@
     <PropertyGroup>
         <RootNamespace>DotProlog.Testing</RootNamespace>
 
+        <IsPackable>true</IsPackable>
+        <PackageId>DotProlog.Testing</PackageId>
+        <Title>DotProlog test framework</Title>
+        <Description>Runs a Prolog project's test_* predicates under Microsoft.Testing.Platform.</Description>
     </PropertyGroup>
 
     <ItemGroup>
