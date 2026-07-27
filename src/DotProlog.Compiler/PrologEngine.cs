@@ -272,6 +272,37 @@ public sealed class PrologEngine : IRuntimeCompiler
     {
         ArgumentNullException.ThrowIfNull(machine);
 
+        // The clause is inspected as cells before it is reified, because an error raised here has
+        // to name the offending part of the term the program passed, and catch/3 can only unify
+        // against a term the machine built.
+        Cell whole = machine.Dereference(clause);
+        if (whole.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        Cell headCell = whole;
+        Cell bodyCell = default;
+        bool hasBody = false;
+        int rule2 = machine.Symbols.InternFunctor(":-", 2);
+
+        if (whole.Tag == CellTag.Structure && machine.HeapAt(whole.Index).Index == rule2)
+        {
+            headCell = machine.Dereference(machine.HeapAt(whole.Index + 1));
+            bodyCell = machine.Dereference(machine.HeapAt(whole.Index + 2));
+            hasBody = true;
+        }
+
+        if (headCell.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        if (headCell.Tag is not (CellTag.Atom or CellTag.Structure))
+        {
+            throw PrologErrors.Type(machine, "callable", headCell);
+        }
+
         SyntaxTerm term = TermReifier.ToSyntax(machine, clause);
         SyntaxTerm head = term;
         SyntaxTerm? body = null;
@@ -283,7 +314,7 @@ public sealed class PrologEngine : IRuntimeCompiler
         {
             if (!DcgTranslator.TryTranslate(grammarRule, diagnostics, null, out head, out SyntaxTerm translated))
             {
-                throw new PrologException($"The asserted grammar rule did not translate: {string.Join("; ", diagnostics)}");
+                throw PrologErrors.Type(machine, "callable", whole);
             }
 
             body = translated;
@@ -298,15 +329,15 @@ public sealed class PrologEngine : IRuntimeCompiler
         {
             AtomTerm atom => Program.Symbols.InternFunctor(atom.Name, 0),
             CompoundTerm compound => Program.Symbols.InternFunctor(compound.Name, compound.Arity),
-            _ => throw new PrologException("type_error(callable, _)"),
+            _ => throw PrologErrors.Type(machine, "callable", headCell),
         };
 
         var compiler = new ClauseCompiler(Program, new ConstantPool(Program), diagnostics, null);
         int address = compiler.Compile(head, body);
 
-        return address < 0
-            ? throw new PrologException($"The asserted clause did not compile: {string.Join("; ", diagnostics)}")
-            : address;
+        // ISO 8.9.1.3: a body that is not callable is type_error(callable, Body). Anything else the
+        // compiler rejects is reported the same way, since the body is what could not be compiled.
+        return address < 0 ? throw PrologErrors.Type(machine, "callable", hasBody ? bodyCell : whole) : address;
     }
 
     /// <inheritdoc />
@@ -317,17 +348,18 @@ public sealed class PrologEngine : IRuntimeCompiler
     /// </remarks>
     public void ConsultFile(Machine machine, string path)
     {
+        ArgumentNullException.ThrowIfNull(machine);
         ArgumentNullException.ThrowIfNull(path);
 
         if (!File.Exists(path))
         {
-            throw new PrologException($"existence_error(source_sink, {path})");
+            throw ExistenceError(machine, "source_sink", Cell.Atom(machine.Symbols.InternAtom(path)));
         }
 
         LoadResult loaded = ConsultText(File.ReadAllText(path), path);
         if (!loaded.Success)
         {
-            throw new PrologException($"Consulting {path} failed: {string.Join("; ", loaded.Diagnostics)}");
+            throw SyntaxError(machine, $"{path}: {string.Join("; ", loaded.Diagnostics)}");
         }
     }
 
@@ -405,6 +437,18 @@ public sealed class PrologEngine : IRuntimeCompiler
 
         Cell error = machine.CreateStructure(machine.Symbols.InternFunctor("error", 2), [formal, machine.CreateVariable()]);
         return machine.CreateBall(error, $"syntax_error({what})");
+    }
+
+    /// <summary>Builds a catchable <c>error(existence_error(Kind, Culprit), _)</c>.</summary>
+    private static PrologException ExistenceError(Machine machine, string kind, Cell culprit)
+    {
+        Cell formal = machine.CreateStructure(
+            machine.Symbols.InternFunctor("existence_error", 2),
+            [Cell.Atom(machine.Symbols.InternAtom(kind)), culprit]
+        );
+
+        Cell error = machine.CreateStructure(machine.Symbols.InternFunctor("error", 2), [formal, machine.CreateVariable()]);
+        return machine.CreateBall(error, $"existence_error({kind}, {TermWriter.ToDisplayString(machine, culprit)})");
     }
 
     private RunResult RunQueue(List<int> queue, string description)
