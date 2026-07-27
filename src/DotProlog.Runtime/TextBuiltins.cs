@@ -170,7 +170,14 @@ internal static class TextBuiltins
 
             if (!numeric)
             {
-                return machine.Unify(machine.Argument(0), Cell.Atom(machine.Symbols.InternAtom(text)));
+                Cell bound = machine.Argument(0);
+
+                // With the first argument already bound, the question is whether those are its
+                // characters — so its text is compared. Interning an atom and unifying instead
+                // would make atom_chars(1.0, ['1', '.', '0']) fail, since a float is not an atom.
+                return bound.Tag == CellTag.Reference
+                    ? machine.Unify(bound, Cell.Atom(machine.Symbols.InternAtom(text)))
+                    : TryText(machine, bound, out string existing) && string.Equals(existing, text, StringComparison.Ordinal);
             }
 
             return TryParseNumber(text, out PrologNumber parsed)
