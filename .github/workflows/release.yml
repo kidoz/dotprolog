@@ -1,0 +1,210 @@
+name: Release
+
+# Publishing is deliberate: it happens when a version tag is pushed, and the push is a human act.
+# Nothing here runs on a branch.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  # The same gates CI applies, re-run against the tagged commit rather than trusted from a branch.
+  verify:
+    name: Verify ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install NativeAOT prerequisites
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install --yes clang zlib1g-dev
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Check formatting
+        if: matrix.os == 'ubuntu-latest'
+        run: dotnet csharpier check .
+
+      - name: Build the facade generator task
+        run: dotnet build src/DotProlog.Build.Tasks -c Release -p:ContinuousIntegrationBuild=true
+
+      - name: Build
+        run: dotnet build DotProlog.slnx -c Release -p:ContinuousIntegrationBuild=true
+
+      - name: Test
+        run: dotnet test DotProlog.slnx -c Release --no-build
+        env:
+          DOTPROLOG_RUN_AOT_TESTS: '1'
+
+      # The tag has to agree with what the projects say they are, or the packages would carry a
+      # version nobody chose.
+      - name: Check the tag matches VersionPrefix
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          declared=$(grep -oE '<VersionPrefix>[^<]+' Directory.Build.props | cut -d'>' -f2)
+          echo "tag=$tag declared=$declared"
+          test "$tag" = "$declared"
+
+  # A published binary anyone can download and run without installing .NET.
+  native:
+    name: Native ${{ matrix.rid }}
+    needs: verify
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-latest
+            rid: osx-arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install NativeAOT prerequisites
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install --yes clang zlib1g-dev
+
+      - name: Publish the sample natively
+        run: >
+          dotnet publish samples/AotAcceptance/AotAcceptance.csproj
+          -c Release -r ${{ matrix.rid }} -p:PublishAot=true
+          -p:ContinuousIntegrationBuild=true -o native/${{ matrix.rid }}
+
+      - name: Name the binary after its platform
+        shell: bash
+        run: |
+          cd native/${{ matrix.rid }}
+          rm -rf ./*.dSYM ./*.pdb
+          if [ -f AotAcceptance.exe ]; then
+            mv AotAcceptance.exe "../../dotprolog-sample-${{ matrix.rid }}.exe"
+          else
+            mv AotAcceptance "../../dotprolog-sample-${{ matrix.rid }}"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.rid }}
+          path: dotprolog-sample-*
+          if-no-files-found: error
+
+  package:
+    name: Package
+    needs: verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Pack
+        run: dotnet pack DotProlog.slnx -c Release -o artifacts -p:ContinuousIntegrationBuild=true
+
+      - name: Checksums
+        run: cd artifacts && sha256sum *.nupkg *.snupkg > SHA256SUMS
+
+      - name: Software bill of materials
+        run: |
+          dotnet tool install --global CycloneDX
+          dotnet CycloneDX DotProlog.slnx -o artifacts --filename sbom.json --json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: artifacts/*
+          if-no-files-found: error
+
+  release:
+    name: GitHub release
+    needs: [native, package]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: downloaded
+
+      # The changelog is the source of the notes, so the two cannot disagree.
+      - name: Extract the notes for this version
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            $0 ~ "^## \\[" v "\\]" { inside = 1; next }
+            inside && /^## \[/ { exit }
+            inside { print }
+          ' CHANGELOG.md > notes.md
+          test -s notes.md
+          cat notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: notes.md
+          files: |
+            downloaded/packages/*
+            downloaded/native-*/*
+          fail_on_unmatched_files: true
+
+  # Separated so that publishing to nuget.org is its own approval gate: configure the `release`
+  # environment with required reviewers and nothing reaches the feed without a person saying so.
+  publish:
+    name: Publish to NuGet
+    needs: release
+    runs-on: ubuntu-latest
+    environment: release
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: artifacts
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # A missing key means the feed is not configured yet, not that the release is broken: the
+      # GitHub release stands on its own, so this reports and stops rather than failing the run.
+      - name: Push
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [ -z "$NUGET_API_KEY" ]; then
+            echo "::notice::NUGET_API_KEY is not set; skipping the push to nuget.org."
+            exit 0
+          fi
+          dotnet nuget push "artifacts/*.nupkg" \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key "$NUGET_API_KEY" \
+            --skip-duplicate
