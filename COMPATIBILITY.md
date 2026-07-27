@@ -8,13 +8,24 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**155 conformance cases encoded from ISO/IEC 13211-1 clause 8, all passing.** They live in
+**244 conformance cases encoded from ISO/IEC 13211-1, 243 passing.** They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
-a goal, and what the standard says that goal does — and run as part of the test suite. They cover
-unification, type testing, term comparison, term construction and decomposition, arithmetic and its
-comparisons, the clause and database predicates, all-solutions predicates, `op/3`, logic and
-control, atomic term processing, and `catch/3`, with an emphasis on the error terms, which is where
-implementations diverge most.
+a goal, and what the standard says that goal does — and run as part of the test suite.
+
+Clause 7 cases cover reading terms from text: number syntax including character, hexadecimal,
+octal, and binary literals; operator priority and associativity; list and curly notation; and what
+`writeq/1` produces, down to the exact codes for a quoted atom. Clause 8 cases cover unification,
+type testing, term comparison, term construction and decomposition, arithmetic and its comparisons,
+the clause and database predicates, all-solutions predicates, streams and character I/O, term
+input and output, `op/3`, logic and control, and atomic term processing — with an emphasis
+throughout on the error terms, which is where implementations diverge most. Sorting is included
+too, though it sits outside clause 8.
+
+**One case does not pass**, and it is pinned rather than hidden: `call((!, fail ; true))` succeeds
+where the standard says it fails, because a cut inside a meta-called goal is local here and does not
+prune the disjunction's alternative. Written directly in a clause body the same goal fails
+correctly; both behaviours are pinned by tests. Closing this needs a call barrier the engine does
+not have.
 
 **These cases are our own encoding of the standard, not third-party verification.** Ulrich
 Neumerkel's conformity tables carry no licence, and the Logtalk suite is written against its own
@@ -22,7 +33,7 @@ test framework, so neither could be vendored. Reading the standard and encoding 
 than nothing and less than an independent suite, and this file will say so until an independent one
 has been run.
 
-Writing them was worth it immediately: the first run found four real defects.
+Writing them was worth it immediately: they found five real defects.
 
 - `assertz(4)` raised an exception `catch/3` could not catch, aborting the run. Several standard
   errors were raw messages rather than Prolog terms.
@@ -30,8 +41,10 @@ Writing them was worth it immediately: the first run found four real defects.
 - `X =.. [_, a]` gave a type error where the standard says `instantiation_error`.
 - `call((fail, 4))` failed instead of raising `type_error(callable, (fail,4))`; a meta-called goal
   is now checked whole before any of it runs.
+- `atom_chars(1.0, ['1', '.', '0'])` failed. With its first argument already bound the predicate
+  built an atom from the list and unified, so a number could never match; it now compares text.
 
-Beyond the conformance cases, the engine is covered by 675 of its own tests, an integration suite
+Beyond the conformance cases, the engine is covered by 676 of its own tests, an integration suite
 that builds and runs the C#, F#, and Visual Basic samples, and a NativeAOT acceptance test.
 
 ## Implemented
