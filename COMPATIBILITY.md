@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**244 conformance cases encoded from ISO/IEC 13211-1, 243 passing.** They live in
+**244 conformance cases encoded from ISO/IEC 13211-1, all passing.** They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
 
@@ -21,19 +21,13 @@ input and output, `op/3`, logic and control, and atomic term processing — with
 throughout on the error terms, which is where implementations diverge most. Sorting is included
 too, though it sits outside clause 8.
 
-**One case does not pass**, and it is pinned rather than hidden: `call((!, fail ; true))` succeeds
-where the standard says it fails, because a cut inside a meta-called goal is local here and does not
-prune the disjunction's alternative. Written directly in a clause body the same goal fails
-correctly; both behaviours are pinned by tests. Closing this needs a call barrier the engine does
-not have.
-
 **These cases are our own encoding of the standard, not third-party verification.** Ulrich
 Neumerkel's conformity tables carry no licence, and the Logtalk suite is written against its own
 test framework, so neither could be vendored. Reading the standard and encoding it is worth more
 than nothing and less than an independent suite, and this file will say so until an independent one
 has been run.
 
-Writing them was worth it immediately: they found five real defects.
+Writing them was worth it immediately: they found six real defects.
 
 - `assertz(4)` raised an exception `catch/3` could not catch, aborting the run. Several standard
   errors were raw messages rather than Prolog terms.
@@ -43,6 +37,9 @@ Writing them was worth it immediately: they found five real defects.
   is now checked whole before any of it runs.
 - `atom_chars(1.0, ['1', '.', '0'])` failed. With its first argument already bound the predicate
   built an atom from the list and unified, so a number could never match; it now compares text.
+- `call((!, fail ; true))` succeeded because the cut could not prune the meta-called disjunction.
+  Meta-called control now goes through the same bytecode lowering and cut barriers as source-level
+  control.
 
 Beyond the conformance cases, the engine is covered by 676 of its own tests, an integration suite
 that builds and runs the C#, F#, and Visual Basic samples, and a NativeAOT acceptance test.
@@ -76,9 +73,7 @@ that builds and runs the C#, F#, and Visual Basic samples, and a NativeAOT accep
 
 | Behaviour | DotProlog | Elsewhere |
 |---|---|---|
-| Cut inside a goal reached through `call/1` | Local to that goal; prunes nothing outside it | ISO: opaque, same result; SWI: same |
 | `\+ 4` | `type_error(callable, 4)` — the inner goal | Same |
-| `findall(X, (G, !), L)` | Does not stop at the first solution, because the cut is local | Stops at the first |
 | A character is a UTF-16 code unit | A character outside the Basic Multilingual Plane is two codes, and `atom_length/2` counts it as two | SWI counts code points |
 | `read_term/2` `singletons/1` option | `domain_error`, rather than a wrong answer | Supported |
 | Two modules exporting the same name | The first loaded gets the unqualified name | SWI reports a conflict |

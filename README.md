@@ -349,10 +349,12 @@ which of a predicate's own arguments are goals.
 
 Nothing in the engine knows modules exist: resolution is a rewrite performed while loading.
 
-One known deviation: a cut inside a goal reached through `call/1` is local to that goal and prunes nothing in the meta-call, so `call((a, !, b))` behaves as `call((a, b))` — which also means `findall(X, (goal(X), !), L)` does not stop at the first solution.
+A control term assembled at run time and passed to `call/1` is lowered to VM bytecode through the
+same control-construct compiler used for source clauses. Its cut is transparent within that
+meta-called goal and opaque to the caller, as ISO specifies.
 
 DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 244 conformance cases encoded
-from ISO/IEC 13211-1, 243 passing, but those are its own reading of the standard rather than an
+from ISO/IEC 13211-1, all passing, but those are its own reading of the standard rather than an
 independent suite — see [COMPATIBILITY.md](COMPATIBILITY.md), which also lists the known
 differences.
 

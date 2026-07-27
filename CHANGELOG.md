@@ -52,19 +52,18 @@ The first release. Everything below is new.
 
 ### Conformance
 
-- 244 cases encoded from ISO/IEC 13211-1 run as part of the test suite, 243 passing. They found
-  five real defects: uncatchable errors from `assertz/1`, wrong error terms in `functor/3` and
-  `=../2`, `call((fail, 4))` failing rather than raising a type error, and `atom_chars/2` unable to
-  match a number already bound as its first argument.
+- 244 cases encoded from ISO/IEC 13211-1 run as part of the test suite, all passing. They found
+  six real defects: uncatchable errors from `assertz/1`, wrong error terms in `functor/3` and
+  `=../2`, malformed meta-call validation, `atom_chars/2` unable to match a bound number, and
+  incorrect cut scope inside meta-called control.
 
 ### Known limitations
 
 - `dotnet test` cannot yet drive a `.dplproj` test project; run the test host directly. See the
   README.
-- No independent conformance claim. 243 of 244 cases encoded from ISO/IEC 13211-1 pass, but they
+- No independent conformance claim. All 244 cases encoded from ISO/IEC 13211-1 pass, but they
   are DotProlog's own reading of the standard, not a third-party suite. See
   [COMPATIBILITY.md](COMPATIBILITY.md).
-- A cut inside a goal reached through `call/1` is local to that goal.
 - No binary streams and no stream repositioning.
 - No first-argument clause indexing, so a predicate with many facts is scanned linearly.
 
