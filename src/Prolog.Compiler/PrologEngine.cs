@@ -64,6 +64,13 @@ public sealed class PrologEngine : IRuntimeCompiler
         set => Machine.Output = value;
     }
 
+    /// <summary>Where the program's <c>read/1</c> and friends take their input from.</summary>
+    public TextReader Input
+    {
+        get => Machine.Input;
+        set => Machine.Input = value;
+    }
+
     /// <summary>Reads and compiles the Prolog file at <paramref name="path"/>.</summary>
     public LoadResult ConsultFile(string path)
     {
@@ -314,6 +321,82 @@ public sealed class PrologEngine : IRuntimeCompiler
         {
             throw new PrologException($"Consulting {path} failed: {string.Join("; ", loaded.Diagnostics)}");
         }
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Text is pulled a line at a time until the lexer finds a clause terminator, so a term can be
+    /// read from a console as soon as it is complete rather than after the input ends. Whatever
+    /// follows the terminator stays in the buffer, which belongs to the stream.
+    /// </remarks>
+    public bool TryReadTerm(Machine machine, TextReader input, ref string buffer, out Cell term, out Cell variableNames)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+        ArgumentNullException.ThrowIfNull(input);
+
+        term = default;
+        variableNames = Cell.Atom(machine.Symbols.EmptyList);
+
+        int end = ClauseScanner.FindClauseEnd(buffer);
+        while (end < 0)
+        {
+            string? line = input.ReadLine();
+            if (line is null)
+            {
+                // What is left at end of input is either nothing, which is end_of_file, or a clause
+                // missing its terminator. Reading the incomplete text as if it were whole would
+                // quietly return a prefix of what the file says.
+                bool blank = ClauseScanner.IsBlank(buffer);
+                buffer = string.Empty;
+
+                return blank ? false : throw SyntaxError(machine, "unexpected_end_of_file");
+            }
+
+            buffer += line + "\n";
+            end = ClauseScanner.FindClauseEnd(buffer);
+        }
+
+        string text = buffer[..end];
+        buffer = buffer[end..];
+
+        ParseResult parsed = TermReader.ReadTerm(text, operators: Program.Operators);
+        if (!parsed.Success || parsed.Clauses.Count == 0)
+        {
+            throw SyntaxError(machine, parsed.Diagnostics.Count > 0 ? parsed.Diagnostics[0].Id : "cannot_start_term");
+        }
+
+        Dictionary<string, Cell> variables = [];
+        term = TermReifier.ToHeap(machine, TermNormalizer.Normalize(parsed.Clauses[0]), variables);
+
+        // Only named variables are reported, and in the order the reader met them, so that
+        // variable_names/1 reads the way the source does.
+        List<Cell> pairs = [];
+        int equals = machine.Symbols.InternFunctor("=", 2);
+        foreach (string name in CollectVariableNames(parsed.Clauses[0]))
+        {
+            if (variables.TryGetValue(name, out Cell variable))
+            {
+                pairs.Add(machine.CreateStructure(equals, [Cell.Atom(machine.Symbols.InternAtom(name)), variable]));
+            }
+        }
+
+        variableNames = machine.CreateList(pairs.ToArray(), Cell.Atom(machine.Symbols.EmptyList));
+        return true;
+    }
+
+    /// <summary>
+    /// Builds a catchable <c>error(syntax_error(What), _)</c>, so that a program reading terms from
+    /// a file it does not control can handle a bad one rather than being stopped by it.
+    /// </summary>
+    private static PrologException SyntaxError(Machine machine, string what)
+    {
+        Cell formal = machine.CreateStructure(
+            machine.Symbols.InternFunctor("syntax_error", 1),
+            [Cell.Atom(machine.Symbols.InternAtom(what))]
+        );
+
+        Cell error = machine.CreateStructure(machine.Symbols.InternFunctor("error", 2), [formal, machine.CreateVariable()]);
+        return machine.CreateBall(error, $"syntax_error({what})");
     }
 
     private RunResult RunQueue(List<int> queue, string description)

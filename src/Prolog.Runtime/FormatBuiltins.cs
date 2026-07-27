@@ -29,7 +29,7 @@ internal static class FormatBuiltins
             1,
             static machine =>
             {
-                machine.Output.Write(Render(machine, machine.Argument(0), Cell.Atom(machine.Symbols.EmptyList)));
+                machine.CurrentOutput.Write(Render(machine, machine.Argument(0), Cell.Atom(machine.Symbols.EmptyList)));
                 return true;
             }
         );
@@ -39,7 +39,7 @@ internal static class FormatBuiltins
             2,
             static machine =>
             {
-                machine.Output.Write(Render(machine, machine.Argument(0), machine.Argument(1)));
+                machine.CurrentOutput.Write(Render(machine, machine.Argument(0), machine.Argument(1)));
                 return true;
             }
         );
@@ -52,7 +52,7 @@ internal static class FormatBuiltins
             static machine =>
             {
                 PrologNumber count = ArithmeticEvaluator.Evaluate(machine, machine.Argument(0));
-                machine.Output.Write(new string(' ', (int)Math.Max(count.Integer, 0)));
+                machine.CurrentOutput.Write(new string(' ', (int)Math.Max(count.Integer, 0)));
                 return true;
             }
         );
@@ -77,7 +77,7 @@ internal static class FormatBuiltins
             string alias = machine.Symbols.AtomName(sink.Index);
             if (alias is "user_output" or "user_error")
             {
-                machine.Output.Write(text);
+                machine.CurrentOutput.Write(text);
                 return true;
             }
 

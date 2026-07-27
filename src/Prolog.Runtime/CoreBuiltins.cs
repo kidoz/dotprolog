@@ -44,7 +44,7 @@ public static class CoreBuiltins
             0,
             static machine =>
             {
-                machine.Output.Write('\n');
+                machine.CurrentOutput.Write('\n');
                 return true;
             }
         );
@@ -54,7 +54,7 @@ public static class CoreBuiltins
             1,
             static machine =>
             {
-                TermWriter.Write(machine, machine.Argument(0), machine.Output);
+                TermWriter.Write(machine, machine.Argument(0), machine.CurrentOutput);
                 return true;
             }
         );
@@ -64,7 +64,7 @@ public static class CoreBuiltins
             1,
             static machine =>
             {
-                TermWriter.Write(machine, machine.Argument(0), machine.Output);
+                TermWriter.Write(machine, machine.Argument(0), machine.CurrentOutput);
                 return true;
             }
         );
@@ -74,7 +74,7 @@ public static class CoreBuiltins
             1,
             static machine =>
             {
-                TermWriter.Write(machine, machine.Argument(0), machine.Output, quoted: true);
+                TermWriter.Write(machine, machine.Argument(0), machine.CurrentOutput, quoted: true);
                 return true;
             }
         );
@@ -84,8 +84,8 @@ public static class CoreBuiltins
             1,
             static machine =>
             {
-                TermWriter.Write(machine, machine.Argument(0), machine.Output);
-                machine.Output.Write('\n');
+                TermWriter.Write(machine, machine.Argument(0), machine.CurrentOutput);
+                machine.CurrentOutput.Write('\n');
                 return true;
             }
         );
@@ -95,7 +95,7 @@ public static class CoreBuiltins
             1,
             static machine =>
             {
-                TermWriter.Write(machine, machine.Argument(0), machine.Output, quoted: true, ignoreOperators: true);
+                TermWriter.Write(machine, machine.Argument(0), machine.CurrentOutput, quoted: true, ignoreOperators: true);
                 return true;
             }
         );
@@ -181,6 +181,7 @@ public static class CoreBuiltins
 
         TextBuiltins.Register(registry);
         OperatorBuiltins.Register(registry);
+        StreamBuiltins.Register(registry);
         SortBuiltins.Register(registry);
         FormatBuiltins.Register(registry);
         DatabaseBuiltins.Register(registry);
@@ -232,7 +233,7 @@ public static class CoreBuiltins
             }
         }
 
-        TermWriter.Write(machine, machine.Argument(term), machine.Output, quoted, ignoreOperators);
+        TermWriter.Write(machine, machine.Argument(term), machine.CurrentOutput, quoted, ignoreOperators);
         return true;
     }
 
@@ -310,15 +311,21 @@ public static class CoreBuiltins
 
         List<Cell> extra = TermList.ReadProper(machine, machine.Argument(1));
 
+        return Extend(machine, goal, extra, machine.Argument(2));
+    }
+
+    /// <summary>Appends <paramref name="extra"/> to <paramref name="goal"/> and unifies with <paramref name="target"/>.</summary>
+    private static bool Extend(Machine machine, Cell goal, List<Cell> extra, Cell target)
+    {
         if (extra.Count == 0)
         {
-            return machine.Unify(machine.Argument(2), goal);
+            return machine.Unify(target, goal);
         }
 
         if (goal.Tag == CellTag.Atom)
         {
             int atomFunctor = machine.Symbols.InternFunctor(goal.Index, extra.Count);
-            return machine.Unify(machine.Argument(2), machine.CreateStructure(atomFunctor, CollectionsMarshal.AsSpan(extra)));
+            return machine.Unify(target, machine.CreateStructure(atomFunctor, CollectionsMarshal.AsSpan(extra)));
         }
 
         if (goal.Tag != CellTag.Structure)
@@ -342,10 +349,7 @@ public static class CoreBuiltins
 
         extra.CopyTo(arguments, functor.Arity);
 
-        return machine.Unify(
-            machine.Argument(2),
-            machine.CreateStructure(machine.Symbols.InternFunctor(functor.NameAtom, arity), arguments)
-        );
+        return machine.Unify(target, machine.CreateStructure(machine.Symbols.InternFunctor(functor.NameAtom, arity), arguments));
     }
 
     /// <summary>

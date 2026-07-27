@@ -27,6 +27,10 @@ dotnet_style_qualification_for_event = false:warning
 # Cell.Float to satisfy CA1720 would make the engine harder to read, not easier.
 dotnet_diagnostic.CA1720.severity = none
 
+# A Prolog stream is not a System.IO.Stream and never will be — it is a source of terms, not of
+# bytes. CA1711 reserves the suffix for the latter; PrologStream is the name the language uses.
+dotnet_diagnostic.CA1711.severity = none
+
 [src/Prolog.Runtime/CellTag.cs]
 # CellTag is a byte on purpose: it is packed into a term cell, not used as a public flags enum.
 dotnet_diagnostic.CA1028.severity = none

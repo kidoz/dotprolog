@@ -35,7 +35,7 @@ public sealed class PrologTestRunner
     /// <summary>Finds every test predicate, in the order the sources declare them.</summary>
     public IReadOnlyList<PrologTest> Discover()
     {
-        var engine = new PrologEngine { Output = TextWriter.Null };
+        var engine = new PrologEngine { Output = TextWriter.Null, Input = TextReader.Null };
         Load(engine);
 
         List<PrologTest> tests = [];
@@ -64,7 +64,8 @@ public sealed class PrologTestRunner
     public PrologTestResult Run(PrologTest test)
     {
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output };
+        // Input is empty rather than the console: a test that reads would otherwise block the run.
+        var engine = new PrologEngine { Output = output, Input = TextReader.Null };
 
         try
         {

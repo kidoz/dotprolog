@@ -64,11 +64,44 @@ public sealed class Machine
         _program = program;
         _symbols = program.Symbols;
         _callFunctor = _symbols.InternFunctor("call", 1);
-        Output = Console.Out;
     }
 
-    /// <summary>Where <c>write/1</c> and friends send their output.</summary>
-    public TextWriter Output { get; set; }
+    /// <summary>The streams this program has open.</summary>
+    public StreamTable Streams { get; } = new();
+
+    /// <summary>
+    /// The program's standard output, which is what an embedding host sets to capture output.
+    /// </summary>
+    /// <remarks>
+    /// This is <c>user_output</c>, not whatever <c>set_output/1</c> last selected. A program that
+    /// redirects its own output therefore cannot detach the host from the stream it handed in.
+    /// </remarks>
+    public TextWriter Output
+    {
+        get => Streams.UserOutput.Writer!;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            Streams.UserOutput.Writer = value;
+        }
+    }
+
+    /// <summary>The program's standard input.</summary>
+    public TextReader Input
+    {
+        get => Streams.UserInput.Reader!;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            Streams.UserInput.Reader = value;
+        }
+    }
+
+    /// <summary>Where a write with no stream argument goes.</summary>
+    public TextWriter CurrentOutput => Streams.CurrentOutput.Writer!;
+
+    /// <summary>Where a read with no stream argument comes from.</summary>
+    public TextReader CurrentInput => Streams.CurrentInput.Reader!;
 
     /// <summary>The exit code requested by <c>halt/1</c>, or zero.</summary>
     public int ExitCode { get; private set; }
@@ -859,6 +892,10 @@ public sealed class Machine
     {
         ExitCode = exitCode;
         _halted = true;
+
+        // A program that writes a file and then halts must find the file written, so what it opened
+        // is flushed and closed here rather than left to a finalizer that may never run.
+        Streams.CloseAll();
     }
 
     /// <summary>Follows a reference chain to the term it denotes, or to the unbound variable that ends it.</summary>

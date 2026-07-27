@@ -236,6 +236,39 @@ internal static class StandardLibrary
         '$predmerge_step'('>', A, As, B, Bs, P, [B|R]) :- '$predmerge'([A|As], Bs, P, R).
         '$predmerge_step'('=', A, As, _, Bs, P, [A|R]) :- '$predmerge'(As, Bs, P, R).
 
+        % --- Output capture ---------------------------------------------------------
+        % with_output_to/2 runs the goal once with output diverted into a buffer, and
+        % restores the previous output however the goal ends: success, failure, or a
+        % thrown ball. Losing the restore would leave every later write in the buffer.
+
+        with_output_to(Sink, Goal) :-
+            '$capture_begin',
+            (   catch(Goal, Error, true)
+            ->  '$capture_end'(Text),
+                ( nonvar(Error) -> throw(Error) ; true ),
+                '$sink'(Sink, Text)
+            ;   '$capture_end'(_),
+                fail
+            ).
+
+        '$sink'(atom(A), Text) :- !, A = Text.
+        '$sink'(codes(C), Text) :- !, atom_codes(Text, C).
+        '$sink'(chars(C), Text) :- !, atom_chars(Text, C).
+        '$sink'(Sink, _) :- throw(error(domain_error(output_sink, Sink), with_output_to/2)).
+
+        % Reading and writing a term as an atom, which is what with_output_to/2 and
+        % read_term_from_atom/3 make possible without a file anywhere in sight.
+        term_to_atom(Term, Atom) :-
+            var(Atom),
+            !,
+            with_output_to(atom(Atom), write_canonical(Term)).
+        term_to_atom(Term, Atom) :-
+            read_term_from_atom(Atom, Term, []).
+
+        read_term_from_atom(Atom, Term, Options) :-
+            atom_concat(Atom, ' .', Text),
+            '$read_from_atom'(Text, Term, Options).
+
         % --- Grammars ---------------------------------------------------------------
         % A grammar rule is translated into an ordinary clause when it is loaded, so
         % phrase/2,3 only has to supply the two list arguments. It walks the control
