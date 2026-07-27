@@ -23,4 +23,10 @@ public static class CompilerDiagnosticIds
 
     /// <summary>A grammar rule could not be translated into an ordinary clause.</summary>
     public const string InvalidGrammarRule = "DPL1007";
+
+    /// <summary>A <c>module/2</c>, <c>use_module</c>, or <c>meta_predicate</c> declaration is malformed.</summary>
+    public const string InvalidModuleDeclaration = "DPL1008";
+
+    /// <summary>A <c>use_module</c> names a file that cannot be found or loaded.</summary>
+    public const string ModuleNotFound = "DPL1009";
 }

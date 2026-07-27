@@ -32,6 +32,10 @@ internal static class StandardLibrary
         call(G, A, B, C, D, E, F) :- '$add_args'(G, [A, B, C, D, E, F], Goal), call(Goal).
         call(G, A, B, C, D, E, F, H) :- '$add_args'(G, [A, B, C, D, E, F, H], Goal), call(Goal).
 
+        % Module:Goal, resolved when it is called rather than when it is compiled: the module named
+        % may not have been loaded at the point the call was read.
+        ':'(Module, Goal) :- '$qualify'(Module, Goal, Resolved), call(Resolved).
+
         once(G) :- call(G), !.
         ignore(G) :- ( call(G) -> true ; true ).
 

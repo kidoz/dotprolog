@@ -218,25 +218,6 @@ public sealed class ExecutionTests
     }
 
     [Fact]
-    public void AModuleExportListIsNotEnforced()
-    {
-        // The module system is not implemented, so an export list is documentation: a predicate the
-        // list omits is still callable. This test records that, so the change is visible when modules land.
-        string output = PrologTestHost.Run(
-            """
-            :- module(shapes, [square/2]).
-
-            square(N, S) :- S is N * N.
-            hidden(secret).
-
-            :- initialization((hidden(X), write(X), nl)).
-            """
-        );
-
-        Assert.Equal("secret\n", output);
-    }
-
-    [Fact]
     public void ReaderDiagnosticsSurfaceThroughConsult()
     {
         (_, _, IReadOnlyList<Diagnostic> diagnostics) = PrologTestHost.Execute("p(a b).");

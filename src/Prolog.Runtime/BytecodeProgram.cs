@@ -122,6 +122,31 @@ public sealed class BytecodeProgram
         return predicate;
     }
 
+    /// <summary>
+    /// Makes <paramref name="alias"/> name the same predicate as <paramref name="target"/>, and
+    /// reports whether it did.
+    /// </summary>
+    /// <remarks>
+    /// A module system uses this to give an exported predicate its plain name alongside its
+    /// qualified one. A dynamic predicate is aliased by sharing the clause list, not just the entry
+    /// address, so that asserting through either name is seen through both.
+    /// </remarks>
+    public bool AliasPredicate(int alias, int target)
+    {
+        if (alias == target || IsDefined(alias) || IsDynamic(alias) || !(IsDefined(target) || IsDynamic(target)))
+        {
+            return false;
+        }
+
+        if (_dynamicPredicates.TryGetValue(target, out DynamicPredicate? dynamic))
+        {
+            _dynamicPredicates[alias] = dynamic;
+        }
+
+        DefinePredicate(alias, EntryPointOf(target));
+        return true;
+    }
+
     /// <summary>Returns the dynamic predicate for <paramref name="functorId"/>, or <see langword="null"/>.</summary>
     internal DynamicPredicate? FindDynamic(int functorId) =>
         _dynamicPredicates.TryGetValue(functorId, out DynamicPredicate? predicate) ? predicate : null;

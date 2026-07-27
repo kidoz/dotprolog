@@ -179,6 +179,9 @@ public static class CoreBuiltins
         // The one piece call/2..8 needs from the runtime: everything else about them is Prolog.
         registry.Register("$add_args", 3, AddArguments);
 
+        // Resolves Module:Goal to the predicate a module system compiled it to.
+        registry.Register("$qualify", 3, Qualify);
+
         TextBuiltins.Register(registry);
         OperatorBuiltins.Register(registry);
         StreamBuiltins.Register(registry);
@@ -297,6 +300,77 @@ public static class CoreBuiltins
     }
 
     /// <summary>
+    /// <c>'$qualify'(+Module, +Goal, -Resolved)</c>: the predicate a goal names inside a module.
+    /// </summary>
+    /// <remarks>
+    /// A module's predicates are compiled under the name <c>module:predicate</c>, so resolving is
+    /// interning that name and checking it exists. When it does not, the plain name is used, which is
+    /// what makes a library predicate and anything in <c>user</c> reachable from inside a module.
+    /// </remarks>
+    private static bool Qualify(Machine machine)
+    {
+        Cell module = machine.Argument(0);
+        Cell goal = machine.Argument(1);
+
+        if (module.Tag == CellTag.Reference || goal.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        if (module.Tag != CellTag.Atom)
+        {
+            throw PrologErrors.Type(machine, "atom", module);
+        }
+
+        // A nested qualification names the innermost module, as M1:M2:G means M2:G.
+        int colon = machine.Symbols.InternFunctor(":", 2);
+        while (goal.Tag == CellTag.Structure && machine.HeapAt(goal.Index).Index == colon)
+        {
+            module = machine.Dereference(machine.HeapAt(goal.Index + 1));
+            goal = machine.Dereference(machine.HeapAt(goal.Index + 2));
+
+            if (module.Tag != CellTag.Atom)
+            {
+                throw module.Tag == CellTag.Reference
+                    ? PrologErrors.Instantiation(machine)
+                    : PrologErrors.Type(machine, "atom", module);
+            }
+        }
+
+        string prefix = machine.Symbols.AtomName(module.Index);
+
+        if (goal.Tag == CellTag.Atom)
+        {
+            int qualified = machine.Symbols.InternFunctor($"{prefix}:{machine.Symbols.AtomName(goal.Index)}", 0);
+            return machine.Unify(
+                machine.Argument(2),
+                machine.Program.IsDefined(qualified) ? Cell.Atom(machine.Symbols.GetFunctor(qualified).NameAtom) : goal
+            );
+        }
+
+        if (goal.Tag != CellTag.Structure)
+        {
+            throw PrologErrors.Type(machine, "callable", goal);
+        }
+
+        Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(goal.Index).Index);
+        int target = machine.Symbols.InternFunctor($"{prefix}:{machine.Symbols.AtomName(functor.NameAtom)}", functor.Arity);
+
+        if (!machine.Program.IsDefined(target) && !machine.Program.IsDynamic(target))
+        {
+            return machine.Unify(machine.Argument(2), goal);
+        }
+
+        var arguments = new Cell[functor.Arity];
+        for (int i = 0; i < functor.Arity; i++)
+        {
+            arguments[i] = machine.HeapAt(goal.Index + 1 + i);
+        }
+
+        return machine.Unify(machine.Argument(2), machine.CreateStructure(target, arguments));
+    }
+
+    /// <summary>
     /// <c>'$add_args'(+Goal, +Extra, -Expanded)</c>: appends arguments to a goal, which is the whole
     /// of what <c>call/2</c> and its higher arities do before meta-calling the result.
     /// </summary>
@@ -310,6 +384,19 @@ public static class CoreBuiltins
         }
 
         List<Cell> extra = TermList.ReadProper(machine, machine.Argument(1));
+
+        // A qualified closure keeps its qualification: M:foo with an extra argument is M:foo(X), so
+        // that the resolution happens once, when the goal is finally called.
+        int colon = machine.Symbols.InternFunctor(":", 2);
+        if (goal.Tag == CellTag.Structure && machine.HeapAt(goal.Index).Index == colon && extra.Count > 0)
+        {
+            Cell module = machine.HeapAt(goal.Index + 1);
+            Cell inner = machine.Dereference(machine.HeapAt(goal.Index + 2));
+            Cell expanded = machine.CreateVariable();
+
+            return Extend(machine, inner, extra, expanded)
+                && machine.Unify(machine.Argument(2), machine.CreateStructure(colon, [module, expanded]));
+        }
 
         return Extend(machine, goal, extra, machine.Argument(2));
     }

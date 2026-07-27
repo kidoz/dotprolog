@@ -14,6 +14,7 @@ namespace Prolog.Compiler;
 /// </remarks>
 public sealed class PrologEngine : IRuntimeCompiler
 {
+    private readonly ModuleTable _modules = new();
     private readonly List<int> _pendingDirectives = [];
     private readonly List<int> _pendingInitialization = [];
 
@@ -32,7 +33,7 @@ public sealed class PrologEngine : IRuntimeCompiler
     /// <summary>Compiles one of the built-in libraries, which must not fail.</summary>
     private void LoadLibrary(string source, string name)
     {
-        LoadResult loaded = new ProgramLoader(Program, Machine).Load(ReadOrThrow(source, name), name);
+        LoadResult loaded = new ProgramLoader(Program, Machine, _modules).Load(ReadOrThrow(source, name), name);
 
         if (!loaded.Success)
         {
@@ -91,8 +92,15 @@ public sealed class PrologEngine : IRuntimeCompiler
             return new LoadResult(parsed.Diagnostics, [], []);
         }
 
-        LoadResult loaded = new ProgramLoader(Program, Machine).Load(parsed.Clauses, fileName);
+        var loader = new ProgramLoader(Program, Machine, _modules);
+        LoadResult loaded = loader.Load(parsed.Clauses, fileName);
         List<Diagnostic> diagnostics = [.. parsed.Diagnostics, .. loaded.Diagnostics];
+
+        // Which module a file declared is what use_module/1 needs to know when it is imported later.
+        if (fileName is not null && File.Exists(fileName))
+        {
+            _modules.RecordLoad(Path.GetFullPath(fileName), loader.Module);
+        }
 
         if (loaded.Success)
         {
