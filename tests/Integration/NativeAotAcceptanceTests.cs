@@ -33,6 +33,7 @@ public sealed class NativeAotAcceptanceTests
                 "dotnet",
                 [
                     "publish",
+                    "-nodereuse:false",
                     Path.Combine(RepositoryLayout.Root, "samples", "AotAcceptance", "AotAcceptance.csproj"),
                     "-c",
                     "Release",
@@ -89,25 +90,6 @@ public sealed class NativeAotAcceptanceTests
         }
     }
 
-    private static async Task<(int ExitCode, string Log)> RunAsync(string fileName, string[] arguments, string workingDirectory)
-    {
-        var start = new ProcessStartInfo(fileName)
-        {
-            WorkingDirectory = workingDirectory,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        };
-
-        foreach (string argument in arguments)
-        {
-            start.ArgumentList.Add(argument);
-        }
-
-        using Process process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {fileName}.");
-        Task<string> standardOutput = process.StandardOutput.ReadToEndAsync();
-        Task<string> standardError = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-
-        return (process.ExitCode, await standardOutput + await standardError);
-    }
+    private static Task<(int ExitCode, string Log)> RunAsync(string fileName, string[] arguments, string workingDirectory) =>
+        ChildProcess.RunAsync(fileName, arguments, workingDirectory);
 }

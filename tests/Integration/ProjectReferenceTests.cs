@@ -28,12 +28,12 @@ public sealed class ProjectReferenceTests
         // The task assembly is loaded by MSBuild, so it has to exist before the sample builds.
         (int taskExit, string taskLog) = await Run(
             "dotnet",
-            ["build", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
+            ["build", "-nodereuse:false", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
         );
 
         Assert.True(taskExit == 0, $"Building the task failed:\n{taskLog}");
 
-        (int buildExit, string buildLog) = await Run("dotnet", ["build", console, "--nologo"]);
+        (int buildExit, string buildLog) = await Run("dotnet", ["build", "-nodereuse:false", console, "--nologo"]);
         Assert.True(buildExit == 0, $"Building the sample failed:\n{buildLog}");
 
         // The facade must be generated into obj/, not beside the sources.
@@ -84,12 +84,12 @@ public sealed class ProjectReferenceTests
 
         (int taskExit, string taskLog) = await Run(
             "dotnet",
-            ["build", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
+            ["build", "-nodereuse:false", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
         );
 
         Assert.True(taskExit == 0, $"Building the task failed:\n{taskLog}");
 
-        (int buildExit, string buildLog) = await Run("dotnet", ["build", project, "--nologo"]);
+        (int buildExit, string buildLog) = await Run("dotnet", ["build", "-nodereuse:false", project, "--nologo"]);
         Assert.True(buildExit == 0, $"Building {sample} failed:\n{buildLog}");
 
         (int runExit, string output) = await Run("dotnet", ["run", "--project", project, "--no-build"]);
@@ -123,12 +123,12 @@ public sealed class ProjectReferenceTests
 
         (int taskExit, string taskLog) = await Run(
             "dotnet",
-            ["build", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
+            ["build", "-nodereuse:false", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
         );
 
         Assert.True(taskExit == 0, $"Building the task failed:\n{taskLog}");
 
-        (int buildExit, string buildLog) = await Run("dotnet", ["build", project, "--nologo"]);
+        (int buildExit, string buildLog) = await Run("dotnet", ["build", "-nodereuse:false", project, "--nologo"]);
         Assert.True(buildExit == 0, $"Building GreetingApp failed:\n{buildLog}");
 
         (int runExit, string output) = await Run("dotnet", ["run", "--project", project, "--no-build"]);
@@ -155,12 +155,12 @@ public sealed class ProjectReferenceTests
 
         (int taskExit, string taskLog) = await Run(
             "dotnet",
-            ["build", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
+            ["build", "-nodereuse:false", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
         );
 
         Assert.True(taskExit == 0, $"Building the task failed:\n{taskLog}");
 
-        (int buildExit, string buildLog) = await Run("dotnet", ["build", project, "--nologo"]);
+        (int buildExit, string buildLog) = await Run("dotnet", ["build", "-nodereuse:false", project, "--nologo"]);
         Assert.True(buildExit == 0, $"Building PricingTests failed:\n{buildLog}");
 
         (int listExit, string listLog) = await Run("dotnet", ["run", "--project", project, "--no-build", "--", "--list-tests"]);
@@ -175,25 +175,6 @@ public sealed class ProjectReferenceTests
         Assert.Contains("failed: 0", runLog, StringComparison.Ordinal);
     }
 
-    private static async Task<(int ExitCode, string Log)> Run(string fileName, string[] arguments)
-    {
-        var start = new ProcessStartInfo(fileName)
-        {
-            WorkingDirectory = RepositoryLayout.Root,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        };
-
-        foreach (string argument in arguments)
-        {
-            start.ArgumentList.Add(argument);
-        }
-
-        using Process process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {fileName}.");
-        Task<string> standardOutput = process.StandardOutput.ReadToEndAsync();
-        Task<string> standardError = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-
-        return (process.ExitCode, await standardOutput + await standardError);
-    }
+    private static Task<(int ExitCode, string Log)> Run(string fileName, string[] arguments) =>
+        ChildProcess.RunAsync(fileName, arguments, RepositoryLayout.Root);
 }
