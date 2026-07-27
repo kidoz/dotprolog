@@ -351,7 +351,10 @@ Nothing in the engine knows modules exist: resolution is a rewrite performed whi
 
 One known deviation: a cut inside a goal reached through `call/1` is local to that goal and prunes nothing in the meta-call, so `call((a, !, b))` behaves as `call((a, b))` — which also means `findall(X, (goal(X), !), L)` does not stop at the first solution.
 
-DotProlog does not claim ISO or SWI-Prolog compatibility. It will not claim it until published conformance tests verify it.
+DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 155 conformance cases encoded
+from ISO/IEC 13211-1 clause 8, all passing, but those are its own reading of the standard rather
+than an independent suite — see [COMPATIBILITY.md](COMPATIBILITY.md), which also lists the known
+differences.
 
 ## Diagnostics
 

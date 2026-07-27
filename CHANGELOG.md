@@ -50,12 +50,19 @@ The first release. Everything below is new.
   `PrologValue`.
 - `PrologHost` binds a predicate once and calls it as `Prove`, `CallOnce`, or `CallAll`.
 
+### Conformance
+
+- 155 cases encoded from ISO/IEC 13211-1 clause 8 run as part of the test suite, all passing. They
+  found four real defects on their first run: uncatchable errors from `assertz/1`, two wrong error
+  terms in `functor/3` and `=../2`, and `call((fail, 4))` failing rather than raising a type error.
+
 ### Known limitations
 
 - `dotnet test` cannot yet drive a `.dplproj` test project; run the test host directly. See the
   README.
-- No conformance claim. DotProlog is not verified against the ISO conformance suite, and does not
-  claim ISO or SWI-Prolog compatibility. See [COMPATIBILITY.md](COMPATIBILITY.md).
+- No independent conformance claim. 155 cases encoded from ISO/IEC 13211-1 clause 8 pass, but they
+  are DotProlog's own reading of the standard, not a third-party suite. See
+  [COMPATIBILITY.md](COMPATIBILITY.md).
 - A cut inside a goal reached through `call/1` is local to that goal.
 - No binary streams and no stream repositioning.
 - No first-argument clause indexing, so a predicate with many facts is scanned linearly.
