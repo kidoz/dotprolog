@@ -10,7 +10,8 @@ The goal is a first-class Prolog experience on the .NET SDK, the way C# and F# h
 works today, and Prolog tests run under Microsoft.Testing.Platform. What is missing: driving those
 tests with `dotnet test` itself, the `plc` compiler, and generating IL for predicate bodies — a
 `.dplproj` currently embeds its Prolog source and compiles it to bytecode at startup. Nothing is
-published to NuGet: package identity is still an open decision.
+published to NuGet yet, though the packages build: see [CHANGELOG.md](CHANGELOG.md) and
+[COMPATIBILITY.md](COMPATIBILITY.md).
 
 ## Hello, world
 
@@ -27,7 +28,7 @@ greeting('Hello! World!').
 ```
 
 ```console
-$ dotnet run --project src/Prolog.DotNetTool -- run samples/HelloProlog/hello.pl
+$ dotnet run --project src/DotProlog.Tool -- run samples/HelloProlog/hello.pl
 Hello! World!
 ```
 
@@ -125,22 +126,22 @@ bundles of [widget, gadget]:
 
 | Path | What it is |
 |---|---|
-| `src/Prolog.Syntax` | Lexer, ISO operator table, operator-precedence reader, diagnostics |
-| `src/Prolog.Runtime` | Tagged terms, heap, trail, choice points, bytecode VM, builtins |
-| `src/Prolog.Compiler` | Clause and directive lowering to bytecode, consult and embedding API |
-| `src/Prolog.CodeGen.CSharp` | `.dpli` contract reader and C# facade generator |
-| `src/Prolog.Build.Tasks` | MSBuild task that runs the generator |
+| `src/DotProlog.Syntax` | Lexer, ISO operator table, operator-precedence reader, diagnostics |
+| `src/DotProlog.Runtime` | Tagged terms, heap, trail, choice points, bytecode VM, builtins |
+| `src/DotProlog.Compiler` | Clause and directive lowering to bytecode, consult and embedding API |
+| `src/DotProlog.CodeGen.CSharp` | `.dpli` contract reader and C# facade generator |
+| `src/DotProlog.Build.Tasks` | MSBuild task that runs the generator |
 | `src/DotProlog.Sdk` | The `DotProlog.Sdk` MSBuild SDK package |
-| `src/Prolog.Templates` | `dotnet new prolog-console` and `prolog-lib` |
-| `src/Prolog.Testing` | Microsoft.Testing.Platform host for Prolog tests |
-| `src/Prolog.DotNetTool` | The `dotnet prolog` command |
+| `src/DotProlog.Templates` | `dotnet new prolog-console` and `prolog-lib` |
+| `src/DotProlog.Testing` | Microsoft.Testing.Platform host for Prolog tests |
+| `src/DotProlog.Tool` | The `dotnet prolog` command |
 | `tests/` | Unit tests per component, plus end-to-end execution tests |
 | `benchmarks/` | BenchmarkDotNet suite for the reader, compiler, and engine |
 | `samples/HelloProlog` | The Hello World sample |
 | `samples/PricingRules` | A `.dplproj`: Prolog rules plus their `.dpli` contract |
 | `samples/PricingConsole`, `samples/PricingFSharp`, `samples/PricingVisualBasic` | C#, F#, and VB apps referencing it |
 | `samples/GreetingApp` | A Prolog application built from a `.dplproj` |
-| `samples/PricingTests` | Prolog tests in a `.dplproj`, run by `Prolog.Testing` |
+| `samples/PricingTests` | Prolog tests in a `.dplproj`, run by `DotProlog.Testing` |
 | `samples/AotAcceptance` | The NativeAOT acceptance sample |
 
 ## Common tasks
@@ -363,7 +364,7 @@ hello.pl(4,12): error DPL0005: Expected '.' to end the clause but found 'b'.
 ## Starting a project
 
 ```console
-$ dotnet new install Prolog.Templates
+$ dotnet new install DotProlog.Templates
 $ dotnet new prolog-console -n HelloProlog
 $ dotnet run --project HelloProlog
 Hello from Prolog on .NET!
@@ -417,6 +418,20 @@ $ just check          # format-check, build, and test
 ```
 
 .NET SDK 10.0 or later is the only requirement; everything else restores from NuGet.
+
+## Releasing
+
+Packages are `DotProlog.*`: `DotProlog.Runtime`, `DotProlog.Syntax`, `DotProlog.Compiler`,
+`DotProlog.Testing`, `DotProlog.Tool`, `DotProlog.Sdk`, and `DotProlog.Templates`. Each carries
+Source Link and a symbol package, so a debugger can step from a package into the exact commit it
+was built from.
+
+```bash
+just pack        # every package into ./artifacts, with SHA256SUMS
+```
+
+`Prolog.NET`, which this project's brief originally proposed, is taken on NuGet by an unrelated
+WAM-based .NET Prolog. `DotProlog.*` is what shipped instead.
 
 ## Licence
 
