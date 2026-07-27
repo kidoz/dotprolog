@@ -50,3 +50,10 @@ bench filter="*":
 clean:
     dotnet clean {{solution}} --nologo
     rm -rf BenchmarkDotNet.Artifacts
+
+# Pack every publishable project into ./artifacts with checksums.
+pack configuration="Release":
+    rm -rf artifacts
+    dotnet pack {{solution}} -c {{configuration}} -o artifacts --nologo
+    cd artifacts && shasum -a 256 *.nupkg *.snupkg > SHA256SUMS
+    @cat artifacts/SHA256SUMS

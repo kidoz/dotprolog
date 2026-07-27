@@ -65,6 +65,17 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: dotnet pack DotProlog.slnx -c Release --no-build -o artifacts -p:ContinuousIntegrationBuild=true
 
+      # A consumer can check a downloaded package against this without trusting the download path.
+      - name: Checksums
+        if: matrix.os == 'ubuntu-latest'
+        run: cd artifacts && sha256sum *.nupkg *.snupkg > SHA256SUMS
+
+      - name: Software bill of materials
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          dotnet tool install --global CycloneDX
+          dotnet CycloneDX DotProlog.slnx -o artifacts --filename sbom.json --json
+
       - name: Upload packages
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
