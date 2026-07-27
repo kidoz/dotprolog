@@ -1,7 +1,7 @@
-using Microsoft.Build.Framework;
-using Microsoft.Build.Utilities;
 using DotProlog.CodeGen.CSharp;
 using DotProlog.Syntax;
+using Microsoft.Build.Framework;
+using Microsoft.Build.Utilities;
 using Task = Microsoft.Build.Utilities.Task;
 
 namespace DotProlog.Build.Tasks;
