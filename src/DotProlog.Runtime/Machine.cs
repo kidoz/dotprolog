@@ -632,6 +632,55 @@ public sealed class Machine
         point.BuiltinState = state;
     }
 
+    /// <summary>
+    /// Checks that a meta-called goal, and every goal reachable through the control constructs
+    /// inside it, is something that could be called.
+    /// </summary>
+    /// <param name="goal">The sub-goal being checked.</param>
+    /// <param name="whole">
+    /// The goal the caller passed, which is what the error names: the standard reports the culprit
+    /// as the whole term, not the part of it that turned out not to be callable.
+    /// </param>
+    private void RequireCallable(Cell goal, Cell whole)
+    {
+        goal = Dereference(goal);
+
+        if (goal.Tag == CellTag.Reference)
+        {
+            // An unbound sub-goal is not an error here: it is resolved when control reaches it.
+            return;
+        }
+
+        if (goal.Tag == CellTag.Atom)
+        {
+            return;
+        }
+
+        if (goal.Tag != CellTag.Structure)
+        {
+            throw PrologErrors.Type(this, "callable", whole);
+        }
+
+        int functorId = _heap[goal.Index].Index;
+        Functor functor = _symbols.GetFunctor(functorId);
+        string name = _symbols.AtomName(functor.NameAtom);
+
+        bool binary = functor.Arity == 2 && name is "," or ";" or "->" or "*->";
+        bool unary = functor.Arity == 1 && name == "\\+";
+
+        if (binary)
+        {
+            RequireCallable(_heap[goal.Index + 1], whole);
+            RequireCallable(_heap[goal.Index + 2], whole);
+        }
+        else if (unary)
+        {
+            // \+/1 names its own argument as the culprit, where call/1 names the goal it was given.
+            Cell inner = Dereference(_heap[goal.Index + 1]);
+            RequireCallable(inner, inner);
+        }
+    }
+
     /// <summary>Wraps <paramref name="term"/> as a thrown ball, detached from the heap.</summary>
     /// <param name="term">The term being thrown.</param>
     /// <param name="description">Readable text for a host that lets the ball escape.</param>
@@ -845,6 +894,11 @@ public sealed class Machine
         {
             goal = Dereference(_heap[goal.Index + 1]);
         }
+
+        // A control construct has to be whole before any of it runs: ISO 7.8.3 makes
+        // call((fail, 4)) a type error rather than a failure, even though the conjunction would
+        // never reach the 4.
+        RequireCallable(goal, goal);
 
         int functorId;
         int arity;
