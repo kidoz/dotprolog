@@ -21,7 +21,14 @@ namespace DotProlog.Compiler.Tests;
 public sealed class ConformanceTests
 {
     /// <summary>Cases known not to pass, each with why it is acceptable for now.</summary>
-    private static readonly Dictionary<string, string> KnownFailures = new(StringComparer.Ordinal);
+    private static readonly Dictionary<string, string> KnownFailures = new(StringComparer.Ordinal)
+    {
+        // call((!, fail ; true)). The suite runs every case through call/1, and a cut inside a
+        // meta-called goal is local to it here, so it does not prune the disjunction's
+        // alternative. Written as a clause body the same goal fails correctly, which a test in
+        // ControlConstructTests pins. Closing this needs a call barrier the engine does not have.
+        ["FAIL 7.8.4"] = "cut inside a meta-called goal is local; see COMPATIBILITY.md",
+    };
 
     [Fact]
     public void EveryConformanceCaseBehavesAsTheStandardSays()

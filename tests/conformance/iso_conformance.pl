@@ -8,6 +8,23 @@
 %
 % This is our own encoding of the standard, not a third-party suite. It is written as ordinary
 % Prolog so it can be run against another system for comparison.
+%
+% Every case is run through call/1, so a case involving cut measures the meta-call path rather
+% than what the same goal would do written directly in a clause body. The two differ here, and
+% COMPATIBILITY.md says how.
+
+
+% --- Helpers used by the cases below -----------------------------------------
+% Reading and writing are checked through atoms rather than files, so that a case
+% stays a single goal and the suite needs nothing on disk.
+
+reads_as(Text, Term) :- read_term_from_atom(Text, Read, []), Read == Term.
+
+writeq_gives(Term, Expected) :- with_output_to(atom(Written), writeq(Term)), Written == Expected.
+
+write_gives(Term, Expected) :- with_output_to(atom(Written), write(Term)), Written == Expected.
+
+writeq_codes(Term, Expected) :- with_output_to(codes(Written), writeq(Term)), Written == Expected.
 
 % --- 8.2 Unification ---------------------------------------------------------
 iso_case('8.2.1', (_X = 1), success).
@@ -194,6 +211,114 @@ iso_case('8.17.1', throw(_), error(instantiation_error)).
 
 % Used by 8.15.3; a goal that is defined so the case tests control flow, not existence.
 repeat_guard(0).
+
+% --- 7.1 Terms, read back from text ------------------------------------------
+iso_case('7.1.1', reads_as('foo', foo), success).
+iso_case('7.1.1', reads_as('[]', []), success).
+iso_case('7.1.2', reads_as('123', 123), success).
+iso_case('7.1.2', reads_as('-123', -123), success).
+iso_case('7.1.2', reads_as('0''a', 97), success).
+iso_case('7.1.2', reads_as('0x1f', 31), success).
+iso_case('7.1.2', reads_as('0o17', 15), success).
+iso_case('7.1.2', reads_as('0b101', 5), success).
+iso_case('7.1.2', reads_as('1.0', 1.0), success).
+iso_case('7.1.2', reads_as('1.0e2', 100.0), success).
+iso_case('7.1.4', reads_as('f(a, b)', f(a, b)), success).
+iso_case('7.1.6', reads_as('[a, b]', [a, b]), success).
+iso_case('7.1.6', reads_as('[a|b]', [a|b]), success).
+iso_case('7.1.6', reads_as('{a}', {a}), success).
+
+% --- 7.2 Operators, and how priority decides structure ------------------------
+iso_case('7.2.1', reads_as('1 + 2 * 3', +(1, *(2, 3))), success).
+iso_case('7.2.1', reads_as('(1 + 2) * 3', *(+(1, 2), 3)), success).
+iso_case('7.2.1', reads_as('1 - 2 - 3', -(-(1, 2), 3)), success).
+iso_case('7.2.1', reads_as('1 ^ 2 ^ 3', ^(1, ^(2, 3))), success).
+iso_case('7.2.1', reads_as('- 1', -(1)), success).
+iso_case('7.2.1', reads_as('a :- b, c', ':-'(a, ','(b, c))), success).
+iso_case('7.2.1', reads_as('\\+ a', \+(a)), success).
+iso_case('7.2.1', reads_as('f(-)', f(-)), success).
+iso_case('7.2.1', reads_as('[-]', [-]), success).
+
+% --- 7.10 Writing terms -------------------------------------------------------
+iso_case('7.10.5', writeq_gives(foo, foo), success).
+iso_case('7.10.5', writeq_gives([], '[]'), success).
+iso_case('7.10.5', writeq_gives(1 + 2, '1+2'), success).
+iso_case('7.10.5', writeq_gives(1 + 2 * 3, '1+2*3'), success).
+iso_case('7.10.5', writeq_gives((1 + 2) * 3, '(1+2)*3'), success).
+iso_case('7.10.5', writeq_gives(1 - (2 - 3), '1-(2-3)'), success).
+iso_case('7.10.5', writeq_gives(-(1), '- 1'), success).
+iso_case('7.10.5', writeq_gives(f(-1), 'f(-1)'), success).
+iso_case('7.10.5', writeq_gives([a, b], '[a,b]'), success).
+iso_case('7.10.5', writeq_gives([a|b], '[a|b]'), success).
+iso_case('7.10.5', writeq_gives({a}, '{a}'), success).
+iso_case('7.10.5', writeq_gives(1.0, '1.0'), success).
+iso_case('7.10.5', write_gives('a b', 'a b'), success).
+% A quoted atom is written so that it reads back: quote, backslash, n, quote.
+iso_case('7.10.5', writeq_codes('\n', [39, 92, 110, 39]), success).
+iso_case('7.10.5', writeq_codes('a b', [39, 97, 32, 98, 39]), success).
+iso_case('7.10.5', writeq_codes('', [39, 39]), success).
+
+% --- 7.8 Control constructs ---------------------------------------------------
+iso_case('7.8.1', true, success).
+iso_case('7.8.2', fail, failure).
+iso_case('7.8.3', call(true), success).
+iso_case('7.8.4', (!, fail ; true), failure).
+iso_case('7.8.5', (fail, _X8), failure).
+iso_case('7.8.6', (true ; fail), success).
+iso_case('7.8.7', (fail -> true ; true), success).
+iso_case('7.8.7', (true -> fail ; true), failure).
+iso_case('7.8.8', catch(true, _, true), success).
+iso_case('7.8.9', catch(fail, _, true), failure).
+
+% --- 8.11 Stream selection and control ----------------------------------------
+iso_case('8.11.5', open(_, read, _), error(instantiation_error)).
+iso_case('8.11.5', open(f, _, _), error(instantiation_error)).
+iso_case('8.11.5', open(f, sideways, _), error(domain_error(io_mode, sideways))).
+iso_case('8.11.5', open(1, read, _), error(type_error(atom, 1))).
+iso_case('8.11.6', close(_), error(instantiation_error)).
+iso_case('8.11.6', close(no_such_stream), error(existence_error(stream, no_such_stream))).
+iso_case('8.11.7', (current_output(S4), \+ var(S4)), success).
+iso_case('8.11.8', set_output(no_such_stream), error(existence_error(stream, no_such_stream))).
+iso_case('8.11.8', set_input(no_such_stream), error(existence_error(stream, no_such_stream))).
+iso_case('8.11.8', set_input(user_output), error(permission_error(input, stream, user_output/0))).
+iso_case('8.11.8', set_output(user_input), error(permission_error(output, stream, user_input/0))).
+
+% --- 8.12 Character input and output ------------------------------------------
+iso_case('8.12.1', get_char(no_such_stream, _), error(existence_error(stream, no_such_stream))).
+iso_case('8.12.1', get_char(user_output, _), error(permission_error(input, stream, user_output/0))).
+iso_case('8.12.2', peek_char(no_such_stream, _), error(existence_error(stream, no_such_stream))).
+iso_case('8.12.3', put_char(user_output, _), error(instantiation_error)).
+iso_case('8.12.3', put_char(user_output, ab), error(type_error(character, ab))).
+iso_case('8.12.3', put_char(user_input, a), error(permission_error(output, stream, user_input/0))).
+
+% --- 8.14 Term input and output -----------------------------------------------
+iso_case('8.14.1', read_term(no_such_stream, _, []), error(existence_error(stream, no_such_stream))).
+iso_case('8.14.1', read_term(user_output, _, []), error(permission_error(input, stream, user_output/0))).
+iso_case('8.14.2', write(no_such_stream, a), error(existence_error(stream, no_such_stream))).
+iso_case('8.14.2', write_term(a, [nonsense(x)]), error(domain_error(write_option, nonsense(x)))).
+iso_case('8.14.2', (with_output_to(atom(A4), write_term(1 + 2, [ignore_ops(true)])), A4 == '+(1,2)'), success).
+iso_case('8.14.2', (with_output_to(atom(A5), write_term('a b', [quoted(true)])), atom_length(A5, 5)), success).
+iso_case('8.14.4', (current_op(P1, xfx, ':-'), P1 =:= 1200), success).
+
+% --- 8.16 Atomic term processing, remaining modes ------------------------------
+iso_case('8.16.2', (atom_concat(A6, B6, ab), A6 == '', B6 == ab), success).
+iso_case('8.16.2', findall(A7-B7, atom_concat(A7, B7, ab), [''-ab, a-b, ab-'']), success).
+iso_case('8.16.3', findall(S5, sub_atom(abc, _, 1, _, S5), [a, b, c]), success).
+iso_case('8.16.3', (sub_atom(abc, 1, 1, A8, S6), A8 =:= 1, S6 == b), success).
+iso_case('8.16.3', sub_atom(abc, 0, 4, _, _), failure).
+iso_case('8.16.4', atom_chars(1.0, ['1', '.', '0']), success).
+iso_case('8.16.5', (atom_codes(A9, [0'a]), A9 == a), success).
+iso_case('8.16.6', char_code(_, -1), error(representation_error(character_code))).
+iso_case('8.16.7', (number_chars(N2, [' ', '3']), N2 == 3), success).
+iso_case('8.16.7', number_chars(_, ['3', 'a']), error(syntax_error(illegal_number))).
+
+% --- Sorting: not in clause 8, but standard in every system --------------------
+iso_case('sort/2', sort([b, a, b], [a, b]), success).
+iso_case('sort/2', sort([], []), success).
+iso_case('msort/2', msort([b, a, b], [a, b, b]), success).
+iso_case('keysort/2', keysort([b-1, a-2], [a-2, b-1]), success).
+iso_case('keysort/2', keysort([a-1, a-2], [a-1, a-2]), success).
+iso_case('sort/4', sort(0, @>=, [1, 2, 2], [2, 2, 1]), success).
 
 % --- Runner ------------------------------------------------------------------
 % Writes one line per case: PASS or FAIL with what was expected and what happened.
