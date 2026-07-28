@@ -58,7 +58,7 @@ jobs:
       # DOTPROLOG_RUN_AOT_TESTS opts in to the NativeAOT acceptance test, which publishes the sample
       # as a native executable and runs it. It is skipped by default because it takes tens of seconds.
       - name: Test
-        run: dotnet test DotProlog.slnx -c Release --no-build
+        run: dotnet test --solution DotProlog.slnx -c Release --no-build --no-ansi
         env:
           DOTPROLOG_RUN_AOT_TESTS: '1'
 
@@ -66,16 +66,20 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: dotnet pack DotProlog.slnx -c Release --no-build -o artifacts -p:ContinuousIntegrationBuild=true
 
-      # A consumer can check a downloaded package against this without trusting the download path.
-      - name: Checksums
+      - name: Test packed templates and tool
         if: matrix.os == 'ubuntu-latest'
-        run: cd artifacts && sha256sum *.nupkg *.snupkg > SHA256SUMS
+        run: tests/Integration/verify-packages.sh artifacts
 
       - name: Software bill of materials
         if: matrix.os == 'ubuntu-latest'
         run: |
-          dotnet tool install --global CycloneDX
+          dotnet tool install --global CycloneDX --version 6.2.0
           dotnet CycloneDX DotProlog.slnx -o artifacts --filename sbom.json --json
+
+      # A consumer can check every uploaded package artifact without trusting the download path.
+      - name: Checksums
+        if: matrix.os == 'ubuntu-latest'
+        run: cd artifacts && sha256sum *.nupkg *.snupkg sbom.json > SHA256SUMS
 
       - name: Upload packages
         if: matrix.os == 'ubuntu-latest'

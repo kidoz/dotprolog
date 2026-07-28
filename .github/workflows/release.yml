@@ -50,7 +50,7 @@ jobs:
         run: dotnet build DotProlog.slnx -c Release -p:ContinuousIntegrationBuild=true
 
       - name: Test
-        run: dotnet test DotProlog.slnx -c Release --no-build
+        run: dotnet test --solution DotProlog.slnx -c Release --no-build --no-ansi
         env:
           DOTPROLOG_RUN_AOT_TESTS: '1'
 
@@ -132,13 +132,16 @@ jobs:
       - name: Pack
         run: dotnet pack DotProlog.slnx -c Release -o artifacts -p:ContinuousIntegrationBuild=true
 
-      - name: Checksums
-        run: cd artifacts && sha256sum *.nupkg *.snupkg > SHA256SUMS
+      - name: Test packed templates and tool
+        run: tests/Integration/verify-packages.sh artifacts
 
       - name: Software bill of materials
         run: |
-          dotnet tool install --global CycloneDX
+          dotnet tool install --global CycloneDX --version 6.2.0
           dotnet CycloneDX DotProlog.slnx -o artifacts --filename sbom.json --json
+
+      - name: Checksums
+        run: cd artifacts && sha256sum *.nupkg *.snupkg sbom.json > SHA256SUMS
 
       - uses: actions/upload-artifact@v4
         with:
@@ -159,6 +162,18 @@ jobs:
         with:
           path: downloaded
 
+      - name: Checksum every release asset
+        shell: bash
+        run: |
+          find downloaded -type f ! -name SHA256SUMS -print0 |
+            sort -z |
+            while IFS= read -r -d '' file; do
+              digest=$(sha256sum "$file" | cut -d' ' -f1)
+              printf '%s  %s\n' "$digest" "$(basename "$file")"
+            done > SHA256SUMS
+          test -s SHA256SUMS
+          cat SHA256SUMS
+
       # The changelog is the source of the notes, so the two cannot disagree.
       - name: Extract the notes for this version
         shell: bash
@@ -177,8 +192,11 @@ jobs:
         with:
           body_path: notes.md
           files: |
-            downloaded/packages/*
+            downloaded/packages/*.nupkg
+            downloaded/packages/*.snupkg
+            downloaded/packages/sbom.json
             downloaded/native-*/*
+            SHA256SUMS
           fail_on_unmatched_files: true
 
   # Separated so that publishing to nuget.org is its own approval gate: configure the `release`
@@ -200,15 +218,13 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # A missing key means the feed is not configured yet, not that the release is broken: the
-      # GitHub release stands on its own, so this reports and stops rather than failing the run.
       - name: Push
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
           if [ -z "$NUGET_API_KEY" ]; then
-            echo "::notice::NUGET_API_KEY is not set; skipping the push to nuget.org."
-            exit 0
+            echo "::error::NUGET_API_KEY is not configured for the release environment."
+            exit 1
           fi
           dotnet nuget push "artifacts/*.nupkg" \
             --source https://api.nuget.org/v3/index.json \
