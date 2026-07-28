@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <Sdk Name="DotProlog.Sdk" Version="DOTPROLOG_VERSION" />
+
+    <PropertyGroup>
+        <!-- OutputType must be visible to Microsoft.NET.Sdk before its targets compute how to run the project. -->
+        <OutputType>Exe</OutputType>
+        <DotPrologTestProject>true</DotPrologTestProject>
+        <TargetFramework>net10.0</TargetFramework>
+        <RootNamespace>PrologTests</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="DotProlog.Testing" Version="DOTPROLOG_VERSION" />
+    </ItemGroup>
+
+</Project>

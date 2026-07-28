@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Aleksandr Pavlov",
+  "classifications": [ "Test", "Prolog" ],
+  "identity": "DotProlog.Tests",
+  "name": "Prolog Test Project",
+  "shortName": "prolog-test",
+  "description": "A Prolog test project run by dotnet test.",
+  "tags": { "language": "Prolog", "type": "project" },
+  "sourceName": "PrologTests",
+  "preferNameDirectory": true,
+  "symbols": {
+    "DotPrologVersion": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "0.1.0",
+      "replaces": "DOTPROLOG_VERSION",
+      "description": "Version of the DotProlog SDK and libraries to reference."
+    }
+  }
+}
