@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <RootNamespace>DotProlog.Testing</RootNamespace>
+        <!-- This assembly provides the framework; only a consuming .dplproj is a runnable test app. -->
+        <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
 
         <IsPackable>true</IsPackable>
         <PackageId>DotProlog.Testing</PackageId>

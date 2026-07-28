@@ -1,16 +1,21 @@
 <Project>
     <PropertyGroup>
         <!--
-          A test project hosts Microsoft.Testing.Platform, which is an executable, so setting
-          DotPrologTestProject implies OutputType Exe.
+          A test project hosts Microsoft.Testing.Platform, which is an executable. The template
+          declares OutputType early enough for Microsoft.NET.Sdk to compute its run command; this
+          fallback also covers projects that import these targets before Microsoft.NET.Sdk.targets.
         -->
         <OutputType Condition="'$(DotPrologTestProject)' == 'true'">Exe</OutputType>
+        <IsTestProject Condition="'$(DotPrologTestProject)' == 'true'">true</IsTestProject>
+        <IsTestingPlatformApplication Condition="'$(DotPrologTestProject)' == 'true'">true</IsTestingPlatformApplication>
 
         <!--
-          Tells `dotnet test` to run the project as a Microsoft.Testing.Platform host rather than
-          looking for a VSTest adapter it will never find.
+          The generated entry point starts Microsoft.Testing.Platform itself, so neither the .NET
+          SDK nor the platform package should generate a second entry point.
         -->
         <GenerateProgramFile Condition="'$(DotPrologTestProject)' == 'true'">false</GenerateProgramFile>
+        <GenerateTestingPlatformEntryPoint Condition="'$(DotPrologTestProject)' == 'true'"
+            >false</GenerateTestingPlatformEntryPoint>
 
         <!-- An application gets a generated entry point; a library only gets its facade. -->
         <_DotPrologGenerateEntryPoint Condition="'$(OutputType)' == 'Exe'">true</_DotPrologGenerateEntryPoint>

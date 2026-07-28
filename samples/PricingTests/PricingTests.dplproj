@@ -4,6 +4,7 @@
 
     <PropertyGroup>
         <!-- Makes this a test project: the SDK generates a test host instead of a program. -->
+        <OutputType>Exe</OutputType>
         <DotPrologTestProject>true</DotPrologTestProject>
 
         <TargetFramework>net10.0</TargetFramework>

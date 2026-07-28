@@ -143,9 +143,8 @@ public sealed class ProjectReferenceTests
     [Fact]
     public async Task APrologTestProjectDiscoversAndRunsItsTests()
     {
-        // The test host is a Microsoft.Testing.Platform application, so it is exercised by running it.
-        // `dotnet test` cannot drive it yet: MTP mode is a repository-wide global.json switch that
-        // breaks the xunit projects here, and VSTest mode is gone on the .NET 10 SDK.
+        // Exercise the public test contract, not only the generated executable: .NET 10's MTP mode
+        // must discover and run a .dplproj alongside the repository's xUnit MTP projects.
         Assert.SkipUnless(
             Environment.GetEnvironmentVariable(OptInVariable) == "1",
             $"Set {OptInVariable}=1 to run the toolchain integration tests."
@@ -163,14 +162,21 @@ public sealed class ProjectReferenceTests
         (int buildExit, string buildLog) = await Run("dotnet", ["build", "-nodereuse:false", project, "--nologo"]);
         Assert.True(buildExit == 0, $"Building PricingTests failed:\n{buildLog}");
 
-        (int listExit, string listLog) = await Run("dotnet", ["run", "--project", project, "--no-build", "--", "--list-tests"]);
+        (int listExit, string listLog) = await Run(
+            "dotnet",
+            ["test", "--project", project, "--no-build", "--no-restore", "--list-tests", "--no-ansi"]
+        );
         Assert.True(listExit == 0, $"Listing tests failed:\n{listLog}");
         Assert.Contains("test_discount_reduces_price", listLog, StringComparison.Ordinal);
-        Assert.Contains("found 7 test(s)", listLog, StringComparison.Ordinal);
+        Assert.Contains("Discovered 7 tests.", listLog, StringComparison.Ordinal);
 
-        (int runExit, string runLog) = await Run("dotnet", ["run", "--project", project, "--no-build"]);
+        (int runExit, string runLog) = await Run(
+            "dotnet",
+            ["test", "--project", project, "--no-build", "--no-restore", "--no-ansi"]
+        );
 
         Assert.True(runExit == 0, $"Running the tests failed:\n{runLog}");
+        Assert.Contains("total: 7", runLog, StringComparison.Ordinal);
         Assert.Contains("succeeded: 7", runLog, StringComparison.Ordinal);
         Assert.Contains("failed: 0", runLog, StringComparison.Ordinal);
     }

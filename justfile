@@ -21,7 +21,7 @@ build configuration="Debug":
 
 # Run every test project.
 test configuration="Debug":
-    dotnet test {{solution}} -c {{configuration}} --nologo
+    dotnet test --solution {{solution}} -c {{configuration}} --no-ansi
 
 # Consult and run a Prolog file: `just run path/to/file.pl`.
 run file:

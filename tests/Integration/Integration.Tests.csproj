@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <RootNamespace>Integration.Tests</RootNamespace>
+        <!-- The six integration tests are intentionally skipped unless their opt-in variable is set. -->
+        <TestingPlatformCommandLineArguments>$(TestingPlatformCommandLineArguments) --ignore-exit-code 8</TestingPlatformCommandLineArguments>
     </PropertyGroup>
 </Project>
