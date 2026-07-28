@@ -6,6 +6,8 @@
           that `<Sdk Name="DotProlog.Sdk" />` resolves to, plus the facade generator they load.
         -->
         <PackageType>MSBuildSdk</PackageType>
+        <Title>DotProlog MSBuild SDK</Title>
+        <Description>Builds .dplproj applications, libraries, and test projects and generates their typed .NET façades.</Description>
         <IncludeBuildOutput>false</IncludeBuildOutput>
         <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
         <EnableDefaultCompileItems>false</EnableDefaultCompileItems>

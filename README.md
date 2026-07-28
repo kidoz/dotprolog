@@ -7,11 +7,10 @@ A Prolog language implementation for .NET 10, written in C# 14.
 The goal is a first-class Prolog experience on the .NET SDK, the way C# and F# have one: `.dplproj` projects, a `plc` compiler, `dotnet prolog`, `dotnet new` templates, and NativeAOT publishing.
 
 **Status: early, but usable.** `dotnet new prolog-console` through `dotnet publish -p:PublishAot=true`
-works today, and Prolog tests run under Microsoft.Testing.Platform. What is missing: driving those
-tests with `dotnet test` itself, the `plc` compiler, and generating IL for predicate bodies — a
-`.dplproj` currently embeds its Prolog source and compiles it to bytecode at startup. Nothing is
-published to NuGet yet, though the packages build: see [CHANGELOG.md](CHANGELOG.md) and
-[COMPATIBILITY.md](COMPATIBILITY.md).
+works today, and `dotnet test` discovers Prolog tests under Microsoft.Testing.Platform. What is
+missing: the `plc` compiler and generating IL for predicate bodies — a `.dplproj` currently embeds
+its Prolog source and compiles it to bytecode at startup. Nothing is published to NuGet yet, though
+the packages build: see [CHANGELOG.md](CHANGELOG.md) and [COMPATIBILITY.md](COMPATIBILITY.md).
 
 ## Hello, world
 
@@ -132,7 +131,7 @@ bundles of [widget, gadget]:
 | `src/DotProlog.CodeGen.CSharp` | `.dpli` contract reader and C# facade generator |
 | `src/DotProlog.Build.Tasks` | MSBuild task that runs the generator |
 | `src/DotProlog.Sdk` | The `DotProlog.Sdk` MSBuild SDK package |
-| `src/DotProlog.Templates` | `dotnet new prolog-console` and `prolog-lib` |
+| `src/DotProlog.Templates` | `dotnet new prolog-console`, `prolog-lib`, and `prolog-test` |
 | `src/DotProlog.Testing` | Microsoft.Testing.Platform host for Prolog tests |
 | `src/DotProlog.Tool` | The `dotnet prolog` command |
 | `tests/` | Unit tests per component, plus end-to-end execution tests |
@@ -172,7 +171,7 @@ Only the second is implemented today. It never emits CLR IL, so it stays valid i
 That is verified, not assumed. `samples/AotAcceptance` publishes to a self-contained native executable with no managed assemblies beside it, then at run time consults a `.pl` file it has never seen, enumerates solutions, asserts and retracts clauses, and catches an ISO error — with zero trimming or AOT warnings in the build. CI runs it on Windows, Linux, and macOS:
 
 ```console
-$ DOTPROLOG_RUN_AOT_TESTS=1 dotnet test tests/Integration
+$ DOTPROLOG_RUN_AOT_TESTS=1 dotnet test --project tests/Integration
 ```
 
 Dynamic predicates use the logical update view, so a goal sees exactly the clauses that existed when it started:
@@ -376,8 +375,8 @@ Hello from Prolog on .NET!
 ```
 
 `prolog-console` builds a Prolog program as a .NET application; `prolog-lib` builds a rule set as a
-typed library for C#, F#, and VB. A project pins the SDK on the element itself, so no `global.json` is
-needed:
+typed library for C#, F#, and VB; and `prolog-test` creates a Prolog test executable that runs under
+`dotnet test`. A project pins the DotProlog SDK on the element itself:
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -390,13 +389,13 @@ A `.dplproj` publishes with NativeAOT like any other project:
 $ dotnet publish HelloProlog -c Release -r osx-arm64 -p:PublishAot=true
 ```
 
-**Nothing is published to NuGet yet** — package identity is still an open decision. The commands above
-are verified against a local feed built by `dotnet pack`.
+**Nothing is published to NuGet yet.** Package identity is settled as `DotProlog.*`, and the commands
+above are verified against a local feed built by `dotnet pack`.
 
 ## Testing Prolog
 
-A `.dplproj` with `<DotPrologTestProject>true</DotPrologTestProject>` builds a test host. Any
-zero-arity predicate named `test_*` is a test — it passes if it can be proved:
+Create a test project with `dotnet new prolog-test`. Any zero-arity predicate named `test_*` is a
+test — it passes if it can be proved:
 
 ```prolog
 test_tier_boundaries :-
@@ -404,15 +403,21 @@ test_tier_boundaries :-
     tier(999, silver).
 ```
 ```console
-$ dotnet run --project PricingTests
-  total: 5   failed: 1   succeeded: 4
+$ dotnet new prolog-test -n PricingTests
+$ cd PricingTests
+$ dotnet test --project PricingTests.dplproj
+Test run summary: Passed!
+  total: 2
+  failed: 0
+  succeeded: 2
 ```
 
 Each test runs in a fresh engine, so one cannot see clauses another asserted.
 
-**`dotnet test` does not drive this yet.** On the .NET 10 SDK its VSTest bridge is gone, and the
-Microsoft.Testing.Platform mode is a repository-wide `global.json` switch that breaks the xunit
-projects in this repository. Run the host directly until that is resolved.
+The .NET 10 SDK selects Microsoft.Testing.Platform through `global.json`. The standalone
+`prolog-test` template includes that setting. A solution containing Prolog tests should keep the
+same `test.runner` setting in its solution-root `global.json`; this repository does so for its mixed
+xUnit and Prolog test suite.
 
 ## Building from source
 
@@ -427,9 +432,9 @@ $ just check          # format-check, build, and test
 ## Releasing
 
 Packages are `DotProlog.*`: `DotProlog.Runtime`, `DotProlog.Syntax`, `DotProlog.Compiler`,
-`DotProlog.Testing`, `DotProlog.Tool`, `DotProlog.Sdk`, and `DotProlog.Templates`. Each carries
-Source Link and a symbol package, so a debugger can step from a package into the exact commit it
-was built from.
+`DotProlog.Testing`, `DotProlog.Tool`, `DotProlog.Sdk`, and `DotProlog.Templates`. Every
+assembly-bearing package carries Source Link and a symbol package, so a debugger can step from a
+package into the exact commit it was built from.
 
 ```bash
 just pack        # every package into ./artifacts, with SHA256SUMS
@@ -448,10 +453,10 @@ changelog section for that version, and only then pushes to NuGet — from a sep
 # 1. Move the version's changelog heading from "unreleased" to today's date.
 # 2. Set VersionPrefix in Directory.Build.props if the version is changing.
 # 3. Commit, then:
-git tag v0.1.0 && git push origin v0.1.0
+git tag v0.1.1 && git push origin v0.1.1
 ```
 
-Nothing is published yet, and nothing publishes without `NUGET_API_KEY` being set.
+Nothing is published to NuGet yet, and the publication job fails unless `NUGET_API_KEY` is set.
 
 ## Licence
 

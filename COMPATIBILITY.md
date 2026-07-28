@@ -41,8 +41,9 @@ Writing them was worth it immediately: they found six real defects.
   Meta-called control now goes through the same bytecode lowering and cut barriers as source-level
   control.
 
-Beyond the conformance cases, the engine is covered by 684 of its own tests, an integration suite
-that builds and runs the C#, F#, and Visual Basic samples, and a NativeAOT acceptance test.
+Beyond the conformance cases, the engine and toolchain are covered by 684 xUnit cases and seven
+Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
+C#, F#, and Visual Basic samples and exercises NativeAOT.
 
 ## Implemented
 

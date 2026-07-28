@@ -6,6 +6,24 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-07-28
+
+### Added
+
+- A `prolog-test` template whose `test_*` predicates are discovered and run by `dotnet test`.
+- A clean local-feed consumer gate that installs the packed templates and .NET tool, then builds,
+  runs, NativeAOT-publishes, and tests generated projects from a path containing spaces.
+
+### Changed
+
+- The repository test suite now uses Microsoft.Testing.Platform v2 through the .NET 10
+  `global.json` test-runner contract, so xUnit and Prolog test projects run together.
+- Release checksums now cover packages, symbols, the SBOM, and all native binaries; the CycloneDX
+  tool is pinned, and a missing NuGet API key fails rather than silently skipping publication.
+- Child build processes close standard input, are killed with their process tree if they exceed the
+  integration-test limit, and every CI and release job has an explicit timeout.
+- `DotProlog.Sdk` now carries a real package title and description.
+
 ## [0.1.0] — 2026-07-27
 
 The first release of **DotProlog** — a Prolog implementation for .NET 10, built as a first-class
@@ -61,5 +79,6 @@ binary: a published executable can consult a `.pl` file it has never seen and ru
 
 **Full Changelog**: https://github.com/kidoz/dotprolog/commits/v0.1.0
 
-[Unreleased]: https://github.com/kidoz/dotprolog/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/kidoz/dotprolog/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/kidoz/dotprolog/releases/tag/v0.1.1
 [0.1.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.1.0
