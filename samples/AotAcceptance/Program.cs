@@ -85,6 +85,11 @@ internal static class Program
                 \+ unify_with_occurs_check(Cycle, f(Cycle)), var(Cycle),
                 write(occurs_check), nl,
 
+                % Predicate enumeration uses explicit program metadata, never reflection.
+                assertz(inspected(value)),
+                current_predicate(inspected/1), \+ current_predicate(write/1),
+                write(predicate_info), nl,
+
                 % An operator declared at run time, in a native image, changing how a term prints.
                 op(700, xfx, likes),
                 write(likes(alice, bob)), nl,
