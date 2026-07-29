@@ -79,6 +79,7 @@ public sealed class NativeAotAcceptanceTests
                     "arithmetic_error",
                     "occurs_check",
                     "predicate_info",
+                    "prolog_flags",
                     "alice likes bob",
                     "+(1,*(2,3))",
                     "427",

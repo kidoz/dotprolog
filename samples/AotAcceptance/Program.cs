@@ -90,6 +90,16 @@ internal static class Program
                 current_predicate(inspected/1), \+ current_predicate(write/1),
                 write(predicate_info), nl,
 
+                % ISO flags own runtime state explicitly and continue to work after trimming.
+                current_prolog_flag(bounded, true),
+                set_prolog_flag(unknown, fail), \+ native_missing_predicate,
+                set_prolog_flag(unknown, error),
+                set_prolog_flag(double_quotes, atom),
+                atom_codes(Quoted, [34, 110, 97, 116, 105, 118, 101, 34]),
+                read_term_from_atom(Quoted, native, []),
+                set_prolog_flag(double_quotes, codes),
+                write(prolog_flags), nl,
+
                 % An operator declared at run time, in a native image, changing how a term prints.
                 op(700, xfx, likes),
                 write(likes(alice, bob)), nl,
