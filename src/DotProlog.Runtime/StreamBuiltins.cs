@@ -19,6 +19,7 @@ namespace DotProlog.Runtime;
 internal static class StreamBuiltins
 {
     private const string StreamFunctor = "$stream";
+    private const int StreamPropertyCount = 9;
 
     internal static void Register(BuiltinRegistry registry)
     {
@@ -29,6 +30,8 @@ internal static class StreamBuiltins
         registry.Register("current_output", 1, static machine => Current(machine, input: false));
         registry.Register("set_input", 1, static machine => Set(machine, input: true));
         registry.Register("set_output", 1, static machine => Set(machine, input: false));
+        registry.RegisterNondeterministic("current_stream", 1, static machine => CurrentStream(machine, 0), CurrentStream);
+        registry.RegisterNondeterministic("stream_property", 2, static machine => StreamProperty(machine, 0), StreamProperty);
 
         registry.Register("read", 1, static machine => Read(machine, stream: -1, term: 0, options: -1));
         registry.Register("read", 2, static machine => Read(machine, stream: 0, term: 1, options: -1));
@@ -253,11 +256,13 @@ internal static class StreamBuiltins
     private static PrologStream? ById(Machine machine, Cell cell)
     {
         Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(cell.Index).Index);
-        Cell id = machine.Dereference(machine.HeapAt(cell.Index + 1));
+        if (machine.Symbols.AtomName(functor.NameAtom) != StreamFunctor || functor.Arity != 1)
+        {
+            return null;
+        }
 
-        return machine.Symbols.AtomName(functor.NameAtom) == StreamFunctor && functor.Arity == 1 && id.Tag == CellTag.Integer
-            ? machine.Streams.ById((int)id.Integer)
-            : null;
+        Cell id = machine.Dereference(machine.HeapAt(cell.Index + 1));
+        return id.Tag == CellTag.Integer ? machine.Streams.ById((int)id.Integer) : null;
     }
 
     private static bool Current(Machine machine, bool input)
@@ -282,6 +287,236 @@ internal static class StreamBuiltins
         return true;
     }
 
+    private static bool CurrentStream(Machine machine, long state)
+    {
+        Cell pattern = machine.Argument(0);
+        if (pattern.Tag != CellTag.Reference && !TryStreamHandle(machine, pattern, out _))
+        {
+            throw PrologErrors.Domain(machine, "stream", pattern);
+        }
+
+        for (int id = (int)state; id < machine.Streams.Count; id++)
+        {
+            PrologStream? stream = machine.Streams.ById(id);
+            if (stream is null)
+            {
+                continue;
+            }
+
+            Cell candidate = StreamTerm(machine, stream);
+            if (!machine.CanUnify(pattern, candidate))
+            {
+                continue;
+            }
+
+            if (id + 1 < machine.Streams.Count)
+            {
+                machine.PushRetry(id + 1);
+            }
+
+            return machine.Unify(pattern, candidate);
+        }
+
+        return false;
+    }
+
+    private static bool StreamProperty(Machine machine, long state)
+    {
+        Cell streamPattern = machine.Argument(0);
+        Cell propertyPattern = machine.Argument(1);
+        PrologStream? selected = ResolvePropertyStream(machine, streamPattern);
+        ValidateProperty(machine, propertyPattern);
+
+        int limit = machine.Streams.Count * StreamPropertyCount;
+        for (int encoded = (int)state; encoded < limit; encoded++)
+        {
+            int id = encoded / StreamPropertyCount;
+            int property = encoded % StreamPropertyCount;
+            PrologStream? stream = machine.Streams.ById(id);
+
+            if (stream is null || (selected is not null && !ReferenceEquals(selected, stream)))
+            {
+                continue;
+            }
+
+            if (!TryProperty(machine, stream, property, out Cell candidateProperty))
+            {
+                continue;
+            }
+
+            Cell candidateStream = StreamTerm(machine, stream);
+            Cell pattern;
+            Cell candidate;
+
+            if (streamPattern.Tag == CellTag.Reference)
+            {
+                int pair = machine.Symbols.InternFunctor("-", 2);
+                pattern = machine.CreateStructure(pair, [streamPattern, propertyPattern]);
+                candidate = machine.CreateStructure(pair, [candidateStream, candidateProperty]);
+            }
+            else
+            {
+                pattern = propertyPattern;
+                candidate = candidateProperty;
+            }
+
+            if (!machine.CanUnify(pattern, candidate))
+            {
+                continue;
+            }
+
+            if (encoded + 1 < limit)
+            {
+                machine.PushRetry(encoded + 1);
+            }
+
+            return machine.Unify(pattern, candidate);
+        }
+
+        return false;
+    }
+
+    private static PrologStream? ResolvePropertyStream(Machine machine, Cell stream)
+    {
+        if (stream.Tag == CellTag.Reference)
+        {
+            return null;
+        }
+
+        if (stream.Tag == CellTag.Atom)
+        {
+            return machine.Streams.ByAlias(machine.Symbols.AtomName(stream.Index)) ?? throw Existence(machine, "stream", stream);
+        }
+
+        if (!TryStreamHandle(machine, stream, out int id))
+        {
+            throw PrologErrors.Domain(machine, "stream", stream);
+        }
+
+        return machine.Streams.ById(id) ?? throw Existence(machine, "stream", stream);
+    }
+
+    private static bool TryStreamHandle(Machine machine, Cell cell, out int id)
+    {
+        id = -1;
+        if (cell.Tag != CellTag.Structure)
+        {
+            return false;
+        }
+
+        Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(cell.Index).Index);
+        if (machine.Symbols.AtomName(functor.NameAtom) != StreamFunctor || functor.Arity != 1)
+        {
+            return false;
+        }
+
+        Cell argument = machine.Dereference(machine.HeapAt(cell.Index + 1));
+        if (argument.Tag != CellTag.Integer || argument.Integer < 0 || argument.Integer > int.MaxValue)
+        {
+            return false;
+        }
+
+        id = (int)argument.Integer;
+        return true;
+    }
+
+    private static void ValidateProperty(Machine machine, Cell property)
+    {
+        if (property.Tag == CellTag.Reference || IsDirectionProperty(machine, property))
+        {
+            return;
+        }
+
+        if (property.Tag != CellTag.Structure)
+        {
+            throw PrologErrors.Domain(machine, "stream_property", property);
+        }
+
+        Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(property.Index).Index);
+        string name = machine.Symbols.AtomName(functor.NameAtom);
+        if (
+            functor.Arity != 1
+            || name
+                is not (
+                    "file_name"
+                    or "mode"
+                    or "alias"
+                    or "type"
+                    or "reposition"
+                    or "eof_action"
+                    or "end_of_stream"
+                    or "position"
+                )
+        )
+        {
+            throw PrologErrors.Domain(machine, "stream_property", property);
+        }
+
+        Cell value = machine.Dereference(machine.HeapAt(property.Index + 1));
+        if (name == "position")
+        {
+            if (value.Tag != CellTag.Reference)
+            {
+                throw PrologErrors.Domain(machine, "stream_property", property);
+            }
+
+            return;
+        }
+
+        if (value.Tag is not (CellTag.Reference or CellTag.Atom))
+        {
+            throw PrologErrors.Type(machine, "atom", value);
+        }
+    }
+
+    private static bool IsDirectionProperty(Machine machine, Cell property) =>
+        property.Tag == CellTag.Atom && machine.Symbols.AtomName(property.Index) is "input" or "output";
+
+    private static bool TryProperty(Machine machine, PrologStream stream, int property, out Cell candidate)
+    {
+        candidate = default;
+        switch (property)
+        {
+            case 0:
+                candidate = UnaryProperty(machine, "file_name", stream.Name);
+                return true;
+            case 1:
+                candidate = UnaryProperty(machine, "mode", stream.Mode);
+                return true;
+            case 2:
+                candidate = Cell.Atom(machine.Symbols.InternAtom(stream.Reader is not null ? "input" : "output"));
+                return true;
+            case 3 when stream.Alias is not null:
+                candidate = UnaryProperty(machine, "alias", stream.Alias);
+                return true;
+            case 4:
+                candidate = UnaryProperty(machine, "type", "text");
+                return true;
+            case 5:
+                candidate = UnaryProperty(machine, "reposition", "false");
+                return true;
+            case 6 when stream.Reader is not null:
+                candidate = UnaryProperty(machine, "eof_action", "eof_code");
+                return true;
+            case 7 when stream.Reader is not null:
+                candidate = UnaryProperty(machine, "end_of_stream", EndStateName(stream.ObserveEnd()));
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static Cell UnaryProperty(Machine machine, string name, string value) =>
+        machine.CreateStructure(machine.Symbols.InternFunctor(name, 1), [Cell.Atom(machine.Symbols.InternAtom(value))]);
+
+    private static string EndStateName(PrologStream.EndState state) =>
+        state switch
+        {
+            PrologStream.EndState.At => "at",
+            PrologStream.EndState.Past => "past",
+            _ => "not",
+        };
+
     private static bool Read(Machine machine, int stream, int term, int options)
     {
         PrologStream source = Resolve(machine, stream, input: true);
@@ -297,6 +532,7 @@ internal static class StreamBuiltins
             out Cell variables,
             out Cell singletons
         );
+        source.RecordInput(read);
 
         if (!read)
         {
@@ -362,12 +598,17 @@ internal static class StreamBuiltins
             if (consume)
             {
                 source.Buffer = source.Buffer[1..];
+                source.RecordInput(read: true);
             }
 
             return machine.Unify(machine.Argument(target), Character(machine, buffered));
         }
 
         int next = consume ? reader.Read() : reader.Peek();
+        if (consume)
+        {
+            source.RecordInput(next >= 0);
+        }
 
         return machine.Unify(
             machine.Argument(target),
@@ -402,11 +643,17 @@ internal static class StreamBuiltins
             if (consume)
             {
                 source.Buffer = source.Buffer[1..];
+                source.RecordInput(read: true);
             }
         }
         else
         {
             next = consume ? source.Reader!.Read() : source.Reader!.Peek();
+        }
+
+        if (consume)
+        {
+            source.RecordInput(next >= 0);
         }
 
         return machine.Unify(code, Cell.Integer60(next));
@@ -463,7 +710,7 @@ internal static class StreamBuiltins
     private static bool AtEnd(Machine machine, int stream)
     {
         PrologStream source = Resolve(machine, stream, input: true);
-        return source.Buffer.Length == 0 && source.Reader!.Peek() < 0;
+        return source.ObserveEnd() != PrologStream.EndState.Not;
     }
 
     private static bool WriteText(Machine machine, int stream, string text)

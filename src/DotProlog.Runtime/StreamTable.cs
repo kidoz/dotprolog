@@ -18,9 +18,9 @@ public sealed class StreamTable
     /// <summary>Creates a table holding the three standard streams.</summary>
     public StreamTable()
     {
-        UserInput = Add(new PrologStream(0, "user_input", "user_input", Console.In, null, permanent: true));
-        UserOutput = Add(new PrologStream(1, "user_output", "user_output", null, Console.Out, permanent: true));
-        UserError = Add(new PrologStream(2, "user_error", "user_error", null, Console.Error, permanent: true));
+        UserInput = Add(new PrologStream(0, "user_input", "read", "user_input", Console.In, null, permanent: true));
+        UserOutput = Add(new PrologStream(1, "user_output", "write", "user_output", null, Console.Out, permanent: true));
+        UserError = Add(new PrologStream(2, "user_error", "write", "user_error", null, Console.Error, permanent: true));
 
         CurrentInput = UserInput;
         CurrentOutput = UserOutput;
@@ -52,9 +52,9 @@ public sealed class StreamTable
 
         PrologStream stream = mode switch
         {
-            "read" => new PrologStream(_streams.Count, path, alias, new StreamReader(path), null, permanent: false),
-            "write" => new PrologStream(_streams.Count, path, alias, null, new StreamWriter(path, append: false), false),
-            "append" => new PrologStream(_streams.Count, path, alias, null, new StreamWriter(path, append: true), false),
+            "read" => new PrologStream(_streams.Count, path, mode, alias, new StreamReader(path), null, permanent: false),
+            "write" => new PrologStream(_streams.Count, path, mode, alias, null, new StreamWriter(path, append: false), false),
+            "append" => new PrologStream(_streams.Count, path, mode, alias, null, new StreamWriter(path, append: true), false),
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown stream mode."),
         };
 
@@ -92,6 +92,9 @@ public sealed class StreamTable
     /// <summary>Finds an open stream by identifier.</summary>
     public PrologStream? ById(int id) => id >= 0 && id < _streams.Count && _streams[id].IsOpen ? _streams[id] : null;
 
+    /// <summary>Number of stream identifiers allocated so far, including closed streams.</summary>
+    internal int Count => _streams.Count;
+
     /// <summary>Finds an open stream by alias.</summary>
     public PrologStream? ByAlias(string alias)
     {
@@ -123,7 +126,7 @@ public sealed class StreamTable
     {
         var sink = new StringWriter(System.Globalization.CultureInfo.InvariantCulture);
         _captures.Push((CurrentOutput, sink));
-        CurrentOutput = new PrologStream(-1, "with_output_to", null, null, sink, permanent: false);
+        CurrentOutput = new PrologStream(-1, "with_output_to", "write", null, null, sink, permanent: false);
     }
 
     /// <summary>Stops capturing and returns what was written.</summary>

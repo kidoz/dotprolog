@@ -11,12 +11,21 @@ namespace DotProlog.Runtime;
 /// </remarks>
 public sealed class PrologStream
 {
-    private string _buffer = string.Empty;
+    internal enum EndState
+    {
+        Not,
+        At,
+        Past,
+    }
 
-    internal PrologStream(int id, string name, string? alias, TextReader? reader, TextWriter? writer, bool permanent)
+    private string _buffer = string.Empty;
+    private EndState _endState;
+
+    internal PrologStream(int id, string name, string mode, string? alias, TextReader? reader, TextWriter? writer, bool permanent)
     {
         Id = id;
         Name = name;
+        Mode = mode;
         Alias = alias;
         Reader = reader;
         Writer = writer;
@@ -28,6 +37,9 @@ public sealed class PrologStream
 
     /// <summary>The file name, or the alias for a standard stream.</summary>
     public string Name { get; }
+
+    /// <summary>The mode used to open the stream: <c>read</c>, <c>write</c>, or <c>append</c>.</summary>
+    internal string Mode { get; }
 
     /// <summary>The alias this stream answers to, if any.</summary>
     public string? Alias { get; internal set; }
@@ -46,6 +58,38 @@ public sealed class PrologStream
 
     /// <summary>Text read past the end of the last clause, held for the next read.</summary>
     internal ref string Buffer => ref _buffer;
+
+    /// <summary>Returns the live ISO end-of-stream state without consuming input.</summary>
+    internal EndState ObserveEnd()
+    {
+        if (Reader is null || _endState == EndState.Past)
+        {
+            return _endState;
+        }
+
+        // Inspecting an interactive standard input must not wait for a user keystroke merely to
+        // answer stream_property/2. A consuming input operation will update the state normally.
+        if (ReferenceEquals(Reader, Console.In))
+        {
+            return EndState.Not;
+        }
+
+        return _buffer.Length == 0 && Reader.Peek() < 0 ? EndState.At : EndState.Not;
+    }
+
+    /// <summary>Records whether a consuming input operation returned the EOF marker.</summary>
+    internal void RecordInput(bool read)
+    {
+        _endState = read ? EndState.Not : EndState.Past;
+    }
+
+    /// <summary>Replaces the standard input source and resets its EOF state.</summary>
+    internal void SetReader(TextReader reader)
+    {
+        Reader = reader;
+        _buffer = string.Empty;
+        _endState = EndState.Not;
+    }
 
     /// <summary>Closes the stream, releasing whatever it was reading from or writing to.</summary>
     internal void Close()

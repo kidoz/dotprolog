@@ -205,6 +205,21 @@ iso_case('8.10.3', setof(_, fail, _), failure).
 % --- 8.11 Stream selection ---------------------------------------------------
 iso_case('8.11.1', (current_output(S1), S1 == S1), success).
 iso_case('8.11.2', (current_input(S2), S2 == S2), success).
+iso_case('8.11.8', (current_input(S8), current_stream(S8)), success).
+iso_case('8.11.8', current_stream(foo), error(domain_error(stream, foo))).
+iso_case('8.11.9', stream_property(user_input, input), success).
+iso_case('8.11.9', stream_property(user_input, mode(read)), success).
+iso_case('8.11.9', stream_property(user_input, alias(user_input)), success).
+iso_case('8.11.9', stream_property(user_input, type(text)), success).
+iso_case('8.11.9', stream_property(user_input, reposition(false)), success).
+iso_case('8.11.9', stream_property(user_input, eof_action(eof_code)), success).
+iso_case('8.11.9', stream_property(user_output, output), success).
+iso_case('8.11.9', stream_property(user_output, mode(write)), success).
+iso_case('8.11.9', (\+ stream_property(S9, alias(S9)), var(S9)), success).
+iso_case('8.11.9', stream_property(1, _), error(domain_error(stream, 1))).
+iso_case('8.11.9', stream_property(no_such_alias, _), error(existence_error(stream, no_such_alias))).
+iso_case('8.11.9', stream_property(_, nonsense), error(domain_error(stream_property, nonsense))).
+iso_case('8.11.9', stream_property(_, mode(1)), error(type_error(atom, 1))).
 
 % --- 8.14 Term input and output ----------------------------------------------
 iso_case('8.14.2', write_canonical([1, 2, 3]), success).

@@ -109,7 +109,7 @@ public sealed class Machine
         set
         {
             ArgumentNullException.ThrowIfNull(value);
-            Streams.UserInput.Reader = value;
+            Streams.UserInput.SetReader(value);
         }
     }
 
