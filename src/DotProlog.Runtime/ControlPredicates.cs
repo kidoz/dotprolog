@@ -66,6 +66,6 @@ internal static class ControlPredicates
         program.Emit(OpCode.ReactivateCatch, FrameIndexSlot);
         program.Emit(OpCode.Fail);
 
-        program.DefinePredicate(catchFunctor, entry);
+        program.DefinePredicate(catchFunctor, entry, userDefined: false);
     }
 }

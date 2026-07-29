@@ -97,11 +97,15 @@ public sealed class DynamicPredicateTests
     }
 
     [Fact]
-    public void AbolishRemovesEveryClause()
+    public void AbolishRemovesTheProcedureDefinition()
     {
         Assert.Equal(
-            "[]\n",
-            PrologTestHost.Run($"{Declared}\n:- initialization((abolish(p/1), findall(X, p(X), L), write(L), nl)).")
+            "gone\n",
+            PrologTestHost.Run(
+                $"{Declared}\n"
+                    + ":- initialization((abolish(p/1), \\+ current_predicate(p/1), "
+                    + "catch(p(_), error(existence_error(procedure, p/1), _), write(gone)), nl))."
+            )
         );
     }
 

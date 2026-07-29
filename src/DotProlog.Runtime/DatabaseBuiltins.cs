@@ -18,6 +18,12 @@ internal static class DatabaseBuiltins
         // Nondeterministic: on redo, both resume the clause list where they left off.
         registry.RegisterNondeterministic("retract", 1, static machine => Retract(machine, 0), Retract);
         registry.RegisterNondeterministic("clause", 2, static machine => Clause(machine, 0), Clause);
+        registry.RegisterNondeterministic(
+            "current_predicate",
+            1,
+            static machine => CurrentPredicate(machine, 0),
+            CurrentPredicate
+        );
         registry.Register("retractall", 1, RetractAll);
         registry.Register("abolish", 1, Abolish);
 
@@ -200,38 +206,122 @@ internal static class DatabaseBuiltins
         return true;
     }
 
+    /// <summary>
+    /// <c>current_predicate(?Name/Arity)</c>: enumerates currently defined user procedures in stable
+    /// functor-identifier order. Native built-ins, bundled library predicates, and internal names
+    /// are deliberately absent for strict ISO behavior.
+    /// </summary>
+    private static bool CurrentPredicate(Machine machine, long state)
+    {
+        Cell indicator = machine.Argument(0);
+        ValidatePredicateIndicator(machine, indicator, variablesAllowed: true, out _, out _);
+
+        int count = machine.Symbols.FunctorCount;
+        int slash = machine.Symbols.InternFunctor("/", 2);
+
+        for (int functorId = (int)state; functorId < count; functorId++)
+        {
+            if (!machine.Program.IsUserPredicate(functorId))
+            {
+                continue;
+            }
+
+            Functor functor = machine.Symbols.GetFunctor(functorId);
+            string name = machine.Symbols.AtomName(functor.NameAtom);
+            if (name.StartsWith('$'))
+            {
+                continue;
+            }
+
+            Cell candidate = machine.CreateStructure(slash, [Cell.Atom(functor.NameAtom), Cell.Integer60(functor.Arity)]);
+
+            if (!machine.CanUnify(indicator, candidate))
+            {
+                continue;
+            }
+
+            if (functorId + 1 < count)
+            {
+                machine.PushRetry(functorId + 1);
+            }
+
+            return machine.Unify(indicator, candidate);
+        }
+
+        return false;
+    }
+
     private static bool Abolish(Machine machine)
     {
         Cell indicator = machine.Argument(0);
-        if (indicator.Tag != CellTag.Structure)
-        {
-            throw PrologErrors.Type(machine, "predicate_indicator", indicator);
-        }
-
-        Cell name = machine.Dereference(machine.HeapAt(indicator.Index + 1));
-        Cell arity = machine.Dereference(machine.HeapAt(indicator.Index + 2));
-        if (name.Tag != CellTag.Atom || arity.Tag != CellTag.Integer)
-        {
-            throw PrologErrors.Type(machine, "predicate_indicator", indicator);
-        }
+        ValidatePredicateIndicator(machine, indicator, variablesAllowed: false, out Cell name, out Cell arity);
 
         int functorId = machine.Symbols.InternFunctor(name.Index, (int)arity.Integer);
-        DynamicPredicate? predicate = machine.Program.FindDynamic(functorId);
-        if (predicate is null)
+        RequireModifiable(machine, functorId);
+        machine.Program.AbolishDynamic(functorId);
+        return true;
+    }
+
+    private static void ValidatePredicateIndicator(
+        Machine machine,
+        Cell indicator,
+        bool variablesAllowed,
+        out Cell name,
+        out Cell arity
+    )
+    {
+        if (indicator.Tag == CellTag.Reference)
         {
-            return true;
+            if (!variablesAllowed)
+            {
+                throw PrologErrors.Instantiation(machine);
+            }
+
+            name = indicator;
+            arity = indicator;
+            return;
         }
 
-        int generation = machine.Program.NextGeneration();
-        for (DynamicClause? clause = predicate.First; clause is not null; clause = clause.Next)
+        int slash = machine.Symbols.InternFunctor("/", 2);
+        if (indicator.Tag != CellTag.Structure || machine.HeapAt(indicator.Index).Index != slash)
         {
-            if (clause.Death == int.MaxValue)
+            throw PrologErrors.Type(machine, "predicate_indicator", indicator);
+        }
+
+        name = machine.Dereference(machine.HeapAt(indicator.Index + 1));
+        arity = machine.Dereference(machine.HeapAt(indicator.Index + 2));
+
+        if (arity.Tag == CellTag.Reference)
+        {
+            if (!variablesAllowed)
             {
-                clause.Death = generation;
+                throw PrologErrors.Instantiation(machine);
             }
         }
+        else if (arity.Tag != CellTag.Integer)
+        {
+            throw PrologErrors.Type(machine, "integer", arity);
+        }
+        else if (arity.Integer < 0)
+        {
+            throw PrologErrors.Domain(machine, "not_less_than_zero", arity);
+        }
+        else if (arity.Integer >= Machine.ArgumentRegisterCount)
+        {
+            throw PrologErrors.Representation(machine, "max_arity");
+        }
 
-        return true;
+        if (name.Tag == CellTag.Reference)
+        {
+            if (!variablesAllowed)
+            {
+                throw PrologErrors.Instantiation(machine);
+            }
+        }
+        else if (name.Tag != CellTag.Atom)
+        {
+            throw PrologErrors.Type(machine, "atom", name);
+        }
     }
 
     private static void Consult(Machine machine, Cell path)
@@ -289,7 +379,10 @@ internal static class DatabaseBuiltins
     /// <summary>Rejects an attempt to change a predicate that was compiled as static.</summary>
     private static void RequireModifiable(Machine machine, int functorId)
     {
-        if (!machine.Program.IsDynamic(functorId) && machine.Program.IsDefined(functorId))
+        if (
+            !machine.Program.IsDynamic(functorId)
+            && (machine.Program.IsDefined(functorId) || machine.Program.Builtins.TryGetId(functorId, out _))
+        )
         {
             throw PrologErrors.Permission(machine, "modify", "static_procedure", functorId);
         }

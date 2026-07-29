@@ -44,6 +44,18 @@ internal sealed class DynamicPredicate
         Last ??= clause;
     }
 
+    /// <summary>Marks every current clause dead at <paramref name="generation"/>.</summary>
+    internal void Abolish(int generation)
+    {
+        for (DynamicClause? clause = First; clause is not null; clause = clause.Next)
+        {
+            if (clause.Death == int.MaxValue)
+            {
+                clause.Death = generation;
+            }
+        }
+    }
+
     /// <summary>
     /// Returns the first clause at or after <paramref name="from"/> that a goal started at
     /// <paramref name="generation"/> can see.

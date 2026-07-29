@@ -33,7 +33,10 @@ public sealed class PrologEngine : IRuntimeCompiler
     /// <summary>Compiles one of the built-in libraries, which must not fail.</summary>
     private void LoadLibrary(string source, string name)
     {
-        LoadResult loaded = new ProgramLoader(Program, Machine, _modules).Load(ReadOrThrow(source, name), name);
+        LoadResult loaded = new ProgramLoader(Program, Machine, _modules, userPredicates: false).Load(
+            ReadOrThrow(source, name),
+            name
+        );
 
         if (!loaded.Success)
         {

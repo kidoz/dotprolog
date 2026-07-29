@@ -161,10 +161,7 @@ public sealed class MachineTests
         BytecodeProgram program = NewProgram();
         var machine = new Machine(program);
         Cell variable = machine.CreateVariable();
-        Cell value = machine.CreateStructure(
-            program.Symbols.InternFunctor("point", 2),
-            [Cell.Integer60(2), Cell.Integer60(3)]
-        );
+        Cell value = machine.CreateStructure(program.Symbols.InternFunctor("point", 2), [Cell.Integer60(2), Cell.Integer60(3)]);
 
         Assert.True(machine.UnifyWithOccursCheck(variable, value));
         Assert.Equal(value, machine.Dereference(variable));
@@ -201,5 +198,36 @@ public sealed class MachineTests
 
         Assert.True(machine.UnifyWithOccursCheck(variable, wrapper));
         Assert.Equal(wrapper, machine.Dereference(variable));
+    }
+
+    [Fact]
+    public void ProgramDistinguishesUserPredicatesFromBuiltinsAndInternalBytecode()
+    {
+        BytecodeProgram program = NewProgram();
+        int user = program.Symbols.InternFunctor("user_predicate", 0);
+        int write = program.Symbols.InternFunctor("write", 1);
+        int catchFunctor = program.Symbols.InternFunctor("catch", 3);
+
+        program.DefinePredicate(user, program.CodeLength);
+
+        Assert.True(program.IsUserPredicate(user));
+        Assert.False(program.IsUserPredicate(write));
+        Assert.False(program.IsUserPredicate(catchFunctor));
+    }
+
+    [Fact]
+    public void AbolishingADynamicPredicateRemovesEveryAlias()
+    {
+        BytecodeProgram program = NewProgram();
+        int target = program.Symbols.InternFunctor("module:entry", 1);
+        int alias = program.Symbols.InternFunctor("entry", 1);
+        program.DeclareDynamic(target);
+        Assert.True(program.AliasPredicate(alias, target));
+
+        Assert.True(program.AbolishDynamic(alias));
+        Assert.False(program.IsDefined(target));
+        Assert.False(program.IsDefined(alias));
+        Assert.False(program.IsUserPredicate(target));
+        Assert.False(program.IsUserPredicate(alias));
     }
 }

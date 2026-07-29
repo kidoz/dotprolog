@@ -171,6 +171,16 @@ iso_case('8.7.1', (a < 1), error(type_error(evaluable, a/0))).
 iso_case('8.8.1', clause(_, _), error(instantiation_error)).
 iso_case('8.8.1', clause(_, b), error(instantiation_error)).
 iso_case('8.8.1', clause(4, _), error(type_error(callable, 4))).
+iso_case('8.8.2', current_predicate(repeat_guard/1), success).
+iso_case('8.8.2', current_predicate(write/1), failure).
+iso_case('8.8.2', (current_predicate(repeat_guard/A10), A10 == 1), success).
+iso_case('8.8.2', (retractall(iso_empty(_)), current_predicate(iso_empty/1)), success).
+iso_case('8.8.2', (assertz(iso_gone(a)), abolish(iso_gone/1), \+ current_predicate(iso_gone/1)), success).
+iso_case('8.8.2', current_predicate(4), error(type_error(predicate_indicator, 4))).
+iso_case('8.8.2', current_predicate(foo/a), error(type_error(integer, a))).
+iso_case('8.8.2', current_predicate(4/1), error(type_error(atom, 4))).
+iso_case('8.8.2', current_predicate(foo/(-1)), error(domain_error(not_less_than_zero, -1))).
+iso_case('8.8.2', current_predicate(foo/256), error(representation_error(max_arity))).
 
 % --- 8.9 Clause creation and destruction -------------------------------------
 iso_case('8.9.1', assertz(iso_scratch(1)), success).

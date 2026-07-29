@@ -19,6 +19,7 @@ public sealed class ProgramLoader
     private readonly ConstantPool _constants;
     private readonly Machine? _machine;
     private readonly ModuleTable _modules;
+    private readonly bool _userPredicates;
 
     /// <summary>Creates a loader that appends to <paramref name="program"/>.</summary>
     /// <param name="program">The program to load into.</param>
@@ -30,13 +31,23 @@ public sealed class ProgramLoader
     /// The program's modules. Without one, every file loads into <c>user</c>, which is what a caller
     /// that only wants to compile a term wants.
     /// </param>
-    public ProgramLoader(BytecodeProgram program, Machine? machine = null, ModuleTable? modules = null)
+    /// <param name="userPredicates">
+    /// Whether predicates emitted by this loader came from user source. The engine's bundled
+    /// libraries pass <see langword="false"/> so ISO predicate enumeration excludes them.
+    /// </param>
+    public ProgramLoader(
+        BytecodeProgram program,
+        Machine? machine = null,
+        ModuleTable? modules = null,
+        bool userPredicates = true
+    )
     {
         ArgumentNullException.ThrowIfNull(program);
         _program = program;
         _constants = new ConstantPool(program);
         _machine = machine;
         _modules = modules ?? new ModuleTable();
+        _userPredicates = userPredicates;
     }
 
     /// <summary>Lowers <paramref name="clauses"/> into the program.</summary>
@@ -556,7 +567,7 @@ public sealed class ProgramLoader
                         ModuleTable.QualifiedName(module, name.Name),
                         (int)arity.Value
                     );
-                    _program.DeclareDynamic(functorId);
+                    _program.DeclareDynamic(functorId, _userPredicates);
                     declared.Add(functorId);
                     continue;
                 }
@@ -582,7 +593,7 @@ public sealed class ProgramLoader
         string? fileName
     )
     {
-        DynamicPredicate predicate = _program.DeclareDynamic(functorId);
+        DynamicPredicate predicate = _program.DeclareDynamic(functorId, _userPredicates);
         Machine machine = _machine!;
         int rule = _program.Symbols.InternFunctor(":-", 2);
 
@@ -673,7 +684,7 @@ public sealed class ProgramLoader
             compiler.Compile(clauses[i].Head, clauses[i].Body);
         }
 
-        _program.DefinePredicate(functorId, entry);
+        _program.DefinePredicate(functorId, entry, _userPredicates);
     }
 
     private bool TryGetHeadFunctor(SyntaxTerm head, out int functorId)

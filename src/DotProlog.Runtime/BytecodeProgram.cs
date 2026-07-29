@@ -31,6 +31,7 @@ public sealed class BytecodeProgram
     private int[] _code = new int[1024];
     private Cell[] _constants = new Cell[64];
     private int[] _entryPoints = new int[64];
+    private bool[] _userPredicates = new bool[64];
     private int _constantCount;
     private readonly Dictionary<int, DynamicPredicate> _dynamicPredicates = [];
 
@@ -68,10 +69,17 @@ public sealed class BytecodeProgram
     internal Cell[] Constants => _constants;
 
     /// <summary>Records that <paramref name="functorId"/> is defined at <paramref name="address"/>.</summary>
-    public void DefinePredicate(int functorId, int address)
+    /// <param name="functorId">Functor identifier of the predicate.</param>
+    /// <param name="address">Entry address in the instruction stream.</param>
+    /// <param name="userDefined">
+    /// Whether the definition came from user source. Internal bytecode predicates pass
+    /// <see langword="false"/> so ISO predicate enumeration does not expose them.
+    /// </param>
+    public void DefinePredicate(int functorId, int address, bool userDefined = true)
     {
         EnsureEntryPoints(functorId + 1);
         _entryPoints[functorId] = address;
+        _userPredicates[functorId] = userDefined && !Builtins.TryGetId(functorId, out _);
     }
 
     /// <summary>Returns the entry address of <paramref name="functorId"/>, or -1 if it is undefined.</summary>
@@ -80,6 +88,13 @@ public sealed class BytecodeProgram
 
     /// <summary>Whether <paramref name="functorId"/> has a definition.</summary>
     public bool IsDefined(int functorId) => EntryPointOf(functorId) != Undefined;
+
+    /// <summary>Whether <paramref name="functorId"/> names a currently defined user procedure.</summary>
+    internal bool IsUserPredicate(int functorId) =>
+        functorId >= 0
+        && functorId < _userPredicates.Length
+        && _userPredicates[functorId]
+        && EntryPointOf(functorId) != Undefined;
 
     /// <summary>
     /// The current clause generation. A goal snapshots this when it starts, and then sees exactly the
@@ -101,14 +116,15 @@ public sealed class BytecodeProgram
     /// Declaring emits a one-instruction trampoline and points the predicate's entry at it.
     /// </summary>
     /// <exception cref="PrologException">A static predicate of that name and arity already exists.</exception>
-    internal DynamicPredicate DeclareDynamic(int functorId)
+    internal DynamicPredicate DeclareDynamic(int functorId, bool userDefined = true)
     {
         if (_dynamicPredicates.TryGetValue(functorId, out DynamicPredicate? existing))
         {
+            _userPredicates[functorId] |= userDefined;
             return existing;
         }
 
-        if (IsDefined(functorId))
+        if (IsDefined(functorId) || Builtins.TryGetId(functorId, out _))
         {
             throw new PrologException($"permission_error(modify, static_procedure, {Symbols.DescribeFunctor(functorId)})");
         }
@@ -118,7 +134,7 @@ public sealed class BytecodeProgram
 
         var predicate = new DynamicPredicate { FunctorId = functorId, TrampolineAddress = trampoline };
         _dynamicPredicates[functorId] = predicate;
-        DefinePredicate(functorId, trampoline);
+        DefinePredicate(functorId, trampoline, userDefined);
         return predicate;
     }
 
@@ -143,13 +159,45 @@ public sealed class BytecodeProgram
             _dynamicPredicates[alias] = dynamic;
         }
 
-        DefinePredicate(alias, EntryPointOf(target));
+        DefinePredicate(alias, EntryPointOf(target), IsUserPredicate(target));
         return true;
     }
 
     /// <summary>Returns the dynamic predicate for <paramref name="functorId"/>, or <see langword="null"/>.</summary>
     internal DynamicPredicate? FindDynamic(int functorId) =>
         _dynamicPredicates.TryGetValue(functorId, out DynamicPredicate? predicate) ? predicate : null;
+
+    /// <summary>
+    /// Removes a dynamic predicate and every alias sharing its clause database. Existing calls keep
+    /// their saved clause objects, while subsequent lookups see an undefined procedure.
+    /// </summary>
+    internal bool AbolishDynamic(int functorId)
+    {
+        if (!_dynamicPredicates.TryGetValue(functorId, out DynamicPredicate? predicate))
+        {
+            return false;
+        }
+
+        predicate.Abolish(NextGeneration());
+
+        List<int> aliases = [];
+        foreach ((int alias, DynamicPredicate candidate) in _dynamicPredicates)
+        {
+            if (ReferenceEquals(candidate, predicate))
+            {
+                aliases.Add(alias);
+            }
+        }
+
+        foreach (int alias in aliases)
+        {
+            _dynamicPredicates.Remove(alias);
+            _entryPoints[alias] = Undefined;
+            _userPredicates[alias] = false;
+        }
+
+        return true;
+    }
 
     /// <summary>Appends an instruction with no operands and returns its address.</summary>
     public int Emit(OpCode opCode) => EmitWord((int)opCode);
@@ -214,6 +262,7 @@ public sealed class BytecodeProgram
 
         int previous = _entryPoints.Length;
         Array.Resize(ref _entryPoints, capacity);
+        Array.Resize(ref _userPredicates, capacity);
         Array.Fill(_entryPoints, Undefined, previous, capacity - previous);
     }
 }
