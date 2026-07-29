@@ -110,6 +110,48 @@ iso_case('8.6.1', (_ is _), error(instantiation_error)).
 iso_case('8.6.1', (_ is 1 + a), error(type_error(evaluable, a/0))).
 iso_case('8.6.1', (_ is 1 // 0), error(evaluation_error(zero_divisor))).
 iso_case('8.6.1', (foo is 1 + 1), failure).
+iso_case('8.6.1', (X10 is 6 / 3, float(X10), X10 =:= 2.0), success).
+iso_case('8.6.1', (_ is 1.0 / 0.0), error(evaluation_error(zero_divisor))).
+iso_case('8.6.1', (_ is 0.0 / 0.0), error(evaluation_error(undefined))).
+iso_case('8.6.1', (_ is 1 // 2.0), error(type_error(integer, 2.0))).
+iso_case('8.6.1', (X11 is 2 ** 3, float(X11), X11 =:= 8.0), success).
+iso_case('8.6.1', (_ is 2 ^ -1), error(type_error(float, 2))).
+iso_case('8.6.1', (1 ^ (-1) =:= 1), success).
+iso_case('8.6.1', ((-1) ^ (-2) =:= 1), success).
+iso_case('8.6.1', (_ is 0 ^ -1), error(evaluation_error(zero_divisor))).
+iso_case('8.6.1', (X12 is min(1.0, 1), integer(X12)), success).
+iso_case('8.6.1', (X13 is max(1.0, 1), integer(X13)), success).
+iso_case('8.6.1', (X14 is \ 1, X14 =:= -2), success).
+iso_case('8.6.1', (_ is \ 1.0), error(type_error(integer, 1.0))).
+iso_case('8.6.1', (1 << 2 =:= 4), success).
+iso_case('8.6.1', (4 >> 2 =:= 1), success).
+iso_case('8.6.1', (_ is 1 << 60), error(evaluation_error(int_overflow))).
+iso_case('8.6.1', (_ is 1.0 << 2), error(type_error(integer, 1.0))).
+iso_case('8.6.1', (X15 is pi, X15 > 3.14, X15 < 3.15), success).
+iso_case('8.6.1', (X16 is sqrt(9), float(X16), X16 =:= 3.0), success).
+iso_case('8.6.1', (_ is sqrt(-1)), error(evaluation_error(undefined))).
+iso_case('8.6.1', (sin(0) =:= 0.0), success).
+iso_case('8.6.1', (cos(0) =:= 1.0), success).
+iso_case('8.6.1', (tan(0) =:= 0.0), success).
+iso_case('8.6.1', (asin(0) =:= 0.0), success).
+iso_case('8.6.1', (acos(1) =:= 0.0), success).
+iso_case('8.6.1', (atan(0) =:= 0.0), success).
+iso_case('8.6.1', (atan2(0, 1) =:= 0.0), success).
+iso_case('8.6.1', (_ is atan2(0, 0)), error(evaluation_error(undefined))).
+iso_case('8.6.1', (exp(0) =:= 1.0), success).
+iso_case('8.6.1', (log(1) =:= 0.0), success).
+iso_case('8.6.1', (_ is log(0)), error(evaluation_error(zero_divisor))).
+iso_case('8.6.1', (X17 is float(3), float(X17), X17 =:= 3.0), success).
+iso_case('8.6.1', (round(1.5) =:= 2), success).
+iso_case('8.6.1', (round(-1.5) =:= -1), success).
+iso_case('8.6.1', (truncate(-1.9) =:= -1), success).
+iso_case('8.6.1', (floor(-1.1) =:= -2), success).
+iso_case('8.6.1', (ceiling(-1.1) =:= -1), success).
+iso_case('8.6.1', (_ is floor(1)), error(type_error(float, 1))).
+iso_case('8.6.1', (float_integer_part(-1.25) =:= -1.0), success).
+iso_case('8.6.1', (float_fractional_part(-1.25) =:= -0.25), success).
+iso_case('8.6.1', (_ is float_integer_part(1)), error(type_error(float, 1))).
+iso_case('8.6.1', (_ is max_tagged_integer + 1), error(evaluation_error(int_overflow))).
 
 % --- 8.7 Arithmetic comparison -----------------------------------------------
 iso_case('8.7.1', (0 =:= 0.0), success).

@@ -100,152 +100,396 @@ public static class ArithmeticEvaluator
             _ => throw PrologErrors.NotEvaluable(machine, name, 0),
         };
 
-    private static PrologNumber EvaluateUnary(string name, PrologNumber value, Machine machine, int functorId) =>
-        name switch
+    private static PrologNumber EvaluateUnary(string name, PrologNumber value, Machine machine, int functorId)
+    {
+        try
         {
-            "+" => value,
-            "-" => value.IsFloat ? PrologNumber.FromReal(-value.Real) : PrologNumber.FromInteger(-value.Integer),
-            "abs" => value.IsFloat
-                ? PrologNumber.FromReal(Math.Abs(value.Real))
-                : PrologNumber.FromInteger(Math.Abs(value.Integer)),
-            "sign" => value.IsFloat
-                ? PrologNumber.FromReal(Math.Sign(value.Real))
-                : PrologNumber.FromInteger(Math.Sign(value.Integer)),
-            "float" => PrologNumber.FromReal(value.AsDouble),
-            "integer" => PrologNumber.FromInteger((long)Math.Round(value.AsDouble, MidpointRounding.AwayFromZero)),
-            "truncate" => PrologNumber.FromInteger((long)Math.Truncate(value.AsDouble)),
-            "floor" => PrologNumber.FromInteger((long)Math.Floor(value.AsDouble)),
-            "ceiling" => PrologNumber.FromInteger((long)Math.Ceiling(value.AsDouble)),
-            "sqrt" => PrologNumber.FromReal(Math.Sqrt(value.AsDouble)),
-            _ => throw Unevaluable(machine, functorId),
-        };
+            return name switch
+            {
+                "+" => value,
+                "-" => value.IsFloat ? FloatResult(machine, -value.Real) : IntegerResult(machine, checked(-value.Integer)),
+                "abs" => value.IsFloat
+                    ? FloatResult(machine, Math.Abs(value.Real))
+                    : IntegerResult(machine, checked(Math.Abs(value.Integer))),
+                "sign" => Sign(machine, value),
+                "float" => FloatResult(machine, value.AsDouble),
+                "integer" => IntegerResult(machine, checked((long)Math.Round(value.AsDouble, MidpointRounding.AwayFromZero))),
+                "truncate" => FloatToInteger(machine, value, Math.Truncate),
+                "floor" => FloatToInteger(machine, value, Math.Floor),
+                "ceiling" => FloatToInteger(machine, value, Math.Ceiling),
+                "round" => FloatToInteger(machine, value, static operand => Math.Floor(operand + 0.5)),
+                "float_integer_part" => FloatPart(machine, value, fractional: false),
+                "float_fractional_part" => FloatPart(machine, value, fractional: true),
+                "sqrt" => FloatResult(machine, Math.Sqrt(value.AsDouble)),
+                "sin" => FloatResult(machine, Math.Sin(value.AsDouble)),
+                "cos" => FloatResult(machine, Math.Cos(value.AsDouble)),
+                "tan" => FloatResult(machine, Math.Tan(value.AsDouble)),
+                "asin" => FloatResult(machine, Math.Asin(value.AsDouble)),
+                "acos" => FloatResult(machine, Math.Acos(value.AsDouble)),
+                "atan" => FloatResult(machine, Math.Atan(value.AsDouble)),
+                "exp" => FloatResult(machine, Math.Exp(value.AsDouble)),
+                "log" => Log(machine, value),
+                "\\" => IntegerResult(machine, ~RequireInteger(machine, value)),
+                _ => throw Unevaluable(machine, functorId),
+            };
+        }
+        catch (OverflowException)
+        {
+            throw PrologErrors.Evaluation(machine, "int_overflow");
+        }
+    }
 
     private static PrologNumber EvaluateBinary(string name, PrologNumber left, PrologNumber right, Machine machine, int functorId)
     {
         bool real = left.IsFloat || right.IsFloat;
 
-        switch (name)
+        try
         {
-            case "+":
-                return real
-                    ? PrologNumber.FromReal(left.AsDouble + right.AsDouble)
-                    : PrologNumber.FromInteger(left.Integer + right.Integer);
-
-            case "-":
-                return real
-                    ? PrologNumber.FromReal(left.AsDouble - right.AsDouble)
-                    : PrologNumber.FromInteger(left.Integer - right.Integer);
-
-            case "*":
-                return real
-                    ? PrologNumber.FromReal(left.AsDouble * right.AsDouble)
-                    : PrologNumber.FromInteger(left.Integer * right.Integer);
-
-            case "/":
-                if (real)
-                {
-                    return PrologNumber.FromReal(left.AsDouble / right.AsDouble);
-                }
-
-                ThrowIfZero(machine, right.Integer);
-
-                // Integer division yields an integer only when it is exact; otherwise it yields a float.
-                return left.Integer % right.Integer == 0
-                    ? PrologNumber.FromInteger(left.Integer / right.Integer)
-                    : PrologNumber.FromReal((double)left.Integer / right.Integer);
-
-            case "//":
-                RequireIntegers(machine, real);
-                ThrowIfZero(machine, right.Integer);
-                return PrologNumber.FromInteger(left.Integer / right.Integer);
-
-            case "div":
-                RequireIntegers(machine, real);
-                ThrowIfZero(machine, right.Integer);
-                return PrologNumber.FromInteger((long)Math.Floor((double)left.Integer / right.Integer));
-
-            case "mod":
+            switch (name)
             {
-                RequireIntegers(machine, real);
-                ThrowIfZero(machine, right.Integer);
-                long remainder = left.Integer % right.Integer;
-                return PrologNumber.FromInteger(
-                    remainder != 0 && (remainder < 0) != (right.Integer < 0) ? remainder + right.Integer : remainder
-                );
-            }
+                case "+":
+                    return real
+                        ? FloatResult(machine, left.AsDouble + right.AsDouble)
+                        : IntegerResult(machine, checked(left.Integer + right.Integer));
 
-            case "rem":
-                RequireIntegers(machine, real);
-                ThrowIfZero(machine, right.Integer);
-                return PrologNumber.FromInteger(left.Integer % right.Integer);
+                case "-":
+                    return real
+                        ? FloatResult(machine, left.AsDouble - right.AsDouble)
+                        : IntegerResult(machine, checked(left.Integer - right.Integer));
 
-            case "min":
-                return Compare(left, right) <= 0 ? left : right;
+                case "*":
+                    return real
+                        ? FloatResult(machine, left.AsDouble * right.AsDouble)
+                        : IntegerResult(machine, checked(left.Integer * right.Integer));
 
-            case "max":
-                return Compare(left, right) >= 0 ? left : right;
+                case "/":
+                    if (right.AsDouble == 0)
+                    {
+                        throw PrologErrors.Evaluation(machine, left.AsDouble == 0 ? "undefined" : "zero_divisor");
+                    }
 
-            case "**":
-                return PrologNumber.FromReal(Math.Pow(left.AsDouble, right.AsDouble));
+                    return FloatResult(machine, left.AsDouble / right.AsDouble);
 
-            case "^":
-                if (real)
+                case "//":
                 {
-                    return PrologNumber.FromReal(Math.Pow(left.AsDouble, right.AsDouble));
+                    long leftInteger = RequireInteger(machine, left);
+                    long rightInteger = RequireInteger(machine, right);
+                    ThrowIfZero(machine, rightInteger);
+                    return IntegerResult(machine, leftInteger / rightInteger);
                 }
 
-                return PrologNumber.FromInteger(IntegerPower(machine, left.Integer, right.Integer));
+                case "div":
+                {
+                    long leftInteger = RequireInteger(machine, left);
+                    long rightInteger = RequireInteger(machine, right);
+                    ThrowIfZero(machine, rightInteger);
+                    return IntegerResult(machine, FloorDivide(leftInteger, rightInteger));
+                }
 
-            case ">>":
-                RequireIntegers(machine, real);
-                return PrologNumber.FromInteger(left.Integer >> (int)right.Integer);
+                case "mod":
+                {
+                    long leftInteger = RequireInteger(machine, left);
+                    long rightInteger = RequireInteger(machine, right);
+                    ThrowIfZero(machine, rightInteger);
+                    long remainder = leftInteger % rightInteger;
+                    return IntegerResult(
+                        machine,
+                        remainder != 0 && (remainder < 0) != (rightInteger < 0) ? checked(remainder + rightInteger) : remainder
+                    );
+                }
 
-            case "<<":
-                RequireIntegers(machine, real);
-                return PrologNumber.FromInteger(left.Integer << (int)right.Integer);
+                case "rem":
+                {
+                    long leftInteger = RequireInteger(machine, left);
+                    long rightInteger = RequireInteger(machine, right);
+                    ThrowIfZero(machine, rightInteger);
+                    return IntegerResult(machine, leftInteger % rightInteger);
+                }
 
-            case "/\\":
-                RequireIntegers(machine, real);
-                return PrologNumber.FromInteger(left.Integer & right.Integer);
+                case "min":
+                    return Minimum(left, right);
 
-            case "\\/":
-                RequireIntegers(machine, real);
-                return PrologNumber.FromInteger(left.Integer | right.Integer);
+                case "max":
+                    return Maximum(left, right);
 
-            case "xor":
-                RequireIntegers(machine, real);
-                return PrologNumber.FromInteger(left.Integer ^ right.Integer);
+                case "**":
+                    return PowerFloat(machine, left.AsDouble, right.AsDouble);
 
-            default:
-                throw Unevaluable(machine, functorId);
+                case "^":
+                    if (real)
+                    {
+                        return PowerFloat(machine, left.AsDouble, right.AsDouble);
+                    }
+
+                    if (right.Integer < 0)
+                    {
+                        if (left.Integer == 0)
+                        {
+                            throw PrologErrors.Evaluation(machine, "zero_divisor");
+                        }
+
+                        if (left.Integer is < -1 or > 1)
+                        {
+                            throw PrologErrors.Type(machine, "float", Cell.Integer60(left.Integer));
+                        }
+
+                        return PrologNumber.FromInteger(left.Integer == -1 && (right.Integer & 1) != 0 ? -1 : 1);
+                    }
+
+                    return IntegerResult(machine, IntegerPower(machine, left.Integer, right.Integer));
+
+                case "atan2":
+                    if (left.AsDouble == 0 && right.AsDouble == 0)
+                    {
+                        throw PrologErrors.Evaluation(machine, "undefined");
+                    }
+
+                    return FloatResult(machine, Math.Atan2(left.AsDouble, right.AsDouble));
+
+                case ">>":
+                    return IntegerResult(
+                        machine,
+                        ShiftRight(machine, RequireInteger(machine, left), RequireInteger(machine, right))
+                    );
+
+                case "<<":
+                    return IntegerResult(
+                        machine,
+                        ShiftLeft(machine, RequireInteger(machine, left), RequireInteger(machine, right))
+                    );
+
+                case "/\\":
+                    return IntegerResult(machine, RequireInteger(machine, left) & RequireInteger(machine, right));
+
+                case "\\/":
+                    return IntegerResult(machine, RequireInteger(machine, left) | RequireInteger(machine, right));
+
+                case "xor":
+                    return IntegerResult(machine, RequireInteger(machine, left) ^ RequireInteger(machine, right));
+
+                default:
+                    throw Unevaluable(machine, functorId);
+            }
+        }
+        catch (OverflowException)
+        {
+            throw PrologErrors.Evaluation(machine, "int_overflow");
         }
     }
 
     private static long IntegerPower(Machine machine, long value, long exponent)
     {
-        if (exponent < 0)
-        {
-            throw PrologErrors.Type(machine, "float", Cell.Integer60(exponent));
-        }
-
         long result = 1;
-        for (long i = 0; i < exponent; i++)
+        long factor = value;
+        long remaining = exponent;
+
+        while (remaining > 0)
         {
-            result *= value;
+            if ((remaining & 1) != 0)
+            {
+                result = checked(result * factor);
+                EnsureIntegerFits(machine, result);
+            }
+
+            remaining >>= 1;
+            if (remaining > 0)
+            {
+                factor = checked(factor * factor);
+                EnsureIntegerFits(machine, factor);
+            }
         }
 
         return result;
     }
 
-    private static void RequireIntegers(Machine machine, bool isReal)
+    private static PrologNumber Sign(Machine machine, PrologNumber value)
     {
-        if (isReal)
+        if (!value.IsFloat)
         {
-            throw PrologErrors.Type(machine, "integer", Cell.Atom(machine.Symbols.InternAtom("float")));
+            return PrologNumber.FromInteger(Math.Sign(value.Integer));
+        }
+
+        if (double.IsNaN(value.Real))
+        {
+            throw PrologErrors.Evaluation(machine, "undefined");
+        }
+
+        return FloatResult(
+            machine,
+            value.Real > 0 ? 1.0
+                : value.Real < 0 ? -1.0
+                : 0.0
+        );
+    }
+
+    private static PrologNumber FloatToInteger(Machine machine, PrologNumber value, Func<double, double> operation)
+    {
+        double operand = RequireFloat(machine, value);
+        double result = operation(operand);
+
+        if (double.IsNaN(result))
+        {
+            throw PrologErrors.Evaluation(machine, "undefined");
+        }
+
+        if (double.IsInfinity(result) || result < Cell.MinInteger || result > Cell.MaxInteger)
+        {
+            throw PrologErrors.Evaluation(machine, "int_overflow");
+        }
+
+        return PrologNumber.FromInteger(checked((long)result));
+    }
+
+    private static PrologNumber FloatPart(Machine machine, PrologNumber value, bool fractional)
+    {
+        double operand = RequireFloat(machine, value);
+        return FloatResult(machine, fractional ? operand % 1.0 : Math.Truncate(operand));
+    }
+
+    private static PrologNumber Log(Machine machine, PrologNumber value)
+    {
+        if (value.AsDouble == 0)
+        {
+            throw PrologErrors.Evaluation(machine, "zero_divisor");
+        }
+
+        return FloatResult(machine, Math.Log(value.AsDouble));
+    }
+
+    private static PrologNumber PowerFloat(Machine machine, double left, double right)
+    {
+        if (left == 0 && right < 0)
+        {
+            throw PrologErrors.Evaluation(machine, "zero_divisor");
+        }
+
+        return FloatResult(machine, Math.Pow(left, right));
+    }
+
+    private static PrologNumber IntegerResult(Machine machine, long value)
+    {
+        EnsureIntegerFits(machine, value);
+        return PrologNumber.FromInteger(value);
+    }
+
+    private static PrologNumber FloatResult(Machine machine, double value)
+    {
+        if (double.IsNaN(value))
+        {
+            throw PrologErrors.Evaluation(machine, "undefined");
+        }
+
+        if (double.IsInfinity(value))
+        {
+            throw PrologErrors.Evaluation(machine, "float_overflow");
+        }
+
+        return PrologNumber.FromReal(value);
+    }
+
+    private static long RequireInteger(Machine machine, PrologNumber value)
+    {
+        if (value.IsFloat)
+        {
+            throw PrologErrors.Type(machine, "integer", ToCell(machine, value));
+        }
+
+        return value.Integer;
+    }
+
+    private static double RequireFloat(Machine machine, PrologNumber value)
+    {
+        if (!value.IsFloat)
+        {
+            throw PrologErrors.Type(machine, "float", ToCell(machine, value));
+        }
+
+        return value.Real;
+    }
+
+    private static PrologNumber Minimum(PrologNumber left, PrologNumber right)
+    {
+        int order = Compare(left, right);
+        if (order < 0)
+        {
+            return left;
+        }
+
+        if (order > 0)
+        {
+            return right;
+        }
+
+        return left.IsFloat && !right.IsFloat ? right : left;
+    }
+
+    private static PrologNumber Maximum(PrologNumber left, PrologNumber right)
+    {
+        int order = Compare(left, right);
+        if (order > 0)
+        {
+            return left;
+        }
+
+        if (order < 0)
+        {
+            return right;
+        }
+
+        return left.IsFloat && !right.IsFloat ? right : left;
+    }
+
+    private static long FloorDivide(long left, long right)
+    {
+        long quotient = left / right;
+        long remainder = left % right;
+        return remainder != 0 && (remainder < 0) != (right < 0) ? checked(quotient - 1) : quotient;
+    }
+
+    private static long ShiftLeft(Machine machine, long value, long count)
+    {
+        if (count < 0)
+        {
+            return count == long.MinValue ? (value < 0 ? -1 : 0) : ShiftRight(machine, value, -count);
+        }
+
+        if (value == 0)
+        {
+            return 0;
+        }
+
+        if (count >= 60 || value > (Cell.MaxInteger >> (int)count) || value < (Cell.MinInteger >> (int)count))
+        {
+            throw PrologErrors.Evaluation(machine, "int_overflow");
+        }
+
+        return value << (int)count;
+    }
+
+    private static long ShiftRight(Machine machine, long value, long count)
+    {
+        if (count < 0)
+        {
+            if (count == long.MinValue)
+            {
+                throw PrologErrors.Evaluation(machine, "int_overflow");
+            }
+
+            return ShiftLeft(machine, value, -count);
+        }
+
+        return count >= 60 ? (value < 0 ? -1 : 0) : value >> (int)count;
+    }
+
+    private static void EnsureIntegerFits(Machine machine, long value)
+    {
+        if (!Cell.FitsInteger(value))
+        {
+            throw PrologErrors.Evaluation(machine, "int_overflow");
         }
     }
 
-    private static void ThrowIfZero(Machine machine, long divisor)
+    private static void ThrowIfZero(Machine machine, double divisor)
     {
         if (divisor == 0)
         {

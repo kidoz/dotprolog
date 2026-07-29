@@ -15,12 +15,20 @@ public sealed class ArithmeticTests
     [InlineData("7 mod 3", "1")]
     [InlineData("-7 mod 3", "2")]
     [InlineData("-7 rem 3", "-1")]
-    [InlineData("6 / 3", "2")]
+    [InlineData("6 / 3", "2.0")]
     [InlineData("7 / 2", "3.5")]
     [InlineData("abs(-4)", "4")]
     [InlineData("min(3, 5)", "3")]
     [InlineData("max(3, 5)", "5")]
     [InlineData("2 ^ 10", "1024")]
+    [InlineData("sqrt(9)", "3.0")]
+    [InlineData("round(-1.5)", "-1")]
+    [InlineData("truncate(-1.9)", "-1")]
+    [InlineData("floor(-1.1)", "-2")]
+    [InlineData("ceiling(-1.1)", "-1")]
+    [InlineData("float_integer_part(-1.25)", "-1.0")]
+    [InlineData("float_fractional_part(-1.25)", "-0.25")]
+    [InlineData("\\ 1", "-2")]
     [InlineData("- (3)", "-3")]
     public void EvaluatesExpressions(string expression, string expected)
     {
@@ -67,5 +75,25 @@ public sealed class ArithmeticTests
         PrologException exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
 
         Assert.Contains("instantiation_error", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("1.0 / 0.0", "zero_divisor")]
+    [InlineData("0.0 / 0.0", "undefined")]
+    [InlineData("sqrt(-1)", "undefined")]
+    [InlineData("log(0)", "zero_divisor")]
+    [InlineData("atan2(0, 0)", "undefined")]
+    [InlineData("exp(1000)", "float_overflow")]
+    [InlineData("max_tagged_integer + 1", "int_overflow")]
+    [InlineData("floor(1)", "type_error(float, 1)")]
+    [InlineData("\\ 1.0", "type_error(integer, 1.0)")]
+    public void RaisesIsoArithmeticErrors(string expression, string expected)
+    {
+        var engine = new PrologEngine { Output = new StringWriter() };
+        Assert.True(engine.ConsultText($":- initialization(X is {expression}).").Success);
+
+        PrologException exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
+
+        Assert.Contains(expected, exception.Message, StringComparison.Ordinal);
     }
 }
