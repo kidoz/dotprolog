@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**300 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**315 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -52,8 +52,11 @@ Writing them was worth it immediately: they found these real defects.
 - `current_predicate/1` was absent. It now enumerates user procedures on backtracking, distinguishes
   built-ins and bundled libraries from user definitions, includes declared-empty procedures, and
   stops reporting an abolished procedure without invalidating calls that already started.
+- Prolog flags were accepted as inert declarations. The fixed and mutable ISO flags are now
+  enumerable and validated; `double_quotes` controls source and runtime term reading, while
+  `unknown` consistently controls direct, meta-called, and host calls.
 
-Beyond the conformance cases, the engine and toolchain are covered by 726 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 740 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
@@ -72,13 +75,12 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 | DCGs, `phrase/2,3` | Implemented |
 | Streams, `read/1`, `read_term/2,3`, character I/O | Implemented |
 | Modules, `use_module/1,2`, `meta_predicate/1` | Implemented |
+| ISO Prolog flags and state-dependent reading/calls | Implemented |
 
 ## Known ISO gaps
 
 | Feature | Current state |
 |---|---|
-| Prolog flag enumeration | `current_prolog_flag/2` is absent |
-| Mutable Prolog flags | `set_prolog_flag/2` is accepted by the loader but does not change state |
 | Complete stream surface | Stream properties, code and byte I/O, binary streams, and repositioning are absent |
 | Character conversion | `char_conversion/2` and `current_char_conversion/2` are absent |
 | Complete term-reading options | `read_term/3` does not yet support every ISO option |
