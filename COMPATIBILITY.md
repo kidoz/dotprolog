@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**290 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**300 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -49,8 +49,11 @@ Writing them was worth it immediately: they found these real defects.
   functors together with their operand signatures and exceptional results.
 - `unify_with_occurs_check/2` was absent. It now rejects only cycle-creating bindings, restores
   tentative bindings after failure, and terminates while inspecting an existing rational tree.
+- `current_predicate/1` was absent. It now enumerates user procedures on backtracking, distinguishes
+  built-ins and bundled libraries from user definitions, includes declared-empty procedures, and
+  stops reporting an abolished procedure without invalidating calls that already started.
 
-Beyond the conformance cases, the engine and toolchain are covered by 711 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 726 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
@@ -63,7 +66,7 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 | Exceptions, ISO `error/2` terms | Implemented |
 | Arithmetic, standard order, `compare/3` | Implemented |
 | `findall/3`, `bagof/3`, `setof/3`, `forall/2` | Implemented |
-| Database predicates, logical update view | Implemented |
+| Database predicates, predicate enumeration, logical update view | Implemented |
 | Text, list, sorting, and higher-order library | Implemented |
 | `op/3`, `current_op/3`, operator-aware writing | Implemented |
 | DCGs, `phrase/2,3` | Implemented |
@@ -74,7 +77,7 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 
 | Feature | Current state |
 |---|---|
-| Predicate and flag enumeration | `current_predicate/1` and `current_prolog_flag/2` are absent |
+| Prolog flag enumeration | `current_prolog_flag/2` is absent |
 | Mutable Prolog flags | `set_prolog_flag/2` is accepted by the loader but does not change state |
 | Complete stream surface | Stream properties, code and byte I/O, binary streams, and repositioning are absent |
 | Character conversion | `char_conversion/2` and `current_char_conversion/2` are absent |

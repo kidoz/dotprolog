@@ -12,13 +12,15 @@ All notable changes to DotProlog are recorded here. The format follows
   decomposition, and bitwise complement.
 - ISO `unify_with_occurs_check/2` with transactional failure and cycle-safe rational-tree
   traversal.
+- ISO `current_predicate/1` enumeration for static, dynamic, declared-empty, and runtime-created
+  user procedures.
 
 ### Changed
 
 - Arithmetic now enforces ISO operand signatures, float division result types, bounded-overflow
   errors, and the distinct exceptional cases for zero division, undefined results, and float
   overflow.
-- The repository's ISO-derived conformance corpus now contains 290 passing cases.
+- The repository's ISO-derived conformance corpus now contains 300 passing cases.
 
 ## [0.1.1] — 2026-07-28
 

@@ -352,7 +352,7 @@ A control term assembled at run time and passed to `call/1` is lowered to VM byt
 same control-construct compiler used for source clauses. Its cut is transparent within that
 meta-called goal and opaque to the caller, as ISO specifies.
 
-DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 290 conformance cases encoded
+DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 300 conformance cases encoded
 from ISO/IEC 13211-1, all passing, but those are its own reading of the standard rather than an
 independent suite — see [COMPATIBILITY.md](COMPATIBILITY.md), which also lists the known
 differences.
