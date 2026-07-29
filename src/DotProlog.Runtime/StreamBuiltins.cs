@@ -12,8 +12,8 @@ namespace DotProlog.Runtime;
 /// already use.
 /// </para>
 /// <para>
-/// There are no binary streams and no repositioning. A stream is a source of terms and characters,
-/// which is what a Prolog program reads; a program that needs bytes should be given them by its host.
+/// Text streams carry terms and characters, while binary streams carry bytes. Stream positioning
+/// remains deliberately absent until opaque ISO positions can be represented consistently.
 /// </para>
 /// </remarks>
 internal static class StreamBuiltins
@@ -50,6 +50,12 @@ internal static class StreamBuiltins
         registry.Register("peek_code", 2, static machine => GetCode(machine, stream: 0, target: 1, consume: false));
         registry.Register("put_code", 1, static machine => PutCode(machine, stream: -1, source: 0));
         registry.Register("put_code", 2, static machine => PutCode(machine, stream: 0, source: 1));
+        registry.Register("get_byte", 1, static machine => GetByte(machine, stream: -1, target: 0, consume: true));
+        registry.Register("get_byte", 2, static machine => GetByte(machine, stream: 0, target: 1, consume: true));
+        registry.Register("peek_byte", 1, static machine => GetByte(machine, stream: -1, target: 0, consume: false));
+        registry.Register("peek_byte", 2, static machine => GetByte(machine, stream: 0, target: 1, consume: false));
+        registry.Register("put_byte", 1, static machine => PutByte(machine, stream: -1, source: 0));
+        registry.Register("put_byte", 2, static machine => PutByte(machine, stream: 0, source: 1));
 
         registry.Register("at_end_of_stream", 0, static machine => AtEnd(machine, stream: -1));
         registry.Register("at_end_of_stream", 1, static machine => AtEnd(machine, stream: 0));
@@ -78,61 +84,71 @@ internal static class StreamBuiltins
     /// Resolves a stream argument, which may be <c>'$stream'(N)</c>, an alias, or absent — in which
     /// case the current input or output is used.
     /// </summary>
-    private static PrologStream Resolve(Machine machine, int index, bool input)
+    private static PrologStream Resolve(Machine machine, int index, bool input, string? expectedType = "text")
     {
+        PrologStream stream;
         if (index < 0)
         {
-            return input ? machine.Streams.CurrentInput : machine.Streams.CurrentOutput;
-        }
-
-        Cell cell = machine.Argument(index);
-
-        if (cell.Tag == CellTag.Reference)
-        {
-            throw PrologErrors.Instantiation(machine);
-        }
-
-        PrologStream? stream;
-
-        if (cell.Tag == CellTag.Atom)
-        {
-            stream = machine.Streams.ByAlias(machine.Symbols.AtomName(cell.Index));
-        }
-        else if (cell.Tag == CellTag.Structure)
-        {
-            Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(cell.Index).Index);
-
-            if (machine.Symbols.AtomName(functor.NameAtom) != StreamFunctor || functor.Arity != 1)
-            {
-                throw PrologErrors.Domain(machine, "stream_or_alias", cell);
-            }
-
-            Cell id = machine.Dereference(machine.HeapAt(cell.Index + 1));
-            if (id.Tag != CellTag.Integer)
-            {
-                throw PrologErrors.Domain(machine, "stream_or_alias", cell);
-            }
-
-            stream = machine.Streams.ById((int)id.Integer);
+            stream = input ? machine.Streams.CurrentInput : machine.Streams.CurrentOutput;
         }
         else
         {
-            throw PrologErrors.Domain(machine, "stream_or_alias", cell);
+            Cell cell = machine.Argument(index);
+
+            if (cell.Tag == CellTag.Reference)
+            {
+                throw PrologErrors.Instantiation(machine);
+            }
+
+            PrologStream? resolved;
+
+            if (cell.Tag == CellTag.Atom)
+            {
+                resolved = machine.Streams.ByAlias(machine.Symbols.AtomName(cell.Index));
+            }
+            else if (cell.Tag == CellTag.Structure)
+            {
+                Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(cell.Index).Index);
+
+                if (machine.Symbols.AtomName(functor.NameAtom) != StreamFunctor || functor.Arity != 1)
+                {
+                    throw PrologErrors.Domain(machine, "stream_or_alias", cell);
+                }
+
+                Cell id = machine.Dereference(machine.HeapAt(cell.Index + 1));
+                if (id.Tag != CellTag.Integer)
+                {
+                    throw PrologErrors.Domain(machine, "stream_or_alias", cell);
+                }
+
+                resolved = machine.Streams.ById((int)id.Integer);
+            }
+            else
+            {
+                throw PrologErrors.Domain(machine, "stream_or_alias", cell);
+            }
+
+            stream = resolved ?? throw Existence(machine, "stream", cell);
         }
 
-        if (stream is null)
+        if (input != stream.IsInput)
         {
-            throw Existence(machine, "stream", cell);
+            throw PrologErrors.Permission(
+                machine,
+                input ? "input" : "output",
+                "stream",
+                machine.Symbols.InternFunctor(stream.Alias ?? stream.Name, 0)
+            );
         }
 
-        if (input && stream.Reader is null)
+        if (expectedType is not null && stream.Type != expectedType)
         {
-            throw PrologErrors.Permission(machine, "input", "stream", machine.Symbols.InternFunctor(stream.Name, 0));
-        }
-
-        if (!input && stream.Writer is null)
-        {
-            throw PrologErrors.Permission(machine, "output", "stream", machine.Symbols.InternFunctor(stream.Name, 0));
+            throw PrologErrors.Permission(
+                machine,
+                input ? "input" : "output",
+                stream.Type == "binary" ? "binary_stream" : "text_stream",
+                machine.Symbols.InternFunctor(stream.Alias ?? stream.Name, 0)
+            );
         }
 
         return stream;
@@ -178,13 +194,13 @@ internal static class StreamBuiltins
             throw PrologErrors.Domain(machine, "io_mode", mode);
         }
 
-        string? alias = options < 0 ? null : ReadAlias(machine, options);
+        OpenOptions openOptions = options < 0 ? new OpenOptions(null, "text") : ReadOpenOptions(machine, options);
         string path = machine.Symbols.AtomName(file.Index);
 
         PrologStream stream;
         try
         {
-            stream = machine.Streams.Open(path, modeName, alias);
+            stream = machine.Streams.Open(path, modeName, openOptions.Alias, openOptions.Type);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
@@ -194,10 +210,10 @@ internal static class StreamBuiltins
         return machine.Unify(machine.Argument(2), StreamTerm(machine, stream));
     }
 
-    /// <summary>Reads the <c>alias/1</c> option of <c>open/4</c>; the rest are rejected rather than ignored.</summary>
-    private static string? ReadAlias(Machine machine, int options)
+    /// <summary>Reads the supported ISO options of <c>open/4</c>; unknown options are rejected.</summary>
+    private static OpenOptions ReadOpenOptions(Machine machine, int options)
     {
-        string? alias = null;
+        var result = new OpenOptions(null, "text");
 
         foreach (Cell element in TermList.ReadProper(machine, machine.Argument(options)))
         {
@@ -215,17 +231,36 @@ internal static class StreamBuiltins
 
             Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(option.Index).Index);
             Cell value = machine.Dereference(machine.HeapAt(option.Index + 1));
+            string name = machine.Symbols.AtomName(functor.NameAtom);
 
-            if (machine.Symbols.AtomName(functor.NameAtom) != "alias" || value.Tag != CellTag.Atom)
+            if (value.Tag == CellTag.Reference)
+            {
+                throw PrologErrors.Instantiation(machine);
+            }
+
+            if (value.Tag != CellTag.Atom)
             {
                 throw PrologErrors.Domain(machine, "stream_option", option);
             }
 
-            alias = machine.Symbols.AtomName(value.Index);
+            string atom = machine.Symbols.AtomName(value.Index);
+            switch (name)
+            {
+                case "alias":
+                    result = result with { Alias = atom };
+                    break;
+                case "type" when atom is "text" or "binary":
+                    result = result with { Type = atom };
+                    break;
+                default:
+                    throw PrologErrors.Domain(machine, "stream_option", option);
+            }
         }
 
-        return alias;
+        return result;
     }
+
+    private readonly record struct OpenOptions(string? Alias = null, string Type = "text");
 
     private static bool Close(Machine machine)
     {
@@ -273,7 +308,7 @@ internal static class StreamBuiltins
 
     private static bool Set(Machine machine, bool input)
     {
-        PrologStream stream = Resolve(machine, 0, input);
+        PrologStream stream = Resolve(machine, 0, input, expectedType: null);
 
         if (input)
         {
@@ -484,21 +519,21 @@ internal static class StreamBuiltins
                 candidate = UnaryProperty(machine, "mode", stream.Mode);
                 return true;
             case 2:
-                candidate = Cell.Atom(machine.Symbols.InternAtom(stream.Reader is not null ? "input" : "output"));
+                candidate = Cell.Atom(machine.Symbols.InternAtom(stream.IsInput ? "input" : "output"));
                 return true;
             case 3 when stream.Alias is not null:
                 candidate = UnaryProperty(machine, "alias", stream.Alias);
                 return true;
             case 4:
-                candidate = UnaryProperty(machine, "type", "text");
+                candidate = UnaryProperty(machine, "type", stream.Type);
                 return true;
             case 5:
                 candidate = UnaryProperty(machine, "reposition", "false");
                 return true;
-            case 6 when stream.Reader is not null:
+            case 6 when stream.IsInput:
                 candidate = UnaryProperty(machine, "eof_action", "eof_code");
                 return true;
-            case 7 when stream.Reader is not null:
+            case 7 when stream.IsInput:
                 candidate = UnaryProperty(machine, "end_of_stream", EndStateName(stream.ObserveEnd()));
                 return true;
             default:
@@ -707,9 +742,55 @@ internal static class StreamBuiltins
         return true;
     }
 
+    private static bool GetByte(Machine machine, int stream, int target, bool consume)
+    {
+        PrologStream source = Resolve(machine, stream, input: true, expectedType: "binary");
+        Cell code = machine.Argument(target);
+
+        if (code.Tag != CellTag.Reference && (code.Tag != CellTag.Integer || code.Integer is < -1 or > byte.MaxValue))
+        {
+            throw PrologErrors.Type(machine, "in_byte", code);
+        }
+
+        Stream input = source.BinaryStream!;
+        int next;
+        if (consume)
+        {
+            next = input.ReadByte();
+            source.RecordInput(next >= 0);
+        }
+        else
+        {
+            long position = input.Position;
+            next = input.ReadByte();
+            input.Position = position;
+        }
+
+        return machine.Unify(code, Cell.Integer60(next));
+    }
+
+    private static bool PutByte(Machine machine, int stream, int source)
+    {
+        PrologStream target = Resolve(machine, stream, input: false, expectedType: "binary");
+        Cell code = machine.Argument(source);
+
+        if (code.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        if (code.Tag != CellTag.Integer || code.Integer is < 0 or > byte.MaxValue)
+        {
+            throw PrologErrors.Type(machine, "byte", code);
+        }
+
+        target.BinaryStream!.WriteByte((byte)code.Integer);
+        return true;
+    }
+
     private static bool AtEnd(Machine machine, int stream)
     {
-        PrologStream source = Resolve(machine, stream, input: true);
+        PrologStream source = Resolve(machine, stream, input: true, expectedType: null);
         return source.ObserveEnd() != PrologStream.EndState.Not;
     }
 
@@ -728,7 +809,9 @@ internal static class StreamBuiltins
 
     private static bool Flush(Machine machine, int stream)
     {
-        Resolve(machine, stream, input: false).Writer!.Flush();
+        PrologStream target = Resolve(machine, stream, input: false, expectedType: null);
+        target.Writer?.Flush();
+        target.BinaryStream?.Flush();
         return true;
     }
 

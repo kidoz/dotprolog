@@ -361,6 +361,9 @@ iso_case('8.11.5', open(_, read, _), error(instantiation_error)).
 iso_case('8.11.5', open(f, _, _), error(instantiation_error)).
 iso_case('8.11.5', open(f, sideways, _), error(domain_error(io_mode, sideways))).
 iso_case('8.11.5', open(1, read, _), error(type_error(atom, 1))).
+iso_case('8.11.5', open(f, write, _, [type(other)]), error(domain_error(stream_option, type(other)))).
+iso_case('8.11.5', open(f, write, _, [type(1)]), error(domain_error(stream_option, type(1)))).
+iso_case('8.11.5', open(f, write, _, [type(_)]), error(instantiation_error)).
 iso_case('8.11.6', close(_), error(instantiation_error)).
 iso_case('8.11.6', close(no_such_stream), error(existence_error(stream, no_such_stream))).
 iso_case('8.11.7', (current_output(S4), \+ var(S4)), success).
@@ -390,6 +393,14 @@ iso_case('8.12.5', put_code(_), error(instantiation_error)).
 iso_case('8.12.5', put_code(a), error(type_error(integer, a))).
 iso_case('8.12.5', put_code(-1), error(representation_error(character_code))).
 iso_case('8.12.5', put_code(user_input, 97), error(permission_error(output, stream, user_input/0))).
+
+% --- 8.13 Byte input and output -----------------------------------------------
+iso_case('8.13.1', get_byte(no_such_stream, _), error(existence_error(stream, no_such_stream))).
+iso_case('8.13.1', get_byte(user_output, _), error(permission_error(input, stream, user_output/0))).
+iso_case('8.13.1', get_byte(user_input, _), error(permission_error(input, text_stream, user_input/0))).
+iso_case('8.13.2', peek_byte(user_input, _), error(permission_error(input, text_stream, user_input/0))).
+iso_case('8.13.3', put_byte(user_input, 0), error(permission_error(output, stream, user_input/0))).
+iso_case('8.13.3', put_byte(user_output, 0), error(permission_error(output, text_stream, user_output/0))).
 
 % --- 8.14 Term input and output -----------------------------------------------
 iso_case('8.14.1', read_term(no_such_stream, _, []), error(existence_error(stream, no_such_stream))).

@@ -18,9 +18,13 @@ public sealed class StreamTable
     /// <summary>Creates a table holding the three standard streams.</summary>
     public StreamTable()
     {
-        UserInput = Add(new PrologStream(0, "user_input", "read", "user_input", Console.In, null, permanent: true));
-        UserOutput = Add(new PrologStream(1, "user_output", "write", "user_output", null, Console.Out, permanent: true));
-        UserError = Add(new PrologStream(2, "user_error", "write", "user_error", null, Console.Error, permanent: true));
+        UserInput = Add(new PrologStream(0, "user_input", "read", "text", "user_input", Console.In, null, null, permanent: true));
+        UserOutput = Add(
+            new PrologStream(1, "user_output", "write", "text", "user_output", null, Console.Out, null, permanent: true)
+        );
+        UserError = Add(
+            new PrologStream(2, "user_error", "write", "text", "user_error", null, Console.Error, null, permanent: true)
+        );
 
         CurrentInput = UserInput;
         CurrentOutput = UserOutput;
@@ -45,20 +49,66 @@ public sealed class StreamTable
     /// <param name="path">File to open.</param>
     /// <param name="mode">One of <c>read</c>, <c>write</c>, or <c>append</c>.</param>
     /// <param name="alias">An alias to register the stream under, if any.</param>
+    /// <param name="type">Either <c>text</c> or <c>binary</c>.</param>
     /// <exception cref="IOException">The file could not be opened.</exception>
-    public PrologStream Open(string path, string mode, string? alias)
+    public PrologStream Open(string path, string mode, string? alias, string type)
     {
         ArgumentNullException.ThrowIfNull(path);
 
-        PrologStream stream = mode switch
+        PrologStream stream = type == "binary" ? OpenBinary(path, mode, alias) : OpenText(path, mode, alias);
+        return Add(stream);
+    }
+
+    private PrologStream OpenText(string path, string mode, string? alias) =>
+        mode switch
         {
-            "read" => new PrologStream(_streams.Count, path, mode, alias, new StreamReader(path), null, permanent: false),
-            "write" => new PrologStream(_streams.Count, path, mode, alias, null, new StreamWriter(path, append: false), false),
-            "append" => new PrologStream(_streams.Count, path, mode, alias, null, new StreamWriter(path, append: true), false),
+            "read" => new PrologStream(
+                _streams.Count,
+                path,
+                mode,
+                "text",
+                alias,
+                new StreamReader(path),
+                null,
+                null,
+                permanent: false
+            ),
+            "write" => new PrologStream(
+                _streams.Count,
+                path,
+                mode,
+                "text",
+                alias,
+                null,
+                new StreamWriter(path, append: false),
+                null,
+                false
+            ),
+            "append" => new PrologStream(
+                _streams.Count,
+                path,
+                mode,
+                "text",
+                alias,
+                null,
+                new StreamWriter(path, append: true),
+                null,
+                false
+            ),
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown stream mode."),
         };
 
-        return Add(stream);
+    private PrologStream OpenBinary(string path, string mode, string? alias)
+    {
+        FileStream stream = mode switch
+        {
+            "read" => new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read),
+            "write" => new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read),
+            "append" => new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read),
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown stream mode."),
+        };
+
+        return new PrologStream(_streams.Count, path, mode, "binary", alias, null, null, stream, permanent: false);
     }
 
     /// <summary>Closes <paramref name="stream"/> and points anything that was using it back at the standard streams.</summary>
@@ -126,7 +176,7 @@ public sealed class StreamTable
     {
         var sink = new StringWriter(System.Globalization.CultureInfo.InvariantCulture);
         _captures.Push((CurrentOutput, sink));
-        CurrentOutput = new PrologStream(-1, "with_output_to", "write", null, null, sink, permanent: false);
+        CurrentOutput = new PrologStream(-1, "with_output_to", "write", "text", null, null, sink, null, permanent: false);
     }
 
     /// <summary>Stops capturing and returns what was written.</summary>

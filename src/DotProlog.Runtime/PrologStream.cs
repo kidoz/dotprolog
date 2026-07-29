@@ -21,14 +21,26 @@ public sealed class PrologStream
     private string _buffer = string.Empty;
     private EndState _endState;
 
-    internal PrologStream(int id, string name, string mode, string? alias, TextReader? reader, TextWriter? writer, bool permanent)
+    internal PrologStream(
+        int id,
+        string name,
+        string mode,
+        string type,
+        string? alias,
+        TextReader? reader,
+        TextWriter? writer,
+        Stream? binaryStream,
+        bool permanent
+    )
     {
         Id = id;
         Name = name;
         Mode = mode;
+        Type = type;
         Alias = alias;
         Reader = reader;
         Writer = writer;
+        BinaryStream = binaryStream;
         IsPermanent = permanent;
     }
 
@@ -41,6 +53,12 @@ public sealed class PrologStream
     /// <summary>The mode used to open the stream: <c>read</c>, <c>write</c>, or <c>append</c>.</summary>
     internal string Mode { get; }
 
+    /// <summary>Whether this is a <c>text</c> or <c>binary</c> stream.</summary>
+    internal string Type { get; }
+
+    /// <summary>Whether input operations are permitted.</summary>
+    internal bool IsInput => Mode == "read";
+
     /// <summary>The alias this stream answers to, if any.</summary>
     public string? Alias { get; internal set; }
 
@@ -49,6 +67,9 @@ public sealed class PrologStream
 
     /// <summary>Where this stream writes to, or <see langword="null"/> for an input stream.</summary>
     public TextWriter? Writer { get; internal set; }
+
+    /// <summary>The raw byte stream, or <see langword="null"/> for a text stream.</summary>
+    internal Stream? BinaryStream { get; private set; }
 
     /// <summary>Whether this is a standard stream, which cannot be closed.</summary>
     public bool IsPermanent { get; }
@@ -62,9 +83,14 @@ public sealed class PrologStream
     /// <summary>Returns the live ISO end-of-stream state without consuming input.</summary>
     internal EndState ObserveEnd()
     {
-        if (Reader is null || _endState == EndState.Past)
+        if (!IsInput || _endState == EndState.Past)
         {
             return _endState;
+        }
+
+        if (BinaryStream is not null)
+        {
+            return BinaryStream.CanSeek && BinaryStream.Position >= BinaryStream.Length ? EndState.At : EndState.Not;
         }
 
         // Inspecting an interactive standard input must not wait for a user keystroke merely to
@@ -74,7 +100,7 @@ public sealed class PrologStream
             return EndState.Not;
         }
 
-        return _buffer.Length == 0 && Reader.Peek() < 0 ? EndState.At : EndState.Not;
+        return _buffer.Length == 0 && Reader!.Peek() < 0 ? EndState.At : EndState.Not;
     }
 
     /// <summary>Records whether a consuming input operation returned the EOF marker.</summary>
@@ -103,7 +129,9 @@ public sealed class PrologStream
         Reader?.Dispose();
         Writer?.Flush();
         Writer?.Dispose();
+        BinaryStream?.Dispose();
         Reader = null;
         Writer = null;
+        BinaryStream = null;
     }
 }
