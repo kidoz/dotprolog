@@ -80,6 +80,7 @@ public sealed class NativeAotAcceptanceTests
                     "occurs_check",
                     "predicate_info",
                     "prolog_flags",
+                    "read_options",
                     "code_io",
                     "alice likes bob",
                     "+(1,*(2,3))",

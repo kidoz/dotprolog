@@ -100,6 +100,14 @@ internal static class Program
                 set_prolog_flag(double_quotes, codes),
                 write(prolog_flags), nl,
 
+                % ISO read options retain source order, sharing, and named-singleton identity.
+                read_term_from_atom('f(A,B,A,_C,_)', ReadOptionsTerm,
+                    [variables(ReadVariables), singletons(ReadSingletons)]),
+                ReadOptionsTerm = f(ReadA, ReadB, ReadA, ReadC, ReadAnonymous),
+                ReadVariables = [ReadA, ReadB, ReadC, ReadAnonymous],
+                ReadSingletons = ['B'=ReadB, '_C'=ReadC],
+                write(read_options), nl,
+
                 % Character-code I/O shares the stream path and must preserve peek and EOF in AOT.
                 open('dotprolog-aot-code.tmp', write, CodeOut),
                 put_code(CodeOut, 65), put_code(CodeOut, 79), put_code(CodeOut, 84), close(CodeOut),
