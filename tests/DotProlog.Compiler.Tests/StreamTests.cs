@@ -86,6 +86,45 @@ public sealed class StreamTests : IDisposable
         );
 
     [Fact]
+    public void ReadTermReportsAllVariablesAndNamedSingletonsInSourceOrder()
+    {
+        Assert.Equal(
+            "yes\n",
+            RunWithInput(
+                """
+                :- initialization((
+                    read_term(T, [variable_names(Names), variables(Vars), singletons(Singles)]),
+                    T = f(A, B, A, C, Anonymous),
+                    Names = ['A'=A, 'B'=B, '_C'=C],
+                    Vars = [A, B, C, Anonymous],
+                    Singles = ['B'=B, '_C'=C],
+                    write(yes), nl
+                )).
+                """,
+                "f(A, B, A, _C, _).\n"
+            )
+        );
+    }
+
+    [Fact]
+    public void ReadTermFromAtomSupportsSingletons()
+    {
+        Assert.Equal(
+            "yes",
+            PrologTestHost.RunGoal(
+                "read_term_from_atom('pair(Left, Right)', pair(L, R), " + "[singletons(['Left'=L, 'Right'=R])]), write(yes)"
+            )
+        );
+    }
+
+    [Fact]
+    public void EndOfFileHasNoVariablesOrSingletons() =>
+        Assert.Equal(
+            "yes",
+            RunWithInput(":- initialization((read_term(end_of_file, [variables([]), singletons([])]), write(yes))).", "")
+        );
+
+    [Fact]
     public void AnUnknownReadOptionIsReported() =>
         Assert.Equal(
             "domain_error(read_option,nonsense(x))\n",

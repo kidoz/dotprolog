@@ -231,8 +231,14 @@ public sealed class PrologEngine : IRuntimeCompiler
     /// <summary>Collects the goal's named variables, in first-occurrence order.</summary>
     private static string[] CollectVariableNames(SyntaxTerm goal)
     {
-        List<string> names = [];
-        HashSet<string> seen = new(StringComparer.Ordinal);
+        return [.. CollectNamedVariables(goal).Select(variable => variable.Name)];
+    }
+
+    /// <summary>Collects named variables and occurrence counts in first-occurrence order.</summary>
+    private static NamedVariable[] CollectNamedVariables(SyntaxTerm goal)
+    {
+        List<string> order = [];
+        Dictionary<string, int> counts = new(StringComparer.Ordinal);
         List<SyntaxTerm> pending = [goal];
 
         while (pending.Count > 0)
@@ -243,8 +249,17 @@ public sealed class PrologEngine : IRuntimeCompiler
             switch (term)
             {
                 // '_' is deliberately not reported: each occurrence is a different variable.
-                case VariableTerm { IsAnonymous: false } variable when seen.Add(variable.Name):
-                    names.Add(variable.Name);
+                case VariableTerm { IsAnonymous: false } variable:
+                    if (counts.TryGetValue(variable.Name, out int count))
+                    {
+                        counts[variable.Name] = count + 1;
+                    }
+                    else
+                    {
+                        counts[variable.Name] = 1;
+                        order.Add(variable.Name);
+                    }
+
                     break;
 
                 case CompoundTerm compound:
@@ -260,8 +275,10 @@ public sealed class PrologEngine : IRuntimeCompiler
             }
         }
 
-        return [.. names];
+        return [.. order.Select(name => new NamedVariable(name, counts[name]))];
     }
+
+    private readonly record struct NamedVariable(string Name, int Count);
 
     /// <summary>Proves <paramref name="goalText"/>, read as a single term, and reports the outcome.</summary>
     /// <param name="goalText">A goal in Prolog syntax, with or without a trailing full stop.</param>
@@ -427,13 +444,23 @@ public sealed class PrologEngine : IRuntimeCompiler
     /// read from a console as soon as it is complete rather than after the input ends. Whatever
     /// follows the terminator stays in the buffer, which belongs to the stream.
     /// </remarks>
-    public bool TryReadTerm(Machine machine, TextReader input, ref string buffer, out Cell term, out Cell variableNames)
+    public bool TryReadTerm(
+        Machine machine,
+        TextReader input,
+        ref string buffer,
+        out Cell term,
+        out Cell variableNames,
+        out Cell variables,
+        out Cell singletons
+    )
     {
         ArgumentNullException.ThrowIfNull(machine);
         ArgumentNullException.ThrowIfNull(input);
 
         term = default;
         variableNames = Cell.Atom(machine.Symbols.EmptyList);
+        variables = Cell.Atom(machine.Symbols.EmptyList);
+        singletons = Cell.Atom(machine.Symbols.EmptyList);
 
         int end = ClauseScanner.FindClauseEnd(buffer);
         while (end < 0)
@@ -463,22 +490,37 @@ public sealed class PrologEngine : IRuntimeCompiler
             throw SyntaxError(machine, parsed.Diagnostics.Count > 0 ? parsed.Diagnostics[0].Id : "cannot_start_term");
         }
 
-        Dictionary<string, Cell> variables = [];
-        term = TermReifier.ToHeap(machine, TermNormalizer.Normalize(parsed.Clauses[0], Program.Flags.DoubleQuotes), variables);
+        Dictionary<string, Cell> namedVariables = [];
+        List<Cell> variableOrder = [];
+        term = TermReifier.ToHeap(
+            machine,
+            TermNormalizer.Normalize(parsed.Clauses[0], Program.Flags.DoubleQuotes),
+            namedVariables,
+            variableOrder
+        );
 
         // Only named variables are reported, and in the order the reader met them, so that
-        // variable_names/1 reads the way the source does.
+        // variable_names/1 and singletons/1 read the way the source does.
         List<Cell> pairs = [];
+        List<Cell> singletonPairs = [];
         int equals = machine.Symbols.InternFunctor("=", 2);
-        foreach (string name in CollectVariableNames(parsed.Clauses[0]))
+        foreach (NamedVariable named in CollectNamedVariables(parsed.Clauses[0]))
         {
-            if (variables.TryGetValue(name, out Cell variable))
+            if (namedVariables.TryGetValue(named.Name, out Cell variable))
             {
-                pairs.Add(machine.CreateStructure(equals, [Cell.Atom(machine.Symbols.InternAtom(name)), variable]));
+                Cell pair = machine.CreateStructure(equals, [Cell.Atom(machine.Symbols.InternAtom(named.Name)), variable]);
+                pairs.Add(pair);
+
+                if (named.Count == 1)
+                {
+                    singletonPairs.Add(pair);
+                }
             }
         }
 
         variableNames = machine.CreateList(pairs.ToArray(), Cell.Atom(machine.Symbols.EmptyList));
+        variables = machine.CreateList(variableOrder.ToArray(), Cell.Atom(machine.Symbols.EmptyList));
+        singletons = machine.CreateList(singletonPairs.ToArray(), Cell.Atom(machine.Symbols.EmptyList));
         return true;
     }
 

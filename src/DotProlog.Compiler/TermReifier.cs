@@ -66,8 +66,16 @@ internal static class TermReifier
         }
     }
 
-    /// <summary>Builds a heap term from a <see cref="SyntaxTerm"/>, sharing a cell per variable name.</summary>
-    internal static Cell ToHeap(Machine machine, SyntaxTerm term, Dictionary<string, Cell> variables)
+    /// <summary>
+    /// Builds a heap term from a <see cref="SyntaxTerm"/>, sharing a cell per variable name and
+    /// optionally recording every distinct variable in first-occurrence order.
+    /// </summary>
+    internal static Cell ToHeap(
+        Machine machine,
+        SyntaxTerm term,
+        Dictionary<string, Cell> variables,
+        List<Cell>? variableOrder = null
+    )
     {
         switch (term)
         {
@@ -76,13 +84,16 @@ internal static class TermReifier
                 // '_' never shares, so each occurrence gets its own cell.
                 if (variable.IsAnonymous)
                 {
-                    return machine.CreateVariable();
+                    Cell anonymous = machine.CreateVariable();
+                    variableOrder?.Add(anonymous);
+                    return anonymous;
                 }
 
                 if (!variables.TryGetValue(variable.Name, out Cell cell))
                 {
                     cell = machine.CreateVariable();
                     variables[variable.Name] = cell;
+                    variableOrder?.Add(cell);
                 }
 
                 return cell;
@@ -105,7 +116,7 @@ internal static class TermReifier
                 var arguments = new Cell[compound.Arity];
                 for (int i = 0; i < compound.Arity; i++)
                 {
-                    arguments[i] = ToHeap(machine, compound.Arguments[i], variables);
+                    arguments[i] = ToHeap(machine, compound.Arguments[i], variables, variableOrder);
                 }
 
                 return machine.CreateStructure(machine.Symbols.InternFunctor(compound.Name, compound.Arity), arguments);

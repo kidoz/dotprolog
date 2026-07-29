@@ -49,7 +49,19 @@ public interface IRuntimeCompiler
     /// </param>
     /// <param name="term">The term read.</param>
     /// <param name="variableNames">A list of <c>Name=Variable</c> for the term's named variables.</param>
+    /// <param name="variables">Every distinct variable in first-occurrence order.</param>
+    /// <param name="singletons">
+    /// A list of <c>Name=Variable</c> for named variables that occur exactly once.
+    /// </param>
     /// <returns><see langword="false"/> at end of input, where the caller reports <c>end_of_file</c>.</returns>
     /// <exception cref="PrologException">The text read does not parse.</exception>
-    bool TryReadTerm(Machine machine, TextReader input, ref string buffer, out Cell term, out Cell variableNames);
+    bool TryReadTerm(
+        Machine machine,
+        TextReader input,
+        ref string buffer,
+        out Cell term,
+        out Cell variableNames,
+        out Cell variables,
+        out Cell singletons
+    );
 }

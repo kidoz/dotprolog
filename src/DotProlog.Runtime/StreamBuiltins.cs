@@ -288,22 +288,33 @@ internal static class StreamBuiltins
         IRuntimeCompiler compiler =
             machine.Program.RuntimeCompiler ?? throw new PrologException("Reading a term needs a compiler to parse it.");
 
-        bool read = compiler.TryReadTerm(machine, source.Reader!, ref source.Buffer, out Cell value, out Cell names);
+        bool read = compiler.TryReadTerm(
+            machine,
+            source.Reader!,
+            ref source.Buffer,
+            out Cell value,
+            out Cell names,
+            out Cell variables,
+            out Cell singletons
+        );
 
         if (!read)
         {
             value = Cell.Atom(machine.Symbols.InternAtom("end_of_file"));
             names = Cell.Atom(machine.Symbols.EmptyList);
+            variables = Cell.Atom(machine.Symbols.EmptyList);
+            singletons = Cell.Atom(machine.Symbols.EmptyList);
         }
 
-        return machine.Unify(machine.Argument(term), value) && (options < 0 || ApplyReadOptions(machine, options, names));
+        return machine.Unify(machine.Argument(term), value)
+            && (options < 0 || ApplyReadOptions(machine, options, names, variables, singletons));
     }
 
     /// <summary>
-    /// Applies the <c>read_term/2</c> options. <c>variable_names/1</c> and <c>variables/1</c> are
-    /// supported; anything else is a <c>domain_error</c> rather than something quietly ignored.
+    /// Applies the ISO <c>read_term/2</c> options. Anything else is a <c>domain_error</c> rather
+    /// than something quietly ignored.
     /// </summary>
-    private static bool ApplyReadOptions(Machine machine, int options, Cell names)
+    private static bool ApplyReadOptions(Machine machine, int options, Cell names, Cell variables, Cell singletons)
     {
         foreach (Cell element in TermList.ReadProper(machine, machine.Argument(options)))
         {
@@ -325,10 +336,8 @@ internal static class StreamBuiltins
             bool applied = machine.Symbols.AtomName(functor.NameAtom) switch
             {
                 "variable_names" => machine.Unify(target, names),
-                "variables" => machine.Unify(target, ValuesOf(machine, names)),
-
-                // singletons/1 is not among them: answering [] would be wrong whenever the term
-                // does have a singleton, and a wrong answer is worse than a reported gap.
+                "variables" => machine.Unify(target, variables),
+                "singletons" => machine.Unify(target, singletons),
                 _ => throw PrologErrors.Domain(machine, "read_option", option),
             };
 
@@ -339,23 +348,6 @@ internal static class StreamBuiltins
         }
 
         return true;
-    }
-
-    /// <summary>The variables of a <c>Name=Variable</c> list, for the <c>variables/1</c> option.</summary>
-    private static Cell ValuesOf(Machine machine, Cell names)
-    {
-        List<Cell> values = [];
-
-        foreach (Cell element in TermList.ReadProper(machine, names))
-        {
-            Cell pair = machine.Dereference(element);
-            if (pair.Tag == CellTag.Structure)
-            {
-                values.Add(machine.HeapAt(pair.Index + 2));
-            }
-        }
-
-        return TermList.Build(machine, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(values));
     }
 
     private static bool GetChar(Machine machine, int stream, int target, bool consume)
@@ -512,15 +504,25 @@ internal static class StreamBuiltins
 
         using var reader = new StringReader(machine.Symbols.AtomName(text.Index));
         string buffer = string.Empty;
-        bool read = compiler.TryReadTerm(machine, reader, ref buffer, out Cell value, out Cell names);
+        bool read = compiler.TryReadTerm(
+            machine,
+            reader,
+            ref buffer,
+            out Cell value,
+            out Cell names,
+            out Cell variables,
+            out Cell singletons
+        );
 
         if (!read)
         {
             value = Cell.Atom(machine.Symbols.InternAtom("end_of_file"));
             names = Cell.Atom(machine.Symbols.EmptyList);
+            variables = Cell.Atom(machine.Symbols.EmptyList);
+            singletons = Cell.Atom(machine.Symbols.EmptyList);
         }
 
-        return machine.Unify(machine.Argument(1), value) && ApplyReadOptions(machine, 2, names);
+        return machine.Unify(machine.Argument(1), value) && ApplyReadOptions(machine, 2, names, variables, singletons);
     }
 
     private static bool CaptureBegin(Machine machine)
