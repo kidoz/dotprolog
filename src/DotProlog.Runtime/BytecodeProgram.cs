@@ -58,6 +58,9 @@ public sealed class BytecodeProgram
     /// <summary>The ISO execution flags in force for this program.</summary>
     public PrologFlags Flags { get; } = new();
 
+    /// <summary>The ISO input-character mappings owned by this program.</summary>
+    public CharacterConversionTable CharacterConversions { get; } = new();
+
     /// <summary>
     /// The operators in force. Reading and writing share one table, so an <c>op/3</c> run at any
     /// point changes how later text is both parsed and printed.

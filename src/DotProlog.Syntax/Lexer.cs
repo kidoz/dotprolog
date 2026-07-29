@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using DotProlog.Runtime;
 
 namespace DotProlog.Syntax;
 
@@ -15,15 +16,25 @@ internal sealed class Lexer
     private readonly string _text;
     private readonly string? _fileName;
     private readonly List<Diagnostic> _diagnostics;
+    private readonly CharacterConversionTable? _conversions;
+    private readonly PrologFlags? _flags;
     private int _position;
     private int _line = 1;
     private int _lineStart;
 
-    internal Lexer(string text, string? fileName, List<Diagnostic> diagnostics)
+    internal Lexer(
+        string text,
+        string? fileName,
+        List<Diagnostic> diagnostics,
+        CharacterConversionTable? conversions = null,
+        PrologFlags? flags = null
+    )
     {
         _text = text;
         _fileName = fileName;
         _diagnostics = diagnostics;
+        _conversions = conversions;
+        _flags = flags;
     }
 
     /// <summary>Reads the next token, or an <see cref="TokenKind.Eof"/> token at end of input.</summary>
@@ -44,7 +55,7 @@ internal sealed class Lexer
                 return new Token(TokenKind.Eof, string.Empty, SpanFrom(start), layout);
             }
 
-            c = _text[_position];
+            c = InputAt(_position);
             if (
                 c is '_' or '\'' or '"'
                 || char.IsLetterOrDigit(c)
@@ -55,7 +66,7 @@ internal sealed class Lexer
                 break;
             }
 
-            _position++;
+            Advance();
             Report(DiagnosticIds.UnexpectedCharacter, $"Unexpected character '{c}'.", SpanFrom(start));
         }
 
@@ -64,18 +75,18 @@ internal sealed class Lexer
             // '[]' and '{}' are atoms, not bracket pairs, when they are written adjacently.
             if ((c == '[' && Peek(1) == ']') || (c == '{' && Peek(1) == '}'))
             {
-                _position += 2;
-                return new Token(TokenKind.Atom, _text.Substring(start, 2), SpanFrom(start), layout);
+                Advance(2);
+                return new Token(TokenKind.Atom, ConvertedText(start, 2), SpanFrom(start), layout);
             }
 
-            _position++;
-            return new Token(TokenKind.Punctuation, _text.Substring(start, 1), SpanFrom(start), layout);
+            Advance();
+            return new Token(TokenKind.Punctuation, ConvertedText(start, 1), SpanFrom(start), layout);
         }
 
         if (c is '!' or ';')
         {
-            _position++;
-            return new Token(TokenKind.Atom, _text.Substring(start, 1), SpanFrom(start), layout);
+            Advance();
+            return new Token(TokenKind.Atom, ConvertedText(start, 1), SpanFrom(start), layout);
         }
 
         if (char.IsAsciiDigit(c))
@@ -85,22 +96,22 @@ internal sealed class Lexer
 
         if (c == '_' || char.IsUpper(c))
         {
-            while (_position < _text.Length && IsAlphanumeric(_text[_position]))
+            while (_position < _text.Length && IsAlphanumeric(InputAt(_position)))
             {
-                _position++;
+                Advance();
             }
 
-            return new Token(TokenKind.Variable, _text[start.._position], SpanFrom(start), layout);
+            return new Token(TokenKind.Variable, ConvertedText(start, _position - start), SpanFrom(start), layout);
         }
 
         if (char.IsLower(c))
         {
-            while (_position < _text.Length && IsAlphanumeric(_text[_position]))
+            while (_position < _text.Length && IsAlphanumeric(InputAt(_position)))
             {
-                _position++;
+                Advance();
             }
 
-            return new Token(TokenKind.Atom, _text[start.._position], SpanFrom(start), layout);
+            return new Token(TokenKind.Atom, ConvertedText(start, _position - start), SpanFrom(start), layout);
         }
 
         if (c == '\'')
@@ -117,15 +128,15 @@ internal sealed class Lexer
 
         if (SymbolCharacters.Contains(c, StringComparison.Ordinal))
         {
-            while (_position < _text.Length && SymbolCharacters.Contains(_text[_position], StringComparison.Ordinal))
+            while (_position < _text.Length && SymbolCharacters.Contains(InputAt(_position), StringComparison.Ordinal))
             {
-                _position++;
+                Advance();
             }
 
-            string symbol = _text[start.._position];
+            string symbol = ConvertedText(start, _position - start);
 
             // A lone '.' followed by layout or end of input terminates a clause.
-            if (symbol == "." && (_position >= _text.Length || IsLayout(_text[_position]) || _text[_position] == '%'))
+            if (symbol == "." && (_position >= _text.Length || IsLayout(InputAt(_position)) || InputAt(_position) == '%'))
             {
                 return new Token(TokenKind.End, symbol, SpanFrom(start), layout);
             }
@@ -143,44 +154,83 @@ internal sealed class Lexer
 
     private static bool IsLayout(char c) => char.IsWhiteSpace(c);
 
-    private char Peek(int offset) => _position + offset < _text.Length ? _text[_position + offset] : '\0';
+    private char Peek(int offset) => InputAt(_position + offset);
+
+    private char RawPeek(int offset) => _position + offset < _text.Length ? _text[_position + offset] : '\0';
+
+    private char InputAt(int position)
+    {
+        if (position < 0 || position >= _text.Length)
+        {
+            return '\0';
+        }
+
+        char input = _text[position];
+        return _flags?.CharConversion == true && _conversions is not null ? _conversions.Convert(input) : input;
+    }
+
+    private string ConvertedText(int start, int length)
+    {
+        if (_flags?.CharConversion != true || _conversions is null)
+        {
+            return _text.Substring(start, length);
+        }
+
+        return string.Create(
+            length,
+            (Text: _text, Start: start, Conversions: _conversions),
+            static (output, state) =>
+            {
+                for (int index = 0; index < output.Length; index++)
+                {
+                    output[index] = state.Conversions.Convert(state.Text[state.Start + index]);
+                }
+            }
+        );
+    }
+
+    private void Advance(int count = 1)
+    {
+        for (int index = 0; index < count && _position < _text.Length; index++)
+        {
+            if (_text[_position] == '\n')
+            {
+                _line++;
+                _lineStart = _position + 1;
+            }
+
+            _position++;
+        }
+    }
 
     private bool SkipLayout()
     {
         int before = _position;
         while (_position < _text.Length)
         {
-            char c = _text[_position];
+            char c = InputAt(_position);
             if (c == '\n')
             {
-                _position++;
-                _line++;
-                _lineStart = _position;
+                Advance();
             }
             else if (IsLayout(c))
             {
-                _position++;
+                Advance();
             }
             else if (c == '%')
             {
-                while (_position < _text.Length && _text[_position] != '\n')
+                while (_position < _text.Length && InputAt(_position) != '\n')
                 {
-                    _position++;
+                    Advance();
                 }
             }
             else if (c == '/' && Peek(1) == '*')
             {
                 int commentStart = _position;
-                _position += 2;
-                while (_position < _text.Length && !(_text[_position] == '*' && Peek(1) == '/'))
+                Advance(2);
+                while (_position < _text.Length && !(InputAt(_position) == '*' && Peek(1) == '/'))
                 {
-                    if (_text[_position] == '\n')
-                    {
-                        _line++;
-                        _lineStart = _position + 1;
-                    }
-
-                    _position++;
+                    Advance();
                 }
 
                 if (_position >= _text.Length)
@@ -189,7 +239,7 @@ internal sealed class Lexer
                 }
                 else
                 {
-                    _position += 2;
+                    Advance(2);
                 }
             }
             else
@@ -203,9 +253,9 @@ internal sealed class Lexer
 
     private Token ReadNumber(int start, bool layout)
     {
-        if (_text[_position] == '0' && Peek(1) == '\'')
+        if (InputAt(_position) == '0' && Peek(1) == '\'')
         {
-            _position += 2;
+            Advance(2);
             if (_position >= _text.Length)
             {
                 Report(DiagnosticIds.InvalidNumber, "Unterminated character-code literal.", SpanFrom(start));
@@ -221,19 +271,19 @@ internal sealed class Lexer
             }
             else if (_text[_position] == '\'' && Peek(1) == '\'')
             {
-                _position += 2;
+                Advance(2);
                 code = '\'';
             }
             else
             {
                 code = _text[_position];
-                _position++;
+                Advance();
             }
 
-            return new Token(TokenKind.Integer, _text[start.._position], SpanFrom(start), layout, Integer: code);
+            return new Token(TokenKind.Integer, ConvertedText(start, _position - start), SpanFrom(start), layout, Integer: code);
         }
 
-        if (_text[_position] == '0' && Peek(1) is 'x' or 'o' or 'b')
+        if (InputAt(_position) == '0' && Peek(1) is 'x' or 'o' or 'b')
         {
             char marker = Peek(1);
             int radix = marker switch
@@ -242,60 +292,66 @@ internal sealed class Lexer
                 'o' => 8,
                 _ => 2,
             };
-            _position += 2;
+            Advance(2);
             int digitsStart = _position;
-            while (_position < _text.Length && IsRadixDigit(_text[_position], radix))
+            while (_position < _text.Length && IsRadixDigit(InputAt(_position), radix))
             {
-                _position++;
+                Advance();
             }
 
             if (_position == digitsStart)
             {
                 Report(DiagnosticIds.InvalidNumber, $"Expected digits after '0{marker}'.", SpanFrom(start));
-                return new Token(TokenKind.Integer, _text[start.._position], SpanFrom(start), layout);
+                return new Token(TokenKind.Integer, ConvertedText(start, _position - start), SpanFrom(start), layout);
             }
 
             long radixValue = 0;
-            foreach (char digit in _text.AsSpan(digitsStart, _position - digitsStart))
+            foreach (char digit in ConvertedText(digitsStart, _position - digitsStart))
             {
                 radixValue =
                     (radixValue * radix) + (char.IsAsciiDigit(digit) ? digit - '0' : char.ToLowerInvariant(digit) - 'a' + 10);
             }
 
-            return new Token(TokenKind.Integer, _text[start.._position], SpanFrom(start), layout, Integer: radixValue);
+            return new Token(
+                TokenKind.Integer,
+                ConvertedText(start, _position - start),
+                SpanFrom(start),
+                layout,
+                Integer: radixValue
+            );
         }
 
-        while (_position < _text.Length && char.IsAsciiDigit(_text[_position]))
+        while (_position < _text.Length && char.IsAsciiDigit(InputAt(_position)))
         {
-            _position++;
+            Advance();
         }
 
         bool isFloat = false;
-        if (_position < _text.Length && _text[_position] == '.' && char.IsAsciiDigit(Peek(1)))
+        if (_position < _text.Length && InputAt(_position) == '.' && char.IsAsciiDigit(Peek(1)))
         {
             isFloat = true;
-            _position++;
-            while (_position < _text.Length && char.IsAsciiDigit(_text[_position]))
+            Advance();
+            while (_position < _text.Length && char.IsAsciiDigit(InputAt(_position)))
             {
-                _position++;
+                Advance();
             }
         }
 
-        if (_position < _text.Length && (_text[_position] is 'e' or 'E'))
+        if (_position < _text.Length && (InputAt(_position) is 'e' or 'E'))
         {
             int exponentOffset = Peek(1) is '+' or '-' ? 2 : 1;
             if (char.IsAsciiDigit(Peek(exponentOffset)))
             {
                 isFloat = true;
-                _position += exponentOffset;
-                while (_position < _text.Length && char.IsAsciiDigit(_text[_position]))
+                Advance(exponentOffset);
+                while (_position < _text.Length && char.IsAsciiDigit(InputAt(_position)))
                 {
-                    _position++;
+                    Advance();
                 }
             }
         }
 
-        string literal = _text[start.._position];
+        string literal = ConvertedText(start, _position - start);
         SourceSpan span = SpanFrom(start);
 
         if (isFloat)
@@ -324,7 +380,7 @@ internal sealed class Lexer
     private string ReadQuoted(char quote, out bool terminated)
     {
         int start = _position;
-        _position++;
+        Advance();
         var builder = new StringBuilder();
         terminated = false;
 
@@ -333,14 +389,14 @@ internal sealed class Lexer
             char c = _text[_position];
             if (c == quote)
             {
-                if (Peek(1) == quote)
+                if (RawPeek(1) == quote)
                 {
                     builder.Append(quote);
-                    _position += 2;
+                    Advance(2);
                     continue;
                 }
 
-                _position++;
+                Advance();
                 terminated = true;
                 break;
             }
@@ -351,14 +407,8 @@ internal sealed class Lexer
                 continue;
             }
 
-            if (c == '\n')
-            {
-                _line++;
-                _lineStart = _position + 1;
-            }
-
             builder.Append(c);
-            _position++;
+            Advance();
         }
 
         if (!terminated)
@@ -376,7 +426,7 @@ internal sealed class Lexer
     private void ReadEscape(StringBuilder builder)
     {
         int start = _position;
-        _position++;
+        Advance();
         if (_position >= _text.Length)
         {
             Report(DiagnosticIds.InvalidEscape, "Unterminated escape sequence.", SpanFrom(start));
@@ -384,7 +434,7 @@ internal sealed class Lexer
         }
 
         char c = _text[_position];
-        _position++;
+        Advance();
 
         switch (c)
         {
@@ -419,15 +469,13 @@ internal sealed class Lexer
                 builder.Append(c);
                 return;
             case '\n':
-                _line++;
-                _lineStart = _position;
                 return;
             case 'x':
             {
                 int digitsStart = _position;
                 while (_position < _text.Length && char.IsAsciiHexDigit(_text[_position]))
                 {
-                    _position++;
+                    Advance();
                 }
 
                 if (_position == digitsStart)
@@ -439,7 +487,7 @@ internal sealed class Lexer
                 builder.Append((char)Convert.ToInt32(_text[digitsStart.._position], 16));
                 if (_position < _text.Length && _text[_position] == '\\')
                 {
-                    _position++;
+                    Advance();
                 }
 
                 return;

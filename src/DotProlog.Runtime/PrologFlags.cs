@@ -32,6 +32,9 @@ public sealed class PrologFlags
     /// <summary>Whether input character conversion is enabled.</summary>
     public bool CharConversion { get; internal set; }
 
+    /// <summary>Enables or disables input character conversion.</summary>
+    public void SetCharConversion(bool enabled) => CharConversion = enabled;
+
     /// <summary>Whether debugging is enabled.</summary>
     public bool Debug { get; internal set; }
 

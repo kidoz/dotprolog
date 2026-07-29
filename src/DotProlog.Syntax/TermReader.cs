@@ -19,15 +19,26 @@ public sealed class TermReader
     private readonly OperatorTable _operators;
     private readonly List<Diagnostic> _diagnostics;
     private readonly string? _fileName;
+    private readonly CharacterConversionTable? _conversions;
+    private readonly PrologFlags? _flags;
     private Token _current;
     private Token? _lookahead;
 
-    private TermReader(string text, string? fileName, OperatorTable operators, List<Diagnostic> diagnostics)
+    private TermReader(
+        string text,
+        string? fileName,
+        OperatorTable operators,
+        List<Diagnostic> diagnostics,
+        CharacterConversionTable? conversions,
+        PrologFlags? flags
+    )
     {
         _fileName = fileName;
         _operators = operators;
         _diagnostics = diagnostics;
-        _lexer = new Lexer(text, fileName, diagnostics);
+        _conversions = conversions;
+        _flags = flags;
+        _lexer = new Lexer(text, fileName, diagnostics, conversions, flags);
         _current = _lexer.Next();
     }
 
@@ -35,12 +46,20 @@ public sealed class TermReader
     /// <param name="text">Prolog source.</param>
     /// <param name="fileName">File name used in diagnostics, when known.</param>
     /// <param name="operators">Operator table to read with; a default ISO table is used when omitted.</param>
-    public static ParseResult ReadProgram(string text, string? fileName = null, OperatorTable? operators = null)
+    /// <param name="characterConversions">Program-owned input-character mappings, when applicable.</param>
+    /// <param name="flags">Program-owned flags controlling whether character conversion is active.</param>
+    public static ParseResult ReadProgram(
+        string text,
+        string? fileName = null,
+        OperatorTable? operators = null,
+        CharacterConversionTable? characterConversions = null,
+        PrologFlags? flags = null
+    )
     {
         ArgumentNullException.ThrowIfNull(text);
 
         List<Diagnostic> diagnostics = [];
-        var reader = new TermReader(text, fileName, operators ?? new OperatorTable(), diagnostics);
+        var reader = new TermReader(text, fileName, operators ?? new OperatorTable(), diagnostics, characterConversions, flags);
         List<SyntaxTerm> clauses = [];
 
         while (reader._current.Kind != TokenKind.Eof)
@@ -62,12 +81,20 @@ public sealed class TermReader
     /// <param name="text">Prolog source.</param>
     /// <param name="fileName">File name used in diagnostics, when known.</param>
     /// <param name="operators">Operator table to read with; a default ISO table is used when omitted.</param>
-    public static ParseResult ReadTerm(string text, string? fileName = null, OperatorTable? operators = null)
+    /// <param name="characterConversions">Program-owned input-character mappings, when applicable.</param>
+    /// <param name="flags">Program-owned flags controlling whether character conversion is active.</param>
+    public static ParseResult ReadTerm(
+        string text,
+        string? fileName = null,
+        OperatorTable? operators = null,
+        CharacterConversionTable? characterConversions = null,
+        PrologFlags? flags = null
+    )
     {
         ArgumentNullException.ThrowIfNull(text);
 
         List<Diagnostic> diagnostics = [];
-        var reader = new TermReader(text, fileName, operators ?? new OperatorTable(), diagnostics);
+        var reader = new TermReader(text, fileName, operators ?? new OperatorTable(), diagnostics, characterConversions, flags);
         SyntaxTerm? term = reader.ParseTerm(MaxTermPriority, out _);
         if (term is not null && reader._current.Kind == TokenKind.End)
         {
@@ -164,9 +191,50 @@ public sealed class TermReader
             return null;
         }
 
+        ApplyCharacterConversionDirective(term);
         Advance();
         return term;
     }
+
+    /// <summary>
+    /// Applies reader-state directives before the first token of the next clause is lexed.
+    /// </summary>
+    private void ApplyCharacterConversionDirective(SyntaxTerm clause)
+    {
+        if (clause is not CompoundTerm { Name: ":-", Arity: 1 } directive)
+        {
+            return;
+        }
+
+        SyntaxTerm goal = directive.Arguments[0];
+        if (
+            _conversions is not null
+            && goal is CompoundTerm { Name: "char_conversion", Arity: 2, Arguments: [AtomTerm input, AtomTerm output] }
+            && IsCharacter(input)
+            && IsCharacter(output)
+        )
+        {
+            _conversions.Set(input.Name[0], output.Name[0]);
+            return;
+        }
+
+        if (
+            _flags is not null
+            && goal
+                is CompoundTerm
+                {
+                    Name: "set_prolog_flag",
+                    Arity: 2,
+                    Arguments: [AtomTerm { Name: "char_conversion" }, AtomTerm value],
+                }
+            && value.Name is "on" or "off"
+        )
+        {
+            _flags.SetCharConversion(value.Name == "on");
+        }
+    }
+
+    private static bool IsCharacter(AtomTerm atom) => atom.Name.Length == 1;
 
     private void SkipToClauseEnd()
     {

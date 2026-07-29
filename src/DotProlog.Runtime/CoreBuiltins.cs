@@ -189,6 +189,7 @@ public static class CoreBuiltins
         FormatBuiltins.Register(registry);
         DatabaseBuiltins.Register(registry);
         PrologFlagBuiltins.Register(registry);
+        CharacterConversionBuiltins.Register(registry);
         ControlPredicates.Install(program);
     }
 

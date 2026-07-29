@@ -46,7 +46,13 @@ public sealed class PrologEngine : IRuntimeCompiler
 
     private IReadOnlyList<SyntaxTerm> ReadOrThrow(string source, string fileName)
     {
-        ParseResult parsed = TermReader.ReadProgram(source, fileName, Program.Operators);
+        ParseResult parsed = TermReader.ReadProgram(
+            source,
+            fileName,
+            Program.Operators,
+            Program.CharacterConversions,
+            Program.Flags
+        );
         if (!parsed.Success)
         {
             throw new PrologException($"The {fileName} library failed to parse: {string.Join("; ", parsed.Diagnostics)}");
@@ -54,6 +60,14 @@ public sealed class PrologEngine : IRuntimeCompiler
 
         return parsed.Clauses;
     }
+
+    private ParseResult ReadTerm(string text) =>
+        TermReader.ReadTerm(
+            text,
+            operators: Program.Operators,
+            characterConversions: Program.CharacterConversions,
+            flags: Program.Flags
+        );
 
     /// <summary>The program this engine loads into.</summary>
     public BytecodeProgram Program { get; }
@@ -96,7 +110,13 @@ public sealed class PrologEngine : IRuntimeCompiler
     {
         ArgumentNullException.ThrowIfNull(text);
 
-        ParseResult parsed = TermReader.ReadProgram(text, fileName, Program.Operators);
+        ParseResult parsed = TermReader.ReadProgram(
+            text,
+            fileName,
+            Program.Operators,
+            Program.CharacterConversions,
+            Program.Flags
+        );
         if (!parsed.Success)
         {
             return new LoadResult(parsed.Diagnostics, [], []);
@@ -170,7 +190,7 @@ public sealed class PrologEngine : IRuntimeCompiler
     {
         ArgumentNullException.ThrowIfNull(goalText);
 
-        ParseResult parsed = TermReader.ReadTerm(goalText, operators: Program.Operators);
+        ParseResult parsed = ReadTerm(goalText);
         if (!parsed.Success || parsed.Clauses.Count == 0)
         {
             diagnostics = parsed.Diagnostics;
@@ -198,7 +218,7 @@ public sealed class PrologEngine : IRuntimeCompiler
     {
         ArgumentNullException.ThrowIfNull(goalText);
 
-        ParseResult parsed = TermReader.ReadTerm(goalText, operators: Program.Operators);
+        ParseResult parsed = ReadTerm(goalText);
         if (!parsed.Success || parsed.Clauses.Count == 0)
         {
             throw new PrologException($"The goal did not parse: {string.Join("; ", parsed.Diagnostics)}");
@@ -462,7 +482,7 @@ public sealed class PrologEngine : IRuntimeCompiler
         variables = Cell.Atom(machine.Symbols.EmptyList);
         singletons = Cell.Atom(machine.Symbols.EmptyList);
 
-        int end = ClauseScanner.FindClauseEnd(buffer);
+        int end = ClauseScanner.FindClauseEnd(buffer, Program.CharacterConversions, Program.Flags);
         while (end < 0)
         {
             string? line = input.ReadLine();
@@ -471,20 +491,20 @@ public sealed class PrologEngine : IRuntimeCompiler
                 // What is left at end of input is either nothing, which is end_of_file, or a clause
                 // missing its terminator. Reading the incomplete text as if it were whole would
                 // quietly return a prefix of what the file says.
-                bool blank = ClauseScanner.IsBlank(buffer);
+                bool blank = ClauseScanner.IsBlank(buffer, Program.CharacterConversions, Program.Flags);
                 buffer = string.Empty;
 
                 return blank ? false : throw SyntaxError(machine, "unexpected_end_of_file");
             }
 
             buffer += line + "\n";
-            end = ClauseScanner.FindClauseEnd(buffer);
+            end = ClauseScanner.FindClauseEnd(buffer, Program.CharacterConversions, Program.Flags);
         }
 
         string text = buffer[..end];
         buffer = buffer[end..];
 
-        ParseResult parsed = TermReader.ReadTerm(text, operators: Program.Operators);
+        ParseResult parsed = ReadTerm(text);
         if (!parsed.Success || parsed.Clauses.Count == 0)
         {
             throw SyntaxError(machine, parsed.Diagnostics.Count > 0 ? parsed.Diagnostics[0].Id : "cannot_start_term");

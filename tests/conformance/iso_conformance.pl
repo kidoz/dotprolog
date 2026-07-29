@@ -433,6 +433,26 @@ iso_case('8.14.2', write_term(a, [nonsense(x)]), error(domain_error(write_option
 iso_case('8.14.2', (with_output_to(atom(A4), write_term(1 + 2, [ignore_ops(true)])), A4 == '+(1,2)'), success).
 iso_case('8.14.2', (with_output_to(atom(A5), write_term('a b', [quoted(true)])), atom_length(A5, 5)), success).
 iso_case('8.14.4', (current_op(P1, xfx, ':-'), P1 =:= 1200), success).
+iso_case('8.14.12', (char_conversion(q, r), current_char_conversion(q, r)), success).
+iso_case('8.14.12', char_conversion(_, a), error(instantiation_error)).
+iso_case('8.14.12', char_conversion(a, _), error(instantiation_error)).
+iso_case('8.14.12', char_conversion(ab, a), error(representation_error(character))).
+iso_case('8.14.12', char_conversion(a, 1), error(representation_error(character))).
+iso_case('8.14.13', current_char_conversion(q, s), failure).
+iso_case('8.14.13', current_char_conversion(ab, _), error(type_error(character, ab))).
+iso_case('8.14.13', current_char_conversion(_, 1), error(type_error(character, 1))).
+iso_case('8.14.13', (char_conversion(q, q), \+ current_char_conversion(q, _)), success).
+iso_case(
+    '8.14.13',
+    (
+        char_conversion(z, x),
+        read_term_from_atom(z, z, []),
+        set_prolog_flag(char_conversion, on),
+        read_term_from_atom(z, x, []),
+        set_prolog_flag(char_conversion, off)
+    ),
+    success
+).
 
 % --- 8.16 Atomic term processing, remaining modes ------------------------------
 iso_case('8.16.2', (atom_concat(A6, B6, ab), A6 == '', B6 == ab), success).

@@ -1,4 +1,5 @@
 using System.Globalization;
+using DotProlog.Runtime;
 using DotProlog.Syntax;
 
 namespace DotProlog.Syntax.Tests;
@@ -134,5 +135,39 @@ public sealed class TermReaderTests
 
         Assert.True(result.Success);
         Assert.Equal(",(write(hi),nl)", Canonical(Assert.Single(result.Clauses)));
+    }
+
+    [Fact]
+    public void CharacterConversionChangesOnlyUnquotedTokenText()
+    {
+        var conversions = new CharacterConversionTable();
+        var flags = new PrologFlags();
+        conversions.Set('z', 'x');
+        flags.SetCharConversion(enabled: true);
+
+        ParseResult result = TermReader.ReadTerm("fizz('fizz', \"fizz\")", characterConversions: conversions, flags: flags);
+
+        Assert.True(result.Success);
+        Assert.Equal("fixx(fizz,\"fizz\")", Canonical(Assert.Single(result.Clauses)));
+    }
+
+    [Fact]
+    public void CharacterConversionDirectivesAffectTheNextClauseFirstToken()
+    {
+        var conversions = new CharacterConversionTable();
+        var flags = new PrologFlags();
+
+        ParseResult result = TermReader.ReadProgram(
+            """
+            :- char_conversion(z, x).
+            :- set_prolog_flag(char_conversion, on).
+            fizz.
+            """,
+            characterConversions: conversions,
+            flags: flags
+        );
+
+        Assert.True(result.Success);
+        Assert.Equal("fixx", Canonical(result.Clauses[^1]));
     }
 }

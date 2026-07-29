@@ -1,3 +1,5 @@
+using DotProlog.Runtime;
+
 namespace DotProlog.Syntax;
 
 /// <summary>
@@ -16,12 +18,12 @@ public static class ClauseScanner
     /// The offset just past the first clause terminator in <paramref name="text"/>, or -1 when the
     /// text holds no complete clause and more input is needed.
     /// </summary>
-    public static int FindClauseEnd(string text)
+    public static int FindClauseEnd(string text, CharacterConversionTable? characterConversions = null, PrologFlags? flags = null)
     {
         ArgumentNullException.ThrowIfNull(text);
 
         List<Diagnostic> ignored = [];
-        var lexer = new Lexer(text, null, ignored);
+        var lexer = new Lexer(text, null, ignored, characterConversions, flags);
 
         while (true)
         {
@@ -46,12 +48,12 @@ public static class ClauseScanner
     /// What is left in the buffer at end of input decides between <c>end_of_file</c> and a syntax
     /// error, and trailing whitespace or a comment must not be mistaken for a partial clause.
     /// </remarks>
-    public static bool IsBlank(string text)
+    public static bool IsBlank(string text, CharacterConversionTable? characterConversions = null, PrologFlags? flags = null)
     {
         ArgumentNullException.ThrowIfNull(text);
 
         List<Diagnostic> ignored = [];
-        var lexer = new Lexer(text, null, ignored);
+        var lexer = new Lexer(text, null, ignored, characterConversions, flags);
         return lexer.Next().Kind == TokenKind.Eof && ignored.Count == 0;
     }
 }

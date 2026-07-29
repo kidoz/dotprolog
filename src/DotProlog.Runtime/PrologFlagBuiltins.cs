@@ -68,7 +68,7 @@ internal static class PrologFlagBuiltins
         string name = machine.Symbols.AtomName(flag.Index);
         return name switch
         {
-            "char_conversion" => SetOnOff(machine, name, value, static (flags, enabled) => flags.CharConversion = enabled),
+            "char_conversion" => SetOnOff(machine, name, value, static (flags, enabled) => flags.SetCharConversion(enabled)),
             "debug" => SetOnOff(machine, name, value, static (flags, enabled) => flags.Debug = enabled),
             "double_quotes" => SetDoubleQuotes(machine, name, value),
             "unknown" => SetUnknown(machine, name, value),
