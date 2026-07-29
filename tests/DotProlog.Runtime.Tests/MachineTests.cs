@@ -142,4 +142,64 @@ public sealed class MachineTests
 
         Assert.Contains("existence_error(procedure, missing/2)", exception.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void OccursCheckRejectsADirectCycleAndRestoresTheVariable()
+    {
+        BytecodeProgram program = NewProgram();
+        var machine = new Machine(program);
+        Cell variable = machine.CreateVariable();
+        Cell recursive = machine.CreateStructure(program.Symbols.InternFunctor("f", 1), [variable]);
+
+        Assert.False(machine.UnifyWithOccursCheck(variable, recursive));
+        Assert.Equal(variable, machine.Dereference(variable));
+    }
+
+    [Fact]
+    public void OccursCheckRetainsFiniteBindings()
+    {
+        BytecodeProgram program = NewProgram();
+        var machine = new Machine(program);
+        Cell variable = machine.CreateVariable();
+        Cell value = machine.CreateStructure(
+            program.Symbols.InternFunctor("point", 2),
+            [Cell.Integer60(2), Cell.Integer60(3)]
+        );
+
+        Assert.True(machine.UnifyWithOccursCheck(variable, value));
+        Assert.Equal(value, machine.Dereference(variable));
+    }
+
+    [Fact]
+    public void OccursCheckRestoresBindingsAfterALaterMismatch()
+    {
+        BytecodeProgram program = NewProgram();
+        var machine = new Machine(program);
+        Cell variable = machine.CreateVariable();
+        int pair = program.Symbols.InternFunctor("pair", 2);
+        Cell left = machine.CreateStructure(pair, [variable, variable]);
+        Cell right = machine.CreateStructure(
+            pair,
+            [Cell.Atom(program.Symbols.InternAtom("a")), Cell.Atom(program.Symbols.InternAtom("b"))]
+        );
+
+        Assert.False(machine.UnifyWithOccursCheck(left, right));
+        Assert.Equal(variable, machine.Dereference(variable));
+    }
+
+    [Fact]
+    public void OccursCheckTerminatesWhenTheCandidateContainsAnExistingCycle()
+    {
+        BytecodeProgram program = NewProgram();
+        var machine = new Machine(program);
+        Cell cyclicVariable = machine.CreateVariable();
+        Cell cyclicTerm = machine.CreateStructure(program.Symbols.InternFunctor("cycle", 1), [cyclicVariable]);
+        Assert.True(machine.Unify(cyclicVariable, cyclicTerm));
+
+        Cell variable = machine.CreateVariable();
+        Cell wrapper = machine.CreateStructure(program.Symbols.InternFunctor("wrapper", 1), [cyclicTerm]);
+
+        Assert.True(machine.UnifyWithOccursCheck(variable, wrapper));
+        Assert.Equal(wrapper, machine.Dereference(variable));
+    }
 }

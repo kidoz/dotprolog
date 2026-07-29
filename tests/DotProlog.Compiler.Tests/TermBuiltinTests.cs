@@ -92,6 +92,18 @@ public sealed class TermBuiltinTests
     }
 
     [Theory]
+    [InlineData("unify_with_occurs_check(X, f(a)), X == f(a)")]
+    [InlineData("unify_with_occurs_check(X, Y), X == Y")]
+    [InlineData("\\+ unify_with_occurs_check(X, f(X)), var(X)")]
+    [InlineData("\\+ unify_with_occurs_check(f(X, X), f(a, b)), var(X)")]
+    [InlineData("(unify_with_occurs_check(X, a), fail ; var(X))")]
+    [InlineData("X = f(X), nonvar(X)")]
+    public void OccursCheckUnificationHasIsoBindingSemantics(string goal)
+    {
+        Assert.Equal("yes", PrologTestHost.RunGoal($"{goal}, write(yes)"));
+    }
+
+    [Theory]
     [InlineData("functor(f(a,b), N, A)", "f 2")]
     [InlineData("functor(foo, N, A)", "foo 0")]
     [InlineData("functor(42, N, A)", "42 0")]

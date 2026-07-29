@@ -44,6 +44,11 @@ public sealed class Machine
     private Cell[] _unificationStack = new Cell[256];
     private int _unificationTop;
 
+    private Cell[] _occursCheckStack = new Cell[256];
+    private int _occursCheckTop;
+    private int[] _occursCheckVisited = new int[1 << 16];
+    private int _occursCheckEpoch;
+
     private int _pc;
     private int _continuation;
     private int _structureArgument;
@@ -883,6 +888,38 @@ public sealed class Machine
     }
 
     /// <summary>
+    /// Unifies two terms without creating a new cyclic binding. A failed attempt restores every
+    /// binding it made; a successful attempt retains the same bindings and trail state that
+    /// ordinary unification would have retained.
+    /// </summary>
+    internal bool UnifyWithOccursCheck(Cell left, Cell right)
+    {
+        int trailMark = _tr;
+        bool previous = _forceTrail;
+        bool unified = false;
+        _forceTrail = true;
+
+        try
+        {
+            unified = UnifyCore(left, right, occursCheck: true);
+            return unified;
+        }
+        finally
+        {
+            _forceTrail = previous;
+
+            if (!unified)
+            {
+                UndoTrail(trailMark);
+            }
+            else if (!previous)
+            {
+                DiscardUnneededForcedTrail(trailMark);
+            }
+        }
+    }
+
+    /// <summary>
     /// Resolves the goal in argument register zero and transfers control to it. Chains of
     /// <c>call/1</c> wrappers are unwrapped first, so <c>call(call(G))</c> costs nothing extra.
     /// </summary>
@@ -996,7 +1033,9 @@ public sealed class Machine
     }
 
     /// <summary>Unifies two terms, trailing every binding so that backtracking can undo them.</summary>
-    public bool Unify(Cell left, Cell right)
+    public bool Unify(Cell left, Cell right) => UnifyCore(left, right, occursCheck: false);
+
+    private bool UnifyCore(Cell left, Cell right, bool occursCheck)
     {
         _unificationTop = 0;
         PushUnification(left, right);
@@ -1016,20 +1055,38 @@ public sealed class Machine
             if (a.Tag == CellTag.Reference)
             {
                 // Bind the younger variable to the older one so the binding survives heap truncation.
-                if (b.Tag == CellTag.Reference && b.Index > a.Index)
+                if (b.Tag == CellTag.Reference)
                 {
-                    Bind(b.Index, a);
-                }
-                else
-                {
-                    Bind(a.Index, b);
+                    if (b.Index > a.Index)
+                    {
+                        Bind(b.Index, a);
+                    }
+                    else
+                    {
+                        Bind(a.Index, b);
+                    }
+
+                    continue;
                 }
 
+                if (occursCheck && OccursIn(a.Index, b))
+                {
+                    _unificationTop = 0;
+                    return false;
+                }
+
+                Bind(a.Index, b);
                 continue;
             }
 
             if (b.Tag == CellTag.Reference)
             {
+                if (occursCheck && OccursIn(b.Index, a))
+                {
+                    _unificationTop = 0;
+                    return false;
+                }
+
                 Bind(b.Index, a);
                 continue;
             }
@@ -1067,6 +1124,7 @@ public sealed class Machine
         _b0 = 0;
         _savedTop = 0;
         _unificationTop = 0;
+        _occursCheckTop = 0;
         _writeMode = false;
         _structureArgument = 0;
         _argumentCount = 0;
@@ -1277,6 +1335,87 @@ public sealed class Machine
         _unificationStack[_unificationTop++] = right;
     }
 
+    private bool OccursIn(int variableAddress, Cell term)
+    {
+        int epoch = NextOccursCheckEpoch();
+        _occursCheckTop = 0;
+        PushOccursCheck(term);
+
+        while (_occursCheckTop > 0)
+        {
+            Cell cell = Dereference(_occursCheckStack[--_occursCheckTop]);
+
+            if (cell.Tag == CellTag.Reference)
+            {
+                if (cell.Index == variableAddress)
+                {
+                    _occursCheckTop = 0;
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (cell.Tag != CellTag.Structure || _occursCheckVisited[cell.Index] == epoch)
+            {
+                continue;
+            }
+
+            _occursCheckVisited[cell.Index] = epoch;
+            int arity = _symbols.ArityOf(_heap[cell.Index].Index);
+            for (int i = arity; i >= 1; i--)
+            {
+                PushOccursCheck(_heap[cell.Index + i]);
+            }
+        }
+
+        return false;
+    }
+
+    private int NextOccursCheckEpoch()
+    {
+        _occursCheckEpoch = unchecked(_occursCheckEpoch + 1);
+        if (_occursCheckEpoch > 0)
+        {
+            return _occursCheckEpoch;
+        }
+
+        Array.Clear(_occursCheckVisited);
+        _occursCheckEpoch = 1;
+        return _occursCheckEpoch;
+    }
+
+    private void PushOccursCheck(Cell cell)
+    {
+        if (_occursCheckTop == _occursCheckStack.Length)
+        {
+            Array.Resize(ref _occursCheckStack, _occursCheckStack.Length * 2);
+        }
+
+        _occursCheckStack[_occursCheckTop++] = cell;
+    }
+
+    private void DiscardUnneededForcedTrail(int trailMark)
+    {
+        if (_b == 0)
+        {
+            _tr = trailMark;
+            return;
+        }
+
+        int heapTop = _choicePoints[_b - 1].HeapTop;
+        int write = trailMark;
+        for (int read = trailMark; read < _tr; read++)
+        {
+            if (_trail[read] < heapTop)
+            {
+                _trail[write++] = _trail[read];
+            }
+        }
+
+        _tr = write;
+    }
+
     private void EnsureHeap(int required)
     {
         if (_h + required <= _heap.Length)
@@ -1285,6 +1424,7 @@ public sealed class Machine
         }
 
         Array.Resize(ref _heap, Math.Max(_heap.Length * 2, _h + required));
+        Array.Resize(ref _occursCheckVisited, _heap.Length);
     }
 
     private void EnsureStack(int required)

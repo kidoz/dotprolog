@@ -31,8 +31,12 @@ iso_case('8.2.1', (_X = 1), success).
 iso_case('8.2.1', (1 = 2), failure).
 iso_case('8.2.1', (f(X1, b) = f(a, Y1)), success).
 iso_case('8.2.1', (f(a) = g(a)), failure).
-iso_case('8.2.2', \+ (_X \= _Y), success).
-iso_case('8.2.2', (1 \= 2), success).
+iso_case('8.2.2', unify_with_occurs_check(X2, f(X2)), failure).
+iso_case('8.2.2', (unify_with_occurs_check(X3, f(a)), X3 == f(a)), success).
+iso_case('8.2.2', (unify_with_occurs_check(X4, Y4), X4 == Y4), success).
+iso_case('8.2.2', (\+ unify_with_occurs_check(f(X5, X5), f(a, b)), var(X5)), success).
+iso_case('8.2.3', \+ (_X \= _Y), success).
+iso_case('8.2.3', (1 \= 2), success).
 
 % --- 8.3 Type testing --------------------------------------------------------
 iso_case('8.3.1', var(_), success).

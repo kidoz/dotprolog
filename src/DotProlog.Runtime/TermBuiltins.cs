@@ -43,6 +43,11 @@ internal static class TermBuiltins
         registry.Register("@=<", 2, static machine => Order(machine) <= 0);
         registry.Register("@>=", 2, static machine => Order(machine) >= 0);
         registry.Register("\\=", 2, static machine => !machine.CanUnify(machine.Argument(0), machine.Argument(1)));
+        registry.Register(
+            "unify_with_occurs_check",
+            2,
+            static machine => machine.UnifyWithOccursCheck(machine.Argument(0), machine.Argument(1))
+        );
 
         int less = symbols.InternAtom("<");
         int equal = symbols.InternAtom("=");
