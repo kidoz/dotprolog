@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**332 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**347 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -59,8 +59,10 @@ Writing them was worth it immediately: they found these real defects.
   `put_code/1,2` now implement code-valued input, lookahead, EOF, and ISO argument errors.
 - `read_term/2,3` omitted `singletons/1`, and `variables/1` omitted anonymous variables. All three
   ISO variable-reporting options now preserve first-occurrence order and share with the read term.
+- `stream_property/2` now enumerates explicit stream metadata and live `not`, `at`, and `past` EOF
+  states; `current_stream/1` enumerates open handles without reflection.
 
-Beyond the conformance cases, the engine and toolchain are covered by 755 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 767 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
@@ -85,7 +87,7 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 
 | Feature | Current state |
 |---|---|
-| Complete stream surface | Stream properties, byte I/O, binary streams, and repositioning are absent |
+| Complete stream surface | Byte I/O, binary streams, and repositioning are absent |
 | Character conversion | `char_conversion/2` and `current_char_conversion/2` are absent |
 
 ## Non-ISO features absent deliberately
