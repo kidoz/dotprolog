@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**364 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**374 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -67,8 +67,11 @@ Writing them was worth it immediately: they found these real defects.
 - Disk streams now expose opaque positions and are repositionable by default.
   `set_stream_position/2` restores logical text positions across parser lookahead and newline
   normalization as well as raw binary offsets; `reposition(false)` is enforced explicitly.
+- `char_conversion/2` and `current_char_conversion/2` now maintain program-owned mappings with
+  snapshot-stable enumeration. The `char_conversion` flag gates conversion before unquoted lexical
+  classification, while quoted text, escapes, and primitive character input remain unchanged.
 
-Beyond the conformance cases, the engine and toolchain are covered by 809 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 827 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
@@ -88,13 +91,13 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 | Repositionable text and binary streams; term, character, code, and byte I/O | Implemented |
 | Modules, `use_module/1,2`, `meta_predicate/1` | Implemented |
 | ISO Prolog flags and state-dependent reading/calls | Implemented |
+| Character conversion and state-dependent lexical reading | Implemented |
 
 ## Known ISO gaps
 
 | Feature | Current state |
 |---|---|
 | Complete stream surface | `close/2`, configurable EOF actions, and the remaining option/error audit are incomplete |
-| Character conversion | `char_conversion/2` and `current_char_conversion/2` are absent |
 
 ## Non-ISO features absent deliberately
 

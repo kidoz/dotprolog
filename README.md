@@ -212,7 +212,7 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 | Operators | `op/3`, `current_op/3` |
 | Grammars | `-->/2` with `{}/1`, `!`, `\+`, pushback lists; `phrase/2`, `phrase/3` |
 | Streams | `open/3,4` text and binary streams, `close/1`, `current_stream/1`, `stream_property/2`, `set_stream_position/2`, current-stream selection, EOF inspection, flushing |
-| Reading | term, character, character-code, and byte input/output; `read_term_from_atom/3`, `term_to_atom/2` |
+| Reading | term, character, character-code, and byte input/output; `read_term_from_atom/3`, `term_to_atom/2`; `char_conversion/2`, `current_char_conversion/2` |
 | Modules | `:- module/2`, `use_module/1,2`, `:- meta_predicate/1`, `Module:Goal` |
 | Directives | `:- Goal`, `:- initialization(Goal)`, `halt/0`, `halt/1` |
 
@@ -298,11 +298,13 @@ number(N)     --> digits(Ds), { number_codes(N, Ds) }.
 `phrase/2` and `phrase/3` walk the control constructs themselves, so a body assembled at run time
 works as well as one written as a rule. A rule asserted with `assertz/1` is translated too.
 
-Streams carry terms and characters, not bytes. `read/1` pulls text a line at a time until the lexer
-finds a clause terminator, so a term can be read from a console as soon as it is complete rather
-than after the input ends — a full stop inside `'a. b'`, inside `3.14`, or inside `=..` is not one.
-An incomplete clause at end of input is a catchable `syntax_error(unexpected_end_of_file)` rather
-than a silently truncated term.
+Text streams carry terms and characters, while binary streams carry bytes. `read/1` pulls text a
+line at a time until the lexer finds a clause terminator, so a term can be read from a console as
+soon as it is complete rather than after the input ends — a full stop inside `'a. b'`, inside
+`3.14`, or inside `=..` is not one. An incomplete clause at end of input is a catchable
+`syntax_error(unexpected_end_of_file)` rather than a silently truncated term. When the
+`char_conversion` flag is on, mappings installed by `char_conversion/2` are applied to unquoted
+input before tokenization; quoted text, escapes, and primitive character input remain raw.
 
 ```prolog
 main :-
@@ -352,7 +354,7 @@ A control term assembled at run time and passed to `call/1` is lowered to VM byt
 same control-construct compiler used for source clauses. Its cut is transparent within that
 meta-called goal and opaque to the caller, as ISO specifies.
 
-DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 364 conformance cases encoded
+DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 374 conformance cases encoded
 from ISO/IEC 13211-1, all passing, but those are its own reading of the standard rather than an
 independent suite — see [COMPATIBILITY.md](COMPATIBILITY.md), which also lists the known
 differences.
