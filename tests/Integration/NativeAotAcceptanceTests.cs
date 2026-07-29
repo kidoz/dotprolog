@@ -75,6 +75,8 @@ public sealed class NativeAotAcceptanceTests
                     "[A,B,C]",
                     "sum=6",
                     "row     7",
+                    "arithmetic=-1,2.0,0.0",
+                    "arithmetic_error",
                     "alice likes bob",
                     "+(1,*(2,3))",
                     "427",

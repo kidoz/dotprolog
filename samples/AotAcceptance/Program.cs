@@ -76,6 +76,11 @@ internal static class Program
                 format("sum=~d~n", [Sum]),
                 format(atom(Aligned), "~w~t~8|~d", [row, 7]), write(Aligned), nl,
 
+                % ISO arithmetic uses the same evaluator after NativeAOT trimming.
+                Rounded is round(-1.5), Quotient is 6 / 3, Sine is sin(0),
+                format("arithmetic=~w,~w,~w~n", [Rounded, Quotient, Sine]),
+                catch(_ is 0.0 / 0.0, error(evaluation_error(undefined), _), write(arithmetic_error)), nl,
+
                 % An operator declared at run time, in a native image, changing how a term prints.
                 op(700, xfx, likes),
                 write(likes(alice, bob)), nl,
