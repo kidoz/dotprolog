@@ -62,12 +62,24 @@ public static class PrologErrors
             [Cell.Atom(functor.NameAtom), Cell.Integer60(functor.Arity)]
         );
 
+        return Permission(machine, operation, type, indicator);
+    }
+
+    /// <summary>An operation is not allowed: <c>permission_error(Operation, Type, Culprit)</c>.</summary>
+    public static PrologException Permission(Machine machine, string operation, string type, Cell culprit)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+
         Cell formal = machine.CreateStructure(
             machine.Symbols.InternFunctor("permission_error", 3),
-            [Cell.Atom(machine.Symbols.InternAtom(operation)), Cell.Atom(machine.Symbols.InternAtom(type)), indicator]
+            [Cell.Atom(machine.Symbols.InternAtom(operation)), Cell.Atom(machine.Symbols.InternAtom(type)), culprit]
         );
 
-        return Build(machine, formal, $"permission_error({operation}, {type}, {machine.Symbols.DescribeFunctor(functorId)})");
+        return Build(
+            machine,
+            formal,
+            $"permission_error({operation}, {type}, {TermWriter.ToDisplayString(machine, culprit, quoted: true)})"
+        );
     }
 
     /// <summary>An arithmetic operation could not produce a value: <c>evaluation_error(What)</c>.</summary>

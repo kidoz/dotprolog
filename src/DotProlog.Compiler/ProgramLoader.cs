@@ -155,8 +155,12 @@ public sealed class ProgramLoader
     /// <summary>Runs the first pass: declarations, and the set of predicates the unit defines.</summary>
     private void Collect(IReadOnlyList<SyntaxTerm> clauses, LoadUnit unit, List<Diagnostic> diagnostics, string? fileName)
     {
-        foreach (SyntaxTerm clause in clauses)
+        DoubleQuotesMode doubleQuotes = _program.Flags.DoubleQuotes;
+
+        foreach (SyntaxTerm rawClause in clauses)
         {
+            SyntaxTerm clause = TermNormalizer.Normalize(rawClause, doubleQuotes);
+
             if (clause is CompoundTerm { Name: ":-", Arity: 1 } directive)
             {
                 SyntaxTerm goal = directive.Arguments[0];
@@ -194,6 +198,12 @@ public sealed class ProgramLoader
 
                     default:
                         break;
+                }
+
+                if (TryDoubleQuotesDirective(goal, out DoubleQuotesMode selected))
+                {
+                    doubleQuotes = selected;
+                    _program.Flags.DoubleQuotes = selected;
                 }
 
                 if (IsAcceptedDeclaration(goal))
@@ -519,9 +529,40 @@ public sealed class ProgramLoader
         goal switch
         {
             CompoundTerm { Name: "discontiguous", Arity: 1 } => true,
-            CompoundTerm { Name: "set_prolog_flag", Arity: 2 } => true,
             _ => false,
         };
+
+    /// <summary>
+    /// Applies a valid <c>double_quotes</c> directive while collecting, because it changes how
+    /// subsequent reader tokens in the same source unit are represented. The directive is still
+    /// compiled and run normally so the ordinary builtin owns validation and final runtime state.
+    /// </summary>
+    private static bool TryDoubleQuotesDirective(SyntaxTerm goal, out DoubleQuotesMode selected)
+    {
+        selected = default;
+        if (
+            goal
+            is not CompoundTerm
+            {
+                Name: "set_prolog_flag",
+                Arity: 2,
+                Arguments: [AtomTerm { Name: "double_quotes" }, AtomTerm value],
+            }
+        )
+        {
+            return false;
+        }
+
+        selected = value.Name switch
+        {
+            "codes" => DoubleQuotesMode.Codes,
+            "chars" => DoubleQuotesMode.Chars,
+            "atom" => DoubleQuotesMode.Atom,
+            _ => default,
+        };
+
+        return value.Name is "codes" or "chars" or "atom";
+    }
 
     /// <summary>Handles <c>:- dynamic Name/Arity</c>, a comma sequence of them, or a list of them.</summary>
     private void DeclareDynamic(

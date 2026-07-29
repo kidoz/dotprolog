@@ -199,7 +199,6 @@ public sealed class ExecutionTests
     [Theory]
     [InlineData(":- module(shapes, [square/2]).")]
     [InlineData(":- discontiguous square/2.")]
-    [InlineData(":- set_prolog_flag(double_quotes, codes).")]
     public void PortableDeclarationsAreAcceptedRatherThanRun(string declaration)
     {
         // A file written to load in any Prolog system opens with declarations this release does not

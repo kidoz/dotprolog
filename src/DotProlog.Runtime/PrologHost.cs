@@ -28,13 +28,15 @@ public sealed class PrologHost
     public Machine Machine => _machine;
 
     /// <summary>Resolves <c>name/arity</c> once, so that repeated calls cost no lookup.</summary>
-    /// <exception cref="PrologException">No such predicate is defined.</exception>
+    /// <exception cref="PrologException">
+    /// No such predicate is defined and the <c>unknown</c> flag is <c>error</c>.
+    /// </exception>
     public PrologPredicate Bind(string name, int arity)
     {
         ArgumentNullException.ThrowIfNull(name);
 
         int functorId = _machine.Symbols.InternFunctor(name, arity);
-        if (!_machine.Program.IsDefined(functorId))
+        if (!_machine.Program.IsDefined(functorId) && _machine.Program.Flags.Unknown == UnknownProcedureAction.Error)
         {
             throw PrologErrors.UndefinedProcedure(_machine, functorId);
         }

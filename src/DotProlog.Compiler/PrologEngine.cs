@@ -68,6 +68,13 @@ public sealed class PrologEngine : IRuntimeCompiler
         set => Machine.Output = value;
     }
 
+    /// <summary>Where warnings and diagnostics raised while running the program go.</summary>
+    public TextWriter Error
+    {
+        get => Machine.Error;
+        set => Machine.Error = value;
+    }
+
     /// <summary>Where the program's <c>read/1</c> and friends take their input from.</summary>
     public TextReader Input
     {
@@ -457,7 +464,7 @@ public sealed class PrologEngine : IRuntimeCompiler
         }
 
         Dictionary<string, Cell> variables = [];
-        term = TermReifier.ToHeap(machine, TermNormalizer.Normalize(parsed.Clauses[0]), variables);
+        term = TermReifier.ToHeap(machine, TermNormalizer.Normalize(parsed.Clauses[0], Program.Flags.DoubleQuotes), variables);
 
         // Only named variables are reported, and in the order the reader met them, so that
         // variable_names/1 reads the way the source does.

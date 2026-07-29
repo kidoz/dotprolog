@@ -91,6 +91,17 @@ public sealed class Machine
         }
     }
 
+    /// <summary>The program's standard error output.</summary>
+    public TextWriter Error
+    {
+        get => Streams.UserError.Writer!;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            Streams.UserError.Writer = value;
+        }
+    }
+
     /// <summary>The program's standard input.</summary>
     public TextReader Input
     {
@@ -124,10 +135,9 @@ public sealed class Machine
     /// <exception cref="PrologException">The predicate is not defined.</exception>
     public RunResult Solve(int functorId)
     {
-        int entry = _program.EntryPointOf(functorId);
-        if (entry < 0)
+        if (!TryEntryPoint(functorId, out int entry))
         {
-            throw PrologErrors.UndefinedProcedure(this, functorId);
+            return RunResult.Failure;
         }
 
         return Run(entry);
@@ -174,7 +184,11 @@ public sealed class Machine
         _argumentCount = arguments.Length;
         _continuation = BytecodeProgram.TopLevelReturnAddress;
         _b0 = 0;
-        _pc = EntryPointOf(functorId);
+        if (!TryEntryPoint(functorId, out _pc))
+        {
+            return RunResult.Failure;
+        }
+
         return Dispatch();
     }
 
@@ -263,7 +277,7 @@ public sealed class Machine
                     _argumentCount = code[_pc++];
                     _continuation = _pc;
                     _b0 = _b;
-                    _pc = EntryPointOf(functorId);
+                    proved = TryEntryPoint(functorId, out _pc);
                     break;
                 }
 
@@ -272,7 +286,7 @@ public sealed class Machine
                     int functorId = code[_pc++];
                     _argumentCount = code[_pc++];
                     _b0 = _b;
-                    _pc = EntryPointOf(functorId);
+                    proved = TryEntryPoint(functorId, out _pc);
                     break;
                 }
 
@@ -984,8 +998,7 @@ public sealed class Machine
 
         _continuation = _pc;
         _b0 = _b;
-        _pc = EntryPointOf(functorId);
-        return true;
+        return TryEntryPoint(functorId, out _pc);
     }
 
     /// <summary>
@@ -1136,15 +1149,26 @@ public sealed class Machine
         ExitCode = 0;
     }
 
-    private int EntryPointOf(int functorId)
+    private bool TryEntryPoint(int functorId, out int entry)
     {
-        int entry = _program.EntryPointOf(functorId);
-        if (entry < 0)
+        entry = _program.EntryPointOf(functorId);
+        if (entry >= 0)
         {
-            throw PrologErrors.UndefinedProcedure(this, functorId);
+            return true;
         }
 
-        return entry;
+        switch (_program.Flags.Unknown)
+        {
+            case UnknownProcedureAction.Fail:
+                return false;
+
+            case UnknownProcedureAction.Warning:
+                Streams.UserError.Writer!.WriteLine($"Warning: undefined procedure {_symbols.DescribeFunctor(functorId)}");
+                return false;
+
+            default:
+                throw PrologErrors.UndefinedProcedure(this, functorId);
+        }
     }
 
     private void Allocate(int slots)

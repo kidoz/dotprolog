@@ -264,6 +264,21 @@ iso_case('8.16.8', number_codes(_, [0'a]), error(syntax_error(illegal_number))).
 iso_case('8.17.1', (catch(throw(ball), Ball, true), Ball == ball), success).
 iso_case('8.17.1', catch(true, _, fail), success).
 iso_case('8.17.1', throw(_), error(instantiation_error)).
+iso_case('8.17.2', current_prolog_flag(bounded, true), success).
+iso_case('8.17.2', current_prolog_flag(integer_rounding_function, toward_zero), success).
+iso_case('8.17.2', current_prolog_flag(max_arity, 255), success).
+iso_case('8.17.2', current_prolog_flag(double_quotes, codes), success).
+iso_case('8.17.2', current_prolog_flag(not_a_flag, _), failure).
+iso_case('8.17.2', (\+ current_prolog_flag(F1, F1), var(F1)), success).
+iso_case('8.17.2', current_prolog_flag(1, _), error(type_error(atom, 1))).
+iso_case('8.17.3', set_prolog_flag(_, codes), error(instantiation_error)).
+iso_case('8.17.3', set_prolog_flag(double_quotes, _), error(instantiation_error)).
+iso_case('8.17.3', set_prolog_flag(1, codes), error(type_error(atom, 1))).
+iso_case('8.17.3', set_prolog_flag(not_a_flag, value), error(domain_error(prolog_flag, not_a_flag))).
+iso_case('8.17.3', set_prolog_flag(double_quotes, strings), error(domain_error(flag_value, double_quotes+strings))).
+iso_case('8.17.3', set_prolog_flag(bounded, false), error(domain_error(flag_value, bounded+false))).
+iso_case('8.17.3', set_prolog_flag(bounded, true), error(permission_error(modify, flag, bounded))).
+iso_case('8.17.3', (set_prolog_flag(debug, on), current_prolog_flag(debug, on), set_prolog_flag(debug, off)), success).
 
 % Used by 8.15.3; a goal that is defined so the case tests control flow, not existence.
 repeat_guard(0).

@@ -1,28 +1,28 @@
+using DotProlog.Runtime;
 using DotProlog.Syntax;
 
 namespace DotProlog.Compiler;
 
 /// <summary>
-/// Rewrites reader output into the subset the clause compiler lowers: today that means expanding
-/// double-quoted literals into lists of character codes, which is the <c>codes</c> setting of the
-/// <c>double_quotes</c> flag.
+/// Rewrites reader output into the subset the clause compiler lowers, including the representation
+/// selected by the <c>double_quotes</c> flag.
 /// </summary>
 internal static class TermNormalizer
 {
-    internal static SyntaxTerm Normalize(SyntaxTerm term) =>
+    internal static SyntaxTerm Normalize(SyntaxTerm term, DoubleQuotesMode doubleQuotes = DoubleQuotesMode.Codes) =>
         term switch
         {
-            StringTerm text => ToCodeList(text),
-            CompoundTerm compound => NormalizeCompound(compound),
+            StringTerm text => NormalizeString(text, doubleQuotes),
+            CompoundTerm compound => NormalizeCompound(compound, doubleQuotes),
             _ => term,
         };
 
-    private static CompoundTerm NormalizeCompound(CompoundTerm compound)
+    private static CompoundTerm NormalizeCompound(CompoundTerm compound, DoubleQuotesMode doubleQuotes)
     {
         SyntaxTerm[]? rewritten = null;
         for (int i = 0; i < compound.Arguments.Count; i++)
         {
-            SyntaxTerm normalized = Normalize(compound.Arguments[i]);
+            SyntaxTerm normalized = Normalize(compound.Arguments[i], doubleQuotes);
             if (!ReferenceEquals(normalized, compound.Arguments[i]) && rewritten is null)
             {
                 rewritten = [.. compound.Arguments];
@@ -37,12 +37,23 @@ internal static class TermNormalizer
         return rewritten is null ? compound : compound with { Arguments = rewritten };
     }
 
-    private static SyntaxTerm ToCodeList(StringTerm text)
+    private static SyntaxTerm NormalizeString(StringTerm text, DoubleQuotesMode doubleQuotes)
     {
+        if (doubleQuotes == DoubleQuotesMode.Atom)
+        {
+            return new AtomTerm(text.Value, text.Span);
+        }
+
         SyntaxTerm result = new AtomTerm(TermReader.EmptyListAtom, text.Span);
+
         for (int i = text.Value.Length - 1; i >= 0; i--)
         {
-            result = new CompoundTerm(TermReader.ListFunctor, [new IntegerTerm(text.Value[i], text.Span), result], text.Span);
+            SyntaxTerm character =
+                doubleQuotes == DoubleQuotesMode.Codes
+                    ? new IntegerTerm(text.Value[i], text.Span)
+                    : new AtomTerm(text.Value[i].ToString(), text.Span);
+
+            result = new CompoundTerm(TermReader.ListFunctor, [character, result], text.Span);
         }
 
         return result;
