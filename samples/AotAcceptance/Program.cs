@@ -81,6 +81,10 @@ internal static class Program
                 format("arithmetic=~w,~w,~w~n", [Rounded, Quotient, Sine]),
                 catch(_ is 0.0 / 0.0, error(evaluation_error(undefined), _), write(arithmetic_error)), nl,
 
+                % Occurs-check unification is iterative and must survive NativeAOT trimming.
+                \+ unify_with_occurs_check(Cycle, f(Cycle)), var(Cycle),
+                write(occurs_check), nl,
+
                 % An operator declared at run time, in a native image, changing how a term prints.
                 op(700, xfx, likes),
                 write(likes(alice, bob)), nl,

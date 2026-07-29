@@ -77,6 +77,7 @@ public sealed class NativeAotAcceptanceTests
                     "row     7",
                     "arithmetic=-1,2.0,0.0",
                     "arithmetic_error",
+                    "occurs_check",
                     "alice likes bob",
                     "+(1,*(2,3))",
                     "427",
