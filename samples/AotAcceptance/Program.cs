@@ -100,6 +100,14 @@ internal static class Program
                 set_prolog_flag(double_quotes, codes),
                 write(prolog_flags), nl,
 
+                % Character-code I/O shares the stream path and must preserve peek and EOF in AOT.
+                open('dotprolog-aot-code.tmp', write, CodeOut),
+                put_code(CodeOut, 65), put_code(CodeOut, 79), put_code(CodeOut, 84), close(CodeOut),
+                open('dotprolog-aot-code.tmp', read, CodeIn),
+                get_code(CodeIn, 65), peek_code(CodeIn, 79),
+                get_code(CodeIn, 79), get_code(CodeIn, 84), get_code(CodeIn, -1), close(CodeIn),
+                write(code_io), nl,
+
                 % An operator declared at run time, in a native image, changing how a term prints.
                 op(700, xfx, likes),
                 write(likes(alice, bob)), nl,
