@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**329 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**332 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -57,8 +57,10 @@ Writing them was worth it immediately: they found these real defects.
   `unknown` consistently controls direct, meta-called, and host calls.
 - Character streams had only atom-valued input and output. `get_code/1,2`, `peek_code/1,2`, and
   `put_code/1,2` now implement code-valued input, lookahead, EOF, and ISO argument errors.
+- `read_term/2,3` omitted `singletons/1`, and `variables/1` omitted anonymous variables. All three
+  ISO variable-reporting options now preserve first-occurrence order and share with the read term.
 
-Beyond the conformance cases, the engine and toolchain are covered by 752 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 755 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
@@ -85,7 +87,6 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 |---|---|
 | Complete stream surface | Stream properties, byte I/O, binary streams, and repositioning are absent |
 | Character conversion | `char_conversion/2` and `current_char_conversion/2` are absent |
-| Complete term-reading options | `read_term/3` does not yet support every ISO option |
 
 ## Non-ISO features absent deliberately
 
@@ -100,7 +101,6 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 |---|---|---|
 | `\+ 4` | `type_error(callable, 4)` — the inner goal | Same |
 | A character is a UTF-16 code unit | A character outside the Basic Multilingual Plane is two codes, and `atom_length/2` counts it as two | SWI counts code points |
-| `read_term/2` `singletons/1` option | `domain_error`, rather than a wrong answer | Supported |
 | Two modules exporting the same name | The first loaded gets the unqualified name | SWI reports a conflict |
 | Clause selection | Linear scan; no first-argument indexing | Indexed |
 | Arithmetic extensions | `div/2`, evaluable `integer/1`, `e/0`, `inf/0`, `nan/0`, and several utility functions remain available | Not part of the ISO core |
