@@ -100,6 +100,17 @@ internal static class Program
                 set_prolog_flag(double_quotes, codes),
                 write(prolog_flags), nl,
 
+                % Character conversion owns explicit versioned state and feeds runtime term parsing.
+                char_conversion(z, x), current_char_conversion(z, x),
+                set_prolog_flag(char_conversion, on),
+                atom_codes(ConvertedSource, [102, 105, 122, 122]),
+                read_term_from_atom(ConvertedSource, fixx, []),
+                atom_codes(QuotedSource, [39, 122, 39]),
+                read_term_from_atom(QuotedSource, z, []),
+                set_prolog_flag(char_conversion, off),
+                char_conversion(z, z), \+ current_char_conversion(z, _),
+                write(character_conversion), nl,
+
                 % ISO read options retain source order, sharing, and named-singleton identity.
                 read_term_from_atom('f(A,B,A,_C,_)', ReadOptionsTerm,
                     [variables(ReadVariables), singletons(ReadSingletons)]),

@@ -80,6 +80,7 @@ public sealed class NativeAotAcceptanceTests
                     "occurs_check",
                     "predicate_info",
                     "prolog_flags",
+                    "character_conversion",
                     "read_options",
                     "stream_properties",
                     "code_io",
