@@ -108,6 +108,14 @@ internal static class Program
                 ReadSingletons = ['B'=ReadB, '_C'=ReadC],
                 write(read_options), nl,
 
+                % Open streams and their ISO metadata are explicit runtime state, not reflection.
+                current_input(NativeInput), current_stream(NativeInput),
+                stream_property(NativeInput, mode(read)),
+                stream_property(NativeInput, input),
+                stream_property(NativeInput, type(text)),
+                stream_property(NativeInput, reposition(false)),
+                write(stream_properties), nl,
+
                 % Character-code I/O shares the stream path and must preserve peek and EOF in AOT.
                 open('dotprolog-aot-code.tmp', write, CodeOut),
                 put_code(CodeOut, 65), put_code(CodeOut, 79), put_code(CodeOut, 84), close(CodeOut),

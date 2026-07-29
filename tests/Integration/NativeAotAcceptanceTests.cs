@@ -81,6 +81,7 @@ public sealed class NativeAotAcceptanceTests
                     "predicate_info",
                     "prolog_flags",
                     "read_options",
+                    "stream_properties",
                     "code_io",
                     "alice likes bob",
                     "+(1,*(2,3))",
