@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**286 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**290 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -47,8 +47,10 @@ Writing them was worth it immediately: they found these real defects.
 - Several ISO evaluable functors were absent, and float-only functions accepted integers. The
   conformance corpus now covers the mathematical, rounding, float-decomposition, and bitwise
   functors together with their operand signatures and exceptional results.
+- `unify_with_occurs_check/2` was absent. It now rejects only cycle-creating bindings, restores
+  tentative bindings after failure, and terminates while inspecting an existing rational tree.
 
-Beyond the conformance cases, the engine and toolchain are covered by 701 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 711 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
@@ -56,7 +58,7 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 
 | Area | Status |
 |---|---|
-| Terms, unification, backtracking, cut | Implemented |
+| Terms, occurs-check unification, backtracking, cut | Implemented |
 | Control constructs, `call/1..8` | Implemented |
 | Exceptions, ISO `error/2` terms | Implemented |
 | Arithmetic, standard order, `compare/3` | Implemented |
@@ -68,13 +70,21 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 | Streams, `read/1`, `read_term/2,3`, character I/O | Implemented |
 | Modules, `use_module/1,2`, `meta_predicate/1` | Implemented |
 
-## Absent, deliberately
+## Known ISO gaps
+
+| Feature | Current state |
+|---|---|
+| Predicate and flag enumeration | `current_predicate/1` and `current_prolog_flag/2` are absent |
+| Mutable Prolog flags | `set_prolog_flag/2` is accepted by the loader but does not change state |
+| Complete stream surface | Stream properties, code and byte I/O, binary streams, and repositioning are absent |
+| Character conversion | `char_conversion/2` and `current_char_conversion/2` are absent |
+| Complete term-reading options | `read_term/3` does not yet support every ISO option |
+
+## Non-ISO features absent deliberately
 
 | Feature | Why |
 |---|---|
 | A string type, and the SWI string predicates | An atom is the only text term. Aliasing the string predicates to atoms would let portable code compile here and then behave differently. |
-| Binary streams, stream repositioning | A Prolog program that needs bytes is better served by its host. |
-| `set_prolog_flag/2` acting on anything | Accepted and ignored so that portable files load. |
 | Constraint solving, tabling, attributed variables | Out of scope for 0.1.0. |
 
 ## Known differences

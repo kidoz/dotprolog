@@ -10,13 +10,15 @@ All notable changes to DotProlog are recorded here. The format follows
 
 - The ISO evaluable functors for trigonometry, logarithms, exponentials, rounding, float
   decomposition, and bitwise complement.
+- ISO `unify_with_occurs_check/2` with transactional failure and cycle-safe rational-tree
+  traversal.
 
 ### Changed
 
 - Arithmetic now enforces ISO operand signatures, float division result types, bounded-overflow
   errors, and the distinct exceptional cases for zero division, undefined results, and float
   overflow.
-- The repository's ISO-derived conformance corpus now contains 286 passing cases.
+- The repository's ISO-derived conformance corpus now contains 290 passing cases.
 
 ## [0.1.1] — 2026-07-28
 
