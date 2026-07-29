@@ -211,7 +211,7 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 | Output | `write/1`, `writeq/1`, `print/1`, `writeln/1`, `write_canonical/1`, `write_term/2`, `nl/0`, `format/1,2,3`, `tab/1` |
 | Operators | `op/3`, `current_op/3` |
 | Grammars | `-->/2` with `{}/1`, `!`, `\+`, pushback lists; `phrase/2`, `phrase/3` |
-| Streams | `open/3,4` text and binary streams, `close/1`, `current_stream/1`, `stream_property/2`, current-stream selection, EOF inspection, flushing |
+| Streams | `open/3,4` text and binary streams, `close/1`, `current_stream/1`, `stream_property/2`, `set_stream_position/2`, current-stream selection, EOF inspection, flushing |
 | Reading | term, character, character-code, and byte input/output; `read_term_from_atom/3`, `term_to_atom/2` |
 | Modules | `:- module/2`, `use_module/1,2`, `:- meta_predicate/1`, `Module:Goal` |
 | Directives | `:- Goal`, `:- initialization(Goal)`, `halt/0`, `halt/1` |
@@ -352,7 +352,7 @@ A control term assembled at run time and passed to `call/1` is lowered to VM byt
 same control-construct compiler used for source clauses. Its cut is transparent within that
 meta-called goal and opaque to the caller, as ISO specifies.
 
-DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 356 conformance cases encoded
+DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 364 conformance cases encoded
 from ISO/IEC 13211-1, all passing, but those are its own reading of the standard rather than an
 independent suite — see [COMPATIBILITY.md](COMPATIBILITY.md), which also lists the known
 differences.
