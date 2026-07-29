@@ -135,6 +135,23 @@ internal static class Program
                 get_code(CodeIn, 79), get_code(CodeIn, 84), get_code(CodeIn, -1), close(CodeIn),
                 write(code_io), nl,
 
+                % EOF policy and close options are explicit stream state in the native image.
+                open('dotprolog-aot-code.tmp', read, ErrorEof, [eof_action(error)]),
+                get_code(ErrorEof, 65), get_code(ErrorEof, 79), get_code(ErrorEof, 84), get_code(ErrorEof, -1),
+                catch(
+                    (get_code(ErrorEof, _), EofErrorCaught = false),
+                    error(permission_error(input, past_end_of_stream, _), _),
+                    EofErrorCaught = true),
+                EofErrorCaught == true,
+                close(ErrorEof, [force(true)]),
+                open('dotprolog-aot-code.tmp', read, ResetEof, [eof_action(reset)]),
+                get_code(ResetEof, 65), get_code(ResetEof, 79), get_code(ResetEof, 84), get_code(ResetEof, -1),
+                stream_property(ResetEof, end_of_stream(past)),
+                peek_code(ResetEof, -1),
+                stream_property(ResetEof, end_of_stream(at)),
+                close(ResetEof, [force(false)]),
+                write(stream_eof_actions), nl,
+
                 % Binary streams and byte predicates use raw storage without reflection or encoding.
                 open('dotprolog-aot-byte.tmp', write, ByteOut, [type(binary)]),
                 stream_property(ByteOut, type(binary)),
