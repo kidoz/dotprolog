@@ -150,6 +150,38 @@ public sealed class StreamTests : IDisposable
     }
 
     [Fact]
+    public void CharacterCodesAreWrittenReadAndPeeked()
+    {
+        string path = Path("codes.txt");
+
+        Assert.Equal(
+            "[97,98,98,-1]\n",
+            PrologTestHost.RunGoal(
+                $"""
+                open('{path}', write, S), put_code(S, 97), put_code(S, 98), close(S),
+                open('{path}', read, R),
+                  get_code(R, A), peek_code(R, P), get_code(R, B), get_code(R, Eof),
+                close(R),
+                write([A,P,B,Eof]), nl
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void OneArgumentCodeOperationsUseTheCurrentStreams() =>
+        Assert.Equal(
+            "[65,66]",
+            PrologTestHost.RunGoal("with_output_to(codes(Codes), (put_code(65), put_code(66))), write(Codes)")
+        );
+
+    [Fact]
+    public void GetCodeConsumesTextBufferedByATermRead()
+    {
+        Assert.Equal("32-90\n", RunWithInput(":- initialization((read(a), get_code(A), peek_code(B), write(A-B), nl)).", "a. Z"));
+    }
+
+    [Fact]
     public void ReadingPastTheEndOfAFileGivesEndOfFile()
     {
         string path = Path("empty.txt");
@@ -244,6 +276,19 @@ public sealed class StreamTests : IDisposable
     [InlineData("write(user_input, x)", "permission_error(output,stream,user_input/0)")]
     [InlineData("read(user_output, _)", "permission_error(input,stream,user_output/0)")]
     public void ReportsBadStreamArguments(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+
+    [Theory]
+    [InlineData("get_code(a)", "type_error(integer,a)")]
+    [InlineData("get_code(-2)", "representation_error(in_character_code)")]
+    [InlineData("get_code(65536)", "representation_error(in_character_code)")]
+    [InlineData("put_code(_)", "instantiation_error")]
+    [InlineData("put_code(a)", "type_error(integer,a)")]
+    [InlineData("put_code(-1)", "representation_error(character_code)")]
+    [InlineData("put_code(65536)", "representation_error(character_code)")]
+    [InlineData("get_code(f(1), _)", "domain_error(stream_or_alias,f(1))")]
+    [InlineData("put_code(user_input, 97)", "permission_error(output,stream,user_input/0)")]
+    public void ReportsCharacterCodeErrors(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
 
     [Fact]

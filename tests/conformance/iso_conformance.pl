@@ -357,10 +357,24 @@ iso_case('8.11.8', set_output(user_input), error(permission_error(output, stream
 % --- 8.12 Character input and output ------------------------------------------
 iso_case('8.12.1', get_char(no_such_stream, _), error(existence_error(stream, no_such_stream))).
 iso_case('8.12.1', get_char(user_output, _), error(permission_error(input, stream, user_output/0))).
+iso_case('8.12.1', get_code(-1), success).
+iso_case('8.12.1', get_code(a), error(type_error(integer, a))).
+iso_case('8.12.1', get_code(-2), error(representation_error(in_character_code))).
+iso_case('8.12.1', get_code(user_output, _), error(permission_error(input, stream, user_output/0))).
+iso_case('8.12.1', get_code(no_such_stream, _), error(existence_error(stream, no_such_stream))).
+iso_case('8.12.1', get_code(f(1), _), error(domain_error(stream_or_alias, f(1)))).
 iso_case('8.12.2', peek_char(no_such_stream, _), error(existence_error(stream, no_such_stream))).
+iso_case('8.12.3', peek_code(-1), success).
+iso_case('8.12.3', peek_code(a), error(type_error(integer, a))).
+iso_case('8.12.3', peek_code(user_output, _), error(permission_error(input, stream, user_output/0))).
 iso_case('8.12.3', put_char(user_output, _), error(instantiation_error)).
 iso_case('8.12.3', put_char(user_output, ab), error(type_error(character, ab))).
 iso_case('8.12.3', put_char(user_input, a), error(permission_error(output, stream, user_input/0))).
+iso_case('8.12.5', (with_output_to(codes(C2), put_code(97)), C2 == [97]), success).
+iso_case('8.12.5', put_code(_), error(instantiation_error)).
+iso_case('8.12.5', put_code(a), error(type_error(integer, a))).
+iso_case('8.12.5', put_code(-1), error(representation_error(character_code))).
+iso_case('8.12.5', put_code(user_input, 97), error(permission_error(output, stream, user_input/0))).
 
 % --- 8.14 Term input and output -----------------------------------------------
 iso_case('8.14.1', read_term(no_such_stream, _, []), error(existence_error(stream, no_such_stream))).

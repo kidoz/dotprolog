@@ -41,6 +41,12 @@ internal static class StreamBuiltins
         registry.Register("peek_char", 2, static machine => GetChar(machine, stream: 0, target: 1, consume: false));
         registry.Register("put_char", 1, static machine => PutChar(machine, stream: -1, source: 0));
         registry.Register("put_char", 2, static machine => PutChar(machine, stream: 0, source: 1));
+        registry.Register("get_code", 1, static machine => GetCode(machine, stream: -1, target: 0, consume: true));
+        registry.Register("get_code", 2, static machine => GetCode(machine, stream: 0, target: 1, consume: true));
+        registry.Register("peek_code", 1, static machine => GetCode(machine, stream: -1, target: 0, consume: false));
+        registry.Register("peek_code", 2, static machine => GetCode(machine, stream: 0, target: 1, consume: false));
+        registry.Register("put_code", 1, static machine => PutCode(machine, stream: -1, source: 0));
+        registry.Register("put_code", 2, static machine => PutCode(machine, stream: 0, source: 1));
 
         registry.Register("at_end_of_stream", 0, static machine => AtEnd(machine, stream: -1));
         registry.Register("at_end_of_stream", 1, static machine => AtEnd(machine, stream: 0));
@@ -83,7 +89,7 @@ internal static class StreamBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        PrologStream? stream = null;
+        PrologStream? stream;
 
         if (cell.Tag == CellTag.Atom)
         {
@@ -92,12 +98,23 @@ internal static class StreamBuiltins
         else if (cell.Tag == CellTag.Structure)
         {
             Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(cell.Index).Index);
-            Cell id = machine.Dereference(machine.HeapAt(cell.Index + 1));
 
-            if (machine.Symbols.AtomName(functor.NameAtom) == StreamFunctor && functor.Arity == 1 && id.Tag == CellTag.Integer)
+            if (machine.Symbols.AtomName(functor.NameAtom) != StreamFunctor || functor.Arity != 1)
             {
-                stream = machine.Streams.ById((int)id.Integer);
+                throw PrologErrors.Domain(machine, "stream_or_alias", cell);
             }
+
+            Cell id = machine.Dereference(machine.HeapAt(cell.Index + 1));
+            if (id.Tag != CellTag.Integer)
+            {
+                throw PrologErrors.Domain(machine, "stream_or_alias", cell);
+            }
+
+            stream = machine.Streams.ById((int)id.Integer);
+        }
+        else
+        {
+            throw PrologErrors.Domain(machine, "stream_or_alias", cell);
         }
 
         if (stream is null)
@@ -368,6 +385,41 @@ internal static class StreamBuiltins
 
     private static Cell Character(Machine machine, char value) => Cell.Atom(machine.Symbols.InternAtom(value.ToString()));
 
+    private static bool GetCode(Machine machine, int stream, int target, bool consume)
+    {
+        PrologStream source = Resolve(machine, stream, input: true);
+        Cell code = machine.Argument(target);
+
+        if (code.Tag != CellTag.Reference)
+        {
+            if (code.Tag != CellTag.Integer)
+            {
+                throw PrologErrors.Type(machine, "integer", code);
+            }
+
+            if (code.Integer is < -1 or > char.MaxValue)
+            {
+                throw PrologErrors.Representation(machine, "in_character_code");
+            }
+        }
+
+        int next;
+        if (source.Buffer.Length > 0)
+        {
+            next = source.Buffer[0];
+            if (consume)
+            {
+                source.Buffer = source.Buffer[1..];
+            }
+        }
+        else
+        {
+            next = consume ? source.Reader!.Read() : source.Reader!.Peek();
+        }
+
+        return machine.Unify(code, Cell.Integer60(next));
+    }
+
     private static bool PutChar(Machine machine, int stream, int source)
     {
         PrologStream target = Resolve(machine, stream, input: false);
@@ -389,6 +441,30 @@ internal static class StreamBuiltins
         }
 
         target.Writer!.Write(text);
+        return true;
+    }
+
+    private static bool PutCode(Machine machine, int stream, int source)
+    {
+        PrologStream target = Resolve(machine, stream, input: false);
+        Cell code = machine.Argument(source);
+
+        if (code.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        if (code.Tag != CellTag.Integer)
+        {
+            throw PrologErrors.Type(machine, "integer", code);
+        }
+
+        if (code.Integer is < 0 or > char.MaxValue)
+        {
+            throw PrologErrors.Representation(machine, "character_code");
+        }
+
+        target.Writer!.Write((char)code.Integer);
         return true;
     }
 
