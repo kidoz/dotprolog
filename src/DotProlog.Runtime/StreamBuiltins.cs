@@ -59,6 +59,7 @@ internal static class StreamBuiltins
 
         registry.Register("at_end_of_stream", 0, static machine => AtEnd(machine, stream: -1));
         registry.Register("at_end_of_stream", 1, static machine => AtEnd(machine, stream: 0));
+        registry.Register("set_stream_position", 2, SetStreamPosition);
 
         registry.Register("nl", 1, static machine => WriteText(machine, stream: 0, "\n"));
         registry.Register("write", 2, static machine => WriteTerm(machine, stream: 0, term: 1, false, false));
@@ -194,13 +195,13 @@ internal static class StreamBuiltins
             throw PrologErrors.Domain(machine, "io_mode", mode);
         }
 
-        OpenOptions openOptions = options < 0 ? new OpenOptions(null, "text") : ReadOpenOptions(machine, options);
+        OpenOptions openOptions = options < 0 ? new OpenOptions(null, "text", true) : ReadOpenOptions(machine, options);
         string path = machine.Symbols.AtomName(file.Index);
 
         PrologStream stream;
         try
         {
-            stream = machine.Streams.Open(path, modeName, openOptions.Alias, openOptions.Type);
+            stream = machine.Streams.Open(path, modeName, openOptions.Alias, openOptions.Type, openOptions.Reposition);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
@@ -213,7 +214,7 @@ internal static class StreamBuiltins
     /// <summary>Reads the supported ISO options of <c>open/4</c>; unknown options are rejected.</summary>
     private static OpenOptions ReadOpenOptions(Machine machine, int options)
     {
-        var result = new OpenOptions(null, "text");
+        var result = new OpenOptions(null, "text", true);
 
         foreach (Cell element in TermList.ReadProper(machine, machine.Argument(options)))
         {
@@ -252,6 +253,9 @@ internal static class StreamBuiltins
                 case "type" when atom is "text" or "binary":
                     result = result with { Type = atom };
                     break;
+                case "reposition" when atom is "true" or "false":
+                    result = result with { Reposition = atom == "true" };
+                    break;
                 default:
                     throw PrologErrors.Domain(machine, "stream_option", option);
             }
@@ -260,7 +264,7 @@ internal static class StreamBuiltins
         return result;
     }
 
-    private readonly record struct OpenOptions(string? Alias = null, string Type = "text");
+    private readonly record struct OpenOptions(string? Alias, string Type, bool Reposition);
 
     private static bool Close(Machine machine)
     {
@@ -281,23 +285,12 @@ internal static class StreamBuiltins
         PrologStream? stream = cell.Tag switch
         {
             CellTag.Atom => machine.Streams.ByAlias(machine.Symbols.AtomName(cell.Index)),
-            CellTag.Structure => ById(machine, cell),
-            _ => null,
+            CellTag.Structure when TryStreamHandle(machine, cell, out int id) => machine.Streams.ById(id),
+            CellTag.Structure => throw PrologErrors.Domain(machine, "stream_or_alias", cell),
+            _ => throw PrologErrors.Domain(machine, "stream_or_alias", cell),
         };
 
         return stream ?? throw Existence(machine, "stream", cell);
-    }
-
-    private static PrologStream? ById(Machine machine, Cell cell)
-    {
-        Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(cell.Index).Index);
-        if (machine.Symbols.AtomName(functor.NameAtom) != StreamFunctor || functor.Arity != 1)
-        {
-            return null;
-        }
-
-        Cell id = machine.Dereference(machine.HeapAt(cell.Index + 1));
-        return id.Tag == CellTag.Integer ? machine.Streams.ById((int)id.Integer) : null;
     }
 
     private static bool Current(Machine machine, bool input)
@@ -490,7 +483,7 @@ internal static class StreamBuiltins
         Cell value = machine.Dereference(machine.HeapAt(property.Index + 1));
         if (name == "position")
         {
-            if (value.Tag != CellTag.Reference)
+            if (value.Tag != CellTag.Reference && !TryReadPosition(machine, value, out _))
             {
                 throw PrologErrors.Domain(machine, "stream_property", property);
             }
@@ -528,13 +521,16 @@ internal static class StreamBuiltins
                 candidate = UnaryProperty(machine, "type", stream.Type);
                 return true;
             case 5:
-                candidate = UnaryProperty(machine, "reposition", "false");
+                candidate = UnaryProperty(machine, "reposition", stream.Reposition ? "true" : "false");
                 return true;
             case 6 when stream.IsInput:
                 candidate = UnaryProperty(machine, "eof_action", "eof_code");
                 return true;
             case 7 when stream.IsInput:
                 candidate = UnaryProperty(machine, "end_of_stream", EndStateName(stream.ObserveEnd()));
+                return true;
+            case 8 when stream.TryGetPosition(out long position):
+                candidate = PositionProperty(machine, position);
                 return true;
             default:
                 return false;
@@ -543,6 +539,15 @@ internal static class StreamBuiltins
 
     private static Cell UnaryProperty(Machine machine, string name, string value) =>
         machine.CreateStructure(machine.Symbols.InternFunctor(name, 1), [Cell.Atom(machine.Symbols.InternAtom(value))]);
+
+    private static Cell PositionProperty(Machine machine, long position) =>
+        machine.CreateStructure(machine.Symbols.InternFunctor("position", 1), [PositionTerm(machine, position)]);
+
+    private static Cell PositionTerm(Machine machine, long position) =>
+        machine.CreateStructure(
+            machine.Symbols.InternFunctor("$stream_position", 4),
+            [Cell.Integer60(position), Cell.Integer60(0), Cell.Integer60(0), Cell.Integer60(0)]
+        );
 
     private static string EndStateName(PrologStream.EndState state) =>
         state switch
@@ -792,6 +797,69 @@ internal static class StreamBuiltins
     {
         PrologStream source = Resolve(machine, stream, input: true, expectedType: null);
         return source.ObserveEnd() != PrologStream.EndState.Not;
+    }
+
+    private static bool SetStreamPosition(Machine machine)
+    {
+        Cell positionTerm = machine.Argument(1);
+        if (positionTerm.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        PrologStream stream = ResolveEither(machine, 0);
+        if (!TryReadPosition(machine, positionTerm, out long position))
+        {
+            throw PrologErrors.Domain(machine, "stream_position", positionTerm);
+        }
+
+        if (!stream.Reposition)
+        {
+            throw PrologErrors.Permission(
+                machine,
+                "reposition",
+                "stream",
+                machine.Symbols.InternFunctor(stream.Alias ?? stream.Name, 0)
+            );
+        }
+
+        if (!stream.TrySetPosition(position))
+        {
+            throw PrologErrors.Domain(machine, "stream_position", positionTerm);
+        }
+
+        return true;
+    }
+
+    private static bool TryReadPosition(Machine machine, Cell term, out long position)
+    {
+        position = 0;
+        if (term.Tag != CellTag.Structure)
+        {
+            return false;
+        }
+
+        Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(term.Index).Index);
+        if (machine.Symbols.AtomName(functor.NameAtom) != "$stream_position" || functor.Arity != 4)
+        {
+            return false;
+        }
+
+        for (int index = 1; index <= 4; index++)
+        {
+            Cell field = machine.Dereference(machine.HeapAt(term.Index + index));
+            if (field.Tag != CellTag.Integer || field.Integer < 0)
+            {
+                return false;
+            }
+
+            if (index == 1)
+            {
+                position = field.Integer;
+            }
+        }
+
+        return true;
     }
 
     private static bool WriteText(Machine machine, int stream, string text)

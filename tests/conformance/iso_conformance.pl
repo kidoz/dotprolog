@@ -364,6 +364,9 @@ iso_case('8.11.5', open(1, read, _), error(type_error(atom, 1))).
 iso_case('8.11.5', open(f, write, _, [type(other)]), error(domain_error(stream_option, type(other)))).
 iso_case('8.11.5', open(f, write, _, [type(1)]), error(domain_error(stream_option, type(1)))).
 iso_case('8.11.5', open(f, write, _, [type(_)]), error(instantiation_error)).
+iso_case('8.11.5', open(f, write, _, [reposition(other)]), error(domain_error(stream_option, reposition(other)))).
+iso_case('8.11.5', open(f, write, _, [reposition(1)]), error(domain_error(stream_option, reposition(1)))).
+iso_case('8.11.5', open(f, write, _, [reposition(_)]), error(instantiation_error)).
 iso_case('8.11.6', close(_), error(instantiation_error)).
 iso_case('8.11.6', close(no_such_stream), error(existence_error(stream, no_such_stream))).
 iso_case('8.11.7', (current_output(S4), \+ var(S4)), success).
@@ -371,6 +374,23 @@ iso_case('8.11.8', set_output(no_such_stream), error(existence_error(stream, no_
 iso_case('8.11.8', set_input(no_such_stream), error(existence_error(stream, no_such_stream))).
 iso_case('8.11.8', set_input(user_output), error(permission_error(input, stream, user_output/0))).
 iso_case('8.11.8', set_output(user_input), error(permission_error(output, stream, user_input/0))).
+iso_case('8.11.11', set_stream_position(user_input, _), error(instantiation_error)).
+iso_case('8.11.11', set_stream_position(user_input, foo), error(domain_error(stream_position, foo))).
+iso_case(
+    '8.11.11',
+    set_stream_position(no_such_stream, '$stream_position'(0, 0, 0, 0)),
+    error(existence_error(stream, no_such_stream))
+).
+iso_case(
+    '8.11.11',
+    set_stream_position(f(1), '$stream_position'(0, 0, 0, 0)),
+    error(domain_error(stream_or_alias, f(1)))
+).
+iso_case(
+    '8.11.11',
+    set_stream_position(user_input, '$stream_position'(0, 0, 0, 0)),
+    error(permission_error(reposition, stream, user_input/0))
+).
 
 % --- 8.12 Character input and output ------------------------------------------
 iso_case('8.12.1', get_char(no_such_stream, _), error(existence_error(stream, no_such_stream))).

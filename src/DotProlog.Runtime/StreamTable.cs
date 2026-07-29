@@ -18,12 +18,47 @@ public sealed class StreamTable
     /// <summary>Creates a table holding the three standard streams.</summary>
     public StreamTable()
     {
-        UserInput = Add(new PrologStream(0, "user_input", "read", "text", "user_input", Console.In, null, null, permanent: true));
+        UserInput = Add(
+            new PrologStream(
+                0,
+                "user_input",
+                "read",
+                "text",
+                "user_input",
+                Console.In,
+                null,
+                null,
+                reposition: false,
+                permanent: true
+            )
+        );
         UserOutput = Add(
-            new PrologStream(1, "user_output", "write", "text", "user_output", null, Console.Out, null, permanent: true)
+            new PrologStream(
+                1,
+                "user_output",
+                "write",
+                "text",
+                "user_output",
+                null,
+                Console.Out,
+                null,
+                reposition: false,
+                permanent: true
+            )
         );
         UserError = Add(
-            new PrologStream(2, "user_error", "write", "text", "user_error", null, Console.Error, null, permanent: true)
+            new PrologStream(
+                2,
+                "user_error",
+                "write",
+                "text",
+                "user_error",
+                null,
+                Console.Error,
+                null,
+                reposition: false,
+                permanent: true
+            )
         );
 
         CurrentInput = UserInput;
@@ -50,16 +85,18 @@ public sealed class StreamTable
     /// <param name="mode">One of <c>read</c>, <c>write</c>, or <c>append</c>.</param>
     /// <param name="alias">An alias to register the stream under, if any.</param>
     /// <param name="type">Either <c>text</c> or <c>binary</c>.</param>
+    /// <param name="reposition">Whether restoring a captured position is permitted.</param>
     /// <exception cref="IOException">The file could not be opened.</exception>
-    public PrologStream Open(string path, string mode, string? alias, string type)
+    public PrologStream Open(string path, string mode, string? alias, string type, bool reposition)
     {
         ArgumentNullException.ThrowIfNull(path);
 
-        PrologStream stream = type == "binary" ? OpenBinary(path, mode, alias) : OpenText(path, mode, alias);
+        PrologStream stream =
+            type == "binary" ? OpenBinary(path, mode, alias, reposition) : OpenText(path, mode, alias, reposition);
         return Add(stream);
     }
 
-    private PrologStream OpenText(string path, string mode, string? alias) =>
+    private PrologStream OpenText(string path, string mode, string? alias, bool reposition) =>
         mode switch
         {
             "read" => new PrologStream(
@@ -68,9 +105,10 @@ public sealed class StreamTable
                 mode,
                 "text",
                 alias,
-                new StreamReader(path),
+                new PositionedTextReader(File.ReadAllText(path)),
                 null,
                 null,
+                reposition,
                 permanent: false
             ),
             "write" => new PrologStream(
@@ -80,8 +118,9 @@ public sealed class StreamTable
                 "text",
                 alias,
                 null,
-                new StreamWriter(path, append: false),
+                new PositionedTextWriter(path, append: false),
                 null,
+                reposition,
                 false
             ),
             "append" => new PrologStream(
@@ -91,24 +130,25 @@ public sealed class StreamTable
                 "text",
                 alias,
                 null,
-                new StreamWriter(path, append: true),
+                new PositionedTextWriter(path, append: true),
                 null,
+                reposition,
                 false
             ),
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown stream mode."),
         };
 
-    private PrologStream OpenBinary(string path, string mode, string? alias)
+    private PrologStream OpenBinary(string path, string mode, string? alias, bool reposition)
     {
         FileStream stream = mode switch
         {
             "read" => new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read),
             "write" => new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read),
-            "append" => new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read),
+            "append" => OpenBinaryAppend(path),
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown stream mode."),
         };
 
-        return new PrologStream(_streams.Count, path, mode, "binary", alias, null, null, stream, permanent: false);
+        return new PrologStream(_streams.Count, path, mode, "binary", alias, null, null, stream, reposition, permanent: false);
     }
 
     /// <summary>Closes <paramref name="stream"/> and points anything that was using it back at the standard streams.</summary>
@@ -176,7 +216,18 @@ public sealed class StreamTable
     {
         var sink = new StringWriter(System.Globalization.CultureInfo.InvariantCulture);
         _captures.Push((CurrentOutput, sink));
-        CurrentOutput = new PrologStream(-1, "with_output_to", "write", "text", null, null, sink, null, permanent: false);
+        CurrentOutput = new PrologStream(
+            -1,
+            "with_output_to",
+            "write",
+            "text",
+            null,
+            null,
+            sink,
+            null,
+            reposition: false,
+            permanent: false
+        );
     }
 
     /// <summary>Stops capturing and returns what was written.</summary>
@@ -201,6 +252,13 @@ public sealed class StreamTable
             _aliases[stream.Alias] = stream;
         }
 
+        return stream;
+    }
+
+    private static FileStream OpenBinaryAppend(string path)
+    {
+        var stream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read);
+        stream.Position = stream.Length;
         return stream;
     }
 }

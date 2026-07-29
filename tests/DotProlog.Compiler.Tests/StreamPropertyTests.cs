@@ -35,10 +35,10 @@ public sealed class StreamPropertyTests : IDisposable
                   stream_property(S, output),
                   stream_property(S, alias(log)),
                   stream_property(S, type(text)),
-                  stream_property(S, reposition(false)),
+                  stream_property(S, reposition(true)),
                   \+ stream_property(S, input),
                   \+ stream_property(S, eof_action(_)),
-                  \+ stream_property(S, position(_)),
+                  stream_property(S, position(Position)), ground(Position),
                 close(S),
                 write(yes), nl
                 """

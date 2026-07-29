@@ -30,6 +30,7 @@ public sealed class PrologStream
         TextReader? reader,
         TextWriter? writer,
         Stream? binaryStream,
+        bool reposition,
         bool permanent
     )
     {
@@ -41,6 +42,7 @@ public sealed class PrologStream
         Reader = reader;
         Writer = writer;
         BinaryStream = binaryStream;
+        Reposition = reposition;
         IsPermanent = permanent;
     }
 
@@ -70,6 +72,9 @@ public sealed class PrologStream
 
     /// <summary>The raw byte stream, or <see langword="null"/> for a text stream.</summary>
     internal Stream? BinaryStream { get; private set; }
+
+    /// <summary>Whether <c>set_stream_position/2</c> may restore this stream.</summary>
+    internal bool Reposition { get; }
 
     /// <summary>Whether this is a standard stream, which cannot be closed.</summary>
     public bool IsPermanent { get; }
@@ -109,12 +114,65 @@ public sealed class PrologStream
         _endState = read ? EndState.Not : EndState.Past;
     }
 
+    /// <summary>Gets the logical character or byte offset represented by the current position.</summary>
+    internal bool TryGetPosition(out long position)
+    {
+        if (Reader is PositionedTextReader reader)
+        {
+            position = reader.PositionBeforeBuffer(_buffer);
+            return true;
+        }
+
+        if (Writer is PositionedTextWriter writer)
+        {
+            position = writer.Position;
+            return true;
+        }
+
+        if (BinaryStream is { CanSeek: true })
+        {
+            position = BinaryStream.Position;
+            return true;
+        }
+
+        position = 0;
+        return false;
+    }
+
+    /// <summary>Restores a logical position and clears input lookahead and EOF state.</summary>
+    internal bool TrySetPosition(long position)
+    {
+        bool changed =
+            Reader is PositionedTextReader reader ? reader.TrySeek(position)
+            : Writer is PositionedTextWriter writer ? writer.TrySeek(position)
+            : TrySeekBinary(position);
+
+        if (changed)
+        {
+            _buffer = string.Empty;
+            _endState = EndState.Not;
+        }
+
+        return changed;
+    }
+
     /// <summary>Replaces the standard input source and resets its EOF state.</summary>
     internal void SetReader(TextReader reader)
     {
         Reader = reader;
         _buffer = string.Empty;
         _endState = EndState.Not;
+    }
+
+    private bool TrySeekBinary(long position)
+    {
+        if (BinaryStream is not { CanSeek: true } || position < 0)
+        {
+            return false;
+        }
+
+        BinaryStream.Position = position;
+        return true;
     }
 
     /// <summary>Closes the stream, releasing whatever it was reading from or writing to.</summary>

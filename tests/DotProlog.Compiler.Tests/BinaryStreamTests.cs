@@ -87,7 +87,7 @@ public sealed class BinaryStreamTests : IDisposable
                   stream_property(In, type(binary)),
                   stream_property(In, mode(read)),
                   stream_property(In, input),
-                  stream_property(In, reposition(false)),
+                  stream_property(In, reposition(true)),
                   stream_property(In, end_of_stream(not)),
                   get_byte(In, 1),
                   stream_property(In, end_of_stream(at)),
