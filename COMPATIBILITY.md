@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**315 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**329 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -55,8 +55,10 @@ Writing them was worth it immediately: they found these real defects.
 - Prolog flags were accepted as inert declarations. The fixed and mutable ISO flags are now
   enumerable and validated; `double_quotes` controls source and runtime term reading, while
   `unknown` consistently controls direct, meta-called, and host calls.
+- Character streams had only atom-valued input and output. `get_code/1,2`, `peek_code/1,2`, and
+  `put_code/1,2` now implement code-valued input, lookahead, EOF, and ISO argument errors.
 
-Beyond the conformance cases, the engine and toolchain are covered by 740 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 752 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
@@ -81,7 +83,7 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 
 | Feature | Current state |
 |---|---|
-| Complete stream surface | Stream properties, code and byte I/O, binary streams, and repositioning are absent |
+| Complete stream surface | Stream properties, byte I/O, binary streams, and repositioning are absent |
 | Character conversion | `char_conversion/2` and `current_char_conversion/2` are absent |
 | Complete term-reading options | `read_term/3` does not yet support every ISO option |
 
