@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**347 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**356 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -17,10 +17,10 @@ Clause 7 cases cover reading terms from text: number syntax including character,
 octal, and binary literals; operator priority and associativity; list and curly notation; and what
 `writeq/1` produces, down to the exact codes for a quoted atom. Clause 8 cases cover unification,
 type testing, term comparison, term construction and decomposition, arithmetic and its comparisons,
-the clause and database predicates, all-solutions predicates, streams and character I/O, term
-input and output, `op/3`, logic and control, and atomic term processing — with an emphasis
-throughout on the error terms, which is where implementations diverge most. Sorting is included
-too, though it sits outside clause 8.
+the clause and database predicates, all-solutions predicates, text and binary streams, character
+and byte I/O, term input and output, `op/3`, logic and control, and atomic term processing — with
+an emphasis throughout on the error terms, which is where implementations diverge most. Sorting
+is included too, though it sits outside clause 8.
 
 **These cases are our own encoding of the standard, not third-party verification.** Ulrich
 Neumerkel's conformity tables carry no licence, and the Logtalk suite is written against its own
@@ -61,8 +61,11 @@ Writing them was worth it immediately: they found these real defects.
   ISO variable-reporting options now preserve first-occurrence order and share with the read term.
 - `stream_property/2` now enumerates explicit stream metadata and live `not`, `at`, and `past` EOF
   states; `current_stream/1` enumerates open handles without reflection.
+- `open/4` accepted only text streams. Its `type(text|binary)` option now selects encoded text or
+  raw-byte storage, and the byte predicates enforce ISO byte domains, stream types, lookahead, and
+  EOF behavior.
 
-Beyond the conformance cases, the engine and toolchain are covered by 767 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 791 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
@@ -79,7 +82,7 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 | Text, list, sorting, and higher-order library | Implemented |
 | `op/3`, `current_op/3`, operator-aware writing | Implemented |
 | DCGs, `phrase/2,3` | Implemented |
-| Streams, `read/1`, `read_term/2,3`, character I/O | Implemented |
+| Text and binary streams, term, character, code, and byte I/O | Implemented |
 | Modules, `use_module/1,2`, `meta_predicate/1` | Implemented |
 | ISO Prolog flags and state-dependent reading/calls | Implemented |
 
@@ -87,7 +90,7 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 
 | Feature | Current state |
 |---|---|
-| Complete stream surface | Byte I/O, binary streams, and repositioning are absent |
+| Complete stream surface | Repositioning is absent |
 | Character conversion | `char_conversion/2` and `current_char_conversion/2` are absent |
 
 ## Non-ISO features absent deliberately
