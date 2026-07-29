@@ -18,6 +18,13 @@ public sealed class PrologStream
         Past,
     }
 
+    internal enum EofAction
+    {
+        Error,
+        EofCode,
+        Reset,
+    }
+
     private string _buffer = string.Empty;
     private EndState _endState;
 
@@ -31,7 +38,8 @@ public sealed class PrologStream
         TextWriter? writer,
         Stream? binaryStream,
         bool reposition,
-        bool permanent
+        bool permanent,
+        EofAction eofAction = EofAction.EofCode
     )
     {
         Id = id;
@@ -44,6 +52,7 @@ public sealed class PrologStream
         BinaryStream = binaryStream;
         Reposition = reposition;
         IsPermanent = permanent;
+        EndOfFileAction = eofAction;
     }
 
     /// <summary>The stream's identifier, which appears in the <c>'$stream'(N)</c> term.</summary>
@@ -76,6 +85,9 @@ public sealed class PrologStream
     /// <summary>Whether <c>set_stream_position/2</c> may restore this stream.</summary>
     internal bool Reposition { get; }
 
+    /// <summary>What an input operation does after an EOF marker has already been returned.</summary>
+    internal EofAction EndOfFileAction { get; }
+
     /// <summary>Whether this is a standard stream, which cannot be closed.</summary>
     public bool IsPermanent { get; }
 
@@ -84,6 +96,9 @@ public sealed class PrologStream
 
     /// <summary>Text read past the end of the last clause, held for the next read.</summary>
     internal ref string Buffer => ref _buffer;
+
+    /// <summary>Whether a consuming input operation has already returned the EOF marker.</summary>
+    internal bool IsPastEnd => _endState == EndState.Past;
 
     /// <summary>Returns the live ISO end-of-stream state without consuming input.</summary>
     internal EndState ObserveEnd()
@@ -113,6 +128,9 @@ public sealed class PrologStream
     {
         _endState = read ? EndState.Not : EndState.Past;
     }
+
+    /// <summary>Lets an EOF-reset stream attempt input from its source again.</summary>
+    internal void ResetEnd() => _endState = EndState.Not;
 
     /// <summary>Gets the logical character or byte offset represented by the current position.</summary>
     internal bool TryGetPosition(out long position)
@@ -175,21 +193,67 @@ public sealed class PrologStream
         return true;
     }
 
-    /// <summary>Closes the stream, releasing whatever it was reading from or writing to.</summary>
-    internal void Close()
+    /// <summary>Closes the stream, optionally reclaiming resources despite I/O errors.</summary>
+    /// <returns>Whether a non-permanent stream was closed.</returns>
+    internal bool Close(bool force)
     {
-        if (!IsOpen || IsPermanent)
+        if (!IsOpen)
         {
-            return;
+            return true;
+        }
+
+        if (IsPermanent)
+        {
+            if (Writer is not null)
+            {
+                CloseResource(Writer.Flush, force);
+            }
+
+            return false;
+        }
+
+        if (force)
+        {
+            if (Reader is not null)
+            {
+                CloseResource(Reader.Dispose, force: true);
+            }
+
+            if (Writer is not null)
+            {
+                CloseResource(Writer.Flush, force: true);
+                CloseResource(Writer.Dispose, force: true);
+            }
+
+            if (BinaryStream is not null)
+            {
+                CloseResource(BinaryStream.Dispose, force: true);
+            }
+        }
+        else
+        {
+            Writer?.Flush();
+            Reader?.Dispose();
+            Writer?.Dispose();
+            BinaryStream?.Dispose();
         }
 
         IsOpen = false;
-        Reader?.Dispose();
-        Writer?.Flush();
-        Writer?.Dispose();
-        BinaryStream?.Dispose();
         Reader = null;
         Writer = null;
         BinaryStream = null;
+        return true;
+    }
+
+    private static void CloseResource(Action close, bool force)
+    {
+        try
+        {
+            close();
+        }
+        catch (Exception error) when (force && error is IOException or UnauthorizedAccessException)
+        {
+            // force(true) exists so cleanup code can reclaim the stream despite resource errors.
+        }
     }
 }

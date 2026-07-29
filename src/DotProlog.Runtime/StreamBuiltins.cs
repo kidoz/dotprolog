@@ -12,8 +12,8 @@ namespace DotProlog.Runtime;
 /// already use.
 /// </para>
 /// <para>
-/// Text streams carry terms and characters, while binary streams carry bytes. Stream positioning
-/// remains deliberately absent until opaque ISO positions can be represented consistently.
+/// Text streams carry terms and characters, while binary streams carry bytes. Disk streams expose
+/// opaque positions, and each input stream owns the EOF action selected when it was opened.
 /// </para>
 /// </remarks>
 internal static class StreamBuiltins
@@ -25,7 +25,8 @@ internal static class StreamBuiltins
     {
         registry.Register("open", 3, static machine => Open(machine, options: -1));
         registry.Register("open", 4, static machine => Open(machine, options: 3));
-        registry.Register("close", 1, Close);
+        registry.Register("close", 1, static machine => Close(machine, options: -1));
+        registry.Register("close", 2, static machine => Close(machine, options: 1));
         registry.Register("current_input", 1, static machine => Current(machine, input: true));
         registry.Register("current_output", 1, static machine => Current(machine, input: false));
         registry.Register("set_input", 1, static machine => Set(machine, input: true));
@@ -195,13 +196,21 @@ internal static class StreamBuiltins
             throw PrologErrors.Domain(machine, "io_mode", mode);
         }
 
-        OpenOptions openOptions = options < 0 ? new OpenOptions(null, "text", true) : ReadOpenOptions(machine, options);
+        OpenOptions openOptions =
+            options < 0 ? new OpenOptions(null, "text", true, PrologStream.EofAction.EofCode) : ReadOpenOptions(machine, options);
         string path = machine.Symbols.AtomName(file.Index);
 
         PrologStream stream;
         try
         {
-            stream = machine.Streams.Open(path, modeName, openOptions.Alias, openOptions.Type, openOptions.Reposition);
+            stream = machine.Streams.Open(
+                path,
+                modeName,
+                openOptions.Alias,
+                openOptions.Type,
+                openOptions.Reposition,
+                openOptions.EofAction
+            );
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
@@ -214,7 +223,7 @@ internal static class StreamBuiltins
     /// <summary>Reads the supported ISO options of <c>open/4</c>; unknown options are rejected.</summary>
     private static OpenOptions ReadOpenOptions(Machine machine, int options)
     {
-        var result = new OpenOptions(null, "text", true);
+        var result = new OpenOptions(null, "text", true, PrologStream.EofAction.EofCode);
 
         foreach (Cell element in TermList.ReadProper(machine, machine.Argument(options)))
         {
@@ -256,6 +265,9 @@ internal static class StreamBuiltins
                 case "reposition" when atom is "true" or "false":
                     result = result with { Reposition = atom == "true" };
                     break;
+                case "eof_action" when TryEofAction(atom, out PrologStream.EofAction eofAction):
+                    result = result with { EofAction = eofAction };
+                    break;
                 default:
                     throw PrologErrors.Domain(machine, "stream_option", option);
             }
@@ -264,12 +276,73 @@ internal static class StreamBuiltins
         return result;
     }
 
-    private readonly record struct OpenOptions(string? Alias, string Type, bool Reposition);
+    private readonly record struct OpenOptions(string? Alias, string Type, bool Reposition, PrologStream.EofAction EofAction);
 
-    private static bool Close(Machine machine)
+    private static bool Close(Machine machine, int options)
     {
-        machine.Streams.Close(ResolveEither(machine, 0));
+        PrologStream stream = ResolveEither(machine, 0);
+        bool force = options >= 0 && ReadCloseOptions(machine, options);
+
+        try
+        {
+            machine.Streams.Close(stream, force);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            throw PrologErrors.System(machine);
+        }
+
         return true;
+    }
+
+    private static bool ReadCloseOptions(Machine machine, int options)
+    {
+        bool force = false;
+
+        foreach (Cell element in TermList.ReadProper(machine, machine.Argument(options)))
+        {
+            Cell option = machine.Dereference(element);
+            if (option.Tag == CellTag.Reference)
+            {
+                throw PrologErrors.Instantiation(machine);
+            }
+
+            if (option.Tag != CellTag.Structure || machine.Symbols.ArityOf(machine.HeapAt(option.Index).Index) != 1)
+            {
+                throw PrologErrors.Domain(machine, "close_option", option);
+            }
+
+            Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(option.Index).Index);
+            Cell value = machine.Dereference(machine.HeapAt(option.Index + 1));
+            if (value.Tag == CellTag.Reference)
+            {
+                throw PrologErrors.Instantiation(machine);
+            }
+
+            string name = machine.Symbols.AtomName(functor.NameAtom);
+            string atom = value.Tag == CellTag.Atom ? machine.Symbols.AtomName(value.Index) : string.Empty;
+            if (name != "force" || atom is not ("true" or "false"))
+            {
+                throw PrologErrors.Domain(machine, "close_option", option);
+            }
+
+            force = atom == "true";
+        }
+
+        return force;
+    }
+
+    private static bool TryEofAction(string atom, out PrologStream.EofAction action)
+    {
+        action = atom switch
+        {
+            "error" => PrologStream.EofAction.Error,
+            "eof_code" => PrologStream.EofAction.EofCode,
+            "reset" => PrologStream.EofAction.Reset,
+            _ => default,
+        };
+
+        return atom is "error" or "eof_code" or "reset";
     }
 
     /// <summary>Resolves a stream argument for an operation that does not care about its direction.</summary>
@@ -524,7 +597,7 @@ internal static class StreamBuiltins
                 candidate = UnaryProperty(machine, "reposition", stream.Reposition ? "true" : "false");
                 return true;
             case 6 when stream.IsInput:
-                candidate = UnaryProperty(machine, "eof_action", "eof_code");
+                candidate = UnaryProperty(machine, "eof_action", EofActionName(stream.EndOfFileAction));
                 return true;
             case 7 when stream.IsInput:
                 candidate = UnaryProperty(machine, "end_of_stream", EndStateName(stream.ObserveEnd()));
@@ -557,9 +630,18 @@ internal static class StreamBuiltins
             _ => "not",
         };
 
+    private static string EofActionName(PrologStream.EofAction action) =>
+        action switch
+        {
+            PrologStream.EofAction.Error => "error",
+            PrologStream.EofAction.Reset => "reset",
+            _ => "eof_code",
+        };
+
     private static bool Read(Machine machine, int stream, int term, int options)
     {
         PrologStream source = Resolve(machine, stream, input: true);
+        PrepareInput(machine, source);
         IRuntimeCompiler compiler =
             machine.Program.RuntimeCompiler ?? throw new PrologException("Reading a term needs a compiler to parse it.");
 
@@ -629,6 +711,7 @@ internal static class StreamBuiltins
     private static bool GetChar(Machine machine, int stream, int target, bool consume)
     {
         PrologStream source = Resolve(machine, stream, input: true);
+        PrepareInput(machine, source);
         TextReader reader = source.Reader!;
 
         // Whatever a term read left behind has to be consumed before the reader itself is touched.
@@ -661,6 +744,7 @@ internal static class StreamBuiltins
     private static bool GetCode(Machine machine, int stream, int target, bool consume)
     {
         PrologStream source = Resolve(machine, stream, input: true);
+        PrepareInput(machine, source);
         Cell code = machine.Argument(target);
 
         if (code.Tag != CellTag.Reference)
@@ -750,6 +834,7 @@ internal static class StreamBuiltins
     private static bool GetByte(Machine machine, int stream, int target, bool consume)
     {
         PrologStream source = Resolve(machine, stream, input: true, expectedType: "binary");
+        PrepareInput(machine, source);
         Cell code = machine.Argument(target);
 
         if (code.Tag != CellTag.Reference && (code.Tag != CellTag.Integer || code.Integer is < -1 or > byte.MaxValue))
@@ -797,6 +882,23 @@ internal static class StreamBuiltins
     {
         PrologStream source = Resolve(machine, stream, input: true, expectedType: null);
         return source.ObserveEnd() != PrologStream.EndState.Not;
+    }
+
+    private static void PrepareInput(Machine machine, PrologStream source)
+    {
+        if (!source.IsPastEnd)
+        {
+            return;
+        }
+
+        switch (source.EndOfFileAction)
+        {
+            case PrologStream.EofAction.Error:
+                throw PrologErrors.Permission(machine, "input", "past_end_of_stream", StreamTerm(machine, source));
+            case PrologStream.EofAction.Reset:
+                source.ResetEnd();
+                break;
+        }
     }
 
     private static bool SetStreamPosition(Machine machine)

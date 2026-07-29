@@ -96,6 +96,13 @@ public static class PrologErrors
         return Unary(machine, "representation_error", flag);
     }
 
+    /// <summary>The host I/O system failed while carrying out a Prolog operation.</summary>
+    public static PrologException System(Machine machine)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+        return Build(machine, Cell.Atom(machine.Symbols.InternAtom("system_error")), "system_error");
+    }
+
     /// <summary>A term is not evaluable as arithmetic: <c>type_error(evaluable, Name/Arity)</c>.</summary>
     public static PrologException NotEvaluable(Machine machine, string name, int arity)
     {

@@ -87,16 +87,29 @@ public sealed class StreamTable
     /// <param name="type">Either <c>text</c> or <c>binary</c>.</param>
     /// <param name="reposition">Whether restoring a captured position is permitted.</param>
     /// <exception cref="IOException">The file could not be opened.</exception>
-    public PrologStream Open(string path, string mode, string? alias, string type, bool reposition)
+    public PrologStream Open(string path, string mode, string? alias, string type, bool reposition) =>
+        Open(path, mode, alias, type, reposition, PrologStream.EofAction.EofCode);
+
+    /// <summary>Opens and registers a stream with an explicit ISO end-of-file action.</summary>
+    internal PrologStream Open(
+        string path,
+        string mode,
+        string? alias,
+        string type,
+        bool reposition,
+        PrologStream.EofAction eofAction
+    )
     {
         ArgumentNullException.ThrowIfNull(path);
 
         PrologStream stream =
-            type == "binary" ? OpenBinary(path, mode, alias, reposition) : OpenText(path, mode, alias, reposition);
+            type == "binary"
+                ? OpenBinary(path, mode, alias, reposition, eofAction)
+                : OpenText(path, mode, alias, reposition, eofAction);
         return Add(stream);
     }
 
-    private PrologStream OpenText(string path, string mode, string? alias, bool reposition) =>
+    private PrologStream OpenText(string path, string mode, string? alias, bool reposition, PrologStream.EofAction eofAction) =>
         mode switch
         {
             "read" => new PrologStream(
@@ -109,7 +122,8 @@ public sealed class StreamTable
                 null,
                 null,
                 reposition,
-                permanent: false
+                permanent: false,
+                eofAction
             ),
             "write" => new PrologStream(
                 _streams.Count,
@@ -121,7 +135,8 @@ public sealed class StreamTable
                 new PositionedTextWriter(path, append: false),
                 null,
                 reposition,
-                false
+                false,
+                eofAction
             ),
             "append" => new PrologStream(
                 _streams.Count,
@@ -133,12 +148,13 @@ public sealed class StreamTable
                 new PositionedTextWriter(path, append: true),
                 null,
                 reposition,
-                false
+                false,
+                eofAction
             ),
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown stream mode."),
         };
 
-    private PrologStream OpenBinary(string path, string mode, string? alias, bool reposition)
+    private PrologStream OpenBinary(string path, string mode, string? alias, bool reposition, PrologStream.EofAction eofAction)
     {
         FileStream stream = mode switch
         {
@@ -148,15 +164,27 @@ public sealed class StreamTable
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown stream mode."),
         };
 
-        return new PrologStream(_streams.Count, path, mode, "binary", alias, null, null, stream, reposition, permanent: false);
+        return new PrologStream(
+            _streams.Count,
+            path,
+            mode,
+            "binary",
+            alias,
+            null,
+            null,
+            stream,
+            reposition,
+            permanent: false,
+            eofAction
+        );
     }
 
     /// <summary>Closes <paramref name="stream"/> and points anything that was using it back at the standard streams.</summary>
-    public void Close(PrologStream stream)
+    public void Close(PrologStream stream, bool force = false)
     {
         ArgumentNullException.ThrowIfNull(stream);
 
-        if (stream.IsPermanent)
+        if (!stream.Close(force))
         {
             return;
         }
@@ -175,8 +203,6 @@ public sealed class StreamTable
         {
             _aliases.Remove(stream.Alias);
         }
-
-        stream.Close();
     }
 
     /// <summary>Finds an open stream by identifier.</summary>
@@ -199,7 +225,7 @@ public sealed class StreamTable
         {
             if (!stream.IsPermanent && stream.IsOpen)
             {
-                Close(stream);
+                Close(stream, force: true);
             }
         }
     }
