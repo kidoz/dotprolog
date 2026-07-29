@@ -8,7 +8,8 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**244 conformance cases encoded from ISO/IEC 13211-1, all passing.** They live in
+**286 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
 
@@ -27,7 +28,7 @@ test framework, so neither could be vendored. Reading the standard and encoding 
 than nothing and less than an independent suite, and this file will say so until an independent one
 has been run.
 
-Writing them was worth it immediately: they found six real defects.
+Writing them was worth it immediately: they found these real defects.
 
 - `assertz(4)` raised an exception `catch/3` could not catch, aborting the run. Several standard
   errors were raw messages rather than Prolog terms.
@@ -40,8 +41,14 @@ Writing them was worth it immediately: they found six real defects.
 - `call((!, fail ; true))` succeeded because the cut could not prune the meta-called disjunction.
   Meta-called control now goes through the same bytecode lowering and cut barriers as source-level
   control.
+- Exact integer quotients from `/2` were returned as integers rather than floats, float zero
+  divisors leaked IEEE infinities, and bounded integer overflow could wrap before it reached a term.
+  Arithmetic now preserves the ISO result kinds and raises catchable evaluation errors.
+- Several ISO evaluable functors were absent, and float-only functions accepted integers. The
+  conformance corpus now covers the mathematical, rounding, float-decomposition, and bitwise
+  functors together with their operand signatures and exceptional results.
 
-Beyond the conformance cases, the engine and toolchain are covered by 684 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 701 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
@@ -79,6 +86,7 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 | `read_term/2` `singletons/1` option | `domain_error`, rather than a wrong answer | Supported |
 | Two modules exporting the same name | The first loaded gets the unqualified name | SWI reports a conflict |
 | Clause selection | Linear scan; no first-argument indexing | Indexed |
+| Arithmetic extensions | `div/2`, evaluable `integer/1`, `e/0`, `inf/0`, `nan/0`, and several utility functions remain available | Not part of the ISO core |
 
 ## Platforms
 
