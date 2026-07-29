@@ -84,6 +84,7 @@ public sealed class NativeAotAcceptanceTests
                     "stream_properties",
                     "code_io",
                     "byte_io",
+                    "stream_position",
                     "alice likes bob",
                     "+(1,*(2,3))",
                     "427",

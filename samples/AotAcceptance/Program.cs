@@ -133,6 +133,17 @@ internal static class Program
                 get_byte(ByteIn, 128), get_byte(ByteIn, 255), get_byte(ByteIn, -1), close(ByteIn),
                 write(byte_io), nl,
 
+                % Opaque positions restore seekable streams without depending on runtime metadata.
+                open('dotprolog-aot-position.tmp', write, PositionOut, [type(binary)]),
+                stream_property(PositionOut, reposition(true)),
+                put_byte(PositionOut, 1),
+                stream_property(PositionOut, position(SavedPosition)),
+                put_byte(PositionOut, 2), put_byte(PositionOut, 3),
+                set_stream_position(PositionOut, SavedPosition), put_byte(PositionOut, 9), close(PositionOut),
+                open('dotprolog-aot-position.tmp', read, PositionIn, [type(binary)]),
+                get_byte(PositionIn, 1), get_byte(PositionIn, 9), get_byte(PositionIn, 3), close(PositionIn),
+                write(stream_position), nl,
+
                 % An operator declared at run time, in a native image, changing how a term prints.
                 op(700, xfx, likes),
                 write(likes(alice, bob)), nl,
