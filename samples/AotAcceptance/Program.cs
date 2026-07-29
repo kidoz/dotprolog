@@ -124,6 +124,15 @@ internal static class Program
                 get_code(CodeIn, 79), get_code(CodeIn, 84), get_code(CodeIn, -1), close(CodeIn),
                 write(code_io), nl,
 
+                % Binary streams and byte predicates use raw storage without reflection or encoding.
+                open('dotprolog-aot-byte.tmp', write, ByteOut, [type(binary)]),
+                stream_property(ByteOut, type(binary)),
+                put_byte(ByteOut, 0), put_byte(ByteOut, 128), put_byte(ByteOut, 255), close(ByteOut),
+                open('dotprolog-aot-byte.tmp', read, ByteIn, [type(binary)]),
+                get_byte(ByteIn, 0), peek_byte(ByteIn, 128),
+                get_byte(ByteIn, 128), get_byte(ByteIn, 255), get_byte(ByteIn, -1), close(ByteIn),
+                write(byte_io), nl,
+
                 % An operator declared at run time, in a native image, changing how a term prints.
                 op(700, xfx, likes),
                 write(likes(alice, bob)), nl,
