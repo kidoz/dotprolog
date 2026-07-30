@@ -183,7 +183,10 @@ internal static class CompiledProgramEmitter
         text.AppendLine("        [");
         foreach ((string name, int arity) in model.Functors)
         {
-            text.AppendLine(CultureInfo.InvariantCulture, $"            symbols.InternFunctor({Literal(name)}, {arity}),");
+            text.AppendLine(
+                CultureInfo.InvariantCulture,
+                $"            symbols.InternFunctor({SyntaxFacts.Literal(name)}, {arity}),"
+            );
         }
 
         text.AppendLine("        ];");
@@ -209,7 +212,7 @@ internal static class CompiledProgramEmitter
         {
             string expression = constant.Tag switch
             {
-                CellTag.Atom => $"global::DotProlog.Runtime.Cell.Atom(symbols.InternAtom({Literal(constant.Text!)}))",
+                CellTag.Atom => $"global::DotProlog.Runtime.Cell.Atom(symbols.InternAtom({SyntaxFacts.Literal(constant.Text!)}))",
                 CellTag.Integer =>
                     $"global::DotProlog.Runtime.Cell.Integer60({constant.Integer.ToString(CultureInfo.InvariantCulture)}L)",
                 CellTag.Float =>
@@ -287,9 +290,6 @@ internal static class CompiledProgramEmitter
             CellTag.Atom or CellTag.Integer or CellTag.Float => $"{program}.Constant({cell.Value})",
             _ => throw new InvalidOperationException($"Term cell tag {cell.Tag} cannot be generated."),
         };
-
-    private static string Literal(string value) =>
-        $"\"{value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal).Replace("\r", "\\r", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal)}\"";
 
     private sealed record CompiledPredicate(int Functor, int Entry);
 

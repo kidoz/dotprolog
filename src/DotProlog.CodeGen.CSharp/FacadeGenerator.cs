@@ -131,7 +131,7 @@ public static class FacadeGenerator
         {
             text.AppendLine(
                 CultureInfo.InvariantCulture,
-                $"        {Field(export)} = _host.Bind(\"{export.PredicateName}\", {export.Arity});"
+                $"        {Field(export)} = _host.Bind({SyntaxFacts.Literal(export.PredicateName)}, {export.Arity});"
             );
         }
 
@@ -212,7 +212,7 @@ public static class FacadeGenerator
             );
             text.AppendLine(
                 CultureInfo.InvariantCulture,
-                $"            ?? throw new global::DotProlog.Runtime.PrologException(\"{export.PredicateName}/{export.Arity} is declared det but failed.\");"
+                $"            ?? throw new global::DotProlog.Runtime.PrologException({SyntaxFacts.Literal($"{export.PredicateName}/{export.Arity} is declared det but failed.")});"
             );
             text.AppendLine(CultureInfo.InvariantCulture, $"        return {ResultExpression(export)};");
         }
@@ -298,11 +298,22 @@ public static class FacadeGenerator
     }
 
     private static string ResultTypeExpression(ContractExport export) =>
-        export.Outputs.Count() > 1 ? ResultTypeName(export) : export.Outputs.First().Type.ClrTypeName;
+        export.Outputs.Count() switch
+        {
+            // nondet with no outputs streams its successes, per ADR 0006's determinism table.
+            0 => "global::DotProlog.Runtime.Unit",
+            1 => export.Outputs.First().Type.ClrTypeName,
+            _ => ResultTypeName(export),
+        };
 
     private static string ResultExpression(ContractExport export)
     {
         ContractArgument[] outputs = [.. export.Outputs];
+
+        if (outputs.Length == 0)
+        {
+            return "global::DotProlog.Runtime.Unit.Value";
+        }
 
         if (outputs.Length == 1)
         {
@@ -366,7 +377,4 @@ public static class FacadeGenerator
     }
 
     private static string LowerFirst(string name) => char.ToLowerInvariant(name[0]) + name[1..];
-
-    private static string Literal(string value) =>
-        $"\"{value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal).Replace("\r", "\\r", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal)}\"";
 }

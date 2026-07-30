@@ -50,6 +50,11 @@ public sealed class GeneratedFacadeTests
         chained(X) :- pair(X), match(X).
         note(_).
         audited(X) :- chained(X), note(X).
+
+        strange_atom('tab\tand "quote" and\nnewline').
+
+        catalogued(widget).
+        catalogued(gadget).
         """;
 
     private const string Contract = """
@@ -64,6 +69,7 @@ public sealed class GeneratedFacadeTests
         :- clr_export(dynamic_value/1, nondet, [out(value, atom)]).
         :- clr_export(split/3, nondet, [in(items, list(atom)), out(left, list(atom)), out(right, list(atom))]).
         :- clr_export(audited/1, nondet, [out(value, atom)]).
+        :- clr_export(catalogued/1, nondet, [in(item, atom)]).
         """;
 
     private static ModuleContract ReadContract()
@@ -195,6 +201,18 @@ public sealed class GeneratedFacadeTests
         var values = (IEnumerable<string>)Call(module, type, "Audited", CancellationToken.None)!;
 
         Assert.Equal(["one", "two"], values);
+    }
+
+    [Fact]
+    public void NondeterministicExportWithNoOutputsStreamsAUnitPerSolution()
+    {
+        object module = CreateModule(out Type type);
+
+        var found = (IEnumerable<Runtime.Unit>)Call(module, type, "Catalogued", "widget", CancellationToken.None)!;
+        Assert.Single(found);
+
+        var missing = (IEnumerable<Runtime.Unit>)Call(module, type, "Catalogued", "sprocket", CancellationToken.None)!;
+        Assert.Empty(missing);
     }
 
     [Fact]

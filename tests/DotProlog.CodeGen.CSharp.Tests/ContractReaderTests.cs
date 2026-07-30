@@ -213,6 +213,86 @@ public sealed class ContractReaderTests
         Assert.Equal("AppendLeft", resolved.Exports[0].ClrName);
     }
 
+    [Theory]
+    [InlineData("has-dash")]
+    [InlineData("2Fast")]
+    [InlineData("class")]
+    public void AModuleNameThatIsNotACSharpIdentifierIsRejected(string name)
+    {
+        Assert.Equal(CodeGenDiagnosticIds.InvalidModuleTypeName, ErrorId($":- clr_module('{name}')."));
+    }
+
+    [Theory]
+    [InlineData("Contoso.9rules")]
+    [InlineData("Contoso.class")]
+    [InlineData("Contoso..Rules")]
+    public void ANamespaceThatIsNotDottedIdentifiersIsRejected(string name)
+    {
+        Assert.Equal(CodeGenDiagnosticIds.InvalidNamespace, ErrorId($":- clr_module('M').\n:- clr_namespace('{name}')."));
+    }
+
+    [Theory]
+    [InlineData("2fast")]
+    [InlineData("has-dash")]
+    [InlineData("with space")]
+    public void APredicateNameThatDoesNotMapToAnIdentifierIsRejected(string name)
+    {
+        Assert.Equal(
+            CodeGenDiagnosticIds.NameDoesNotMapToIdentifier,
+            ErrorId($":- clr_module('M').\n:- clr_export('{name}'/1, det, [out(v, atom)]).")
+        );
+    }
+
+    [Fact]
+    public void AnArgumentNameThatDoesNotMapToAnIdentifierIsRejected()
+    {
+        Assert.Equal(
+            CodeGenDiagnosticIds.NameDoesNotMapToIdentifier,
+            ErrorId(":- clr_module('M').\n:- clr_export(p/1, det, [out('the value', atom)]).")
+        );
+    }
+
+    [Theory]
+    [InlineData("Not Valid")]
+    [InlineData("double")]
+    public void AGeneratedNameThatIsNotACSharpIdentifierIsRejected(string alias)
+    {
+        // The alias is emitted verbatim as the method name, so a keyword is as fatal as a space.
+        Assert.Equal(
+            CodeGenDiagnosticIds.InvalidClrName,
+            ErrorId($":- clr_module('M').\n:- clr_export(p/1, det, [out(v, atom)], '{alias}').")
+        );
+    }
+
+    [Fact]
+    public void UnderscoredNamesStillMapToIdentifiers()
+    {
+        ModuleContract contract = ReadValid(
+            ":- clr_module('M').\n:- clr_export('_private_pred'/1, nondet, [out('_v_1', atom)])."
+        );
+
+        Assert.Equal("_private_pred", contract.Exports[0].PredicateName);
+    }
+
+    [Fact]
+    public void AMultiExportWithNoOutputsIsRejected()
+    {
+        // ADR 0006 defines no signature for this shape.
+        Assert.Equal(
+            CodeGenDiagnosticIds.MultiExportNeedsOutput,
+            ErrorId(":- clr_module('M').\n:- clr_export(p/1, multi, [in(v, atom)]).")
+        );
+    }
+
+    [Fact]
+    public void ANondetExportWithNoOutputsIsAccepted()
+    {
+        // Its facade streams a Unit per solution, per ADR 0006's determinism table.
+        ModuleContract contract = ReadValid(":- clr_module('M').\n:- clr_export(p/1, nondet, [in(v, atom)]).");
+
+        Assert.Empty(contract.Exports[0].Outputs);
+    }
+
     [Fact]
     public void ReaderDiagnosticsSurfaceFromTheContractItself()
     {

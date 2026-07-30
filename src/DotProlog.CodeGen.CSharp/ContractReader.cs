@@ -55,10 +55,32 @@ public static class ContractReader
             switch (directive.Arguments[0])
             {
                 case CompoundTerm { Name: "clr_module", Arity: 1 } module when module.Arguments[0] is AtomTerm name:
+                    if (!SyntaxFacts.IsIdentifier(name.Name))
+                    {
+                        Report(
+                            diagnostics,
+                            CodeGenDiagnosticIds.InvalidModuleTypeName,
+                            $"'{name.Name}' is not a valid C# identifier, so it cannot name the generated type.",
+                            module.Span,
+                            fileName
+                        );
+                    }
+
                     typeName = name.Name;
                     break;
 
                 case CompoundTerm { Name: "clr_namespace", Arity: 1 } space when space.Arguments[0] is AtomTerm name:
+                    if (!SyntaxFacts.IsDottedIdentifierSequence(name.Name))
+                    {
+                        Report(
+                            diagnostics,
+                            CodeGenDiagnosticIds.InvalidNamespace,
+                            $"'{name.Name}' is not a dot-separated sequence of C# identifiers, so it cannot name the namespace.",
+                            space.Span,
+                            fileName
+                        );
+                    }
+
                     declaredNamespace = name.Name;
                     break;
 
@@ -154,6 +176,19 @@ public static class ContractReader
             return null;
         }
 
+        if (!SyntaxFacts.MapsToIdentifier(name.Name))
+        {
+            Report(
+                diagnostics,
+                CodeGenDiagnosticIds.NameDoesNotMapToIdentifier,
+                $"'{name.Name}' does not map to a C# identifier; only letters, digits, and underscores do.",
+                indicator.Span,
+                fileName
+            );
+
+            return null;
+        }
+
         if (
             export.Arguments[1] is not AtomTerm determinismTerm
             || !TryReadDeterminism(determinismTerm.Name, out Determinism determinism)
@@ -223,6 +258,20 @@ public static class ContractReader
             return null;
         }
 
+        // ADR 0006 defines no signature for multi with no outputs; nondet with none streams units.
+        if (determinism == Determinism.Multi && arguments.TrueForAll(argument => argument.Mode == ArgumentMode.In))
+        {
+            Report(
+                diagnostics,
+                CodeGenDiagnosticIds.MultiExportNeedsOutput,
+                $"{name.Name}/{arity.Value} is multi with no outputs; declare it nondet or semidet instead.",
+                export.Span,
+                fileName
+            );
+
+            return null;
+        }
+
         string? clrName = null;
         if (export.Arity == 4)
         {
@@ -232,6 +281,20 @@ public static class ContractReader
                     diagnostics,
                     CodeGenDiagnosticIds.InvalidClrName,
                     "The fourth argument of clr_export/4 must be an atom naming the generated method.",
+                    export.Arguments[3].Span,
+                    fileName
+                );
+
+                return null;
+            }
+
+            // The alias is emitted verbatim as the method name, so it has to be legal as written.
+            if (!SyntaxFacts.IsIdentifier(alias.Name))
+            {
+                Report(
+                    diagnostics,
+                    CodeGenDiagnosticIds.InvalidClrName,
+                    $"'{alias.Name}' is not a valid C# identifier, so it cannot name the generated method.",
                     export.Arguments[3].Span,
                     fileName
                 );
@@ -260,6 +323,19 @@ public static class ContractReader
                 term.Span,
                 fileName
             );
+            return null;
+        }
+
+        if (!SyntaxFacts.MapsToIdentifier(name.Name))
+        {
+            Report(
+                diagnostics,
+                CodeGenDiagnosticIds.NameDoesNotMapToIdentifier,
+                $"'{name.Name}' does not map to a C# identifier; only letters, digits, and underscores do.",
+                name.Span,
+                fileName
+            );
+
             return null;
         }
 

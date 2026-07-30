@@ -32,4 +32,16 @@ public static class CodeGenDiagnosticIds
 
     /// <summary>Two exports would generate the same method name and parameter list.</summary>
     public const string DuplicateMethodSignature = "DPL2010";
+
+    /// <summary>The <c>clr_module/1</c> atom is not a valid C# identifier.</summary>
+    public const string InvalidModuleTypeName = "DPL2011";
+
+    /// <summary>The <c>clr_namespace/1</c> atom is not a dot-separated sequence of C# identifiers.</summary>
+    public const string InvalidNamespace = "DPL2012";
+
+    /// <summary>An exported predicate or argument name does not map to a C# identifier.</summary>
+    public const string NameDoesNotMapToIdentifier = "DPL2013";
+
+    /// <summary>A <c>multi</c> export declares no outputs, a shape ADR 0006 leaves undefined.</summary>
+    public const string MultiExportNeedsOutput = "DPL2014";
 }
