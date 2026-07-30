@@ -1,3 +1,4 @@
+using System.Text;
 using DotProlog.Compiler;
 using DotProlog.Runtime;
 using DotProlog.Syntax;
@@ -34,6 +35,11 @@ internal static class Program
     {
         string path = args.Length > 0 ? args[0] : Path.Combine(AppContext.BaseDirectory, "acceptance.pl");
         var engine = new PrologEngine();
+
+        if (!ExerciseSystemErrors())
+        {
+            return 1;
+        }
 
         if (!Report(engine.ConsultText(Embedded, "embedded"), "embedded library"))
         {
@@ -191,6 +197,7 @@ internal static class Program
                 get_char(CharacterMode, 'A'),
                 close(CharacterMode),
                 write(character_input_modes), nl,
+                write(stream_system_errors), nl,
 
                 % Binary streams and byte predicates use raw storage without reflection or encoding.
                 open('dotprolog-aot-byte.tmp', write, ByteOut, [type(binary)]),
@@ -256,5 +263,37 @@ internal static class Program
         }
 
         return loaded.Success;
+    }
+
+    private static bool ExerciseSystemErrors()
+    {
+        var engine = new PrologEngine { Input = new FailingReader() };
+        if (
+            engine.RunGoal("catch(get_char(_), error(system_error, _), true)", out IReadOnlyList<Diagnostic> inputDiagnostics)
+                != RunResult.Success
+            || inputDiagnostics.Count != 0
+        )
+        {
+            return false;
+        }
+
+        engine.Output = new FailingWriter();
+        return engine.RunGoal(
+                "catch(write(native), error(system_error, _), true)",
+                out IReadOnlyList<Diagnostic> outputDiagnostics
+            ) == RunResult.Success
+            && outputDiagnostics.Count == 0;
+    }
+
+    private sealed class FailingReader : TextReader
+    {
+        public override int Read() => throw new IOException("native input failure");
+    }
+
+    private sealed class FailingWriter : TextWriter
+    {
+        public override Encoding Encoding => Encoding.UTF8;
+
+        public override void Write(string? value) => throw new IOException("native output failure");
     }
 }
