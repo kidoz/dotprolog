@@ -6,8 +6,13 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-07-30
+
 ### Added
 
+- A `prolog-test` template whose `test_*` predicates are discovered and run by `dotnet test`.
+- A clean local-feed consumer gate that installs the packed templates and .NET tool, then builds,
+  runs, NativeAOT-publishes, and tests generated projects from a path containing spaces.
 - A uv-managed MkDocs documentation site on Python 3.14 with getting-started, language, .NET
   integration, architecture, and contributing guides, plus strict link validation in CI.
 - The ISO evaluable functors for trigonometry, logarithms, exponentials, rounding, float
@@ -19,21 +24,6 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Changed
 
-- Arithmetic now enforces ISO operand signatures, float division result types, bounded-overflow
-  errors, and the distinct exceptional cases for zero division, undefined results, and float
-  overflow.
-- The repository's ISO-derived conformance corpus now contains 300 passing cases.
-
-## [0.1.1] — 2026-07-28
-
-### Added
-
-- A `prolog-test` template whose `test_*` predicates are discovered and run by `dotnet test`.
-- A clean local-feed consumer gate that installs the packed templates and .NET tool, then builds,
-  runs, NativeAOT-publishes, and tests generated projects from a path containing spaces.
-
-### Changed
-
 - The repository test suite now uses Microsoft.Testing.Platform v2 through the .NET 10
   `global.json` test-runner contract, so xUnit and Prolog test projects run together.
 - Release checksums now cover packages, symbols, the SBOM, and all native binaries; the CycloneDX
@@ -41,6 +31,10 @@ All notable changes to DotProlog are recorded here. The format follows
 - Child build processes close standard input, are killed with their process tree if they exceed the
   integration-test limit, and every CI and release job has an explicit timeout.
 - `DotProlog.Sdk` now carries a real package title and description.
+- Arithmetic now enforces ISO operand signatures, float division result types, bounded-overflow
+  errors, and the distinct exceptional cases for zero division, undefined results, and float
+  overflow.
+- The repository's ISO-derived conformance corpus now contains 549 passing cases.
 
 ## [0.1.0] — 2026-07-27
 
