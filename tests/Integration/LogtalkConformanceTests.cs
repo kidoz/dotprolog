@@ -190,7 +190,7 @@ public sealed class LogtalkConformanceTests
 
         const string unrelatedDispatchSource = """
             test(iso_dispatch, true) :-
-                ^^set_text_output(''),
+                ^^file_path(output, Path),
                 {write(a)}.
             """;
         LogtalkTestDeclaration unrelatedDispatch = Assert.Single(
@@ -207,6 +207,16 @@ public sealed class LogtalkConformanceTests
             )
         );
         Assert.Empty(textInputDiagnostics);
+
+        Assert.Equal(
+            RunResult.Success,
+            textInputEngine.RunGoal(
+                "'$logtalk_set_text_output'(q), write(w), "
+                    + "'$logtalk_text_output_assertion'(qw, Assertion), call(Assertion)",
+                out IReadOnlyList<DotProlog.Syntax.Diagnostic> textOutputDiagnostics
+            )
+        );
+        Assert.Empty(textOutputDiagnostics);
 
         var adapterEngine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
         var errors = new LogtalkTestDeclaration(
@@ -351,16 +361,16 @@ public sealed class LogtalkConformanceTests
                 ),
             ];
 
-            Assert.Equal(696, directCases.Length);
-            Assert.Equal(405, directCases.Count(test => test.OutcomeKind == "true"));
+            Assert.Equal(715, directCases.Length);
+            Assert.Equal(419, directCases.Count(test => test.OutcomeKind == "true"));
             Assert.Equal(73, directCases.Count(test => test.OutcomeKind == "false"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "fail"));
-            Assert.Equal(142, directCases.Count(test => test.OutcomeKind == "error"));
+            Assert.Equal(144, directCases.Count(test => test.OutcomeKind == "error"));
             Assert.Equal(13, directCases.Count(test => test.OutcomeKind == "variant"));
             Assert.Equal(41, directCases.Count(test => test.OutcomeKind == "exists"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "subsumes"));
             Assert.Single(directCases, test => test.OutcomeKind == "deterministic");
-            Assert.Equal(14, directCases.Count(test => test.OutcomeKind == "errors"));
+            Assert.Equal(17, directCases.Count(test => test.OutcomeKind == "errors"));
             Assert.Single(directCases, test => test.OutcomeKind == "ball");
 
             string? selectedId = Environment.GetEnvironmentVariable(CaseVariable);
@@ -483,17 +493,80 @@ public sealed class LogtalkConformanceTests
     {
         var engine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
         engine.Program.Builtins.Register("$logtalk_set_text_input", 1, SetTextInput);
+        engine.Program.Builtins.Register("$logtalk_set_text_output", 1, SetTextOutput);
+        engine.Program.Builtins.Register("$logtalk_text_output_assertion", 2, TextOutputAssertion);
+        engine.Program.Builtins.Register("$logtalk_text_output_contents", 1, TextOutputContents);
+        engine.Program.Builtins.Register(
+            "$logtalk_suppress_text_output",
+            0,
+            static machine =>
+            {
+                machine.Output = TextWriter.Null;
+                return true;
+            }
+        );
         return engine;
     }
 
     private static bool SetTextInput(Machine machine)
     {
-        var input = new StringBuilder();
-        Cell item = machine.Argument(0);
+        if (!TryReadTextContents(machine, machine.Argument(0), out string input))
+        {
+            return false;
+        }
+
+        machine.Input = new StringReader(input);
+        return true;
+    }
+
+    private static bool SetTextOutput(Machine machine)
+    {
+        if (!TryReadTextContents(machine, machine.Argument(0), out string initial))
+        {
+            return false;
+        }
+
+        machine.Output = new StringWriter(new StringBuilder(initial));
+        return true;
+    }
+
+    private static bool TextOutputAssertion(Machine machine)
+    {
+        if (machine.Output is not StringWriter output)
+        {
+            return false;
+        }
+
+        Cell expected = machine.Argument(0);
+        Cell actual = Cell.Atom(machine.Symbols.InternAtom(output.ToString()));
+        Cell assertion = machine.CreateStructure(machine.Symbols.InternFunctor("==", 2), [expected, actual]);
+        machine.Output = TextWriter.Null;
+        return machine.Unify(machine.Argument(1), assertion);
+    }
+
+    private static bool TextOutputContents(Machine machine)
+    {
+        if (machine.Output is not StringWriter output)
+        {
+            return false;
+        }
+
+        Cell[] characters =
+        [
+            .. output.ToString().Select(character => Cell.Atom(machine.Symbols.InternAtom(character.ToString()))),
+        ];
+        Cell contents = machine.CreateList(characters, Cell.Atom(machine.Symbols.EmptyList));
+        machine.Output = TextWriter.Null;
+        return machine.Unify(machine.Argument(0), contents);
+    }
+
+    private static bool TryReadTextContents(Machine machine, Cell item, out string contents)
+    {
+        var text = new StringBuilder();
 
         if (item.Tag == CellTag.Atom)
         {
-            input.Append(machine.Symbols.AtomName(item.Index));
+            text.Append(machine.Symbols.AtomName(item.Index));
         }
         else
         {
@@ -505,20 +578,22 @@ public sealed class LogtalkConformanceTests
                 Cell head = machine.Dereference(machine.HeapAt(item.Index + 1));
                 if (head.Tag != CellTag.Atom)
                 {
+                    contents = string.Empty;
                     return false;
                 }
 
-                input.Append(machine.Symbols.AtomName(head.Index));
+                text.Append(machine.Symbols.AtomName(head.Index));
                 item = machine.Dereference(machine.HeapAt(item.Index + 2));
             }
 
             if (item.Tag != CellTag.Atom || item.Index != machine.Symbols.EmptyList)
             {
+                contents = string.Empty;
                 return false;
             }
         }
 
-        machine.Input = new StringReader(input.ToString());
+        contents = text.ToString();
         return true;
     }
 

@@ -412,22 +412,60 @@ internal static class LogtalkTestAdapter
                 continue;
             }
 
+            const string suppressTextOutput = "^^suppress_text_output";
+            if (
+                source.AsSpan(current).StartsWith(suppressTextOutput, StringComparison.Ordinal)
+                && (
+                    current + suppressTextOutput.Length == source.Length
+                    || !(
+                        char.IsLetterOrDigit(source[current + suppressTextOutput.Length])
+                        || source[current + suppressTextOutput.Length] == '_'
+                    )
+                )
+            )
+            {
+                result.Append(source, copyStart, current - copyStart);
+                result.Append("'$logtalk_suppress_text_output'");
+                copyStart = current + suppressTextOutput.Length;
+                index = copyStart - 1;
+                found = true;
+                continue;
+            }
+
             int functorStart = current;
             bool dispatchedAssertion = source.AsSpan(current).StartsWith("^^assertion(", StringComparison.Ordinal);
             bool dispatchedTextInput = source
                 .AsSpan(current)
                 .StartsWith("^^set_text_input(", StringComparison.Ordinal);
+            bool dispatchedTextOutput = source
+                .AsSpan(current)
+                .StartsWith("^^set_text_output(", StringComparison.Ordinal);
+            bool dispatchedTextOutputAssertion = source
+                .AsSpan(current)
+                .StartsWith("^^text_output_assertion(", StringComparison.Ordinal);
+            bool dispatchedTextOutputContents = source
+                .AsSpan(current)
+                .StartsWith("^^text_output_contents(", StringComparison.Ordinal);
             if (
                 source.AsSpan(current).StartsWith("^^", StringComparison.Ordinal)
                 && !dispatchedAssertion
                 && !dispatchedTextInput
+                && !dispatchedTextOutput
+                && !dispatchedTextOutputAssertion
+                && !dispatchedTextOutputContents
             )
             {
                 translated = string.Empty;
                 return false;
             }
 
-            if (dispatchedAssertion || dispatchedTextInput)
+            if (
+                dispatchedAssertion
+                || dispatchedTextInput
+                || dispatchedTextOutput
+                || dispatchedTextOutputAssertion
+                || dispatchedTextOutputContents
+            )
             {
                 functorStart += 2;
             }
@@ -436,6 +474,9 @@ internal static class LogtalkTestAdapter
                 IsFunctorCallAt(source, functorStart, "assertion") ? "assertion"
                 : IsFunctorCallAt(source, functorStart, "variant") ? "variant"
                 : IsFunctorCallAt(source, functorStart, "set_text_input") ? "set_text_input"
+                : IsFunctorCallAt(source, functorStart, "set_text_output") ? "set_text_output"
+                : IsFunctorCallAt(source, functorStart, "text_output_assertion") ? "text_output_assertion"
+                : IsFunctorCallAt(source, functorStart, "text_output_contents") ? "text_output_contents"
                 : null;
             if (functor is null)
             {
@@ -478,7 +519,22 @@ internal static class LogtalkTestAdapter
             }
             else
             {
-                replacement = $"'$logtalk_set_text_input'({arguments})";
+                List<string> hostArguments = SplitTopLevel(arguments, ',');
+                int requiredArity = functor == "text_output_assertion" ? 2 : 1;
+                if (hostArguments.Count != requiredArity)
+                {
+                    translated = string.Empty;
+                    return false;
+                }
+
+                string hostFunctor = functor switch
+                {
+                    "set_text_input" => "$logtalk_set_text_input",
+                    "set_text_output" => "$logtalk_set_text_output",
+                    "text_output_assertion" => "$logtalk_text_output_assertion",
+                    _ => "$logtalk_text_output_contents",
+                };
+                replacement = $"'{hostFunctor}'({arguments})";
             }
 
             result.Append(source, copyStart, current - copyStart);
