@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace Integration.Tests;
 
 /// <summary>
@@ -342,20 +344,50 @@ internal static class LogtalkTestAdapter
     private static bool TryTranslateEmbeddedBackendGoal(string source, out string goal)
     {
         if (
-            !source.Contains('{')
-            || source.Contains("^^", StringComparison.Ordinal)
-            || source.Contains("::", StringComparison.Ordinal)
-            || source.Contains("assertion(", StringComparison.Ordinal)
-            || source.Contains("variant(", StringComparison.Ordinal)
+            source.Contains("::", StringComparison.Ordinal)
+            || !TryTranslateLgtunitHelpers(source, out string helpersTranslated, out bool foundHelper)
         )
         {
             goal = string.Empty;
             return false;
         }
 
-        char[] translated = source.ToCharArray();
+        char[] translated = helpersTranslated.ToCharArray();
         var state = new ScanState();
-        bool found = false;
+        bool foundBackendEscape = false;
+
+        for (int index = 0; index < helpersTranslated.Length; index++)
+        {
+            bool shielded = state.LineComment || state.BlockComment || state.Quote != '\0';
+            int current = index;
+            Advance(helpersTranslated, ref index, state);
+
+            if (shielded || current != index)
+            {
+                continue;
+            }
+
+            if (helpersTranslated[current] == '{')
+            {
+                translated[current] = '(';
+                foundBackendEscape = true;
+            }
+            else if (helpersTranslated[current] == '}')
+            {
+                translated[current] = ')';
+            }
+        }
+
+        goal = (foundBackendEscape || foundHelper) && state.Braces == 0 ? new string(translated) : string.Empty;
+        return goal.Length > 0;
+    }
+
+    private static bool TryTranslateLgtunitHelpers(string source, out string translated, out bool found)
+    {
+        var result = new StringBuilder(source.Length);
+        var state = new ScanState();
+        int copyStart = 0;
+        found = false;
 
         for (int index = 0; index < source.Length; index++)
         {
@@ -368,19 +400,104 @@ internal static class LogtalkTestAdapter
                 continue;
             }
 
-            if (source[current] == '{')
+            int functorStart = current;
+            bool dispatchedAssertion = source.AsSpan(current).StartsWith("^^assertion(", StringComparison.Ordinal);
+            if (source.AsSpan(current).StartsWith("^^", StringComparison.Ordinal) && !dispatchedAssertion)
             {
-                translated[current] = '(';
-                found = true;
+                translated = string.Empty;
+                return false;
             }
-            else if (source[current] == '}')
+
+            if (dispatchedAssertion)
             {
-                translated[current] = ')';
+                functorStart += 2;
+            }
+
+            string? functor =
+                IsFunctorCallAt(source, functorStart, "assertion") ? "assertion"
+                : IsFunctorCallAt(source, functorStart, "variant") ? "variant"
+                : null;
+            if (functor is null)
+            {
+                continue;
+            }
+
+            int opening = functorStart + functor.Length;
+            int closing = FindMatchingParenthesis(source, opening);
+            if (closing < 0)
+            {
+                translated = string.Empty;
+                return false;
+            }
+
+            string arguments = source[(opening + 1)..closing];
+            string replacement;
+            if (functor == "assertion")
+            {
+                if (!TryTranslateLgtunitHelpers(arguments, out string assertion, out _))
+                {
+                    translated = string.Empty;
+                    return false;
+                }
+
+                replacement = $"({assertion})";
+            }
+            else
+            {
+                List<string> variantArguments = SplitTopLevel(arguments, ',');
+                if (variantArguments.Count != 2)
+                {
+                    translated = string.Empty;
+                    return false;
+                }
+
+                string left = variantArguments[0];
+                string right = variantArguments[1];
+                replacement =
+                    $"(subsumes_term(({left}), ({right})), subsumes_term(({right}), ({left})))";
+            }
+
+            result.Append(source, copyStart, current - copyStart);
+            result.Append(replacement);
+            copyStart = closing + 1;
+            index = closing;
+            found = true;
+        }
+
+        result.Append(source, copyStart, source.Length - copyStart);
+        translated = result.ToString();
+        return true;
+    }
+
+    private static bool IsFunctorCallAt(string source, int start, string functor)
+    {
+        if (
+            start < 0
+            || !source.AsSpan(start).StartsWith(functor, StringComparison.Ordinal)
+            || start + functor.Length >= source.Length
+            || source[start + functor.Length] != '('
+        )
+        {
+            return false;
+        }
+
+        return start == 0 || !(char.IsLetterOrDigit(source[start - 1]) || source[start - 1] == '_');
+    }
+
+    private static int FindMatchingParenthesis(string source, int opening)
+    {
+        var state = new ScanState();
+
+        for (int index = opening; index < source.Length; index++)
+        {
+            Advance(source, ref index, state);
+            if (index > opening && state.Parentheses == 0)
+            {
+                return index;
             }
         }
 
-        goal = found && state.Braces == 0 ? new string(translated) : string.Empty;
-        return goal.Length > 0;
+        return -1;
     }
 
     private static bool TryTranslateSupportClause(string clause, out string translated)

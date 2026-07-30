@@ -155,6 +155,37 @@ public sealed class LogtalkConformanceTests
             mixedGoal
         );
 
+        const string helperSource = """
+            test(iso_helpers, true) :-
+                {term_variables(A+B+B, [B|Vars])},
+                ^^assertion(A == B),
+                assertion(Vars == [B]),
+                (variant(Pair, pair(_, _)) -> true; fail).
+            """;
+        LogtalkTestDeclaration helper = Assert.Single(
+            LogtalkTestAdapter.ReadDeclarations(helperSource, "helpers.lgt")
+        );
+        Assert.True(LogtalkTestAdapter.TryUnwrapBackendGoal(helper, out string helperGoal));
+        Assert.Equal(
+            """
+            (term_variables(A+B+B, [B|Vars])),
+                (A == B),
+                (Vars == [B]),
+                ((subsumes_term((Pair), (pair(_, _))), subsumes_term((pair(_, _)), (Pair))) -> true; fail)
+            """,
+            helperGoal
+        );
+
+        const string unrelatedDispatchSource = """
+            test(iso_dispatch, true) :-
+                ^^set_text_output(''),
+                {write(a)}.
+            """;
+        LogtalkTestDeclaration unrelatedDispatch = Assert.Single(
+            LogtalkTestAdapter.ReadDeclarations(unrelatedDispatchSource, "dispatch.lgt")
+        );
+        Assert.False(LogtalkTestAdapter.TryUnwrapBackendGoal(unrelatedDispatch, out _));
+
         var adapterEngine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
         var errors = new LogtalkTestDeclaration(
             "fixture.lgt",
@@ -298,12 +329,12 @@ public sealed class LogtalkConformanceTests
                 ),
             ];
 
-            Assert.Equal(616, directCases.Length);
-            Assert.Equal(335, directCases.Count(test => test.OutcomeKind == "true"));
+            Assert.Equal(626, directCases.Length);
+            Assert.Equal(343, directCases.Count(test => test.OutcomeKind == "true"));
             Assert.Equal(73, directCases.Count(test => test.OutcomeKind == "false"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "fail"));
             Assert.Equal(134, directCases.Count(test => test.OutcomeKind == "error"));
-            Assert.Equal(11, directCases.Count(test => test.OutcomeKind == "variant"));
+            Assert.Equal(13, directCases.Count(test => test.OutcomeKind == "variant"));
             Assert.Equal(41, directCases.Count(test => test.OutcomeKind == "exists"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "subsumes"));
             Assert.Single(directCases, test => test.OutcomeKind == "deterministic");
