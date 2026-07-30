@@ -206,6 +206,24 @@ internal static class Program
                 op(0, xfx, native_snapshot_new),
                 write(current_op_snapshot), nl,
 
+                % Database inspection and removal preserve ISO procedure permissions after trimming.
+                catch(
+                    clause(greeting(_), _),
+                    error(permission_error(access, private_procedure, greeting/1), _),
+                    ClausePrivateCaught = true),
+                ClausePrivateCaught == true,
+                catch(
+                    clause(native_absent(_), 4),
+                    error(type_error(callable, 4), _),
+                    ClauseBodyCaught = true),
+                ClauseBodyCaught == true,
+                catch(
+                    retract(greeting(_)),
+                    error(permission_error(modify, static_procedure, greeting/1), _),
+                    RetractStaticCaught = true),
+                RetractStaticCaught == true,
+                write(database_permission_errors), nl,
+
                 % Open streams and their ISO metadata are explicit runtime state, not reflection.
                 current_input(NativeInput), current_stream(NativeInput),
                 stream_property(NativeInput, mode(read)),
