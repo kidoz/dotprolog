@@ -74,7 +74,9 @@ that goal began, even if it changes the predicate while enumerating.
 ## Modules, grammars, and operators
 
 Modules declare exports with `module/2`, import with `use_module/1,2`, and qualify calls with
-`Module:Goal`. `meta_predicate/1` declares goal arguments.
+`Module:Goal`. `meta_predicate/1` declares goal arguments. A module declaration must be the first
+term in its source, selected imports must be exported predicate indicators, and conflicting
+imports are rejected.
 
 Definite clause grammars use `-->/2` and run through `phrase/2,3`:
 
@@ -82,6 +84,17 @@ Definite clause grammars use `-->/2` and run through `phrase/2,3`:
 digits([D | Ds]) --> [D], { D >= 0'0, D =< 0'9 }, digits(Ds).
 digits([]) --> [].
 ```
+
+Part 3 terminal pushback (semicontexts) is supported:
+
+```prolog
+look_ahead(X), [X] --> [X].
+```
+
+`dynamic/1`, `multifile/1`, and `discontiguous/1` accept `Name//Arity` indicators. Grammar rules
+cannot define grammar control constructs or expand over predefined procedures. `phrase/2` checks
+that its input can be a list; `phrase/3` deliberately leaves its sequence arguments unchecked, the
+implementation-defined lower-overhead choice permitted by the grammar specification.
 
 `op/3` changes the program-owned operator table used by both reading and writing terms.
 
@@ -98,7 +111,8 @@ number conversion, term inspection, arithmetic, formatting, and standard-order c
 
 - Clause selection is currently a linear scan; first-argument indexing is not implemented.
 - Runtime-loaded source compiles to DotProlog bytecode, not new CLR IL.
-- Build-time compilation of predicate bodies to generated C# is planned but not implemented.
+- Build-time source compiles to direct-threaded generated C# blocks sharing the same explicit
+  machine state as runtime bytecode.
 - Constraint solving, tabling, and attributed variables are outside the current scope.
 
 For the detailed and continually updated compatibility record, see

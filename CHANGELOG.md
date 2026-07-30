@@ -6,6 +6,20 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The pinned 768-case independent ISO corpus now runs exhaustively through generated C#,
+  compiled-to-bytecode, bytecode-to-compiled, and NativeAOT paths in CI.
+- Part 3 DCG semicontexts and `Name//Arity` declarations for `dynamic/1`, `multifile/1`, and
+  `discontiguous/1`.
+
+### Changed
+
+- Module preparation now requires one leading `module/2` declaration and rejects malformed,
+  unexported, or conflicting selected imports.
+- DCG processing uses the Part 3 `|` operator priority, rejects reserved and predefined grammar
+  heads, and applies the specified `phrase/2` and terminal-sequence validation.
+
 ## [0.1.1] — 2026-07-30
 
 ### Added

@@ -2,13 +2,21 @@
 
 ## The claim
 
-DotProlog **does not claim ISO or SWI-Prolog compatibility**, and will not until published
-conformance tests verify it. What follows is what is implemented, what is deliberately absent, and
-where behaviour is known to differ. It is a description, not a conformance statement.
+DotProlog **does not yet claim complete ISO or SWI-Prolog compatibility**. The applicable
+independent Part 1 corpus passes on every execution path, but licensed-text traceability and the
+separate Part 2 module and Part 3 grammar completion gates remain open. What follows is evidence
+and known variation, not a certification.
 
 ## What has been measured
 
-**563 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**The 768 applicable declarations in the pinned Logtalk 3.101.0 ISO Prolog corpus all pass.**
+The same inventory passes as managed consulted bytecode, generated C#, generated C# calling
+consulted bytecode, consulted bytecode calling generated C#, and NativeAOT. The adapter inventories
+802 declarations in total: 29 are disabled upstream and five are non-applicable alternative
+branches. CI pins and verifies the upstream revision and rejects changed counts.
+
+The repository also carries conformance cases encoded from ISO/IEC 13211-1 and its published
+corrigenda, all passing.
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -22,11 +30,9 @@ and byte I/O, term input and output, `op/3`, logic and control, and atomic term 
 an emphasis throughout on the error terms, which is where implementations diverge most. Sorting
 is included too, though it sits outside clause 8.
 
-**These cases are our own encoding of the standard, not third-party verification.** Ulrich
-Neumerkel's conformity tables carry no licence, and the Logtalk suite is written against its own
-test framework, so neither could be vendored. Reading the standard and encoding it is worth more
-than nothing and less than an independent suite, and this file will say so until an independent one
-has been run.
+The repository cases are our own encoding and are not independent verification. The Logtalk suite
+is independently maintained and Apache-2.0 licensed; DotProlog mechanically adapts its test wrapper
+without changing expected outcomes and runs it from a pinned checkout.
 
 Writing them was worth it immediately: they found these real defects.
 
@@ -223,8 +229,9 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 
 | Feature | Current state |
 |---|---|
-| Complete standard clause audit | Repository mappings and direct tests cover lexical, operator, stream, and non-stream clauses |
-| Independent ISO verification | The repository corpus is not a substitute for a published independent suite |
+| Complete standard clause audit | The private maps still require a licensed-text, one-row-per-normative-requirement review |
+| Part 2 modules | Core behavior is implemented; strict-mode and licensed-text completion remain |
+| Part 3 grammars | Common semantics, semicontexts, declarations, errors, and all execution paths are tested; a whole-processor strict mode and final-text traceability remain |
 
 ## Non-ISO features absent deliberately
 
