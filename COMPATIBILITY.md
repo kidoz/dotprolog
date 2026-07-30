@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**507 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**510 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -158,8 +158,11 @@ Writing them was worth it immediately: they found these real defects.
 - ISO backquoted-name syntax denotes atoms and supports doubled delimiters and the same escapes as
   the other quoted forms, including `\d` for DEL. Raw control and non-space layout characters are
   rejected inside quoted input.
+- ISO floats require a decimal point with digits on both sides before an exponent. Exponent-only
+  spellings are rejected consistently by term input and number conversion, and single-term input
+  no longer accepts an otherwise valid prefix while ignoring trailing tokens.
 
-Beyond the conformance cases, the engine and toolchain are covered by 1062 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 1066 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
