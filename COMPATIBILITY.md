@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**391 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**397 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -85,8 +85,11 @@ Writing them was worth it immediately: they found these real defects.
 - Host reader and writer failures now become catchable ISO `system_error` terms throughout stream
   input, output, EOF inspection, positioning, formatting, flushing, and closing. Implicit-current
   output predicates also enforce the same text/binary permissions as explicit-stream calls.
+- `write_term/3` now writes to an explicit stream, and the ISO `quoted/1`, `ignore_ops/1`, and
+  `numbervars/1` options are strict booleans with rightmost precedence. Numbered variables use the
+  portable `A` through `Z`, `A1`, `B1`, and later naming sequence.
 
-Beyond the conformance cases, the engine and toolchain are covered by 887 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 907 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
@@ -112,7 +115,7 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 
 | Feature | Current state |
 |---|---|
-| Complete stream surface | Term I/O option modes and the remaining I/O error clauses still require a systematic audit |
+| Complete stream surface | The remaining term/stream I/O error clauses still require a systematic audit |
 
 ## Non-ISO features absent deliberately
 

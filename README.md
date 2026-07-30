@@ -208,7 +208,7 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 | Higher order | `maplist/2..5`, `foldl/4,5`, `include/3`, `exclude/3`, `partition/4` |
 | Sorting | `sort/2`, `sort/4`, `msort/2`, `keysort/2`, `predsort/3` |
 | Integers | `succ/2`, `plus/3` |
-| Output | `write/1`, `writeq/1`, `print/1`, `writeln/1`, `write_canonical/1`, `write_term/2`, `nl/0`, `format/1,2,3`, `tab/1` |
+| Output | `write/1,2`, `writeq/1,2`, `print/1,2`, `writeln/1`, `write_canonical/1,2`, `write_term/2,3`, `nl/0,1`, `format/1,2,3`, `tab/1` |
 | Operators | `op/3`, `current_op/3` |
 | Grammars | `-->/2` with `{}/1`, `!`, `\+`, pushback lists; `phrase/2`, `phrase/3` |
 | Streams | `open/3,4` text and binary streams, `close/1,2`, configurable EOF actions, `current_stream/1`, `stream_property/2`, `set_stream_position/2`, current-stream selection, EOF inspection, flushing |
@@ -310,7 +310,8 @@ stream's `eof_action(error|eof_code|reset)` controls reads after its first EOF m
 collisions before it touches the requested source/sink. Stream permission errors preserve that
 alias or handle as the culprit, and malformed handles cannot wrap to another live stream. Bound
 character-input targets are validated before any character is consumed. Host reader and writer
-failures remain recoverable through `catch/3` as `system_error`.
+failures remain recoverable through `catch/3` as `system_error`. `write_term/2,3` supports the ISO
+`quoted`, `ignore_ops`, and `numbervars` options with exact boolean validation.
 
 ```prolog
 main :-
@@ -360,7 +361,7 @@ A control term assembled at run time and passed to `call/1` is lowered to VM byt
 same control-construct compiler used for source clauses. Its cut is transparent within that
 meta-called goal and opaque to the caller, as ISO specifies.
 
-DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 391 conformance cases encoded
+DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 397 conformance cases encoded
 from ISO/IEC 13211-1, all passing, but those are its own reading of the standard rather than an
 independent suite — see [COMPATIBILITY.md](COMPATIBILITY.md), which also lists the known
 differences.
