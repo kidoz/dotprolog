@@ -29,4 +29,13 @@ public static class CompilerDiagnosticIds
 
     /// <summary>A <c>use_module</c> names a file that cannot be found or loaded.</summary>
     public const string ModuleNotFound = "DPL1009";
+
+    /// <summary>An <c>include/1</c> declaration does not name a source file with an atom.</summary>
+    public const string InvalidIncludeDeclaration = "DPL1010";
+
+    /// <summary>An <c>include/1</c> declaration names a source file that cannot be found or read.</summary>
+    public const string IncludeNotFound = "DPL1011";
+
+    /// <summary>An <c>include/1</c> declaration recursively includes a source already being read.</summary>
+    public const string IncludeCycle = "DPL1012";
 }

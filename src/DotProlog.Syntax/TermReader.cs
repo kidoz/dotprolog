@@ -48,12 +48,19 @@ public sealed class TermReader
     /// <param name="operators">Operator table to read with; a default ISO table is used when omitted.</param>
     /// <param name="characterConversions">Program-owned input-character mappings, when applicable.</param>
     /// <param name="flags">Program-owned flags controlling whether character conversion is active.</param>
+    /// <param name="directiveExpansion">
+    /// Optional source-level directive expander. A non-null result replaces the directive with the
+    /// returned clauses before the next clause is lexed. This is the seam used by ISO
+    /// <c>include/1</c>, whose included operator and character-conversion declarations must affect
+    /// the remainder of the including source.
+    /// </param>
     public static ParseResult ReadProgram(
         string text,
         string? fileName = null,
         OperatorTable? operators = null,
         CharacterConversionTable? characterConversions = null,
-        PrologFlags? flags = null
+        PrologFlags? flags = null,
+        Func<SyntaxTerm, ParseResult?>? directiveExpansion = null
     )
     {
         ArgumentNullException.ThrowIfNull(text);
@@ -67,10 +74,23 @@ public sealed class TermReader
             SyntaxTerm? clause = reader.ReadClause();
             if (clause is not null)
             {
-                // An operator declaration has to take effect before the next clause is read, or the
-                // file that declares an operator could not then use it.
+                // Reader-state and source-expansion directives take effect while the full stop is
+                // still current, before Advance lexes the first token of the following clause.
+                reader.ApplyCharacterConversionDirective(clause);
                 reader.ApplyOperatorDirective(clause);
-                clauses.Add(clause);
+
+                ParseResult? expanded = directiveExpansion?.Invoke(clause);
+                if (expanded is null)
+                {
+                    clauses.Add(clause);
+                }
+                else
+                {
+                    clauses.AddRange(expanded.Clauses);
+                    diagnostics.AddRange(expanded.Diagnostics);
+                }
+
+                reader.Advance();
             }
         }
 
@@ -209,8 +229,6 @@ public sealed class TermReader
             return null;
         }
 
-        ApplyCharacterConversionDirective(term);
-        Advance();
         return term;
     }
 

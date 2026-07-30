@@ -110,13 +110,7 @@ public sealed class PrologEngine : IRuntimeCompiler
     {
         ArgumentNullException.ThrowIfNull(text);
 
-        ParseResult parsed = TermReader.ReadProgram(
-            text,
-            fileName,
-            Program.Operators,
-            Program.CharacterConversions,
-            Program.Flags
-        );
+        ParseResult parsed = ReadProgramWithIncludes(text, fileName);
         if (!parsed.Success)
         {
             return new LoadResult(parsed.Diagnostics, [], []);
@@ -140,6 +134,119 @@ public sealed class PrologEngine : IRuntimeCompiler
 
         return new LoadResult(diagnostics, loaded.DirectiveAddresses, loaded.InitializationAddresses);
     }
+
+    /// <summary>
+    /// Reads a source unit while expanding ISO <c>include/1</c> declarations at their source
+    /// position. All nested readers share the program's reader state.
+    /// </summary>
+    private ParseResult ReadProgramWithIncludes(string text, string? fileName)
+    {
+        HashSet<string> active = new(PathComparer);
+        string? rootPath = ExistingFullPath(fileName);
+        if (rootPath is not null)
+        {
+            active.Add(rootPath);
+        }
+
+        return ReadSource(text, fileName);
+
+        ParseResult ReadSource(string source, string? sourceName) =>
+            TermReader.ReadProgram(
+                source,
+                sourceName,
+                Program.Operators,
+                Program.CharacterConversions,
+                Program.Flags,
+                clause => ExpandInclude(clause, sourceName)
+            );
+
+        ParseResult? ExpandInclude(SyntaxTerm clause, string? includingFile)
+        {
+            if (
+                clause is not CompoundTerm { Name: ":-", Arity: 1 } directive
+                || directive.Arguments[0] is not CompoundTerm { Name: "include", Arity: 1 } include
+            )
+            {
+                return null;
+            }
+
+            if (include.Arguments[0] is not AtomTerm file)
+            {
+                return IncludeError(
+                    CompilerDiagnosticIds.InvalidIncludeDeclaration,
+                    "include/1 needs an atom naming a source file.",
+                    include.Arguments[0].Span,
+                    includingFile
+                );
+            }
+
+            string? path = ResolveSourcePath(file.Name, includingFile);
+            if (path is null)
+            {
+                return IncludeError(
+                    CompilerDiagnosticIds.IncludeNotFound,
+                    $"No file for include({file.Name}).",
+                    file.Span,
+                    includingFile
+                );
+            }
+
+            if (!active.Add(path))
+            {
+                return IncludeError(
+                    CompilerDiagnosticIds.IncludeCycle,
+                    $"Recursive include of '{path}'.",
+                    file.Span,
+                    includingFile
+                );
+            }
+
+            try
+            {
+                return ReadSource(File.ReadAllText(path), path);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                return IncludeError(
+                    CompilerDiagnosticIds.IncludeNotFound,
+                    $"Could not read included file '{path}': {exception.Message}",
+                    file.Span,
+                    includingFile
+                );
+            }
+            finally
+            {
+                active.Remove(path);
+            }
+        }
+    }
+
+    private static ParseResult IncludeError(string id, string message, SourceSpan span, string? fileName) =>
+        new([], [new Diagnostic(id, DiagnosticSeverity.Error, message, span, fileName)]);
+
+    private static string? ExistingFullPath(string? fileName) =>
+        fileName is not null && File.Exists(fileName) ? Path.GetFullPath(fileName) : null;
+
+    private static string? ResolveSourcePath(string name, string? includingFile)
+    {
+        string directory = includingFile is null
+            ? Directory.GetCurrentDirectory()
+            : (Path.GetDirectoryName(Path.GetFullPath(includingFile)) ?? ".");
+
+        foreach (string candidate in (string[])[name, name + ".pl"])
+        {
+            string absolute = Path.IsPathRooted(candidate) ? candidate : Path.Combine(directory, candidate);
+            if (File.Exists(absolute))
+            {
+                return Path.GetFullPath(absolute);
+            }
+        }
+
+        return null;
+    }
+
+    private static StringComparer PathComparer =>
+        OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
 
     /// <summary>
     /// Consults <paramref name="text"/> and throws if it does not compile, with the diagnostics in the
