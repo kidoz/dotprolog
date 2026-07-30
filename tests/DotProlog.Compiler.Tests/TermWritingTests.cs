@@ -45,6 +45,27 @@ public sealed class TermWritingTests
         Assert.Equal(expected, PrologTestHost.RunGoal($"{goal}, writeq(X)"));
     }
 
+    [Theory]
+    [InlineData("atom_codes(X, [97, 10, 98])", @"'a\nb'")]
+    [InlineData("atom_codes(X, [97, 13, 98])", @"'a\rb'")]
+    [InlineData("atom_codes(X, [7, 8, 9, 11, 12])", @"'\a\b\t\v\f'")]
+    // Control characters with no named escape leave as the delimited hexadecimal form.
+    [InlineData("atom_codes(X, [97, 0, 26, 98])", @"'a\x0\\x1a\b'")]
+    public void WriteqEscapesControlCharacters(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal($"{goal}, writeq(X)"));
+
+    [Theory]
+    [InlineData("[97, 13, 98]")]
+    [InlineData("[7, 8, 9, 10, 11, 12, 13, 27, 0, 127]")]
+    public void WriteqControlCharactersReadBackAsTheSameAtom(string codes) =>
+        Assert.Equal(
+            "yes",
+            PrologTestHost.RunGoal(
+                $"atom_codes(A, {codes}), with_output_to(atom(W), writeq(A)), "
+                    + "read_term_from_atom(W, T, []), ( T == A -> write(yes) ; write(no) )"
+            )
+        );
+
     [Fact]
     public void WritelnAppendsANewline()
     {

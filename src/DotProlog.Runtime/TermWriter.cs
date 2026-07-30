@@ -362,8 +362,19 @@ public static class TermWriter
             {
                 '\'' => quotedText.Append("\\'"),
                 '\\' => quotedText.Append("\\\\"),
+                '\a' => quotedText.Append("\\a"),
+                '\b' => quotedText.Append("\\b"),
+                '\f' => quotedText.Append("\\f"),
                 '\n' => quotedText.Append("\\n"),
+                '\r' => quotedText.Append("\\r"),
                 '\t' => quotedText.Append("\\t"),
+                '\v' => quotedText.Append("\\v"),
+                // The reader rejects a raw control character between quotes, so the rest of them
+                // leave as the delimited hexadecimal escape it accepts back.
+                _ when char.IsControl(c) => quotedText
+                    .Append("\\x")
+                    .Append(((int)c).ToString("x", CultureInfo.InvariantCulture))
+                    .Append('\\'),
                 _ => quotedText.Append(c),
             };
         }
