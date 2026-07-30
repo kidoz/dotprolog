@@ -87,6 +87,24 @@ internal static class Program
                 % trimming and work in a native image like everything else here.
                 msort([c, a, b], Sorted), write(Sorted), nl,
                 maplist(upcase_atom, Sorted, Upper), write(Upper), nl,
+                findall(NativeItem, member(NativeItem, [a, b]), [a | NativeTail]),
+                NativeTail == [b],
+                catch(
+                    findall(_, fail, atom),
+                    error(type_error(list, atom), _),
+                    FindallListCaught = true),
+                FindallListCaught == true,
+                catch(
+                    bagof(_, true, atom),
+                    error(type_error(list, atom), _),
+                    BagofListCaught = true),
+                BagofListCaught == true,
+                catch(
+                    setof(_, true, atom),
+                    error(type_error(list, atom), _),
+                    SetofListCaught = true),
+                SetofListCaught == true,
+                write(all_solutions_errors), nl,
                 aggregate_all(sum(N), member(N, [1, 2, 3]), Sum),
                 format("sum=~d~n", [Sum]),
                 format(atom(Aligned), "~w~t~8|~d", [row, 7]), write(Aligned), nl,

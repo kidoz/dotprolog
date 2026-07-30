@@ -73,6 +73,7 @@ public sealed class NativeAotAcceptanceTests
                     "caught",
                     "[a,b,c]",
                     "[A,B,C]",
+                    "all_solutions_errors",
                     "sum=6",
                     "row     7",
                     "arithmetic=-1,2.0,0.0",
