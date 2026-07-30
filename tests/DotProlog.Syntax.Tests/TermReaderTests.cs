@@ -32,6 +32,12 @@ public sealed class TermReaderTests
     }
 
     [Fact]
+    public void ReadsBackquotedAtom()
+    {
+        Assert.Equal("greeting(Hello! World!)", ReadSingle("greeting(`Hello! World!`)."));
+    }
+
+    [Fact]
     public void ReadsRuleWithConjunctiveBody()
     {
         Assert.Equal(":-(main,,(write(hi),nl))", ReadSingle("main :- write(hi), nl."));
@@ -95,6 +101,7 @@ public sealed class TermReaderTests
 
     [Theory]
     [InlineData("left 'is' right.", "is(left,right)")]
+    [InlineData("left `is` right.", "is(left,right)")]
     [InlineData("'dynamic' predicate.", "dynamic(predicate)")]
     [InlineData("p('+', q).", "p(+,q)")]
     public void QuotedOperatorNamesRetainTheirOperatorMeaning(string source, string expected)

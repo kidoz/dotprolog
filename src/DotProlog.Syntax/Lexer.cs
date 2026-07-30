@@ -58,7 +58,7 @@ internal sealed class Lexer
 
             c = InputAt(_position);
             if (
-                c is '_' or '\'' or '"'
+                c is '_' or '\'' or '"' or '`'
                 || char.IsLetterOrDigit(c)
                 || IsStructural(c)
                 || SymbolCharacters.Contains(c, StringComparison.Ordinal)
@@ -127,6 +127,12 @@ internal sealed class Lexer
             return new Token(TokenKind.String, value, SpanFrom(start), layout);
         }
 
+        if (c == '`')
+        {
+            string name = ReadQuoted('`', out _);
+            return new Token(TokenKind.Atom, name, SpanFrom(start), layout, Quoted: true);
+        }
+
         if (SymbolCharacters.Contains(c, StringComparison.Ordinal))
         {
             while (_position < _text.Length && SymbolCharacters.Contains(InputAt(_position), StringComparison.Ordinal))
@@ -167,7 +173,7 @@ internal sealed class Lexer
         }
 
         char input = _text[position];
-        if (input is '\'' or '"')
+        if (input is '\'' or '"' or '`')
         {
             return input;
         }
@@ -414,6 +420,17 @@ internal sealed class Lexer
                 continue;
             }
 
+            if (c != ' ' && (char.IsControl(c) || IsLayout(c)))
+            {
+                Report(
+                    DiagnosticIds.InvalidQuotedCharacter,
+                    "Control and layout characters inside quoted text must use an escape sequence.",
+                    SpanFrom(_position)
+                );
+                Advance();
+                continue;
+            }
+
             builder.Append(c);
             Advance();
         }
@@ -468,6 +485,9 @@ internal sealed class Lexer
                 return;
             case 'e':
                 builder.Append('\u001b');
+                return;
+            case 'd':
+                builder.Append('\u007f');
                 return;
             case '0':
                 builder.Append('\0');

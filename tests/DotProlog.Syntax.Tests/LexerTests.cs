@@ -62,6 +62,40 @@ public sealed class LexerTests
         Assert.True(tokens[0].Quoted);
     }
 
+    [Fact]
+    public void ReadsBackquotedAtomWithEscapesAndDoubledQuote()
+    {
+        List<Token> tokens = Tokenize(@"`Hello\n``world`", out List<Diagnostic> diagnostics);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(TokenKind.Atom, tokens[0].Kind);
+        Assert.Equal("Hello\n`world", tokens[0].Text);
+        Assert.True(tokens[0].Quoted);
+    }
+
+    [Theory]
+    [InlineData(@"'\d'", '\u007f')]
+    [InlineData(@"""\d""", '\u007f')]
+    [InlineData(@"`\d`", '\u007f')]
+    public void ReadsIsoDeleteEscape(string text, char expected)
+    {
+        List<Token> tokens = Tokenize(text, out List<Diagnostic> diagnostics);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(expected.ToString(), tokens[0].Text);
+    }
+
+    [Theory]
+    [InlineData("'raw\tlayout'")]
+    [InlineData("\"raw\nlayout\"")]
+    [InlineData("`raw\u0001control`")]
+    public void RejectsUnescapedControlAndLayoutCharactersInsideQuotes(string text)
+    {
+        Tokenize(text, out List<Diagnostic> diagnostics);
+
+        Assert.Equal(DiagnosticIds.InvalidQuotedCharacter, Assert.Single(diagnostics).Id);
+    }
+
     [Theory]
     [InlineData(@"'\x41\'", false)]
     [InlineData(@"""\o101\""", true)]

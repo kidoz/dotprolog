@@ -55,14 +55,17 @@ public sealed class CharacterConversionTests
         Assert.Equal(
             "yes\n",
             PrologTestHost.RunGoal(
-                "char_code(SingleQuote, 39), char_code(DoubleQuote, 34), "
-                    + "char_conversion(z, x), char_conversion(SingleQuote, x), char_conversion(DoubleQuote, x), "
+                "char_code(SingleQuote, 39), char_code(DoubleQuote, 34), char_code(Backquote, 96), "
+                    + "char_conversion(z, x), char_conversion(SingleQuote, x), "
+                    + "char_conversion(DoubleQuote, x), char_conversion(Backquote, x), "
                     + "set_prolog_flag(char_conversion, on), "
                     + "atom_codes(SingleQuoted, [39,122,39]), "
                     + "read_term_from_atom(SingleQuoted, z, []), "
                     + "set_prolog_flag(double_quotes, atom), "
                     + "atom_codes(DoubleQuoted, [34,122,34]), "
                     + "read_term_from_atom(DoubleQuoted, z, []), "
+                    + "atom_codes(Backquoted, [96,122,96]), "
+                    + "read_term_from_atom(Backquoted, z, []), "
                     + "write(yes), nl"
             )
         );

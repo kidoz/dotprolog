@@ -32,4 +32,7 @@ public static class DiagnosticIds
 
     /// <summary>A floating-point literal exceeds the finite implementation range.</summary>
     public const string FloatOverflow = "DPL0010";
+
+    /// <summary>An unescaped control or layout character appeared inside a quoted token.</summary>
+    public const string InvalidQuotedCharacter = "DPL0011";
 }

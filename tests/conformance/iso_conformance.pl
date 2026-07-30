@@ -416,6 +416,17 @@ iso_unreached_noncallable_body :- fail, 4.
 % --- 7.1 Terms, read back from text ------------------------------------------
 iso_case('7.1.1', reads_as('foo', foo), success).
 iso_case('7.1.1', reads_as('[]', []), success).
+iso_case('6.4.2', reads_as('`hello`', hello), success).
+iso_case('6.4.2', reads_as('left `is` right', is(left, right)), success).
+iso_case(
+    '6.4.2',
+    (
+        atom_codes(BackquotedDeleteSource, [96, 92, 100, 96]),
+        atom_codes(DeleteAtom, [127]),
+        reads_as(BackquotedDeleteSource, DeleteAtom)
+    ),
+    success
+).
 iso_case('7.1.2', reads_as('123', 123), success).
 iso_case('7.1.2', reads_as('-123', -123), success).
 iso_case('7.1.2', reads_as('0''a', 97), success).
