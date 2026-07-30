@@ -83,6 +83,7 @@ public sealed class NativeAotAcceptanceTests
                     "character_conversion",
                     "read_options",
                     "read_option_validation",
+                    "integer_representation_errors",
                     "stream_properties",
                     "current_stream_domains",
                     "code_io",

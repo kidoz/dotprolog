@@ -136,6 +136,19 @@ internal static class Program
                 read(ReadOptionIn, first), close(ReadOptionIn),
                 write(read_option_validation), nl,
 
+                % Runtime reading preserves bounded integer representation errors after trimming.
+                catch(
+                    read_term_from_atom('999999999999999999999999999999', _, []),
+                    error(representation_error(max_integer), _),
+                    MaxIntegerCaught = true),
+                MaxIntegerCaught == true,
+                catch(
+                    read_term_from_atom('-999999999999999999999999999999', _, []),
+                    error(representation_error(min_integer), _),
+                    MinIntegerCaught = true),
+                MinIntegerCaught == true,
+                write(integer_representation_errors), nl,
+
                 % Open streams and their ISO metadata are explicit runtime state, not reflection.
                 current_input(NativeInput), current_stream(NativeInput),
                 stream_property(NativeInput, mode(read)),
