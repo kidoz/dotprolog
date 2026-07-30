@@ -106,6 +106,8 @@ internal static class OperatorBuiltins
     /// </remarks>
     private static bool Current(Machine machine, long state)
     {
+        ValidateCurrentArguments(machine);
+
         PrologOperator[] all = machine.Operators.All();
         int index = (int)state;
 
@@ -137,4 +139,30 @@ internal static class OperatorBuiltins
             OperatorType.Xf => "xf",
             _ => "yf",
         };
+
+    private static void ValidateCurrentArguments(Machine machine)
+    {
+        Cell priority = machine.Argument(0);
+        if (priority.Tag != CellTag.Reference && (priority.Tag != CellTag.Integer || priority.Integer is < 0 or > 1200))
+        {
+            throw PrologErrors.Domain(machine, "operator_priority", priority);
+        }
+
+        Cell specifier = machine.Argument(1);
+        if (
+            specifier.Tag != CellTag.Reference
+            && (specifier.Tag != CellTag.Atom || !IsSpecifier(machine.Symbols.AtomName(specifier.Index)))
+        )
+        {
+            throw PrologErrors.Domain(machine, "operator_specifier", specifier);
+        }
+
+        Cell name = machine.Argument(2);
+        if (name.Tag is not (CellTag.Reference or CellTag.Atom))
+        {
+            throw PrologErrors.Type(machine, "atom", name);
+        }
+    }
+
+    private static bool IsSpecifier(string name) => name is "xfx" or "xfy" or "yfx" or "fy" or "fx" or "xf" or "yf";
 }

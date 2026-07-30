@@ -73,6 +73,15 @@ public sealed class OperatorDeclarationTests
         Assert.Equal("54", PrologTestHost.RunGoal("findall(N, current_op(_, _, N), L), length(L, C), write(C)"));
     }
 
+    [Theory]
+    [InlineData("current_op(a, _, _)", "domain_error(operator_priority,a)")]
+    [InlineData("current_op(1201, _, _)", "domain_error(operator_priority,1201)")]
+    [InlineData("current_op(_, 1, _)", "domain_error(operator_specifier,1)")]
+    [InlineData("current_op(_, nonsense, _)", "domain_error(operator_specifier,nonsense)")]
+    [InlineData("current_op(_, _, 1)", "type_error(atom,1)")]
+    public void CurrentOpRejectsInvalidFilters(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+
     [Fact]
     public void CurrentOpSeesWhatOpDeclared() =>
         Assert.Equal("yes", PrologTestHost.RunGoal("op(333, xfx, zzz), current_op(333, xfx, zzz), write(yes)"));

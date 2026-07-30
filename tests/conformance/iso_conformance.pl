@@ -556,6 +556,9 @@ iso_case(
 iso_case('8.14.2', (with_output_to(atom(A4), write_term(1 + 2, [ignore_ops(true)])), A4 == '+(1,2)'), success).
 iso_case('8.14.2', (with_output_to(atom(A5), write_term('a b', [quoted(true)])), atom_length(A5, 5)), success).
 iso_case('8.14.4', (current_op(P1, xfx, ':-'), P1 =:= 1200), success).
+iso_case('8.14.4', current_op(a, _, _), error(domain_error(operator_priority, a))).
+iso_case('8.14.4', current_op(_, nonsense, _), error(domain_error(operator_specifier, nonsense))).
+iso_case('8.14.4', current_op(_, _, 1), error(type_error(atom, 1))).
 iso_case('8.14.12', (char_conversion(q, r), current_char_conversion(q, r)), success).
 iso_case('8.14.12', char_conversion(_, a), error(instantiation_error)).
 iso_case('8.14.12', char_conversion(a, _), error(instantiation_error)).
