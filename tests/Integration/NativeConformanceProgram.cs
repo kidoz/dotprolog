@@ -1,0 +1,20 @@
+#if NATIVE_CONFORMANCE_RUNNER
+namespace Integration.Tests;
+
+/// <summary>Direct NativeAOT entry point for the pinned independent ISO corpus.</summary>
+internal static class NativeConformanceProgram
+{
+    private static async Task<int> Main(string[] args)
+    {
+        string? reportPath = args.Length > 0 ? args[0] : null;
+
+        await LogtalkConformanceTests.RunPinnedIsoCorpusAsync(
+            selectedId: null,
+            reportPath,
+            CancellationToken.None
+        );
+        await Console.Out.WriteLineAsync("NativeAOT independent ISO conformance: 768/768 passed.");
+        return 0;
+    }
+}
+#endif

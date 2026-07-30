@@ -5,6 +5,20 @@
         <TestingPlatformCommandLineArguments>$(TestingPlatformCommandLineArguments) --ignore-exit-code 8</TestingPlatformCommandLineArguments>
     </PropertyGroup>
 
+    <PropertyGroup Condition="'$(NativeConformanceRunner)' == 'true'">
+        <DefineConstants>$(DefineConstants);NATIVE_CONFORMANCE_RUNNER</DefineConstants>
+        <StartupObject>Integration.Tests.NativeConformanceProgram</StartupObject>
+        <PublishAot>true</PublishAot>
+        <TrimMode>full</TrimMode>
+        <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+        <EnableAotAnalyzer>true</EnableAotAnalyzer>
+        <!--
+          The direct entry point bypasses and trims test discovery. These warnings originate in the
+          unreachable xUnit runner assemblies, which remain package references for the managed mode.
+        -->
+        <NoWarn>$(NoWarn);IL2104;IL3000;IL3053</NoWarn>
+    </PropertyGroup>
+
     <ItemGroup>
         <ProjectReference Include="..\..\src\DotProlog.Compiler\DotProlog.Compiler.csproj" />
     </ItemGroup>

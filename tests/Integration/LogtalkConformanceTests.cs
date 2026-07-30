@@ -18,8 +18,6 @@ public sealed class LogtalkConformanceTests
     private const string Repository = "https://github.com/LogtalkDotOrg/logtalk3.git";
     private const string Tag = "lgt31010stable";
     private const string Commit = "11dfd24eb6673250be996012489e65c0f9370a7c";
-    private static readonly JsonSerializerOptions ReportJsonOptions = new() { WriteIndented = true };
-
     [Fact]
     public void AdapterPreservesDeclarationsExpectationsAndCharacterCodeSyntax()
     {
@@ -288,6 +286,23 @@ public sealed class LogtalkConformanceTests
             $"Set {OptInVariable}=1 to run the pinned independent conformance suite."
         );
 
+        await RunPinnedIsoCorpusAsync(
+            Environment.GetEnvironmentVariable(CaseVariable),
+            Environment.GetEnvironmentVariable(ReportVariable),
+            TestContext.Current.CancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Runs the pinned corpus without a test-framework dependency in the execution path, allowing
+    /// the same implementation to be used by the direct NativeAOT entry point.
+    /// </summary>
+    internal static async Task RunPinnedIsoCorpusAsync(
+        string? selectedId,
+        string? reportPath,
+        CancellationToken cancellationToken
+    )
+    {
         string checkout = Path.Combine(Path.GetTempPath(), $"dotprolog-logtalk-{Environment.ProcessId}");
         string adapterFilesRoot = Path.Combine(checkout, ".dotprolog-adapter");
         var engines = new Dictionary<string, PrologEngine>(StringComparer.Ordinal);
@@ -300,26 +315,26 @@ public sealed class LogtalkConformanceTests
                 ["clone", "--depth", "1", "--branch", Tag, "--filter=blob:none", "--sparse", Repository, checkout],
                 RepositoryLayout.Root
             );
-            Assert.True(cloneExit == 0, $"Could not clone the pinned Logtalk suite:\n{cloneLog}");
+            Require(cloneExit == 0, $"Could not clone the pinned Logtalk suite:\n{cloneLog}");
 
             (int sparseExit, string sparseLog) = await ChildProcess.RunAsync(
                 "git",
                 ["-C", checkout, "sparse-checkout", "set", "tests/prolog"],
                 RepositoryLayout.Root
             );
-            Assert.True(sparseExit == 0, $"Could not select the Logtalk Prolog tests:\n{sparseLog}");
+            Require(sparseExit == 0, $"Could not select the Logtalk Prolog tests:\n{sparseLog}");
 
             (int revisionExit, string revisionLog) = await ChildProcess.RunAsync(
                 "git",
                 ["-C", checkout, "rev-parse", "HEAD"],
                 RepositoryLayout.Root
             );
-            Assert.True(revisionExit == 0, $"Could not read the Logtalk revision:\n{revisionLog}");
-            Assert.Equal(Commit, revisionLog.Trim());
+            Require(revisionExit == 0, $"Could not read the Logtalk revision:\n{revisionLog}");
+            Require(revisionLog.Trim() == Commit, $"Expected Logtalk commit {Commit}, got {revisionLog.Trim()}.");
 
             string testsRoot = Path.Combine(checkout, "tests", "prolog");
             string[] files = Directory.GetFiles(testsRoot, "tests.lgt", SearchOption.AllDirectories);
-            Assert.Equal(192, files.Length);
+            Require(files.Length == 192, $"Expected 192 test files, got {files.Length}.");
 
             var sourceByPath = new Dictionary<string, string>(StringComparer.Ordinal);
             LogtalkTestDeclaration[] declarations =
@@ -333,17 +348,19 @@ public sealed class LogtalkConformanceTests
                 }),
             ];
 
-            Assert.Equal(802, declarations.Length);
-            Assert.Equal(773, declarations.Count(test => !test.Disabled));
-            Assert.Equal(29, declarations.Count(test => test.Disabled));
+            Require(declarations.Length == 802, $"Expected 802 declarations, got {declarations.Length}.");
+            Require(
+                declarations.Count(test => !test.Disabled) == 773,
+                "The enabled declaration inventory changed."
+            );
+            Require(declarations.Count(test => test.Disabled) == 29, "The disabled declaration inventory changed.");
 
             Dictionary<string, int> outcomeKinds = declarations
                 .Where(test => !test.Disabled)
                 .GroupBy(test => test.OutcomeKind, StringComparer.Ordinal)
                 .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
 
-            Assert.Equal(
-                new Dictionary<string, int>(StringComparer.Ordinal)
+            Dictionary<string, int> expectedOutcomeKinds = new(StringComparer.Ordinal)
                 {
                     ["ball"] = 1,
                     ["deterministic"] = 1,
@@ -356,8 +373,13 @@ public sealed class LogtalkConformanceTests
                     ["subsumes"] = 3,
                     ["true"] = 460,
                     ["variant"] = 13,
-                },
-                outcomeKinds
+                };
+            Require(
+                expectedOutcomeKinds.Count == outcomeKinds.Count
+                    && expectedOutcomeKinds.All(item =>
+                        outcomeKinds.TryGetValue(item.Key, out int count) && count == item.Value
+                    ),
+                "The enabled outcome-kind inventory changed."
             );
 
             var supportByPath = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -393,7 +415,7 @@ public sealed class LogtalkConformanceTests
                     && !applicableConditionalCases.Contains(test)
                 ),
             ];
-            Assert.Equal(5, nonApplicableCases.Count);
+            Require(nonApplicableCases.Count == 5, "The conditional-branch inventory changed.");
 
             LogtalkTestDeclaration[] directCases =
             [
@@ -417,20 +439,25 @@ public sealed class LogtalkConformanceTests
                 ),
             ];
 
-            Assert.Equal(768, directCases.Length);
-            Assert.Equal(455, directCases.Count(test => test.OutcomeKind == "true"));
-            Assert.Equal(74, directCases.Count(test => test.OutcomeKind == "false"));
-            Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "fail"));
-            Assert.Equal(154, directCases.Count(test => test.OutcomeKind == "error"));
-            Assert.Equal(13, directCases.Count(test => test.OutcomeKind == "variant"));
-            Assert.Equal(41, directCases.Count(test => test.OutcomeKind == "exists"));
-            Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "subsumes"));
-            Assert.Single(directCases, test => test.OutcomeKind == "deterministic");
-            Assert.Equal(17, directCases.Count(test => test.OutcomeKind == "errors"));
-            Assert.Single(directCases, test => test.OutcomeKind == "ball");
-            Assert.Equal(6, directCases.Count(test => test.OutcomeKind == "quick_check"));
+            Require(directCases.Length == 768, "The applicable direct-case inventory changed.");
+            Require(directCases.Count(test => test.OutcomeKind == "true") == 455, "The true-case inventory changed.");
+            Require(directCases.Count(test => test.OutcomeKind == "false") == 74, "The false-case inventory changed.");
+            Require(directCases.Count(test => test.OutcomeKind == "fail") == 3, "The fail-case inventory changed.");
+            Require(directCases.Count(test => test.OutcomeKind == "error") == 154, "The error-case inventory changed.");
+            Require(directCases.Count(test => test.OutcomeKind == "variant") == 13, "The variant-case inventory changed.");
+            Require(directCases.Count(test => test.OutcomeKind == "exists") == 41, "The exists-case inventory changed.");
+            Require(directCases.Count(test => test.OutcomeKind == "subsumes") == 3, "The subsumes-case inventory changed.");
+            Require(
+                directCases.Count(test => test.OutcomeKind == "deterministic") == 1,
+                "The deterministic-case inventory changed."
+            );
+            Require(directCases.Count(test => test.OutcomeKind == "errors") == 17, "The errors-case inventory changed.");
+            Require(directCases.Count(test => test.OutcomeKind == "ball") == 1, "The ball-case inventory changed.");
+            Require(
+                directCases.Count(test => test.OutcomeKind == "quick_check") == 6,
+                "The QuickCheck inventory changed."
+            );
 
-            string? selectedId = Environment.GetEnvironmentVariable(CaseVariable);
             LogtalkTestDeclaration[] casesToExecute = SelectCasesToExecute(directCases, selectedId);
 
             var failures = new List<string>();
@@ -458,14 +485,20 @@ public sealed class LogtalkConformanceTests
                 }
             }
 
-            string? reportPath = Environment.GetEnvironmentVariable(ReportVariable);
             if (reportPath is not null)
             {
-                Assert.Null(selectedId);
-                await WriteReportAsync(reportPath, declarations, directCases, nonApplicableCases, executionResults);
+                Require(selectedId is null, "A full report cannot be combined with a selected case.");
+                await WriteReportAsync(
+                    reportPath,
+                    declarations,
+                    directCases,
+                    nonApplicableCases,
+                    executionResults,
+                    cancellationToken
+                );
             }
 
-            Assert.True(failures.Count == 0, $"Independent ISO cases failed:\n{string.Join('\n', failures)}");
+            Require(failures.Count == 0, $"Independent ISO cases failed:\n{string.Join('\n', failures)}");
         }
         finally
         {
@@ -527,7 +560,10 @@ public sealed class LogtalkConformanceTests
         }
 
         LogtalkTestDeclaration[] selected = [.. directCases.Where(test => test.Id == selectedId)];
-        Assert.Single(selected);
+        Require(
+            selected.Length == 1,
+            $"Case identifier '{selectedId}' selected {selected.Length} cases; use a unique identifier."
+        );
 
         LogtalkTestDeclaration target = selected[0];
         LogtalkTestDeclaration[] sourceCases = [.. directCases.Where(test => test.SourcePath == target.SourcePath)];
@@ -1038,7 +1074,8 @@ public sealed class LogtalkConformanceTests
         LogtalkTestDeclaration[] declarations,
         LogtalkTestDeclaration[] directCases,
         HashSet<LogtalkTestDeclaration> nonApplicableCases,
-        Dictionary<LogtalkTestDeclaration, string> executionResults
+        Dictionary<LogtalkTestDeclaration, string> executionResults,
+        CancellationToken cancellationToken
     )
     {
         string? directory = Path.GetDirectoryName(path);
@@ -1047,38 +1084,53 @@ public sealed class LogtalkConformanceTests
             Directory.CreateDirectory(directory);
         }
 
-        var report = new
+        await using FileStream output = File.Create(path);
+        using var writer = new Utf8JsonWriter(output, new JsonWriterOptions { Indented = true });
+        writer.WriteStartObject();
+        writer.WriteString("repository", Repository);
+        writer.WriteString("tag", Tag);
+        writer.WriteString("commit", Commit);
+        writer.WriteStartObject("summary");
+        writer.WriteNumber("total", declarations.Length);
+        writer.WriteNumber("enabled", declarations.Count(test => !test.Disabled));
+        writer.WriteNumber(
+            "applicable",
+            declarations.Count(test => !test.Disabled && !nonApplicableCases.Contains(test))
+        );
+        writer.WriteNumber("disabled", declarations.Count(test => test.Disabled));
+        writer.WriteNumber("not_applicable", nonApplicableCases.Count);
+        writer.WriteNumber("passed", executionResults.Count(result => result.Value == "passed"));
+        writer.WriteNumber(
+            "failed",
+            executionResults.Count(result => result.Value.StartsWith("failed:", StringComparison.Ordinal))
+        );
+        writer.WriteNumber(
+            "unsupported",
+            declarations.Count(test =>
+                !test.Disabled && !nonApplicableCases.Contains(test) && !directCases.Contains(test)
+            )
+        );
+        writer.WriteEndObject();
+        writer.WriteStartArray("cases");
+
+        foreach (LogtalkTestDeclaration test in declarations)
         {
-            repository = Repository,
-            tag = Tag,
-            commit = Commit,
-            summary = new
-            {
-                total = declarations.Length,
-                enabled = declarations.Count(test => !test.Disabled),
-                applicable = declarations.Count(test => !test.Disabled && !nonApplicableCases.Contains(test)),
-                disabled = declarations.Count(test => test.Disabled),
-                not_applicable = nonApplicableCases.Count,
-                passed = executionResults.Count(result => result.Value == "passed"),
-                failed = executionResults.Count(result => result.Value.StartsWith("failed:", StringComparison.Ordinal)),
-                unsupported = declarations.Count(test =>
-                    !test.Disabled && !nonApplicableCases.Contains(test) && !directCases.Contains(test)
-                ),
-            },
-            cases = declarations.Select(test => new
-            {
-                source = test.SourcePath,
-                id = test.Id,
-                expectation = test.Outcome,
-                status = test.Disabled ? "upstream-disabled"
+            string status =
+                test.Disabled ? "upstream-disabled"
                 : nonApplicableCases.Contains(test) ? "not-applicable"
                 : executionResults.TryGetValue(test, out string? result) ? result
-                : "unsupported",
-            }),
-        };
+                : "unsupported";
+            writer.WriteStartObject();
+            writer.WriteString("source", test.SourcePath);
+            writer.WriteString("id", test.Id);
+            writer.WriteString("expectation", test.Outcome);
+            writer.WriteString("status", status);
+            writer.WriteEndObject();
+        }
 
-        string json = JsonSerializer.Serialize(report, ReportJsonOptions);
-        await File.WriteAllTextAsync(path, json, TestContext.Current.CancellationToken);
+        writer.WriteEndArray();
+        writer.WriteEndObject();
+        await writer.FlushAsync(cancellationToken);
     }
 
     private static bool Execute(LogtalkTestDeclaration test, PrologEngine engine, out string failure)
@@ -1327,5 +1379,13 @@ public sealed class LogtalkConformanceTests
         }
 
         return outcome[prefix.Length..^1];
+    }
+
+    private static void Require(bool condition, string message)
+    {
+        if (!condition)
+        {
+            throw new InvalidOperationException(message);
+        }
     }
 }

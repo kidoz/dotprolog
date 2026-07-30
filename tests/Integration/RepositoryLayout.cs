@@ -8,8 +8,22 @@ internal static class RepositoryLayout
 
     private static string FindRoot()
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        string? fromBinary = FindAbove(AppContext.BaseDirectory);
+        if (fromBinary is not null)
+        {
+            return fromBinary;
+        }
 
+        string? fromWorkingDirectory = FindAbove(Directory.GetCurrentDirectory());
+        return fromWorkingDirectory
+            ?? throw new InvalidOperationException(
+                $"No DotProlog.slnx above {AppContext.BaseDirectory} or {Directory.GetCurrentDirectory()}."
+            );
+    }
+
+    private static string? FindAbove(string start)
+    {
+        var directory = new DirectoryInfo(start);
         while (directory is not null)
         {
             if (File.Exists(Path.Combine(directory.FullName, "DotProlog.slnx")))
@@ -20,6 +34,6 @@ internal static class RepositoryLayout
             directory = directory.Parent;
         }
 
-        throw new InvalidOperationException($"No DotProlog.slnx above {AppContext.BaseDirectory}.");
+        return null;
     }
 }

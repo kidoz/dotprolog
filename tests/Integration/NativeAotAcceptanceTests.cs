@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 
 namespace Integration.Tests;
 
@@ -128,6 +129,64 @@ public sealed class NativeAotAcceptanceTests
                 ],
                 runLog.ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
             );
+        }
+        finally
+        {
+            Directory.Delete(output, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task PublishedExecutableRunsTheFullIndependentIsoCorpus()
+    {
+        Assert.SkipUnless(
+            Environment.GetEnvironmentVariable(OptInVariable) == "1",
+            $"Set {OptInVariable}=1 to run the NativeAOT conformance test."
+        );
+
+        string output = Path.Combine(Path.GetTempPath(), $"dotprolog-aot-iso-{Environment.ProcessId}");
+        Directory.CreateDirectory(output);
+
+        try
+        {
+            (int exitCode, string log) = await RunAsync(
+                "dotnet",
+                [
+                    "publish",
+                    "-nodereuse:false",
+                    Path.Combine(RepositoryLayout.Root, "tests", "Integration", "Integration.Tests.csproj"),
+                    "-c",
+                    "Release",
+                    "-r",
+                    RuntimeInformation.RuntimeIdentifier,
+                    "-p:NativeConformanceRunner=true",
+                    "-o",
+                    output,
+                    "--nologo",
+                ],
+                RepositoryLayout.Root
+            );
+
+            Assert.True(exitCode == 0, $"Native conformance publish failed:\n{log}");
+            Assert.DoesNotContain("warning IL", log, StringComparison.Ordinal);
+
+            string executable = Path.Combine(output, OperatingSystem.IsWindows() ? "Integration.Tests.exe" : "Integration.Tests");
+            string report = Path.Combine(output, "native-iso-report.json");
+            Assert.True(File.Exists(executable), $"No published executable at {executable}.");
+            Assert.Empty(Directory.GetFiles(output, "*.dll"));
+
+            (int runExit, string runLog) = await RunAsync(executable, [report], RepositoryLayout.Root);
+            Assert.True(runExit == 0, $"Native independent ISO corpus failed:\n{runLog}");
+            Assert.Contains("768/768 passed", runLog, StringComparison.Ordinal);
+
+            using JsonDocument document = JsonDocument.Parse(
+                await File.ReadAllTextAsync(report, TestContext.Current.CancellationToken)
+            );
+            JsonElement summary = document.RootElement.GetProperty("summary");
+            Assert.Equal(768, summary.GetProperty("applicable").GetInt32());
+            Assert.Equal(768, summary.GetProperty("passed").GetInt32());
+            Assert.Equal(0, summary.GetProperty("failed").GetInt32());
+            Assert.Equal(0, summary.GetProperty("unsupported").GetInt32());
         }
         finally
         {
