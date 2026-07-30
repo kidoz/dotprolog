@@ -44,11 +44,15 @@ internal static class LogtalkTestAdapter
             set_output(Stream).
         """;
 
-    /// <summary>Reads every enabled and explicitly disabled <c>iso_*</c> declaration in one source.</summary>
+    /// <summary>
+    /// Reads every enabled and explicitly disabled <c>iso_*</c> declaration in one source, plus the
+    /// pinned suite's dedicated ISO directive fixtures whose identifiers name the directive instead.
+    /// </summary>
     internal static IReadOnlyList<LogtalkTestDeclaration> ReadDeclarations(string source, string relativePath)
     {
         var declarations = new List<LogtalkTestDeclaration>();
         var conditionals = new List<ConditionalFrame>();
+        bool directiveFixture = IsIsoDirectiveFixture(relativePath);
 
         foreach (string clause in SplitClauses(source))
         {
@@ -131,10 +135,12 @@ internal static class LogtalkTestAdapter
                 continue;
             }
 
-            bool disabled = text.StartsWith("- test(iso", StringComparison.Ordinal);
+            bool disabled = text.StartsWith("- test(iso", StringComparison.Ordinal)
+                || (directiveFixture && text.StartsWith("- test(", StringComparison.Ordinal));
             int testStart =
                 disabled ? 2
                 : text.StartsWith("test(iso", StringComparison.Ordinal) ? 0
+                : directiveFixture && text.StartsWith("test(", StringComparison.Ordinal) ? 0
                 : -1;
 
             if (testStart < 0)
@@ -164,7 +170,7 @@ internal static class LogtalkTestAdapter
             }
 
             string id = arguments[0];
-            if (!id.StartsWith("iso_", StringComparison.Ordinal))
+            if (!id.StartsWith("iso_", StringComparison.Ordinal) && !directiveFixture)
             {
                 continue;
             }
@@ -200,6 +206,19 @@ internal static class LogtalkTestAdapter
         }
 
         return declarations;
+    }
+
+    /// <summary>Whether a pinned unprefixed fixture directly tests one standardized directive.</summary>
+    internal static bool IsIsoDirectiveFixture(string relativePath)
+    {
+        string normalized = relativePath.Replace('\\', '/');
+        return normalized
+            is "directives/discontiguous_1/tests.lgt"
+                or "directives/ensure_loaded_1/tests.lgt"
+                or "directives/include_1/tests.lgt"
+                or "directives/initialization_1/tests.lgt"
+                or "directives/multifile_1/tests.lgt"
+                or "directives/op_3/tests.lgt";
     }
 
     /// <summary>

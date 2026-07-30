@@ -174,6 +174,15 @@ public sealed class LogtalkConformanceTests
             mixedGoal
         );
 
+        const string directiveFixtureSource = """
+            test(include_1_01, true(L == [1,2,3])) :-
+                findall(X, {a(X)}, L).
+            """;
+        Assert.Single(
+            LogtalkTestAdapter.ReadDeclarations(directiveFixtureSource, "directives/include_1/tests.lgt")
+        );
+        Assert.Empty(LogtalkTestAdapter.ReadDeclarations(directiveFixtureSource, "ordinary/tests.lgt"));
+
         const string helperSource = """
             test(iso_helpers, true) :-
                 {term_variables(A+B+B, [B|Vars])},
@@ -324,8 +333,8 @@ public sealed class LogtalkConformanceTests
                 }),
             ];
 
-            Assert.Equal(788, declarations.Length);
-            Assert.Equal(759, declarations.Count(test => !test.Disabled));
+            Assert.Equal(802, declarations.Length);
+            Assert.Equal(773, declarations.Count(test => !test.Disabled));
             Assert.Equal(29, declarations.Count(test => test.Disabled));
 
             Dictionary<string, int> outcomeKinds = declarations
@@ -342,10 +351,10 @@ public sealed class LogtalkConformanceTests
                     ["errors"] = 17,
                     ["exists"] = 41,
                     ["fail"] = 3,
-                    ["false"] = 73,
+                    ["false"] = 74,
                     ["quick_check"] = 6,
                     ["subsumes"] = 3,
-                    ["true"] = 447,
+                    ["true"] = 460,
                     ["variant"] = 13,
                 },
                 outcomeKinds
@@ -408,9 +417,9 @@ public sealed class LogtalkConformanceTests
                 ),
             ];
 
-            Assert.Equal(754, directCases.Length);
-            Assert.Equal(442, directCases.Count(test => test.OutcomeKind == "true"));
-            Assert.Equal(73, directCases.Count(test => test.OutcomeKind == "false"));
+            Assert.Equal(768, directCases.Length);
+            Assert.Equal(455, directCases.Count(test => test.OutcomeKind == "true"));
+            Assert.Equal(74, directCases.Count(test => test.OutcomeKind == "false"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "fail"));
             Assert.Equal(154, directCases.Count(test => test.OutcomeKind == "error"));
             Assert.Equal(13, directCases.Count(test => test.OutcomeKind == "variant"));
@@ -432,6 +441,7 @@ public sealed class LogtalkConformanceTests
                     !TryGetSourceEngine(
                         test,
                         supportByPath[test.SourcePath],
+                        testsRoot,
                         adapterFilesRoot,
                         engines,
                         out PrologEngine engine,
@@ -528,6 +538,7 @@ public sealed class LogtalkConformanceTests
     private static bool TryGetSourceEngine(
         LogtalkTestDeclaration test,
         string supportProgram,
+        string testsRoot,
         string adapterFilesRoot,
         Dictionary<string, PrologEngine> engines,
         out PrologEngine engine,
@@ -541,6 +552,14 @@ public sealed class LogtalkConformanceTests
         }
 
         engine = CreateAdapterEngine(adapterFilesRoot);
+        if (
+            LogtalkTestAdapter.IsIsoDirectiveFixture(test.SourcePath)
+            && !TryLoadDirectiveFixture(test.SourcePath, testsRoot, engine, out failure)
+        )
+        {
+            return false;
+        }
+
         if (supportProgram.Length > 0)
         {
             LoadResult loaded = engine.ConsultText(supportProgram, test.SourcePath);
@@ -554,6 +573,47 @@ public sealed class LogtalkConformanceTests
         }
 
         engines.Add(test.SourcePath, engine);
+        failure = string.Empty;
+        return true;
+    }
+
+    private static bool TryLoadDirectiveFixture(
+        string sourcePath,
+        string testsRoot,
+        PrologEngine engine,
+        out string failure
+    )
+    {
+        string directory = Path.Combine(testsRoot, Path.GetDirectoryName(sourcePath)!);
+        string[] files = sourcePath switch
+        {
+            "directives/discontiguous_1/tests.lgt" => ["file.pl"],
+            "directives/ensure_loaded_1/tests.lgt" => ["main.pl"],
+            "directives/include_1/tests.lgt" => ["main.pl"],
+            "directives/initialization_1/tests.lgt" => ["main.pl"],
+            "directives/multifile_1/tests.lgt" => ["file_1.pl", "file_2.pl"],
+            "directives/op_3/tests.lgt" => ["file.pl"],
+            _ => [],
+        };
+
+        foreach (string file in files)
+        {
+            string path = Path.Combine(directory, file);
+            LoadResult loaded = engine.ConsultFile(path);
+            if (!loaded.Success)
+            {
+                failure = $"directive fixture {file} did not compile: {string.Join("; ", loaded.Diagnostics)}";
+                return false;
+            }
+        }
+
+        RunResult initialized = engine.RunPendingGoals();
+        if (initialized != RunResult.Success)
+        {
+            failure = $"directive fixture initialization returned {initialized}.";
+            return false;
+        }
+
         failure = string.Empty;
         return true;
     }
