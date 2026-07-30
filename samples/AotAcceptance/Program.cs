@@ -35,6 +35,7 @@ internal static class Program
     {
         string path = args.Length > 0 ? args[0] : Path.Combine(AppContext.BaseDirectory, "acceptance.pl");
         var engine = new PrologEngine();
+        string maxAritySource = $"f({string.Join(",", Enumerable.Repeat("a", 256))})";
 
         if (!ExerciseSystemErrors())
         {
@@ -148,6 +149,14 @@ internal static class Program
                     MinIntegerCaught = true),
                 MinIntegerCaught == true,
                 write(integer_representation_errors), nl,
+
+                % Runtime reading enforces the same maximum arity in the native image.
+                catch(
+                    read_term_from_atom('{{maxAritySource}}', _, []),
+                    error(representation_error(max_arity), _),
+                    MaxArityCaught = true),
+                MaxArityCaught == true,
+                write(max_arity_representation_error), nl,
 
                 % Open streams and their ISO metadata are explicit runtime state, not reflection.
                 current_input(NativeInput), current_stream(NativeInput),
