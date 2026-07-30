@@ -185,6 +185,14 @@ internal static class Program
                 close(AliasOut, [force(true)]),
                 write(stream_open_errors), nl,
 
+                % Source/sink is an ISO domain, including after the runtime is trimmed.
+                catch(
+                    (open(source(file), read, _), SourceSinkDomainCaught = false),
+                    error(domain_error(source_sink, source(file)), _),
+                    SourceSinkDomainCaught = true),
+                SourceSinkDomainCaught == true,
+                write(source_sink_domains), nl,
+
                 % Permission culprits stay as stream designators, and malformed handles never wrap.
                 catch(
                     (set_input(user_output), StreamPermissionCaught = false),

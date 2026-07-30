@@ -87,6 +87,7 @@ public sealed class NativeAotAcceptanceTests
                     "code_io",
                     "stream_eof_actions",
                     "stream_open_errors",
+                    "source_sink_domains",
                     "stream_error_terms",
                     "character_input_modes",
                     "stream_system_errors",
