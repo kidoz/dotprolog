@@ -199,6 +199,23 @@ internal static class Program
                 write(character_input_modes), nl,
                 write(stream_system_errors), nl,
 
+                % ISO write_term/3 and numbervars options stay explicitly registered after trimming.
+                with_output_to(atom(NumberedOutput),
+                    write_term('$VAR'(27), [numbervars(true), quoted(true)])),
+                NumberedOutput == 'B1',
+                catch(
+                    (write_term(x, [quoted(on)]), WriteOptionCaught = false),
+                    error(domain_error(write_option, quoted(on)), _),
+                    WriteOptionCaught = true),
+                WriteOptionCaught == true,
+                open('dotprolog-aot-write-term.tmp', write, WriteTermOut),
+                write_term(WriteTermOut, '$VAR'(26), [numbervars(true)]),
+                close(WriteTermOut),
+                open('dotprolog-aot-write-term.tmp', read, WriteTermIn),
+                get_char(WriteTermIn, 'A'), get_char(WriteTermIn, '1'),
+                get_char(WriteTermIn, end_of_file), close(WriteTermIn),
+                write(term_write_options), nl,
+
                 % Binary streams and byte predicates use raw storage without reflection or encoding.
                 open('dotprolog-aot-byte.tmp', write, ByteOut, [type(binary)]),
                 stream_property(ByteOut, type(binary)),

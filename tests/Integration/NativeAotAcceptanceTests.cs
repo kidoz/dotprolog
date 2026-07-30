@@ -89,6 +89,7 @@ public sealed class NativeAotAcceptanceTests
                     "stream_error_terms",
                     "character_input_modes",
                     "stream_system_errors",
+                    "term_write_options",
                     "byte_io",
                     "stream_position",
                     "alice likes bob",
