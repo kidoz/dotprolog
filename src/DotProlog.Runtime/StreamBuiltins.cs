@@ -63,16 +63,18 @@ internal static class StreamBuiltins
         registry.Register("set_stream_position", 2, SetStreamPosition);
 
         registry.Register("nl", 0, static machine => WriteText(machine, stream: -1, "\n"));
-        registry.Register("write", 1, static machine => WriteTerm(machine, stream: -1, term: 0, false, false));
-        registry.Register("print", 1, static machine => WriteTerm(machine, stream: -1, term: 0, false, false));
-        registry.Register("writeq", 1, static machine => WriteTerm(machine, stream: -1, term: 0, true, false));
+        registry.Register("write", 1, static machine => WriteTerm(machine, stream: -1, term: 0, false, false, true));
+        registry.Register("print", 1, static machine => WriteTerm(machine, stream: -1, term: 0, false, false, false));
+        registry.Register("writeq", 1, static machine => WriteTerm(machine, stream: -1, term: 0, true, false, true));
         registry.Register("writeln", 1, WriteLine);
-        registry.Register("write_canonical", 1, static machine => WriteTerm(machine, stream: -1, term: 0, true, true));
+        registry.Register("write_canonical", 1, static machine => WriteTerm(machine, stream: -1, term: 0, true, true, false));
         registry.Register("nl", 1, static machine => WriteText(machine, stream: 0, "\n"));
-        registry.Register("write", 2, static machine => WriteTerm(machine, stream: 0, term: 1, false, false));
-        registry.Register("print", 2, static machine => WriteTerm(machine, stream: 0, term: 1, false, false));
-        registry.Register("writeq", 2, static machine => WriteTerm(machine, stream: 0, term: 1, true, false));
-        registry.Register("write_canonical", 2, static machine => WriteTerm(machine, stream: 0, term: 1, true, true));
+        registry.Register("write", 2, static machine => WriteTerm(machine, stream: 0, term: 1, false, false, true));
+        registry.Register("print", 2, static machine => WriteTerm(machine, stream: 0, term: 1, false, false, false));
+        registry.Register("writeq", 2, static machine => WriteTerm(machine, stream: 0, term: 1, true, false, true));
+        registry.Register("write_canonical", 2, static machine => WriteTerm(machine, stream: 0, term: 1, true, true, false));
+        registry.Register("write_term", 2, static machine => WriteTermOptions(machine, stream: -1, term: 0, options: 1));
+        registry.Register("write_term", 3, static machine => WriteTermOptions(machine, stream: 0, term: 1, options: 2));
         registry.Register("flush_output", 0, static machine => Flush(machine, stream: -1));
         registry.Register("flush_output", 1, static machine => Flush(machine, stream: 0));
 
@@ -999,12 +1001,79 @@ internal static class StreamBuiltins
         return true;
     }
 
-    private static bool WriteTerm(Machine machine, int stream, int term, bool quoted, bool ignoreOperators)
+    private static bool WriteTerm(Machine machine, int stream, int term, bool quoted, bool ignoreOperators, bool numberVariables)
     {
         PrologStream target = Resolve(machine, stream, input: false);
-        GuardIo(machine, () => TermWriter.Write(machine, machine.Argument(term), target.Writer!, quoted, ignoreOperators));
+        GuardIo(
+            machine,
+            () => TermWriter.Write(machine, machine.Argument(term), target.Writer!, quoted, ignoreOperators, numberVariables)
+        );
         return true;
     }
+
+    private static bool WriteTermOptions(Machine machine, int stream, int term, int options)
+    {
+        PrologStream target = Resolve(machine, stream, input: false);
+        WriteOptions selected = ReadWriteOptions(machine, options);
+        GuardIo(
+            machine,
+            () =>
+                TermWriter.Write(
+                    machine,
+                    machine.Argument(term),
+                    target.Writer!,
+                    selected.Quoted,
+                    selected.IgnoreOperators,
+                    selected.NumberVariables
+                )
+        );
+        return true;
+    }
+
+    private static WriteOptions ReadWriteOptions(Machine machine, int options)
+    {
+        var selected = new WriteOptions();
+
+        foreach (Cell element in TermList.ReadProper(machine, machine.Argument(options)))
+        {
+            Cell option = machine.Dereference(element);
+            if (option.Tag == CellTag.Reference)
+            {
+                throw PrologErrors.Instantiation(machine);
+            }
+
+            if (option.Tag != CellTag.Structure || machine.Symbols.ArityOf(machine.HeapAt(option.Index).Index) != 1)
+            {
+                throw PrologErrors.Domain(machine, "write_option", option);
+            }
+
+            Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(option.Index).Index);
+            Cell value = machine.Dereference(machine.HeapAt(option.Index + 1));
+            if (value.Tag == CellTag.Reference)
+            {
+                throw PrologErrors.Instantiation(machine);
+            }
+
+            string atom = value.Tag == CellTag.Atom ? machine.Symbols.AtomName(value.Index) : string.Empty;
+            if (atom is not ("true" or "false"))
+            {
+                throw PrologErrors.Domain(machine, "write_option", option);
+            }
+
+            bool enabled = atom == "true";
+            selected = machine.Symbols.AtomName(functor.NameAtom) switch
+            {
+                "quoted" => selected with { Quoted = enabled },
+                "ignore_ops" => selected with { IgnoreOperators = enabled },
+                "numbervars" => selected with { NumberVariables = enabled },
+                _ => throw PrologErrors.Domain(machine, "write_option", option),
+            };
+        }
+
+        return selected;
+    }
+
+    private readonly record struct WriteOptions(bool Quoted = false, bool IgnoreOperators = false, bool NumberVariables = false);
 
     private static bool WriteLine(Machine machine)
     {
@@ -1013,18 +1082,11 @@ internal static class StreamBuiltins
             machine,
             () =>
             {
-                TermWriter.Write(machine, machine.Argument(0), target.Writer!);
+                TermWriter.Write(machine, machine.Argument(0), target.Writer!, numberVariables: true);
                 target.Writer!.Write('\n');
             }
         );
         return true;
-    }
-
-    /// <summary>Writes an option-controlled term to the current text output with catchable I/O errors.</summary>
-    internal static void WriteCurrentTerm(Machine machine, int term, bool quoted, bool ignoreOperators)
-    {
-        PrologStream target = Resolve(machine, index: -1, input: false);
-        GuardIo(machine, () => TermWriter.Write(machine, machine.Argument(term), target.Writer!, quoted, ignoreOperators));
     }
 
     /// <summary>Writes text to the current text output with catchable I/O errors.</summary>

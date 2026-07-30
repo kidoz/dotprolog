@@ -39,7 +39,15 @@ public static class TermWriter
     /// <param name="ignoreOperators">
     /// Whether to write every compound term in functional notation, as <c>write_canonical/1</c> does.
     /// </param>
-    public static void Write(Machine machine, Cell term, TextWriter output, bool quoted = false, bool ignoreOperators = false)
+    /// <param name="numberVariables">Whether <c>'$VAR'(N)</c> terms use ISO variable names.</param>
+    public static void Write(
+        Machine machine,
+        Cell term,
+        TextWriter output,
+        bool quoted = false,
+        bool ignoreOperators = false,
+        bool numberVariables = false
+    )
     {
         ArgumentNullException.ThrowIfNull(machine);
         ArgumentNullException.ThrowIfNull(output);
@@ -67,7 +75,7 @@ public static class TermWriter
                     break;
 
                 default:
-                    WriteTerm(machine, item, output: writer, quoted, ignoreOperators, work);
+                    WriteTerm(machine, item, output: writer, quoted, ignoreOperators, numberVariables, work);
                     break;
             }
         }
@@ -78,14 +86,29 @@ public static class TermWriter
     /// <param name="term">The term to render.</param>
     /// <param name="quoted">Whether atoms are quoted so the output can be read back.</param>
     /// <param name="ignoreOperators">Whether to write every compound term in functional notation.</param>
-    public static string ToDisplayString(Machine machine, Cell term, bool quoted = false, bool ignoreOperators = false)
+    /// <param name="numberVariables">Whether <c>'$VAR'(N)</c> terms use ISO variable names.</param>
+    public static string ToDisplayString(
+        Machine machine,
+        Cell term,
+        bool quoted = false,
+        bool ignoreOperators = false,
+        bool numberVariables = false
+    )
     {
         using var writer = new StringWriter(CultureInfo.InvariantCulture);
-        Write(machine, term, writer, quoted, ignoreOperators);
+        Write(machine, term, writer, quoted, ignoreOperators, numberVariables);
         return writer.ToString();
     }
 
-    private static void WriteTerm(Machine machine, Item item, Emitter output, bool quoted, bool ignoreOperators, List<Item> work)
+    private static void WriteTerm(
+        Machine machine,
+        Item item,
+        Emitter output,
+        bool quoted,
+        bool ignoreOperators,
+        bool numberVariables,
+        List<Item> work
+    )
     {
         Cell cell = machine.Dereference(item.Cell);
 
@@ -117,6 +140,11 @@ public static class TermWriter
 
         int functorId = machine.HeapAt(cell.Index).Index;
         Functor functor = machine.Symbols.GetFunctor(functorId);
+
+        if (numberVariables && TryWriteNumberVariable(machine, cell, functor, output))
+        {
+            return;
+        }
 
         if (functorId == machine.Symbols.ListFunctor)
         {
@@ -157,6 +185,27 @@ public static class TermWriter
                 work.Add(Item.OfText(","));
             }
         }
+    }
+
+    private static bool TryWriteNumberVariable(Machine machine, Cell cell, Functor functor, Emitter output)
+    {
+        if (functor.Arity != 1 || machine.Symbols.AtomName(functor.NameAtom) != "$VAR")
+        {
+            return false;
+        }
+
+        Cell number = machine.Dereference(machine.HeapAt(cell.Index + 1));
+        if (number.Tag != CellTag.Integer || number.Integer < 0)
+        {
+            return false;
+        }
+
+        long value = number.Integer;
+        char letter = (char)('A' + (value % 26));
+        long suffix = value / 26;
+        output.Write(suffix == 0 ? letter.ToString() : $"{letter}{suffix.ToString(CultureInfo.InvariantCulture)}");
+
+        return true;
     }
 
     /// <summary>

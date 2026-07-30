@@ -455,6 +455,16 @@ iso_case('8.14.1', (read_term_from_atom('f(A,_,A)', _, [variables(V7)]), V7 = [_
 iso_case('8.14.1', read_term_from_atom('f(A,A)', _, [singletons([])]), success).
 iso_case('8.14.2', write(no_such_stream, a), error(existence_error(stream, no_such_stream))).
 iso_case('8.14.2', write_term(a, [nonsense(x)]), error(domain_error(write_option, nonsense(x)))).
+iso_case('8.14.2', write_term(a, [quoted(_)]), error(instantiation_error)).
+iso_case('8.14.2', write_term(a, [quoted(on)]), error(domain_error(write_option, quoted(on)))).
+iso_case('8.14.2', write_term(a, [numbervars(1)]), error(domain_error(write_option, numbervars(1)))).
+iso_case('8.14.2', write_term(user_input, a, []), error(permission_error(output, stream, user_input))).
+iso_case('8.14.2', write_term(_, a, []), error(instantiation_error)).
+iso_case(
+    '8.14.2',
+    (with_output_to(atom(A6), write_term('$VAR'(27), [numbervars(true)])), A6 == 'B1'),
+    success
+).
 iso_case('8.14.2', (with_output_to(atom(A4), write_term(1 + 2, [ignore_ops(true)])), A4 == '+(1,2)'), success).
 iso_case('8.14.2', (with_output_to(atom(A5), write_term('a b', [quoted(true)])), atom_length(A5, 5)), success).
 iso_case('8.14.4', (current_op(P1, xfx, ':-'), P1 =:= 1200), success).
