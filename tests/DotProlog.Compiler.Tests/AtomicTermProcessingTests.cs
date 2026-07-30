@@ -41,4 +41,17 @@ public sealed class AtomicTermProcessingTests
     [InlineData("atom_chars(ab, [a,c])")]
     public void ValidButNonMatchingModesFail(string goal) =>
         Assert.Equal("no", PrologTestHost.RunGoal($"( {goal} -> write(yes) ; write(no) )"));
+
+    [Theory]
+    [InlineData("number_chars")]
+    [InlineData("number_codes")]
+    public void SmallFloatTextRoundTrips(string predicate) =>
+        Assert.Equal(
+            "yes",
+            PrologTestHost.RunGoal(
+                $"{predicate}(0.000000000001, Text), "
+                    + $"{predicate}(Value, Text), "
+                    + "Value == 0.000000000001, write(yes)"
+            )
+        );
 }

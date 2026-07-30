@@ -320,9 +320,18 @@ public static class TermWriter
         string text = value.ToString("R", CultureInfo.InvariantCulture);
 
         // A Prolog float must be readable back as a float, so it always carries a decimal point.
-        return text.Contains('.', StringComparison.Ordinal) || text.Contains('e', StringComparison.OrdinalIgnoreCase)
-            ? text
-            : text + ".0";
+        if (text.Contains('.', StringComparison.Ordinal))
+        {
+            return text;
+        }
+
+        int exponent = text.IndexOf('E', StringComparison.Ordinal);
+        if (exponent < 0)
+        {
+            exponent = text.IndexOf('e', StringComparison.Ordinal);
+        }
+
+        return exponent >= 0 ? text.Insert(exponent, ".0") : text + ".0";
     }
 
     /// <summary>
