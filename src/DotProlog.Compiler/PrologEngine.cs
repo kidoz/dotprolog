@@ -513,12 +513,6 @@ public sealed class PrologEngine : IRuntimeCompiler
                 ? new AtomTerm("$meta_control", SourceSpan.None)
                 : new CompoundTerm("$meta_control", headArguments, SourceSpan.None);
 
-        // Keep the anonymous frame alive until the whole meta-call returns. A choice point created
-        // by an earlier subgoal restores this frame on redo; tail-executing the last subgoal would
-        // otherwise let that subgoal reuse stack space still named by the choice point.
-        var completion = new CompoundTerm("call", [new AtomTerm("true", SourceSpan.None)], SourceSpan.None);
-        body = new CompoundTerm(",", [body, completion], SourceSpan.None);
-
         List<Diagnostic> diagnostics = [];
         var compiler = new ClauseCompiler(Program, new ConstantPool(Program), diagnostics, null);
         int address = compiler.Compile(head, body);

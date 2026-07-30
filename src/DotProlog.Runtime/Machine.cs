@@ -1728,7 +1728,11 @@ public sealed class Machine
         point.ArgumentCount = _argumentCount;
         point.HeapTop = _h;
         point.TrailTop = _tr;
-        point.StackTop = _stackTop;
+
+        // The protection watermark must be monotone up the choice-point stack. Deallocate lowers
+        // _stackTop below frames that older choice points still reference; recording the raw value
+        // here would let Allocate reuse their stack space and clobber a live frame.
+        point.StackTop = _b > 0 ? Math.Max(_stackTop, _choicePoints[_b - 1].StackTop) : _stackTop;
         point.Environment = _e;
         point.Continuation = _continuation;
         point.CutBarrier = _b0;

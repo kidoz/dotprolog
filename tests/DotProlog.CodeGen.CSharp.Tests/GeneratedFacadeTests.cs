@@ -44,6 +44,12 @@ public sealed class GeneratedFacadeTests
         split([], [], []).
         split([H|T], [H|L], R) :- split(T, L, R).
         split([H|T], L, [H|R]) :- split(T, L, R).
+
+        pair(one). pair(two).
+        match(one). match(two).
+        chained(X) :- pair(X), match(X).
+        note(_).
+        audited(X) :- chained(X), note(X).
         """;
 
     private const string Contract = """
@@ -57,6 +63,7 @@ public sealed class GeneratedFacadeTests
         :- clr_export(runtime_bridge/1, nondet, [out(value, atom)]).
         :- clr_export(dynamic_value/1, nondet, [out(value, atom)]).
         :- clr_export(split/3, nondet, [in(items, list(atom)), out(left, list(atom)), out(right, list(atom))]).
+        :- clr_export(audited/1, nondet, [out(value, atom)]).
         """;
 
     private static ModuleContract ReadContract()
@@ -175,6 +182,19 @@ public sealed class GeneratedFacadeTests
         var colours = (IEnumerable<string>)Call(module, type, "Colour", CancellationToken.None)!;
 
         Assert.Equal(["red", "green", "blue"], colours);
+    }
+
+    [Fact]
+    public void NondeterministicExportSurvivesBacktrackingThroughAnLcoReturn()
+    {
+        // chained/1 reaches match/1 by last-call optimisation while pair/1's choice point still
+        // references its frame, and note/1 allocates a frame before backtracking. The compiled
+        // blocks share the machine's stack-protection watermark, so both solutions must survive.
+        object module = CreateModule(out Type type);
+
+        var values = (IEnumerable<string>)Call(module, type, "Audited", CancellationToken.None)!;
+
+        Assert.Equal(["one", "two"], values);
     }
 
     [Fact]
