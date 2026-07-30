@@ -65,6 +65,7 @@ public sealed class ProgramLoader
         // it defines; only then can a call in a body be told from one to somewhere else.
         var unit = new LoadUnit();
         Collect(clauses, unit, diagnostics, fileName);
+        DeclareMultifilePredicates(unit, diagnostics, fileName);
 
         var resolver = new ModuleResolver(_modules, unit.Module, unit.Defines);
         List<int> predicateOrder = [];
@@ -106,9 +107,21 @@ public sealed class ProgramLoader
 
         foreach (int functorId in predicateOrder)
         {
-            if (dynamicPredicates.Contains(functorId))
+            if (dynamicPredicates.Contains(functorId) || _program.IsDynamic(functorId))
             {
                 EmitDynamicClauses(functorId, predicates[functorId], diagnostics, fileName);
+                continue;
+            }
+
+            PredicateIndicator sourceIndicator = SourceIndicatorOf(unit.Module, functorId);
+            if (_modules.IsMultifile(unit.Module, sourceIndicator))
+            {
+                IReadOnlyList<(SyntaxTerm Head, SyntaxTerm? Body)> accumulated = _modules.AppendMultifileClauses(
+                    unit.Module,
+                    sourceIndicator,
+                    predicates[functorId]
+                );
+                EmitPredicate(functorId, accumulated, diagnostics, fileName);
                 continue;
             }
 
@@ -183,6 +196,21 @@ public sealed class ProgramLoader
                         EnsureLoaded(ensureLoaded, diagnostics, fileName);
                         continue;
 
+                    case CompoundTerm { Name: "multifile", Arity: 1 } multifile:
+                        unit.Multifile.Add(multifile.Arguments[0]);
+                        AddDeclaredPredicates(multifile.Arguments[0], unit.Defines);
+                        continue;
+
+                    case CompoundTerm { Name: "discontiguous", Arity: 1 } discontiguous:
+                        ValidateDeclaration(
+                            discontiguous.Arguments[0],
+                            CompilerDiagnosticIds.InvalidDiscontiguousDeclaration,
+                            "discontiguous",
+                            diagnostics,
+                            fileName
+                        );
+                        continue;
+
                     // A dynamic declaration changes how later clauses are stored, so it is collected
                     // here and acted on once the module is known.
                     case CompoundTerm { Name: "dynamic", Arity: 1 } dynamic:
@@ -208,11 +236,6 @@ public sealed class ProgramLoader
                 {
                     doubleQuotes = selected;
                     _program.Flags.DoubleQuotes = selected;
-                }
-
-                if (IsAcceptedDeclaration(goal))
-                {
-                    continue;
                 }
 
                 unit.Directives.Add(goal);
@@ -303,6 +326,42 @@ public sealed class ProgramLoader
                 CompilerDiagnosticIds.EnsureLoadedNotFound,
                 exception.Message,
                 file.Span,
+                fileName
+            );
+        }
+    }
+
+    private static void AddDeclaredPredicates(SyntaxTerm declarations, HashSet<PredicateIndicator> defines)
+    {
+        foreach (SyntaxTerm item in Indicators(declarations))
+        {
+            if (TryIndicator(item, out PredicateIndicator indicator))
+            {
+                defines.Add(indicator);
+            }
+        }
+    }
+
+    private static void ValidateDeclaration(
+        SyntaxTerm declarations,
+        string diagnosticId,
+        string declarationName,
+        List<Diagnostic> diagnostics,
+        string? fileName
+    )
+    {
+        foreach (SyntaxTerm item in Indicators(declarations))
+        {
+            if (TryIndicator(item, out _))
+            {
+                continue;
+            }
+
+            Report(
+                diagnostics,
+                diagnosticId,
+                $"{declarationName}/1 expected a predicate indicator of the form Name/Arity or Name//Arity.",
+                item.Span,
                 fileName
             );
         }
@@ -495,6 +554,30 @@ public sealed class ProgramLoader
         return declared;
     }
 
+    /// <summary>Validates and persists the unit's static multifile declarations.</summary>
+    private void DeclareMultifilePredicates(LoadUnit unit, List<Diagnostic> diagnostics, string? fileName)
+    {
+        foreach (SyntaxTerm declarations in unit.Multifile)
+        {
+            foreach (SyntaxTerm item in Indicators(declarations))
+            {
+                if (!TryIndicator(item, out PredicateIndicator indicator))
+                {
+                    Report(
+                        diagnostics,
+                        CompilerDiagnosticIds.InvalidMultifileDeclaration,
+                        "multifile/1 expected a predicate indicator of the form Name/Arity or Name//Arity.",
+                        item.Span,
+                        fileName
+                    );
+                    continue;
+                }
+
+                _modules.DeclareMultifile(unit.Module, indicator);
+            }
+        }
+    }
+
     /// <summary>The items of a comma sequence or a list, which is how these declarations are written.</summary>
     private static IEnumerable<SyntaxTerm> Indicators(SyntaxTerm term)
     {
@@ -547,8 +630,14 @@ public sealed class ProgramLoader
             return false;
         }
 
+        long compiledArity = arity.Value + (slash.Name == "//" ? 2 : 0);
+        if (compiledArity is < 0 or >= Machine.ArgumentRegisterCount)
+        {
+            return false;
+        }
+
         // A grammar rule is compiled with two extra arguments, so that is what its predicate is.
-        indicator = new PredicateIndicator(name.Name, (int)arity.Value + (slash.Name == "//" ? 2 : 0));
+        indicator = new PredicateIndicator(name.Name, (int)compiledArity);
         return true;
     }
 
@@ -564,21 +653,9 @@ public sealed class ProgramLoader
         internal List<SyntaxTerm> Directives { get; } = [];
 
         internal List<SyntaxTerm> Dynamic { get; } = [];
-    }
 
-    /// <summary>
-    /// Whether a directive is one the loader accepts and ignores, rather than running as a goal.
-    /// </summary>
-    /// <remarks>
-    /// <c>discontiguous/1</c> is ignored because clauses are grouped by predicate before they are
-    /// emitted, so a predicate whose clauses are scattered through a file already works.
-    /// </remarks>
-    private static bool IsAcceptedDeclaration(SyntaxTerm goal) =>
-        goal switch
-        {
-            CompoundTerm { Name: "discontiguous", Arity: 1 } => true,
-            _ => false,
-        };
+        internal List<SyntaxTerm> Multifile { get; } = [];
+    }
 
     /// <summary>
     /// Applies a valid <c>double_quotes</c> directive while collecting, because it changes how
@@ -621,56 +698,38 @@ public sealed class ProgramLoader
         string module
     )
     {
-        List<SyntaxTerm> pending = [indicators];
-
-        while (pending.Count > 0)
+        foreach (SyntaxTerm term in Indicators(indicators))
         {
-            SyntaxTerm term = pending[^1];
-            pending.RemoveAt(pending.Count - 1);
-
-            switch (term)
+            if (!TryIndicator(term, out PredicateIndicator indicator))
             {
-                case CompoundTerm { Name: ",", Arity: 2 } or CompoundTerm { Name: ".", Arity: 2 }:
-                    pending.AddRange(((CompoundTerm)term).Arguments);
-                    continue;
-
-                case AtomTerm { Name: "[]" }:
-                    continue;
-
-                case CompoundTerm { Name: "/", Arity: 2 } indicator
-                    when indicator.Arguments[0] is AtomTerm name && indicator.Arguments[1] is IntegerTerm arity:
-                {
-                    if (_machine is null)
-                    {
-                        Report(
-                            diagnostics,
-                            CompilerDiagnosticIds.DynamicNotAvailable,
-                            "A dynamic declaration needs a machine to load into.",
-                            term.Span,
-                            fileName
-                        );
-                        continue;
-                    }
-
-                    int functorId = _program.Symbols.InternFunctor(
-                        ModuleTable.QualifiedName(module, name.Name),
-                        (int)arity.Value
-                    );
-                    _program.DeclareDynamic(functorId, _userPredicates);
-                    declared.Add(functorId);
-                    continue;
-                }
-
-                default:
-                    Report(
-                        diagnostics,
-                        CompilerDiagnosticIds.InvalidDynamicDeclaration,
-                        "Expected a predicate indicator of the form Name/Arity.",
-                        term.Span,
-                        fileName
-                    );
-                    continue;
+                Report(
+                    diagnostics,
+                    CompilerDiagnosticIds.InvalidDynamicDeclaration,
+                    "Expected a predicate indicator of the form Name/Arity or Name//Arity.",
+                    term.Span,
+                    fileName
+                );
+                continue;
             }
+
+            if (_machine is null)
+            {
+                Report(
+                    diagnostics,
+                    CompilerDiagnosticIds.DynamicNotAvailable,
+                    "A dynamic declaration needs a machine to load into.",
+                    term.Span,
+                    fileName
+                );
+                continue;
+            }
+
+            int functorId = _program.Symbols.InternFunctor(
+                ModuleTable.QualifiedName(module, indicator.Name),
+                indicator.Arity
+            );
+            _program.DeclareDynamic(functorId, _userPredicates);
+            declared.Add(functorId);
         }
     }
 
@@ -742,7 +801,7 @@ public sealed class ProgramLoader
 
     private void EmitPredicate(
         int functorId,
-        List<(SyntaxTerm Head, SyntaxTerm? Body)> clauses,
+        IReadOnlyList<(SyntaxTerm Head, SyntaxTerm? Body)> clauses,
         List<Diagnostic> diagnostics,
         string? fileName
     )
@@ -793,5 +852,14 @@ public sealed class ProgramLoader
                 functorId = -1;
                 return false;
         }
+    }
+
+    private PredicateIndicator SourceIndicatorOf(string module, int functorId)
+    {
+        Functor functor = _program.Symbols.GetFunctor(functorId);
+        string compiledName = _program.Symbols.AtomName(functor.NameAtom);
+        string sourceName =
+            module == ModuleTable.UserModule ? compiledName : compiledName[(module.Length + 1)..];
+        return new PredicateIndicator(sourceName, functor.Arity);
     }
 }

@@ -44,4 +44,10 @@ public static class CompilerDiagnosticIds
 
     /// <summary>An <c>ensure_loaded/1</c> declaration names a source file that cannot be found or loaded.</summary>
     public const string EnsureLoadedNotFound = "DPL1014";
+
+    /// <summary>A <c>discontiguous/1</c> declaration contains an invalid predicate indicator.</summary>
+    public const string InvalidDiscontiguousDeclaration = "DPL1015";
+
+    /// <summary>A <c>multifile/1</c> declaration contains an invalid predicate indicator.</summary>
+    public const string InvalidMultifileDeclaration = "DPL1016";
 }

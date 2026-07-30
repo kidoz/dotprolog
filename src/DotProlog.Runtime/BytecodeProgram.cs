@@ -34,6 +34,8 @@ public sealed class BytecodeProgram
     private bool[] _userPredicates = new bool[64];
     private int _constantCount;
     private readonly Dictionary<int, DynamicPredicate> _dynamicPredicates = [];
+    private readonly Dictionary<int, HashSet<int>> _staticAliases = [];
+    private readonly Dictionary<int, int> _staticAliasTargets = [];
 
     /// <summary>Creates an empty program with its own symbol table and builtin registry.</summary>
     public BytecodeProgram()
@@ -82,6 +84,24 @@ public sealed class BytecodeProgram
     /// <see langword="false"/> so ISO predicate enumeration does not expose them.
     /// </param>
     public void DefinePredicate(int functorId, int address, bool userDefined = true)
+    {
+        if (_staticAliasTargets.Remove(functorId, out int previousTarget))
+        {
+            _staticAliases[previousTarget].Remove(functorId);
+        }
+
+        SetPredicate(functorId, address, userDefined);
+
+        if (_staticAliases.TryGetValue(functorId, out HashSet<int>? aliases))
+        {
+            foreach (int alias in aliases)
+            {
+                SetPredicate(alias, address, userDefined);
+            }
+        }
+    }
+
+    private void SetPredicate(int functorId, int address, bool userDefined)
     {
         EnsureEntryPoints(functorId + 1);
         _entryPoints[functorId] = address;
@@ -164,8 +184,19 @@ public sealed class BytecodeProgram
         {
             _dynamicPredicates[alias] = dynamic;
         }
+        else
+        {
+            if (!_staticAliases.TryGetValue(target, out HashSet<int>? aliases))
+            {
+                aliases = [];
+                _staticAliases[target] = aliases;
+            }
 
-        DefinePredicate(alias, EntryPointOf(target), IsUserPredicate(target));
+            aliases.Add(alias);
+            _staticAliasTargets[alias] = target;
+        }
+
+        SetPredicate(alias, EntryPointOf(target), IsUserPredicate(target));
         return true;
     }
 

@@ -132,7 +132,18 @@ public sealed class OperatorTable
         Define(1200, OperatorType.Fx, ":-");
         Define(1200, OperatorType.Fx, "?-");
         foreach (
-            string name in (string[])["dynamic", "discontiguous", "initialization", "meta_predicate", "module", "use_module"]
+            string name in (string[])
+                [
+                    "dynamic",
+                    "discontiguous",
+                    "ensure_loaded",
+                    "include",
+                    "initialization",
+                    "meta_predicate",
+                    "module",
+                    "multifile",
+                    "use_module",
+                ]
         )
         {
             Define(1150, OperatorType.Fx, name);

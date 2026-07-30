@@ -137,6 +137,95 @@ public sealed class SourceDirectiveTests : IDisposable
         Assert.Equal(CompilerDiagnosticIds.EnsureLoadedNotFound, Assert.Single(loaded.Diagnostics).Id);
     }
 
+    [Fact]
+    public void MultifileCombinesStaticClausesAcrossSourceFiles()
+    {
+        Write(
+            "first.pl",
+            """
+            :- multifile value/1.
+            value(first).
+            """
+        );
+        Write(
+            "second.pl",
+            """
+            :- multifile value/1.
+            value(second).
+            """
+        );
+        string main = Write(
+            "main.pl",
+            """
+            :- ensure_loaded(first).
+            :- ensure_loaded(second).
+            :- initialization((findall(X, value(X), Xs), write(Xs))).
+            """
+        );
+
+        Assert.Equal("[first,second]", RunFile(main));
+    }
+
+    [Fact]
+    public void StaticMultifilePredicatesRemainProtectedFromModification()
+    {
+        string main = Write(
+            "main.pl",
+            """
+            :- multifile value/1.
+            value(first).
+            :- initialization(catch(assertz(value(second)), error(E, _), write(E))).
+            """
+        );
+
+        Assert.Equal("permission_error(modify,static_procedure,value/1)", RunFile(main));
+    }
+
+    [Fact]
+    public void ExportAliasTracksLaterMultifileClauses()
+    {
+        Write(
+            "first.pl",
+            """
+            :- module(values, [value/1]).
+            :- multifile value/1.
+            value(first).
+            """
+        );
+        Write(
+            "second.pl",
+            """
+            :- module(values, [value/1]).
+            :- multifile value/1.
+            value(second).
+            """
+        );
+        string main = Write(
+            "main.pl",
+            """
+            :- use_module(first).
+            :- ensure_loaded(second).
+            :- initialization((findall(X, value(X), Xs), write(Xs))).
+            """
+        );
+
+        Assert.Equal("[first,second]", RunFile(main));
+    }
+
+    [Theory]
+    [InlineData(":- discontiguous value.", CompilerDiagnosticIds.InvalidDiscontiguousDeclaration)]
+    [InlineData(":- discontiguous value/ -1.", CompilerDiagnosticIds.InvalidDiscontiguousDeclaration)]
+    [InlineData(":- multifile value.", CompilerDiagnosticIds.InvalidMultifileDeclaration)]
+    [InlineData(":- multifile value/256.", CompilerDiagnosticIds.InvalidMultifileDeclaration)]
+    public void PredicatePropertyDeclarationsValidateEveryIndicator(string source, string diagnosticId)
+    {
+        var engine = new PrologEngine();
+
+        LoadResult loaded = engine.ConsultText(source, "invalid.pl");
+
+        Assert.Equal(diagnosticId, Assert.Single(loaded.Diagnostics).Id);
+    }
+
     private string Write(string name, string source)
     {
         string path = Path.Combine(_directory, name);

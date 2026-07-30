@@ -1,3 +1,5 @@
+using DotProlog.Syntax;
+
 namespace DotProlog.Compiler;
 
 /// <summary>
@@ -27,6 +29,8 @@ public sealed class ModuleTable
     private readonly Dictionary<string, Dictionary<PredicateIndicator, string>> _imports = new(StringComparer.Ordinal);
     private readonly Dictionary<PredicateIndicator, int[]> _metaArguments = [];
     private readonly Dictionary<string, string> _loaded = new(StringComparer.Ordinal);
+    private readonly HashSet<MultifileKey> _multifile = [];
+    private readonly Dictionary<MultifileKey, List<(SyntaxTerm Head, SyntaxTerm? Body)>> _multifileClauses = [];
 
     /// <summary>Creates a table holding the meta-predicates every program starts with.</summary>
     public ModuleTable()
@@ -177,9 +181,40 @@ public sealed class ModuleTable
         return _loaded.TryGetValue(path, out string? module) ? module : null;
     }
 
+    /// <summary>Declares a predicate to accept static clauses from more than one source unit.</summary>
+    public void DeclareMultifile(string module, PredicateIndicator predicate) =>
+        _multifile.Add(new MultifileKey(module, predicate));
+
+    /// <summary>Whether a predicate is a persistent static multifile predicate.</summary>
+    public bool IsMultifile(string module, PredicateIndicator predicate) =>
+        _multifile.Contains(new MultifileKey(module, predicate));
+
+    /// <summary>
+    /// Appends clauses contributed by one source unit and returns every clause accumulated for the
+    /// multifile predicate in load order.
+    /// </summary>
+    public IReadOnlyList<(SyntaxTerm Head, SyntaxTerm? Body)> AppendMultifileClauses(
+        string module,
+        PredicateIndicator predicate,
+        IEnumerable<(SyntaxTerm Head, SyntaxTerm? Body)> clauses
+    )
+    {
+        var key = new MultifileKey(module, predicate);
+        if (!_multifileClauses.TryGetValue(key, out List<(SyntaxTerm Head, SyntaxTerm? Body)>? accumulated))
+        {
+            accumulated = [];
+            _multifileClauses[key] = accumulated;
+        }
+
+        accumulated.AddRange(clauses);
+        return accumulated;
+    }
+
     /// <summary>The compiled name of <paramref name="predicate"/> inside <paramref name="module"/>.</summary>
     public static string QualifiedName(string module, string predicate) =>
         module == UserModule ? predicate : $"{module}:{predicate}";
+
+    private readonly record struct MultifileKey(string Module, PredicateIndicator Predicate);
 }
 
 /// <summary>A predicate named by its name and arity.</summary>
