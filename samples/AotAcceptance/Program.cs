@@ -2,6 +2,7 @@ using System.Text;
 using DotProlog.Compiler;
 using DotProlog.Runtime;
 using DotProlog.Syntax;
+using PricingRules;
 
 namespace AotAcceptance;
 
@@ -15,9 +16,9 @@ namespace AotAcceptance;
 /// clause database, and exit cleanly — with no trimming or AOT warnings anywhere in the build.
 /// </para>
 /// <para>
-/// One clause of the scope's acceptance list is not covered here: predicates compiled at build time
-/// into generated C#. That path does not exist yet, so "ahead of the run" below means consulted from
-/// an embedded source constant before the external file is read, not compiled to IL.
+/// The referenced PricingRules project is lowered to generated C# before Roslyn runs. This sample
+/// installs those predicates into the same engine used for runtime consultation and exercises calls
+/// in both directions.
 /// </para>
 /// </remarks>
 internal static class Program
@@ -35,9 +36,10 @@ internal static class Program
     {
         string path = args.Length > 0 ? args[0] : Path.Combine(AppContext.BaseDirectory, "acceptance.pl");
         var engine = new PrologEngine();
+        IPricingModule pricing = PricingModule.Create(engine);
         string maxAritySource = $"f({string.Join(",", Enumerable.Repeat("a", 256))})";
 
-        if (!ExerciseSystemErrors())
+        if (!ExerciseSystemErrors() || pricing.Discount(100.0, 10) != 90.0)
         {
             return 1;
         }
@@ -59,9 +61,13 @@ internal static class Program
             native_octal_escape('a\123\b').
             native_backquoted(`native`).
             native_extended_atom(ǅelta).
+            runtime_value(native).
 
             main :-
                 greeting(G), write(G), nl,
+                tier(1200, gold),
+                compiled_runtime(native),
+                write(compiled_cross_paths), nl,
 
                 consult('{{path.Replace("\\", "\\\\", StringComparison.Ordinal)}}'),
 

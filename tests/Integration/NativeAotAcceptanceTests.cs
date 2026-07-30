@@ -66,6 +66,7 @@ public sealed class NativeAotAcceptanceTests
             Assert.Equal(
                 [
                     "Hello from NativeAOT!",
+                    "compiled_cross_paths",
                     "colours(3)",
                     "[red,green,blue]",
                     "[first]",

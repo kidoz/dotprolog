@@ -18,6 +18,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\DotProlog.Compiler\DotProlog.Compiler.csproj" />
+        <ProjectReference Include="..\PricingRules\PricingRules.dplproj" />
     </ItemGroup>
 
     <ItemGroup>
