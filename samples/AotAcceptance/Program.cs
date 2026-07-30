@@ -174,6 +174,13 @@ internal static class Program
                 HaltTypeCaught == true,
                 write(halt_status_errors), nl,
 
+                % compare/3 validates the ISO order domain in the native image.
+                catch(compare(1, a, b), error(type_error(atom, 1), _), CompareTypeCaught = true),
+                CompareTypeCaught == true,
+                catch(compare(foo, a, b), error(domain_error(order, foo), _), CompareDomainCaught = true),
+                CompareDomainCaught == true,
+                write(compare_order_errors), nl,
+
                 % Open streams and their ISO metadata are explicit runtime state, not reflection.
                 current_input(NativeInput), current_stream(NativeInput),
                 stream_property(NativeInput, mode(read)),
