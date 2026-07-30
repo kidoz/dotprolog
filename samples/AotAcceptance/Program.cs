@@ -367,11 +367,21 @@ internal static class Program
         }
 
         engine.Output = new FailingWriter();
+        if (
+            engine.RunGoal("catch(write(native), error(system_error, _), true)", out IReadOnlyList<Diagnostic> outputDiagnostics)
+                != RunResult.Success
+            || outputDiagnostics.Count != 0
+        )
+        {
+            return false;
+        }
+
+        engine.Output = new DisposedWriter();
         return engine.RunGoal(
-                "catch(write(native), error(system_error, _), true)",
-                out IReadOnlyList<Diagnostic> outputDiagnostics
+                "catch(close(user_output, [force(false)]), error(system_error, _), true), " + "close(user_output, [force(true)])",
+                out IReadOnlyList<Diagnostic> closeDiagnostics
             ) == RunResult.Success
-            && outputDiagnostics.Count == 0;
+            && closeDiagnostics.Count == 0;
     }
 
     private sealed class FailingReader : TextReader
@@ -384,5 +394,10 @@ internal static class Program
         public override Encoding Encoding => Encoding.UTF8;
 
         public override void Write(string? value) => throw new IOException("native output failure");
+    }
+
+    private sealed class DisposedWriter : StringWriter
+    {
+        public override void Flush() => throw new ObjectDisposedException(nameof(DisposedWriter));
     }
 }
