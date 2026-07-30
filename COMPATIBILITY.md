@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**498 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**500 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -149,8 +149,11 @@ Writing them was worth it immediately: they found these real defects.
 - The flag audit covers all nine ISO flags, each fixed flag's modification permission, and every
   mutable value domain. Modules enumerate the same core set without exposing extension-specific
   flags, and NativeAOT retains the same values and permissions.
+- Quoted atom spelling no longer suppresses the atom's operator definition. ISO prefix, infix, and
+  postfix interpretation therefore applies equally to quoted default and dynamically declared
+  operator names in compiled source and runtime term input.
 
-Beyond the conformance cases, the engine and toolchain are covered by 1039 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 1043 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
