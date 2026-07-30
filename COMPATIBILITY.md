@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**496 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**498 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -71,7 +71,8 @@ Writing them was worth it immediately: they found these real defects.
   normalization as well as raw binary offsets; `reposition(false)` is enforced explicitly.
 - `char_conversion/2` and `current_char_conversion/2` now maintain program-owned mappings with
   snapshot-stable enumeration. The `char_conversion` flag gates conversion before unquoted lexical
-  classification, while quoted text, escapes, and primitive character input remain unchanged.
+  classification, while quoted delimiters and text, escapes, character-code literal payloads, and
+  primitive character input remain unchanged.
 - `close/2` now validates `force(true|false)` and makes forced cleanup best-effort. Input streams
   own their selected `eof_action(error|eof_code|reset)`, report it as a property, and apply it
   consistently to term, character, code, and byte input after the first EOF marker.
@@ -149,7 +150,7 @@ Writing them was worth it immediately: they found these real defects.
   mutable value domain. Modules enumerate the same core set without exposing extension-specific
   flags, and NativeAOT retains the same values and permissions.
 
-Beyond the conformance cases, the engine and toolchain are covered by 1038 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 1039 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
