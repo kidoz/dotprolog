@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**400 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**402 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -61,6 +61,8 @@ Writing them was worth it immediately: they found these real defects.
   ISO variable-reporting options now preserve first-occurrence order and share with the read term.
 - `stream_property/2` now enumerates explicit stream metadata and live `not`, `at`, and `past` EOF
   states; `current_stream/1` enumerates open handles without reflection.
+- `current_input/1` and `current_output/1` now reject bound aliases, malformed handles, and stale
+  handles with the exact ISO `domain_error(stream, Culprit)` instead of silently failing.
 - `open/4` accepted only text streams. Its `type(text|binary)` option now selects encoded text or
   raw-byte storage, and the byte predicates enforce ISO byte domains, stream types, lookahead, and
   EOF behavior.
@@ -95,7 +97,7 @@ Writing them was worth it immediately: they found these real defects.
   Unknown options, variable elements, and partial lists therefore raise their ISO errors without
   consuming the next term.
 
-Beyond the conformance cases, the engine and toolchain are covered by 914 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 918 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
