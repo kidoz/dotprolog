@@ -167,6 +167,13 @@ internal static class Program
                 read_term_from_atom('1e-9999', Underflow, []), Underflow =:= 0.0,
                 write(float_read_limits), nl,
 
+                % halt/1 validates its ISO input mode before it can stop the native process.
+                catch(halt(_), error(instantiation_error, _), HaltVariableCaught = true),
+                HaltVariableCaught == true,
+                catch(halt(stopped), error(type_error(integer, stopped), _), HaltTypeCaught = true),
+                HaltTypeCaught == true,
+                write(halt_status_errors), nl,
+
                 % Open streams and their ISO metadata are explicit runtime state, not reflection.
                 current_input(NativeInput), current_stream(NativeInput),
                 stream_property(NativeInput, mode(read)),

@@ -86,6 +86,7 @@ public sealed class NativeAotAcceptanceTests
                     "integer_representation_errors",
                     "max_arity_representation_error",
                     "float_read_limits",
+                    "halt_status_errors",
                     "stream_properties",
                     "current_stream_domains",
                     "code_io",
