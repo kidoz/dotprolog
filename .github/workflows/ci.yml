@@ -62,10 +62,10 @@ jobs:
         env:
           DOTPROLOG_RUN_AOT_TESTS: '1'
 
-      # One platform inventories the independently maintained ISO cases at their pinned upstream
-      # revision. The executable adapter remains a separate gate while unsupported wrappers are
-      # being eliminated; this step ensures upstream drift or incomplete accounting cannot hide.
-      - name: Inventory independent ISO conformance corpus
+      # One platform inventories every independently maintained ISO case at its pinned revision and
+      # executes the mechanically supported wrapper slice. Exact counts prevent upstream drift or
+      # incomplete accounting from hiding while the remaining wrappers are adapted.
+      - name: Run independent ISO conformance slice
         if: matrix.os == 'ubuntu-latest'
         run: >-
           dotnet test tests/Integration/Integration.Tests.csproj
