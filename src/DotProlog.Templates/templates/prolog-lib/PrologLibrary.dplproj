@@ -6,9 +6,6 @@
         <TargetFramework>net10.0</TargetFramework>
         <RootNamespace>PrologLibrary</RootNamespace>
 
-        <!-- Names the generated interface and class: IRulesModule and RulesModule. -->
-        <DotPrologClrTypeName>Rules</DotPrologClrTypeName>
-
         <!-- Generated code carries no XML documentation of its own. -->
         <NoWarn>$(NoWarn);CS1591</NoWarn>
     </PropertyGroup>

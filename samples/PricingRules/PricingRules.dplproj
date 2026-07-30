@@ -9,7 +9,6 @@
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <RootNamespace>PricingRules</RootNamespace>
-        <DotPrologClrTypeName>Pricing</DotPrologClrTypeName>
         <IsPackable>false</IsPackable>
 
         <!-- Generated code carries no XML documentation of its own. -->

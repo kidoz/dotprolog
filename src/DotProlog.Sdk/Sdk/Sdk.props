@@ -22,9 +22,6 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <!-- The type name generated for the module; defaults to the project name. -->
-        <DotPrologClrTypeName Condition="'$(DotPrologClrTypeName)' == ''">$(MSBuildProjectName)</DotPrologClrTypeName>
-
         <!-- Prolog sources and contracts are picked up automatically, like .cs files are. -->
         <EnableDefaultPrologItems Condition="'$(EnableDefaultPrologItems)' == ''">true</EnableDefaultPrologItems>
     </PropertyGroup>
