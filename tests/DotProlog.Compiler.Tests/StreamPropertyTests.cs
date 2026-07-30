@@ -108,6 +108,10 @@ public sealed class StreamPropertyTests : IDisposable
     }
 
     [Theory]
+    [InlineData("current_input(foo)", "domain_error(stream,foo)")]
+    [InlineData("current_output(1)", "domain_error(stream,1)")]
+    [InlineData("current_input('$stream'(-1))", "domain_error(stream,$stream(-1))")]
+    [InlineData("current_output('$stream'(999))", "domain_error(stream,$stream(999))")]
     [InlineData("current_stream(foo)", "domain_error(stream,foo)")]
     [InlineData("stream_property(1, _)", "domain_error(stream,1)")]
     [InlineData("stream_property('$stream'(999), _)", "existence_error(stream,$stream(999))")]

@@ -386,6 +386,8 @@ iso_case('8.11.6', close(user_output, [force(other)]), error(domain_error(close_
 iso_case('8.11.6', close(user_output, [force(1)]), error(domain_error(close_option, force(1)))).
 iso_case('8.11.6', close(user_output, atom), error(type_error(list, atom))).
 iso_case('8.11.7', (current_output(S4), \+ var(S4)), success).
+iso_case('8.11.7', current_input(foo), error(domain_error(stream, foo))).
+iso_case('8.11.7', current_output(1), error(domain_error(stream, 1))).
 iso_case('8.11.8', set_output(no_such_stream), error(existence_error(stream, no_such_stream))).
 iso_case('8.11.8', set_input(no_such_stream), error(existence_error(stream, no_such_stream))).
 iso_case('8.11.8', set_input(user_output), error(permission_error(input, stream, user_output))).

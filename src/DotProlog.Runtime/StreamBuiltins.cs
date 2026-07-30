@@ -380,8 +380,17 @@ internal static class StreamBuiltins
 
     private static bool Current(Machine machine, bool input)
     {
+        Cell pattern = machine.Argument(0);
+        if (pattern.Tag != CellTag.Reference)
+        {
+            if (!TryStreamHandle(machine, pattern, out int id) || machine.Streams.ById(id) is null)
+            {
+                throw PrologErrors.Domain(machine, "stream", pattern);
+            }
+        }
+
         PrologStream stream = input ? machine.Streams.CurrentInput : machine.Streams.CurrentOutput;
-        return machine.Unify(machine.Argument(0), StreamTerm(machine, stream));
+        return machine.Unify(pattern, StreamTerm(machine, stream));
     }
 
     private static bool Set(Machine machine, bool input)
