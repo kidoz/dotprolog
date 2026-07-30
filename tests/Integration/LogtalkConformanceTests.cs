@@ -1,8 +1,11 @@
+using DotProlog.Compiler;
+using DotProlog.Runtime;
+
 namespace Integration.Tests;
 
 /// <summary>
-/// Pins and inventories the independently maintained Logtalk ISO Prolog tests before their wrapper
-/// is adapted to DotProlog execution.
+/// Pins and inventories the independently maintained Logtalk ISO Prolog tests and executes the
+/// subset whose Logtalk wrapper needs no support clauses.
 /// </summary>
 public sealed class LogtalkConformanceTests
 {
@@ -17,7 +20,8 @@ public sealed class LogtalkConformanceTests
         const string source = """
             % A dot and comma inside terms are not declaration boundaries.
             test(iso_fixture_01, true(X == 1.0)) :-
-                {X = 1.0}.
+                {X = 1.0},
+                {Y = pair(a, b)}.
 
             test(iso_fixture_02, error(type_error(character,0'.))) :-
                 {char_code(0'., _)}.
@@ -34,7 +38,13 @@ public sealed class LogtalkConformanceTests
             {
                 Assert.Equal("iso_fixture_01", first.Id);
                 Assert.Equal("true(X == 1.0)", first.Outcome);
-                Assert.Equal("{X = 1.0}", first.Body);
+                Assert.Equal(
+                    """
+                    {X = 1.0},
+                        {Y = pair(a, b)}
+                    """,
+                    first.Body
+                );
                 Assert.False(first.Disabled);
             },
             second =>
@@ -50,14 +60,21 @@ public sealed class LogtalkConformanceTests
                 Assert.True(third.Disabled);
             }
         );
+
+        Assert.True(LogtalkTestAdapter.TryUnwrapBackendGoal(declarations[0], out string firstGoal));
+        Assert.Equal("(X = 1.0), (Y = pair(a, b))", firstGoal);
+        Assert.Equal(
+            "((abs((X) - (3.1415927)) < 0.0000000001) -> true ; (abs((X) - (3.1415927)) < (0.00001 * max(abs(X), abs(3.1415927)))))",
+            LogtalkTestAdapter.TranslateAssertion("X =~= 3.1415927")
+        );
     }
 
     [Fact]
-    public async Task PinnedIsoCorpusIsCompleteAndMechanicallyReadable()
+    public async Task PinnedIsoCorpusIsCompleteAndDirectCasesExecute()
     {
         Assert.SkipUnless(
             Environment.GetEnvironmentVariable(OptInVariable) == "1",
-            $"Set {OptInVariable}=1 to inventory the pinned independent conformance suite."
+            $"Set {OptInVariable}=1 to run the pinned independent conformance suite."
         );
 
         string checkout = Path.Combine(Path.GetTempPath(), $"dotprolog-logtalk-{Environment.ProcessId}");
@@ -91,14 +108,16 @@ public sealed class LogtalkConformanceTests
             string[] files = Directory.GetFiles(testsRoot, "tests.lgt", SearchOption.AllDirectories);
             Assert.Equal(192, files.Length);
 
+            var sourceByPath = new Dictionary<string, string>(StringComparer.Ordinal);
             LogtalkTestDeclaration[] declarations =
             [
                 .. files.SelectMany(file =>
-                    LogtalkTestAdapter.ReadDeclarations(
-                        File.ReadAllText(file),
-                        Path.GetRelativePath(testsRoot, file).Replace('\\', '/')
-                    )
-                ),
+                {
+                    string relativePath = Path.GetRelativePath(testsRoot, file).Replace('\\', '/');
+                    string source = File.ReadAllText(file);
+                    sourceByPath.Add(relativePath, source);
+                    return LogtalkTestAdapter.ReadDeclarations(source, relativePath);
+                }),
             ];
 
             Assert.Equal(782, declarations.Length);
@@ -126,10 +145,91 @@ public sealed class LogtalkConformanceTests
                 },
                 outcomeKinds
             );
+
+            LogtalkTestDeclaration[] directCases =
+            [
+                .. declarations.Where(test =>
+                    !test.Disabled
+                    && test.OutcomeKind is "true" or "false" or "error"
+                    && LogtalkTestAdapter.CanExecuteWithoutSupportClauses(sourceByPath[test.SourcePath])
+                    && LogtalkTestAdapter.TryUnwrapBackendGoal(test, out _)
+                ),
+            ];
+
+            Assert.Equal(50, directCases.Length);
+            Assert.Equal(30, directCases.Count(test => test.OutcomeKind == "true"));
+            Assert.Equal(7, directCases.Count(test => test.OutcomeKind == "false"));
+            Assert.Equal(13, directCases.Count(test => test.OutcomeKind == "error"));
+
+            var failures = new List<string>();
+            foreach (LogtalkTestDeclaration test in directCases)
+            {
+                if (!Execute(test, out string failure))
+                {
+                    failures.Add($"{test.SourcePath} | {test.Id} | {failure}");
+                }
+            }
+
+            Assert.True(failures.Count == 0, $"Independent ISO cases failed:\n{string.Join('\n', failures)}");
         }
         finally
         {
             Directory.Delete(checkout, recursive: true);
         }
+    }
+
+    private static bool Execute(LogtalkTestDeclaration test, out string failure)
+    {
+        if (!LogtalkTestAdapter.TryUnwrapBackendGoal(test, out string goal))
+        {
+            failure = "adapter did not find one backend goal";
+            return false;
+        }
+
+        string assertion = test.OutcomeKind switch
+        {
+            "true" when test.Outcome == "true" => $"({goal})",
+            "true" => $"(({goal}), ({LogtalkTestAdapter.TranslateAssertion(ArgumentOf(test.Outcome, "true"))}))",
+            "false" => $"\\+ ({goal})",
+            "error" => $"catch((({goal}), fail), error(ExternalError, _), ExternalError = ({ArgumentOf(test.Outcome, "error")}))",
+            _ => throw new InvalidOperationException($"Unsupported direct expectation: {test.Outcome}"),
+        };
+
+        var engine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
+
+        try
+        {
+            RunResult result = engine.RunGoal(assertion, out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics);
+            if (diagnostics.Count > 0)
+            {
+                failure = $"adapter goal did not compile: {string.Join("; ", diagnostics)} | {assertion}";
+                return false;
+            }
+
+            if (result != RunResult.Success)
+            {
+                failure = $"expected {test.Outcome}, got {result} | {assertion}";
+                return false;
+            }
+        }
+        catch (PrologException exception)
+        {
+            failure = $"uncaught {exception.Message} | {assertion}";
+            return false;
+        }
+
+        failure = string.Empty;
+        return true;
+    }
+
+    private static string ArgumentOf(string outcome, string functor)
+    {
+        string prefix = $"{functor}(";
+        if (!outcome.StartsWith(prefix, StringComparison.Ordinal) || !outcome.EndsWith(')'))
+        {
+            throw new InvalidDataException($"Malformed {functor} expectation: {outcome}");
+        }
+
+        return outcome[prefix.Length..^1];
     }
 }

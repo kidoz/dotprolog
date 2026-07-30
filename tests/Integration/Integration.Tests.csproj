@@ -4,4 +4,8 @@
         <!-- Slow integration tests are intentionally skipped unless their opt-in variables are set. -->
         <TestingPlatformCommandLineArguments>$(TestingPlatformCommandLineArguments) --ignore-exit-code 8</TestingPlatformCommandLineArguments>
     </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\DotProlog.Compiler\DotProlog.Compiler.csproj" />
+    </ItemGroup>
 </Project>

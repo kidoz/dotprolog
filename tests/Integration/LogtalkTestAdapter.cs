@@ -79,6 +79,99 @@ internal static class LogtalkTestAdapter
         return declarations;
     }
 
+    /// <summary>
+    /// Whether a source contains only the Logtalk object/test wrapper and no helpers or conditional
+    /// compilation whose backend-dependent branch would first need adaptation.
+    /// </summary>
+    internal static bool CanExecuteWithoutSupportClauses(string source)
+    {
+        foreach (string clause in SplitClauses(source))
+        {
+            string text = TrimLeadingTrivia(clause);
+            if (text.Length == 0)
+            {
+                continue;
+            }
+
+            if (
+                text.StartsWith("test(", StringComparison.Ordinal)
+                || text.StartsWith("- test(", StringComparison.Ordinal)
+                || text.StartsWith(":- object", StringComparison.Ordinal)
+                || text.StartsWith(":- info", StringComparison.Ordinal)
+                || text.StartsWith(":- end_object", StringComparison.Ordinal)
+                || text.StartsWith(":- public", StringComparison.Ordinal)
+                || text.StartsWith(":- private", StringComparison.Ordinal)
+                || text.StartsWith(":- protected", StringComparison.Ordinal)
+                || text.StartsWith(":- uses", StringComparison.Ordinal)
+                || text.StartsWith(":- meta_predicate", StringComparison.Ordinal)
+            )
+            {
+                continue;
+            }
+
+            // Backend conditions select different declarations or helpers and must be accounted for
+            // by the later conditional-compilation adapter, not guessed here.
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Unwraps one or more conjoined Logtalk backend escapes, leaving each Prolog goal unchanged.
+    /// </summary>
+    internal static bool TryUnwrapBackendGoal(LogtalkTestDeclaration declaration, out string goal)
+    {
+        string body = declaration.Body.Trim();
+        List<string> parts = SplitTopLevel(body, ',');
+        var goals = new List<string>(parts.Count);
+
+        foreach (string part in parts)
+        {
+            string wrapper = part.Trim();
+            if (wrapper.Length < 3 || wrapper[0] != '{' || wrapper[^1] != '}')
+            {
+                goal = string.Empty;
+                return false;
+            }
+
+            string backendGoal = wrapper[1..^1].Trim();
+            if (backendGoal.Length == 0)
+            {
+                goal = string.Empty;
+                return false;
+            }
+
+            goals.Add($"({backendGoal})");
+        }
+
+        goal = string.Join(", ", goals);
+        return goals.Count > 0;
+    }
+
+    /// <summary>
+    /// Translates lgtunit's numeric approximate-equality assertion to its pinned implementation.
+    /// Other assertions remain unchanged.
+    /// </summary>
+    internal static string TranslateAssertion(string assertion)
+    {
+        int approximateEquality = FindTopLevel(assertion, "=~=");
+        if (approximateEquality < 0)
+        {
+            return assertion;
+        }
+
+        string left = assertion[..approximateEquality].Trim();
+        string right = assertion[(approximateEquality + 3)..].Trim();
+        if (left.Length == 0 || right.Length == 0 || FindTopLevel(right, "=~=") >= 0)
+        {
+            throw new InvalidDataException($"Malformed lgtunit approximate-equality assertion: {assertion}");
+        }
+
+        string difference = $"abs(({left}) - ({right}))";
+        return $"(({difference} < 0.0000000001) -> true ; ({difference} < (0.00001 * max(abs({left}), abs({right})))))";
+    }
+
     private static List<string> SplitClauses(string source)
     {
         var clauses = new List<string>();
