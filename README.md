@@ -383,8 +383,10 @@ Nothing in the engine knows modules exist: resolution is a rewrite performed whi
 A control term assembled at run time and passed to `call/1` is lowered to VM bytecode through the
 same control-construct compiler used for source clauses. Its cut is transparent within that
 meta-called goal and opaque to the caller, as ISO specifies.
+A non-callable term in a compiled clause body remains a runtime error: it is catchable if execution
+reaches it, while normal control flow can leave it unevaluated.
 
-DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 474 conformance cases encoded
+DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 476 conformance cases encoded
 from ISO/IEC 13211-1, all passing, but those are its own reading of the standard rather than an
 independent suite — see [COMPATIBILITY.md](COMPATIBILITY.md), which also lists the known
 differences.

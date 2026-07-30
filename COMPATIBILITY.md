@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**474 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**476 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -139,8 +139,11 @@ Writing them was worth it immediately: they found these real defects.
 - `repeat/0` now supplies the ISO infinite sequence of retry points. Focused and NativeAOT tests
   use persistent database state to prove that failure after the first success really re-enters it
   until a cut commits the loop.
+- A literal non-callable clause body is now accepted as a Prolog term and raises its catchable
+  `type_error(callable, Culprit)` if execution reaches it. It no longer becomes a consultation
+  diagnostic, and an unreachable body after `fail` does not raise.
 
-Beyond the conformance cases, the engine and toolchain are covered by 1023 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 1024 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
