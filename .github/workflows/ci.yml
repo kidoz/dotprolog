@@ -73,6 +73,7 @@ jobs:
           --filter-class Integration.Tests.LogtalkConformanceTests
         env:
           DOTPROLOG_RUN_EXTERNAL_CONFORMANCE_TESTS: '1'
+          DOTPROLOG_LOGTALK_REPORT_PATH: 'artifacts/logtalk-iso-conformance.json'
 
       - name: Pack
         if: matrix.os == 'ubuntu-latest'

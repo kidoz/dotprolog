@@ -1,3 +1,4 @@
+using System.Text.Json;
 using DotProlog.Compiler;
 using DotProlog.Runtime;
 
@@ -11,9 +12,11 @@ public sealed class LogtalkConformanceTests
 {
     private const string OptInVariable = "DOTPROLOG_RUN_EXTERNAL_CONFORMANCE_TESTS";
     private const string CaseVariable = "DOTPROLOG_LOGTALK_CASE_ID";
+    private const string ReportVariable = "DOTPROLOG_LOGTALK_REPORT_PATH";
     private const string Repository = "https://github.com/LogtalkDotOrg/logtalk3.git";
     private const string Tag = "lgt31010stable";
     private const string Commit = "11dfd24eb6673250be996012489e65c0f9370a7c";
+    private static readonly JsonSerializerOptions ReportJsonOptions = new() { WriteIndented = true };
 
     [Fact]
     public void AdapterPreservesDeclarationsExpectationsAndCharacterCodeSyntax()
@@ -172,12 +175,25 @@ public sealed class LogtalkConformanceTests
             );
 
             var failures = new List<string>();
+            var executionResults = new Dictionary<LogtalkTestDeclaration, string>();
             foreach (LogtalkTestDeclaration test in casesToExecute)
             {
                 if (!Execute(test, out string failure))
                 {
                     failures.Add($"{test.SourcePath} | {test.Id} | {failure}");
+                    executionResults.Add(test, $"failed: {failure}");
                 }
+                else
+                {
+                    executionResults.Add(test, "passed");
+                }
+            }
+
+            string? reportPath = Environment.GetEnvironmentVariable(ReportVariable);
+            if (reportPath is not null)
+            {
+                Assert.Null(selectedId);
+                await WriteReportAsync(reportPath, declarations, directCases, executionResults);
             }
 
             Assert.True(failures.Count == 0, $"Independent ISO cases failed:\n{string.Join('\n', failures)}");
@@ -186,6 +202,48 @@ public sealed class LogtalkConformanceTests
         {
             Directory.Delete(checkout, recursive: true);
         }
+    }
+
+    private static async Task WriteReportAsync(
+        string path,
+        LogtalkTestDeclaration[] declarations,
+        LogtalkTestDeclaration[] directCases,
+        Dictionary<LogtalkTestDeclaration, string> executionResults
+    )
+    {
+        string? directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var report = new
+        {
+            repository = Repository,
+            tag = Tag,
+            commit = Commit,
+            summary = new
+            {
+                total = declarations.Length,
+                enabled = declarations.Count(test => !test.Disabled),
+                disabled = declarations.Count(test => test.Disabled),
+                passed = executionResults.Count(result => result.Value == "passed"),
+                failed = executionResults.Count(result => result.Value.StartsWith("failed:", StringComparison.Ordinal)),
+                unsupported = declarations.Count(test => !test.Disabled && !directCases.Contains(test)),
+            },
+            cases = declarations.Select(test => new
+            {
+                source = test.SourcePath,
+                id = test.Id,
+                expectation = test.Outcome,
+                status = test.Disabled ? "upstream-disabled"
+                : executionResults.TryGetValue(test, out string? result) ? result
+                : "unsupported",
+            }),
+        };
+
+        string json = JsonSerializer.Serialize(report, ReportJsonOptions);
+        await File.WriteAllTextAsync(path, json, TestContext.Current.CancellationToken);
     }
 
     private static bool Execute(LogtalkTestDeclaration test, out string failure)
