@@ -407,11 +407,11 @@ public sealed class LogtalkConformanceTests
                 ),
             ];
 
-            Assert.Equal(741, directCases.Length);
-            Assert.Equal(437, directCases.Count(test => test.OutcomeKind == "true"));
+            Assert.Equal(745, directCases.Length);
+            Assert.Equal(439, directCases.Count(test => test.OutcomeKind == "true"));
             Assert.Equal(73, directCases.Count(test => test.OutcomeKind == "false"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "fail"));
-            Assert.Equal(152, directCases.Count(test => test.OutcomeKind == "error"));
+            Assert.Equal(154, directCases.Count(test => test.OutcomeKind == "error"));
             Assert.Equal(13, directCases.Count(test => test.OutcomeKind == "variant"));
             Assert.Equal(41, directCases.Count(test => test.OutcomeKind == "exists"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "subsumes"));
@@ -615,6 +615,26 @@ public sealed class LogtalkConformanceTests
             "$logtalk_closed_output_stream",
             2,
             static machine => ClosedStream(machine, input: false)
+        );
+        engine.Program.Builtins.Register(
+            "$logtalk_create_binary_output",
+            2,
+            machine => CreateBinaryOutput(machine, filesRoot)
+        );
+        engine.Program.Builtins.Register(
+            "$logtalk_set_named_binary_output",
+            2,
+            machine => SetNamedBinaryOutput(machine, filesRoot)
+        );
+        engine.Program.Builtins.Register(
+            "$logtalk_binary_output_assertion",
+            2,
+            BinaryOutputAssertion
+        );
+        engine.Program.Builtins.Register(
+            "$logtalk_binary_output_assertion",
+            3,
+            NamedBinaryOutputAssertion
         );
         engine.Program.Builtins.Register(
             "$logtalk_suppress_text_output",
@@ -845,6 +865,114 @@ public sealed class LogtalkConformanceTests
         File.Delete(path);
         return machine.Unify(machine.Argument(0), handle);
     }
+
+    private static bool CreateBinaryOutput(Machine machine, string filesRoot)
+    {
+        if (
+            !TryReadBytes(machine, machine.Argument(0), out byte[] initial)
+            || !TryOpenBinaryOutput(machine, filesRoot, alias: null, initial, out PrologStream stream)
+        )
+        {
+            return false;
+        }
+
+        Cell handle = machine.CreateStructure(
+            machine.Symbols.InternFunctor("$stream", 1),
+            [Cell.Integer60(stream.Id)]
+        );
+        return machine.Unify(machine.Argument(1), handle);
+    }
+
+    private static bool SetNamedBinaryOutput(Machine machine, string filesRoot)
+    {
+        Cell alias = machine.Argument(0);
+        return alias.Tag == CellTag.Atom
+            && TryReadBytes(machine, machine.Argument(1), out byte[] initial)
+            && TryOpenBinaryOutput(
+                machine,
+                filesRoot,
+                machine.Symbols.AtomName(alias.Index),
+                initial,
+                out _
+            );
+    }
+
+    private static bool TryOpenBinaryOutput(
+        Machine machine,
+        string filesRoot,
+        string? alias,
+        byte[] initial,
+        out PrologStream stream
+    )
+    {
+        Directory.CreateDirectory(filesRoot);
+        string path = Path.Combine(filesRoot, $"{Guid.NewGuid():N}.bin");
+        File.WriteAllBytes(path, initial);
+        stream = machine.Streams.Open(path, "append", alias, "binary", reposition: false);
+        return true;
+    }
+
+    private static bool BinaryOutputAssertion(Machine machine)
+    {
+        if (!TryTakeBinaryOutput(machine, machine.Streams.CurrentOutput, out byte[] output))
+        {
+            return false;
+        }
+
+        return machine.Unify(
+            machine.Argument(1),
+            EqualityAssertion(machine, machine.Argument(0), ByteList(machine, output))
+        );
+    }
+
+    private static bool NamedBinaryOutputAssertion(Machine machine)
+    {
+        Cell alias = machine.Argument(0);
+        if (
+            alias.Tag != CellTag.Atom
+            || !TryTakeBinaryOutput(
+                machine,
+                machine.Streams.ByAlias(machine.Symbols.AtomName(alias.Index)),
+                out byte[] output
+            )
+        )
+        {
+            return false;
+        }
+
+        return machine.Unify(
+            machine.Argument(2),
+            EqualityAssertion(machine, machine.Argument(1), ByteList(machine, output))
+        );
+    }
+
+    private static bool TryTakeBinaryOutput(
+        Machine machine,
+        PrologStream? stream,
+        out byte[] output
+    )
+    {
+        if (stream is null || stream.IsPermanent)
+        {
+            output = [];
+            return false;
+        }
+
+        string path = stream.Name;
+        machine.Streams.Close(stream);
+        output = File.ReadAllBytes(path);
+        File.Delete(path);
+        return true;
+    }
+
+    private static Cell ByteList(Machine machine, byte[] bytes)
+    {
+        Cell[] items = [.. bytes.Select(value => Cell.Integer60(value))];
+        return machine.CreateList(items, Cell.Atom(machine.Symbols.EmptyList));
+    }
+
+    private static Cell EqualityAssertion(Machine machine, Cell expected, Cell actual) =>
+        machine.CreateStructure(machine.Symbols.InternFunctor("==", 2), [expected, actual]);
 
     private static bool TryReadBytes(Machine machine, Cell item, out byte[] contents)
     {

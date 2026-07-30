@@ -38,6 +38,12 @@ internal static class LogtalkTestAdapter
             ).
         """;
 
+    private const string BinaryOutputSupport = """
+        '$logtalk_set_binary_output'(Bytes) :-
+            '$logtalk_create_binary_output'(Bytes, Stream),
+            set_output(Stream).
+        """;
+
     /// <summary>Reads every enabled and explicitly disabled <c>iso_*</c> declaration in one source.</summary>
     internal static IReadOnlyList<LogtalkTestDeclaration> ReadDeclarations(string source, string relativePath)
     {
@@ -327,6 +333,11 @@ internal static class LogtalkTestAdapter
             support.Add(TextInputAssertionSupport);
         }
 
+        if (source.Contains("^^set_binary_output(", StringComparison.Ordinal))
+        {
+            support.Add(BinaryOutputSupport);
+        }
+
         program = string.Join(Environment.NewLine, support);
         return true;
     }
@@ -502,6 +513,12 @@ internal static class LogtalkTestAdapter
             bool dispatchedClosedOutputStream = source
                 .AsSpan(current)
                 .StartsWith("^^closed_output_stream(", StringComparison.Ordinal);
+            bool dispatchedSetBinaryOutput = source
+                .AsSpan(current)
+                .StartsWith("^^set_binary_output(", StringComparison.Ordinal);
+            bool dispatchedBinaryOutputAssertion = source
+                .AsSpan(current)
+                .StartsWith("^^binary_output_assertion(", StringComparison.Ordinal);
             if (
                 source.AsSpan(current).StartsWith("^^", StringComparison.Ordinal)
                 && !dispatchedAssertion
@@ -516,6 +533,8 @@ internal static class LogtalkTestAdapter
                 && !dispatchedCreateBinaryFile
                 && !dispatchedClosedInputStream
                 && !dispatchedClosedOutputStream
+                && !dispatchedSetBinaryOutput
+                && !dispatchedBinaryOutputAssertion
             )
             {
                 translated = string.Empty;
@@ -535,6 +554,8 @@ internal static class LogtalkTestAdapter
                 || dispatchedCreateBinaryFile
                 || dispatchedClosedInputStream
                 || dispatchedClosedOutputStream
+                || dispatchedSetBinaryOutput
+                || dispatchedBinaryOutputAssertion
             )
             {
                 functorStart += 2;
@@ -554,6 +575,8 @@ internal static class LogtalkTestAdapter
                 : IsFunctorCallAt(source, functorStart, "create_binary_file") ? "create_binary_file"
                 : IsFunctorCallAt(source, functorStart, "closed_input_stream") ? "closed_input_stream"
                 : IsFunctorCallAt(source, functorStart, "closed_output_stream") ? "closed_output_stream"
+                : IsFunctorCallAt(source, functorStart, "set_binary_output") ? "set_binary_output"
+                : IsFunctorCallAt(source, functorStart, "binary_output_assertion") ? "binary_output_assertion"
                 : null;
             if (functor is null)
             {
@@ -603,6 +626,8 @@ internal static class LogtalkTestAdapter
                     "set_text_output" or "text_output_contents" => hostArguments.Count is 1 or 2,
                     "text_output_assertion" => hostArguments.Count is 2 or 3,
                     "text_input_assertion" => hostArguments.Count is 2 or 3,
+                    "set_binary_output" => hostArguments.Count is 1 or 2,
+                    "binary_output_assertion" => hostArguments.Count is 2 or 3,
                     _ => hostArguments.Count == 2,
                 };
                 if (!supportedArity)
@@ -623,7 +648,10 @@ internal static class LogtalkTestAdapter
                     "create_text_file" => "$logtalk_create_text_file",
                     "create_binary_file" => "$logtalk_create_binary_file",
                     "closed_input_stream" => "$logtalk_closed_input_stream",
-                    _ => "$logtalk_closed_output_stream",
+                    "closed_output_stream" => "$logtalk_closed_output_stream",
+                    "set_binary_output" when hostArguments.Count == 1 => "$logtalk_set_binary_output",
+                    "set_binary_output" => "$logtalk_set_named_binary_output",
+                    _ => "$logtalk_binary_output_assertion",
                 };
                 replacement = $"'{hostFunctor}'({arguments})";
             }
