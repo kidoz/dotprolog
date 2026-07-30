@@ -39,8 +39,16 @@ format: tools
 format-check: tools
     dotnet csharpier check .
 
-# Build, format-check, and test — the gate before committing.
-check: format-check build test
+# Build the documentation and fail on warnings or broken links.
+docs:
+    uv run --locked --only-group docs mkdocs build --strict
+
+# Preview the documentation at http://127.0.0.1:8000/.
+docs-serve:
+    uv run --locked --only-group docs mkdocs serve
+
+# Build, format-check, documentation, and test — the gate before committing.
+check: format-check docs build test
 
 # Run the BenchmarkDotNet suite; pass a filter, e.g. `just bench '*Engine*'`.
 bench filter="*":

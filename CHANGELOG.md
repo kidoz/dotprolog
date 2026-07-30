@@ -8,6 +8,8 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Added
 
+- A uv-managed MkDocs documentation site on Python 3.14 with getting-started, language, .NET
+  integration, architecture, and contributing guides, plus strict link validation in CI.
 - The ISO evaluable functors for trigonometry, logarithms, exponentials, rounding, float
   decomposition, and bitwise complement.
 - ISO `unify_with_occurs_check/2` with transactional failure and cycle-safe rational-tree

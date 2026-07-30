@@ -1,0 +1,48 @@
+site_name: DotProlog
+site_description: A Prolog language implementation for .NET 10, written in C# 14.
+repo_name: kidoz/dotprolog
+repo_url: https://github.com/kidoz/dotprolog
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+site_dir: obj/docs
+
+theme:
+  name: mkdocs
+  locale: en
+  color_mode: auto
+  user_color_mode_toggle: true
+  navigation_depth: 3
+  highlightjs: true
+  hljs_languages:
+    - csharp
+    - fsharp
+    - prolog
+    - xml
+    - yaml
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Language guide: language-guide.md
+  - .NET integration: dotnet-integration.md
+  - Architecture: architecture/index.md
+  - Contributing: contributing.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - fenced_code
+  - tables
+  - toc:
+      permalink: true
+
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+  links:
+    not_found: warn
+    anchors: warn
+    unrecognized_links: warn

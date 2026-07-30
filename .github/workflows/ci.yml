@@ -16,6 +16,29 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
 
 jobs:
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: '0.12.0'
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Synchronize documentation dependencies
+        run: uv sync --locked --only-group docs
+
+      - name: Build documentation
+        run: uv run --locked --only-group docs mkdocs build --strict
+
   build:
     name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}

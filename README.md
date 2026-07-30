@@ -6,6 +6,9 @@ A Prolog language implementation for .NET 10, written in C# 14.
 
 The goal is a first-class Prolog experience on the .NET SDK, the way C# and F# have one: `.dplproj` projects, a `plc` compiler, `dotnet prolog`, `dotnet new` templates, and NativeAOT publishing.
 
+Read the [DotProlog documentation](docs/index.md) for setup, language support, .NET integration,
+and architecture.
+
 **Status: early, but usable.** `dotnet new prolog-console` through `dotnet publish -p:PublishAot=true`
 works today, and `dotnet test` discovers Prolog tests under Microsoft.Testing.Platform. What is
 missing: the `plc` compiler and generating IL for predicate bodies — a `.dplproj` currently embeds
@@ -136,6 +139,7 @@ bundles of [widget, gadget]:
 | `src/DotProlog.Tool` | The `dotnet prolog` command |
 | `tests/` | Unit tests per component, plus end-to-end execution tests |
 | `benchmarks/` | BenchmarkDotNet suite for the reader, compiler, and engine |
+| `docs/` | MkDocs documentation source |
 | `samples/HelloProlog` | The Hello World sample |
 | `samples/PricingRules` | A `.dplproj`: Prolog rules plus their `.dpli` contract |
 | `samples/PricingConsole`, `samples/PricingFSharp`, `samples/PricingVisualBasic` | C#, F#, and VB apps referencing it |
@@ -145,17 +149,23 @@ bundles of [widget, gadget]:
 
 ## Common tasks
 
+Documentation tasks require [uv](https://docs.astral.sh/uv/). The project pins Python 3.14 and the
+complete documentation environment in `uv.lock`; run `uv sync --locked --only-group docs` once to
+prepare it.
+
 ```console
 just build          # build everything
 just test           # run every test project
 just format         # format all C# with CSharpier
 just format-check   # fail if anything is unformatted
-just check          # format-check + build + test
+just docs           # build the MkDocs site with strict link validation
+just docs-serve     # preview the documentation with live reload
+just check          # format-check + docs + build + test
 just run FILE.pl    # consult and run a Prolog file
 just bench '*'      # run the benchmark suite
 ```
 
-Without `just`, each recipe is a plain `dotnet` command — read the `justfile`.
+See the `justfile` for the underlying `dotnet` and `uv` commands.
 
 ## How it executes
 
