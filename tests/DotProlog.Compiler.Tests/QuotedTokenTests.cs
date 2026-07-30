@@ -1,3 +1,5 @@
+using DotProlog.Runtime;
+
 namespace DotProlog.Compiler.Tests;
 
 /// <summary>ISO backquoted names, quoted control-character escapes, and runtime syntax errors.</summary>
@@ -42,5 +44,22 @@ public sealed class QuotedTokenTests
                     + "error(syntax_error('DPL0011'), _), write(yes)), nl"
             )
         );
+    }
+
+    [Fact]
+    public void StreamingTermInputIgnoresTerminatorsInsideBackquotedNames()
+    {
+        var output = new StringWriter();
+        var engine = new PrologEngine { Input = new StringReader("`inside.with.dot`. next."), Output = output };
+
+        engine.ConsultOrThrow(
+            """
+            :- initialization((read(First), read(Second), write([First,Second]), nl)).
+            """,
+            "backquoted-stream.pl"
+        );
+
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("[inside.with.dot,next]\n", output.ToString());
     }
 }
