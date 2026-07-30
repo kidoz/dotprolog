@@ -188,6 +188,17 @@ public sealed class ExecutionTests
         Assert.Equal("before\n", output);
     }
 
+    [Theory]
+    [InlineData("halt(_)", "instantiation_error")]
+    [InlineData("halt(stopped)", "type_error(integer,stopped)")]
+    [InlineData("halt(1.0)", "type_error(integer,1.0)")]
+    public void HaltRejectsInvalidExitStatus(string goal, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(goal);
+
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+    }
+
     [Fact]
     public void AGoalThatIsNotCallableIsReportedNotIgnored()
     {

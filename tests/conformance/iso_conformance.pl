@@ -307,6 +307,10 @@ iso_case('8.17.3', set_prolog_flag(bounded, false), error(domain_error(flag_valu
 iso_case('8.17.3', set_prolog_flag(bounded, true), error(permission_error(modify, flag, bounded))).
 iso_case('8.17.3', (set_prolog_flag(debug, on), current_prolog_flag(debug, on), set_prolog_flag(debug, off)), success).
 
+% --- 8.18 Logic and control --------------------------------------------------
+iso_case('8.18.1', halt(_), error(instantiation_error)).
+iso_case('8.18.1', halt(stopped), error(type_error(integer, stopped))).
+
 % Used by 8.15.3; a goal that is defined so the case tests control flow, not existence.
 repeat_guard(0).
 

@@ -34,7 +34,17 @@ public static class CoreBuiltins
             static machine =>
             {
                 Cell code = machine.Argument(0);
-                machine.RequestHalt(code.Tag == CellTag.Integer ? (int)code.Integer : 0);
+                if (code.Tag == CellTag.Reference)
+                {
+                    throw PrologErrors.Instantiation(machine);
+                }
+
+                if (code.Tag != CellTag.Integer)
+                {
+                    throw PrologErrors.Type(machine, "integer", code);
+                }
+
+                machine.RequestHalt((int)code.Integer);
                 return false;
             }
         );
