@@ -302,12 +302,16 @@ internal static class StandardLibrary
         ^(_, Goal) :- call(Goal).
 
         bagof(Template, Goal, Bag) :-
+            '$validate_callable'(Goal),
+            '$validate_partial_list'(Bag),
             term_variables(Template, Bound),
             '$free_variables'(Goal, Bound, [], Reversed),
             reverse(Reversed, Witness),
             '$bagof'(Witness, Template, Goal, Bag).
 
         setof(Template, Goal, Set) :-
+            '$validate_callable'(Goal),
+            '$validate_partial_list'(Set),
             bagof(Template, Goal, Bag),
             sort(Bag, Set).
 

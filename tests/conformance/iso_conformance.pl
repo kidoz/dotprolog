@@ -230,10 +230,26 @@ iso_case('8.10.1', findall(X5, member(X5, [1, 2]), [1, 2]), success).
 iso_case('8.10.1', findall(_, fail, []), success).
 iso_case('8.10.1', findall(_, _, _), error(instantiation_error)).
 iso_case('8.10.1', findall(_, 4, _), error(type_error(callable, 4))).
+iso_case('8.10.1', findall(_, true, atom), error(type_error(list, atom))).
+iso_case('8.10.1', findall(_, fail, atom), error(type_error(list, atom))).
+iso_case('8.10.1', findall(_, true, [a | tail]), error(type_error(list, [a | tail]))).
+iso_case('8.10.1', (findall(X5a, member(X5a, [a, b]), [a | T5a]), T5a == [b]), success).
 iso_case('8.10.2', bagof(X6, member(X6, [1, 2]), [1, 2]), success).
 iso_case('8.10.2', bagof(_, fail, _), failure).
+iso_case('8.10.2', bagof(_, _, _), error(instantiation_error)).
+iso_case('8.10.2', bagof(_, 4, _), error(type_error(callable, 4))).
+iso_case('8.10.2', bagof(_, true, atom), error(type_error(list, atom))).
+iso_case('8.10.2', bagof(_, fail, atom), error(type_error(list, atom))).
+iso_case('8.10.2', bagof(_, true, [a | tail]), error(type_error(list, [a | tail]))).
+iso_case('8.10.2', (bagof(X6a, member(X6a, [a, b]), [a | T6a]), T6a == [b]), success).
 iso_case('8.10.3', setof(X7, member(X7, [2, 1, 2]), [1, 2]), success).
 iso_case('8.10.3', setof(_, fail, _), failure).
+iso_case('8.10.3', setof(_, _, _), error(instantiation_error)).
+iso_case('8.10.3', setof(_, 4, _), error(type_error(callable, 4))).
+iso_case('8.10.3', setof(_, true, atom), error(type_error(list, atom))).
+iso_case('8.10.3', setof(_, fail, atom), error(type_error(list, atom))).
+iso_case('8.10.3', setof(_, true, [a | tail]), error(type_error(list, [a | tail]))).
+iso_case('8.10.3', (setof(X7a, member(X7a, [b, a]), [a | T7a]), T7a == [b]), success).
 
 % --- 8.11 Stream selection ---------------------------------------------------
 iso_case('8.11.1', (current_output(S1), S1 == S1), success).

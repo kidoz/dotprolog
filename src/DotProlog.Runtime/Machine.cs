@@ -700,6 +700,21 @@ public sealed class Machine
         }
     }
 
+    /// <summary>
+    /// Validates a complete meta-call argument without executing it. Unlike recursive control
+    /// sub-goals, an unbound top-level goal is immediately an instantiation error.
+    /// </summary>
+    internal void ValidateCallable(Cell goal)
+    {
+        goal = Dereference(goal);
+        if (goal.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(this);
+        }
+
+        RequireCallable(goal, goal);
+    }
+
     /// <summary>Wraps <paramref name="term"/> as a thrown ball, detached from the heap.</summary>
     /// <param name="term">The term being thrown.</param>
     /// <param name="description">Readable text for a host that lets the ball escape.</param>

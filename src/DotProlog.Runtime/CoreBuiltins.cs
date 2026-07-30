@@ -104,6 +104,16 @@ public static class CoreBuiltins
         );
 
         registry.Register("$collect_end", 1, static machine => machine.Unify(machine.Argument(0), machine.EndCollect()));
+        registry.Register(
+            "$validate_callable",
+            1,
+            static machine =>
+            {
+                machine.ValidateCallable(machine.Argument(0));
+                return true;
+            }
+        );
+        registry.Register("$validate_partial_list", 1, ValidatePartialList);
 
         // Records where a host query's variables live, so each solution can be read back. The engine
         // compiles '$bindings'(v(V1, ..., Vn)) as the first goal of a query it was handed.
@@ -199,6 +209,18 @@ public static class CoreBuiltins
         return second.Tag == CellTag.Integer
             ? machine.Unify(first, Cell.Integer60(sum.Integer - second.Integer))
             : throw PrologErrors.Instantiation(machine);
+    }
+
+    /// <summary>Accepts a proper or partial list and reports every other tail as an ISO list type error.</summary>
+    private static bool ValidatePartialList(Machine machine)
+    {
+        Cell list = machine.Argument(0);
+        List<Cell> elements = [];
+        Cell tail = TermList.Read(machine, list, elements);
+
+        return TermList.IsEmpty(machine, tail) || tail.Tag == CellTag.Reference
+            ? true
+            : throw PrologErrors.Type(machine, "list", list);
     }
 
     /// <summary>
