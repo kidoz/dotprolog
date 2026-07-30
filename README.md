@@ -321,6 +321,8 @@ options with exact boolean validation. `read_term/2,3` rejects malformed options
 the next term and reports bounded integer overflows as
 `representation_error(max_integer|min_integer)`. It also enforces the advertised `max_arity` of
 255 while reading, raising `representation_error(max_arity)` before constructing a larger compound.
+Oversized float literals raise `syntax_error(float_overflow)` instead of becoming IEEE infinity;
+underflow rounds to signed zero.
 
 ```prolog
 main :-
