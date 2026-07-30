@@ -306,7 +306,8 @@ soon as it is complete rather than after the input ends — a full stop inside `
 `char_conversion` flag is on, mappings installed by `char_conversion/2` are applied to unquoted
 input before tokenization; quoted text, escapes, and primitive character input remain raw. An input
 stream's `eof_action(error|eof_code|reset)` controls reads after its first EOF marker, and
-`close/2` supports forced best-effort cleanup.
+`close/2` supports forced best-effort cleanup. `open/3,4` rejects bound output arguments and alias
+collisions before it touches the requested source/sink.
 
 ```prolog
 main :-
@@ -356,7 +357,7 @@ A control term assembled at run time and passed to `call/1` is lowered to VM byt
 same control-construct compiler used for source clauses. Its cut is transparent within that
 meta-called goal and opaque to the caller, as ISO specifies.
 
-DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 384 conformance cases encoded
+DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 386 conformance cases encoded
 from ISO/IEC 13211-1, all passing, but those are its own reading of the standard rather than an
 independent suite — see [COMPATIBILITY.md](COMPATIBILITY.md), which also lists the known
 differences.

@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**384 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**386 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -73,8 +73,11 @@ Writing them was worth it immediately: they found these real defects.
 - `close/2` now validates `force(true|false)` and makes forced cleanup best-effort. Input streams
   own their selected `eof_action(error|eof_code|reset)`, report it as a property, and apply it
   consistently to term, character, code, and byte input after the first EOF marker.
+- `open/3,4` now raises `uninstantiation_error/1` for a bound stream output and rejects an alias
+  already owned by an open stream. Both checks happen before opening or truncating the source/sink,
+  so error handling cannot leak a stream or replace an alias.
 
-Beyond the conformance cases, the engine and toolchain are covered by 849 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 855 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
@@ -100,7 +103,7 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 
 | Feature | Current state |
 |---|---|
-| Complete stream surface | The remaining stream option and error clauses still require a systematic audit |
+| Complete stream surface | Source/sink permission failures and the remaining I/O error clauses still require a systematic audit |
 
 ## Non-ISO features absent deliberately
 
