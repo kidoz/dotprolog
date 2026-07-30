@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**533 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**549 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -40,6 +40,9 @@ Writing them was worth it immediately: they found these real defects.
   checks, and treated negative sub-atom positions as ordinary failure. They now enforce atom,
   number, integer, character, list, and non-negative domains with ISO error terms; number
   conversion also distinguishes permitted leading layout from invalid trailing layout.
+- `findall/3`, `bagof/3`, and `setof/3` treated malformed result arguments as ordinary unification
+  failure. They now validate callable goals and require a proper or partial result list before
+  enumeration, while valid pre-instantiated lists retain normal success or failure.
 - `call((!, fail ; true))` succeeded because the cut could not prune the meta-called disjunction.
   Meta-called control now goes through the same bytecode lowering and cut barriers as source-level
   control.
@@ -167,7 +170,7 @@ Writing them was worth it immediately: they found these real defects.
   letters and underscore start variables, other Unicode letters start atoms, and unsupported
   unquoted starts become catchable reader errors rather than host exceptions.
 
-Beyond the conformance cases, the engine and toolchain are covered by 1102 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 1121 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
