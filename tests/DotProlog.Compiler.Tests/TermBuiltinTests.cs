@@ -78,6 +78,16 @@ public sealed class TermBuiltinTests
         Assert.Equal(expected, PrologTestHost.RunGoal($"{goal}, write(R)"));
     }
 
+    [Theory]
+    [InlineData("compare(1, a, b)", "type_error(atom,1)")]
+    [InlineData("compare(foo, a, b)", "domain_error(order,foo)")]
+    public void CompareRejectsInvalidOrderArguments(string goal, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(goal);
+
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+    }
+
     [Fact]
     public void NotUnifiableLeavesNoBindingsBehind()
     {

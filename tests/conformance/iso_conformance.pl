@@ -87,6 +87,8 @@ iso_case('8.4.1', (1.0 @< 1), success).
 iso_case('8.4.2', compare(<, 1, 2), success).
 iso_case('8.4.2', compare(=, 1, 1), success).
 iso_case('8.4.2', compare(>, 2, 1), success).
+iso_case('8.4.2', compare(1, a, b), error(type_error(atom, 1))).
+iso_case('8.4.2', compare(foo, a, b), error(domain_error(order, foo))).
 
 % --- 8.5 Term creation and decomposition -------------------------------------
 iso_case('8.5.1', functor(foo(a, b, c), foo, 3), success).

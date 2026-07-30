@@ -52,19 +52,7 @@ internal static class TermBuiltins
         int less = symbols.InternAtom("<");
         int equal = symbols.InternAtom("=");
         int greater = symbols.InternAtom(">");
-        registry.Register(
-            "compare",
-            3,
-            machine =>
-            {
-                int order = TermOrder.Compare(machine, machine.Argument(1), machine.Argument(2));
-                int atom =
-                    order < 0 ? less
-                    : order > 0 ? greater
-                    : equal;
-                return machine.Unify(machine.Argument(0), Cell.Atom(atom));
-            }
-        );
+        registry.Register("compare", 3, machine => Compare(machine, less, equal, greater));
     }
 
     private static void RegisterInspection(BuiltinRegistry registry, SymbolTable symbols)
@@ -136,6 +124,30 @@ internal static class TermBuiltins
     }
 
     private static int Order(Machine machine) => TermOrder.Compare(machine, machine.Argument(0), machine.Argument(1));
+
+    private static bool Compare(Machine machine, int less, int equal, int greater)
+    {
+        Cell requested = machine.Argument(0);
+        if (requested.Tag != CellTag.Reference)
+        {
+            if (requested.Tag != CellTag.Atom)
+            {
+                throw PrologErrors.Type(machine, "atom", requested);
+            }
+
+            if (requested.Index != less && requested.Index != equal && requested.Index != greater)
+            {
+                throw PrologErrors.Domain(machine, "order", requested);
+            }
+        }
+
+        int order = TermOrder.Compare(machine, machine.Argument(1), machine.Argument(2));
+        int result =
+            order < 0 ? less
+            : order > 0 ? greater
+            : equal;
+        return machine.Unify(requested, Cell.Atom(result));
+    }
 
     private static bool Functor3(Machine machine)
     {
