@@ -14,11 +14,14 @@ namespace DotProlog.Compiler;
 /// </remarks>
 public sealed class PrologEngine : IRuntimeCompiler
 {
+    private const int ControlGoalCacheLimit = 1024;
+
     private readonly ModuleTable _modules = new();
     private readonly List<int> _pendingDirectives = [];
     private readonly List<int> _pendingInitialization = [];
     private readonly HashSet<string> _loadedSourceFiles = new(PathComparer);
     private readonly HashSet<string> _loadingSourceFiles = new(PathComparer);
+    private readonly Dictionary<string, (int Address, int ArgumentCount)> _controlGoals = new(StringComparer.Ordinal);
     private bool _preparationHalted;
 
     /// <summary>Creates an engine with the core builtins registered and an empty program.</summary>
@@ -485,11 +488,27 @@ public sealed class PrologEngine : IRuntimeCompiler
     /// <remarks>
     /// This is the meta-called-control path. The anonymous clause receives the original live
     /// variables as arguments, so compiling the body in place preserves both aliasing and ISO cut
-    /// scope without adding control state to the runtime machine.
+    /// scope without adding control state to the runtime machine. The compiled code depends only on
+    /// the goal's shape with variables numbered by first occurrence, so one clause per shape is
+    /// cached: the program is append-only, and recompiling the same shape on every meta-call would
+    /// grow it without bound.
     /// </remarks>
     public int CompileControlGoal(Machine machine, Cell goal, Span<Cell> arguments, out int argumentCount)
     {
         ArgumentNullException.ThrowIfNull(machine);
+
+        string key = ControlGoalKey(machine, goal, out List<Cell> goalVariables);
+
+        if (_controlGoals.TryGetValue(key, out (int Address, int ArgumentCount) cached))
+        {
+            for (int i = 0; i < cached.ArgumentCount; i++)
+            {
+                arguments[i] = goalVariables[i];
+            }
+
+            argumentCount = cached.ArgumentCount;
+            return cached.Address;
+        }
 
         var variables = new Dictionary<string, Cell>(StringComparer.Ordinal);
         SyntaxTerm body = TermReifier.ToSyntax(machine, goal, variables);
@@ -518,9 +537,97 @@ public sealed class PrologEngine : IRuntimeCompiler
         int address = compiler.Compile(head, body);
         argumentCount = names.Length;
 
-        return address < 0
-            ? throw new PrologException($"The meta-called control term did not compile: {string.Join("; ", diagnostics)}")
-            : address;
+        if (address < 0)
+        {
+            throw new PrologException($"The meta-called control term did not compile: {string.Join("; ", diagnostics)}");
+        }
+
+        if (_controlGoals.Count < ControlGoalCacheLimit)
+        {
+            _controlGoals[key] = (address, names.Length);
+        }
+
+        return address;
+    }
+
+    /// <summary>
+    /// Builds the cache key for a meta-called control term — its structure with constants by
+    /// interned identity and variables numbered by first occurrence — and collects those variables
+    /// in the same order <see cref="CollectVariableNames"/> reaches them in the reified goal.
+    /// </summary>
+    private static string ControlGoalKey(Machine machine, Cell goal, out List<Cell> variables)
+    {
+        var key = new System.Text.StringBuilder();
+        Dictionary<int, int> ordinals = [];
+        HashSet<int> active = [];
+        variables = [];
+        List<(Cell Cell, bool Leaving)> work = [(goal, false)];
+
+        while (work.Count > 0)
+        {
+            (Cell source, bool leaving) = work[^1];
+            work.RemoveAt(work.Count - 1);
+
+            if (leaving)
+            {
+                active.Remove(source.Index);
+                key.Append(')');
+                continue;
+            }
+
+            Cell cell = machine.Dereference(source);
+            switch (cell.Tag)
+            {
+                case CellTag.Reference:
+                    if (!ordinals.TryGetValue(cell.Index, out int ordinal))
+                    {
+                        ordinal = variables.Count;
+                        ordinals[cell.Index] = ordinal;
+                        variables.Add(cell);
+                    }
+
+                    key.Append('V').Append(ordinal).Append(',');
+                    break;
+
+                case CellTag.Atom:
+                    key.Append('a').Append(cell.Index).Append(',');
+                    break;
+
+                case CellTag.Integer:
+                    key.Append('i').Append(cell.Integer).Append(',');
+                    break;
+
+                case CellTag.Float:
+                    key.Append('f').Append(cell.Index).Append(',');
+                    break;
+
+                case CellTag.Structure:
+                {
+                    // A rational control term cannot be reified into finite syntax; reject it with
+                    // a catchable error rather than looping here or overflowing in the reifier.
+                    if (!active.Add(cell.Index))
+                    {
+                        throw PrologErrors.Representation(machine, "cyclic_term");
+                    }
+
+                    int functorId = machine.HeapAt(cell.Index).Index;
+                    key.Append('s').Append(functorId).Append('(');
+                    work.Add((cell, true));
+                    for (int i = machine.Symbols.ArityOf(functorId); i >= 1; i--)
+                    {
+                        work.Add((machine.HeapAt(cell.Index + i), false));
+                    }
+
+                    break;
+                }
+
+                default:
+                    key.Append(cell.ToString()).Append(',');
+                    break;
+            }
+        }
+
+        return key.ToString();
     }
 
     /// <inheritdoc />

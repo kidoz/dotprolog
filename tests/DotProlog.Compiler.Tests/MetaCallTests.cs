@@ -216,4 +216,50 @@ public sealed class MetaCallTests
 
         Assert.Contains("existence_error(procedure, nowhere/0)", exception.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void MetaCallingTheSameControlShapeTwiceReusesTheCompiledClause()
+    {
+        var engine = new PrologEngine { Output = new StringWriter() };
+        Machine machine = engine.Machine;
+        int conjunction = machine.Symbols.InternFunctor(",", 2);
+        Cell yes = Cell.Atom(machine.Symbols.InternAtom("true"));
+        var registers = new Cell[Machine.ArgumentRegisterCount];
+
+        Cell first = machine.CreateStructure(conjunction, [yes, machine.CreateVariable()]);
+        int address = engine.CompileControlGoal(machine, first, registers, out int arity);
+        int size = engine.Program.CodeLength;
+
+        Cell variable = machine.CreateVariable();
+        Cell second = machine.CreateStructure(conjunction, [yes, variable]);
+        int reused = engine.CompileControlGoal(machine, second, registers, out int reusedArity);
+
+        Assert.Equal(address, reused);
+        Assert.Equal(arity, reusedArity);
+        Assert.Equal(size, engine.Program.CodeLength);
+        Assert.Equal(variable, registers[0]);
+    }
+
+    [Fact]
+    public void CachedControlShapesRunWithFreshBindings()
+    {
+        // G1 and G2 share one compiled clause; the second call must run with Y, not the X that the
+        // first call already bound.
+        Assert.Equal(
+            "aaok\n",
+            PrologTestHost.RunGoal("G1 = (X = a, write(X)), call(G1), G2 = (Y = a, write(Y)), call(G2), Y == a, write(ok), nl")
+        );
+    }
+
+    [Fact]
+    public void CachedControlShapesBacktrackIndependently()
+    {
+        Assert.Equal(
+            "[1,2][1,2]\n",
+            PrologTestHost.RunGoal(
+                "G1 = (A = 1 ; A = 2), findall(A, call(G1), L1), "
+                    + "G2 = (B = 1 ; B = 2), findall(B, call(G2), L2), write(L1), write(L2), nl"
+            )
+        );
+    }
 }

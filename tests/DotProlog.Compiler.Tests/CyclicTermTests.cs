@@ -34,6 +34,12 @@ public sealed class CyclicTermTests
     }
 
     [Fact]
+    public void MetaCallOfACyclicControlTermRaisesACatchableError()
+    {
+        Assert.Equal("caught\n", PrologTestHost.RunGoal($"X = (true, X), catch(call(X), {Catcher}, write(caught)), nl"));
+    }
+
+    [Fact]
     public void WritingACyclicTermTerminatesWithAnEllipsis()
     {
         Assert.Equal("f(a,...)\n", PrologTestHost.RunGoal("X = f(a, X), write(X), nl"));
