@@ -354,9 +354,14 @@ iso_case('8.17.1', catch(throw(ball), ball, 4), error(type_error(callable, 4))).
 iso_case('8.17.1', catch(true, _, 4), success).
 iso_case('8.17.1', throw(_), error(instantiation_error)).
 iso_case('8.17.2', current_prolog_flag(bounded, true), success).
+iso_case('8.17.2', (current_prolog_flag(max_integer, M1), M1 =:= max_tagged_integer), success).
+iso_case('8.17.2', (current_prolog_flag(min_integer, M2), M2 =:= min_tagged_integer), success).
 iso_case('8.17.2', current_prolog_flag(integer_rounding_function, toward_zero), success).
 iso_case('8.17.2', current_prolog_flag(max_arity, 255), success).
+iso_case('8.17.2', current_prolog_flag(char_conversion, off), success).
+iso_case('8.17.2', current_prolog_flag(debug, off), success).
 iso_case('8.17.2', current_prolog_flag(double_quotes, codes), success).
+iso_case('8.17.2', current_prolog_flag(unknown, error), success).
 iso_case('8.17.2', current_prolog_flag(not_a_flag, _), failure).
 iso_case('8.17.2', (\+ current_prolog_flag(F1, F1), var(F1)), success).
 iso_case('8.17.2', current_prolog_flag(1, _), error(type_error(atom, 1))).
@@ -367,6 +372,36 @@ iso_case('8.17.3', set_prolog_flag(not_a_flag, value), error(domain_error(prolog
 iso_case('8.17.3', set_prolog_flag(double_quotes, strings), error(domain_error(flag_value, double_quotes+strings))).
 iso_case('8.17.3', set_prolog_flag(bounded, false), error(domain_error(flag_value, bounded+false))).
 iso_case('8.17.3', set_prolog_flag(bounded, true), error(permission_error(modify, flag, bounded))).
+iso_case(
+    '8.17.3',
+    (current_prolog_flag(max_integer, M3), set_prolog_flag(max_integer, M3)),
+    error(permission_error(modify, flag, max_integer))
+).
+iso_case(
+    '8.17.3',
+    (current_prolog_flag(min_integer, M4), set_prolog_flag(min_integer, M4)),
+    error(permission_error(modify, flag, min_integer))
+).
+iso_case(
+    '8.17.3',
+    set_prolog_flag(integer_rounding_function, toward_zero),
+    error(permission_error(modify, flag, integer_rounding_function))
+).
+iso_case('8.17.3', set_prolog_flag(max_arity, 255), error(permission_error(modify, flag, max_arity))).
+iso_case(
+    '8.17.3',
+    (
+        set_prolog_flag(char_conversion, on),
+        set_prolog_flag(char_conversion, off),
+        set_prolog_flag(double_quotes, chars),
+        set_prolog_flag(double_quotes, atom),
+        set_prolog_flag(double_quotes, codes),
+        set_prolog_flag(unknown, warning),
+        set_prolog_flag(unknown, fail),
+        set_prolog_flag(unknown, error)
+    ),
+    success
+).
 iso_case('8.17.3', (set_prolog_flag(debug, on), current_prolog_flag(debug, on), set_prolog_flag(debug, off)), success).
 
 % --- 8.18 Logic and control --------------------------------------------------

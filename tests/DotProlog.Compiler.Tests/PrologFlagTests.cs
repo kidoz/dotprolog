@@ -30,6 +30,23 @@ public sealed class PrologFlagTests
     }
 
     [Fact]
+    public void ModulesSeeOnlyTheSameIsoFlagSet()
+    {
+        Assert.Equal(
+            "[bounded,max_integer,min_integer,integer_rounding_function,max_arity,char_conversion,debug,double_quotes,unknown]\n",
+            PrologTestHost.Run(
+                """
+                :- module(flag_scope, [flag_names/1]).
+
+                flag_names(Names) :- findall(Name, current_prolog_flag(Name, _), Names).
+
+                :- initialization((flag_names(Names), write(Names), nl)).
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void MutableFlagsCanBeChangedAndReadBack()
     {
         Assert.Equal(
@@ -130,6 +147,19 @@ public sealed class PrologFlagTests
     [InlineData("set_prolog_flag(double_quotes, strings)", "domain_error(flag_value,double_quotes+strings)")]
     [InlineData("set_prolog_flag(bounded, false)", "domain_error(flag_value,bounded+false)")]
     [InlineData("set_prolog_flag(bounded, true)", "permission_error(modify,flag,bounded)")]
+    [InlineData(
+        "current_prolog_flag(max_integer, V), set_prolog_flag(max_integer, V)",
+        "permission_error(modify,flag,max_integer)"
+    )]
+    [InlineData(
+        "current_prolog_flag(min_integer, V), set_prolog_flag(min_integer, V)",
+        "permission_error(modify,flag,min_integer)"
+    )]
+    [InlineData(
+        "set_prolog_flag(integer_rounding_function, toward_zero)",
+        "permission_error(modify,flag,integer_rounding_function)"
+    )]
+    [InlineData("set_prolog_flag(max_arity, 255)", "permission_error(modify,flag,max_arity)")]
     public void ReportsIsoFlagErrors(string goal, string expected)
     {
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch(({goal}), error(E, _), write(E))"));
