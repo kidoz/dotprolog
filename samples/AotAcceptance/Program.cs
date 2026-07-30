@@ -152,6 +152,22 @@ internal static class Program
                 close(ResetEof, [force(false)]),
                 write(stream_eof_actions), nl,
 
+                % Open rejects bound outputs and alias collisions before touching another file.
+                catch(
+                    (open('dotprolog-aot-invalid.tmp', write, already_bound), OpenOutputCaught = false),
+                    error(uninstantiation_error(already_bound), _),
+                    OpenOutputCaught = true),
+                OpenOutputCaught == true,
+                open('dotprolog-aot-alias.tmp', write, AliasOut, [alias(native_shared)]),
+                catch(
+                    (open('dotprolog-aot-duplicate.tmp', write, _, [alias(native_shared)]),
+                        AliasErrorCaught = false),
+                    error(permission_error(open, source_sink, alias(native_shared)), _),
+                    AliasErrorCaught = true),
+                AliasErrorCaught == true,
+                close(AliasOut, [force(true)]),
+                write(stream_open_errors), nl,
+
                 % Binary streams and byte predicates use raw storage without reflection or encoding.
                 open('dotprolog-aot-byte.tmp', write, ByteOut, [type(binary)]),
                 stream_property(ByteOut, type(binary)),
