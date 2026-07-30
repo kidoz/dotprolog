@@ -345,30 +345,36 @@ internal static class StandardLibrary
         '$take_variant_keys'(K, [Pair|T], Vs, [Pair|Rest]) :-
             '$take_variant_keys'(K, T, Vs, Rest).
 
-        % The free variables of a goal are those a solution can bind and the caller
-        % can therefore see grouped. Control constructs are walked into so that a
-        % variable's position inside one is what decides. A variable occurring only
-        % under \+ is not free: negation proves a goal, it never binds anything.
+        % Only a leading chain of ^/2 terms is existential syntax for bagof/3. A
+        % caret nested inside a control construct is an ordinary callable goal, so
+        % its variables remain free for grouping.
         '$free_variables'(Goal, _, Free, Free) :- var(Goal), !.
         '$free_variables'(Quantified^Goal, Bound, Free0, Free) :-
             !,
             term_variables(Quantified, Vars),
             append(Vars, Bound, Bound1),
             '$free_variables'(Goal, Bound1, Free0, Free).
-        '$free_variables'(\+ _, _, Free, Free) :- !.
-        '$free_variables'((A, B), Bound, Free0, Free) :-
-            !,
-            '$free_variables'(A, Bound, Free0, Free1),
-            '$free_variables'(B, Bound, Free1, Free).
-        '$free_variables'((A ; B), Bound, Free0, Free) :-
-            !,
-            '$free_variables'(A, Bound, Free0, Free1),
-            '$free_variables'(B, Bound, Free1, Free).
-        '$free_variables'((A -> B), Bound, Free0, Free) :-
-            !,
-            '$free_variables'(A, Bound, Free0, Free1),
-            '$free_variables'(B, Bound, Free1, Free).
         '$free_variables'(Goal, Bound, Free0, Free) :-
+            '$free_goal_variables'(Goal, Bound, Free0, Free).
+
+        % Control constructs are walked into so that a variable's position inside
+        % one is what decides. A variable occurring only under \+ is not free:
+        % negation proves a goal, it never binds anything.
+        '$free_goal_variables'(Goal, _, Free, Free) :- var(Goal), !.
+        '$free_goal_variables'(\+ _, _, Free, Free) :- !.
+        '$free_goal_variables'((A, B), Bound, Free0, Free) :-
+            !,
+            '$free_goal_variables'(A, Bound, Free0, Free1),
+            '$free_goal_variables'(B, Bound, Free1, Free).
+        '$free_goal_variables'((A ; B), Bound, Free0, Free) :-
+            !,
+            '$free_goal_variables'(A, Bound, Free0, Free1),
+            '$free_goal_variables'(B, Bound, Free1, Free).
+        '$free_goal_variables'((A -> B), Bound, Free0, Free) :-
+            !,
+            '$free_goal_variables'(A, Bound, Free0, Free1),
+            '$free_goal_variables'(B, Bound, Free1, Free).
+        '$free_goal_variables'(Goal, Bound, Free0, Free) :-
             term_variables(Goal, Vars),
             '$add_free'(Vars, Bound, Free0, Free).
 

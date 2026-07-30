@@ -31,6 +31,30 @@ public sealed class BagofTests
         Assert.Equal("[peter,ann,pat]", Run("bagof(N, A^C^(class(N, C), age(N, A)), L), write(L)"));
 
     [Fact]
+    public void ACaretNestedInsideADisjunctionKeepsItsVariablesFree()
+    {
+        Assert.Equal(
+            "yes",
+            PrologTestHost.RunGoal(
+                "findall(S-Y, bagof(X, (Y^(X=1;Y=1);X=3), S), L), "
+                    + "subsumes_term(L, [[1,3]-_,[_]-1]), subsumes_term([[1,3]-_,[_]-1], L), write(yes)"
+            )
+        );
+    }
+
+    [Fact]
+    public void SetofUsesTheSameNestedCaretScope()
+    {
+        Assert.Equal(
+            "yes",
+            PrologTestHost.RunGoal(
+                "findall(S-Y, setof(X, (Y^(X=1;Y=2);X=3), S), L), "
+                    + "subsumes_term(L, [[1,3]-_,[_]-2]), subsumes_term([[1,3]-_,[_]-2], L), write(yes)"
+            )
+        );
+    }
+
+    [Fact]
     public void QuantifyingATermQuantifiesItsVariables() =>
         Assert.Equal("[peter,ann,pat]", Run("bagof(N, f(C, A)^(class(N, C), age(N, A)), L), write(L)"));
 
