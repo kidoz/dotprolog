@@ -36,6 +36,7 @@ public sealed class BytecodeProgram
     private readonly Dictionary<int, DynamicPredicate> _dynamicPredicates = [];
     private readonly Dictionary<int, HashSet<int>> _staticAliases = [];
     private readonly Dictionary<int, int> _staticAliasTargets = [];
+    private readonly List<(CompiledPredicateBlock Block, CompiledProgram Program)> _compiledBlocks = [];
 
     /// <summary>Creates an empty program with its own symbol table and builtin registry.</summary>
     public BytecodeProgram()
@@ -75,6 +76,29 @@ public sealed class BytecodeProgram
     internal int[] Code => _code;
 
     internal Cell[] Constants => _constants;
+
+    /// <summary>Registers a statically generated C# block and returns its machine target.</summary>
+    public int RegisterCompiledBlock(CompiledPredicateBlock block, CompiledProgram program)
+    {
+        ArgumentNullException.ThrowIfNull(block);
+        ArgumentNullException.ThrowIfNull(program);
+
+        int index = _compiledBlocks.Count;
+        _compiledBlocks.Add((block, program));
+        return EncodeCompiledTarget(index);
+    }
+
+    internal bool ExecuteCompiled(int target, ref Machine.CompiledExecution execution)
+    {
+        (CompiledPredicateBlock block, CompiledProgram program) = _compiledBlocks[DecodeCompiledTarget(target)];
+        return block(ref execution, program);
+    }
+
+    internal static bool IsCompiledTarget(int target) => target < Undefined;
+
+    private static int EncodeCompiledTarget(int index) => -index - 2;
+
+    private static int DecodeCompiledTarget(int target) => -target - 2;
 
     /// <summary>Records that <paramref name="functorId"/> is defined at <paramref name="address"/>.</summary>
     /// <param name="functorId">Functor identifier of the predicate.</param>
@@ -164,6 +188,27 @@ public sealed class BytecodeProgram
         return predicate;
     }
 
+    /// <summary>Declares a dynamic predicate owned by build-time-generated code.</summary>
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    public void DeclareCompiledDynamic(int functorId) => DeclareDynamic(functorId);
+
+    /// <summary>Adds one build-time-generated clause to a dynamic predicate.</summary>
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    public void AddCompiledDynamicClause(int functorId, int codeTarget, Cell[] termCells, int termRoot)
+    {
+        ArgumentNullException.ThrowIfNull(termCells);
+        DynamicPredicate predicate = DeclareDynamic(functorId);
+        predicate.Append(
+            new DynamicClause
+            {
+                CodeAddress = codeTarget,
+                Term = TermBuffer.FromCells(termCells),
+                TermRoot = termRoot,
+                Birth = Generation,
+            }
+        );
+    }
+
     /// <summary>
     /// Makes <paramref name="alias"/> name the same predicate as <paramref name="target"/>, and
     /// reports whether it did.
@@ -203,6 +248,8 @@ public sealed class BytecodeProgram
     /// <summary>Returns the dynamic predicate for <paramref name="functorId"/>, or <see langword="null"/>.</summary>
     internal DynamicPredicate? FindDynamic(int functorId) =>
         _dynamicPredicates.TryGetValue(functorId, out DynamicPredicate? predicate) ? predicate : null;
+
+    internal IEnumerable<KeyValuePair<int, DynamicPredicate>> DynamicPredicates => _dynamicPredicates;
 
     /// <summary>
     /// Removes a dynamic predicate and every alias sharing its clause database. Existing calls keep

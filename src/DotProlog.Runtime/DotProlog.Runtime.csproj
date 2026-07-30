@@ -10,6 +10,7 @@
 
     <ItemGroup>
         <InternalsVisibleTo Include="DotProlog.Compiler" />
+        <InternalsVisibleTo Include="DotProlog.CodeGen.CSharp" />
         <InternalsVisibleTo Include="DotProlog.Runtime.Tests" />
         <InternalsVisibleTo Include="DotProlog.Syntax" />
     </ItemGroup>

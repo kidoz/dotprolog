@@ -35,6 +35,11 @@ dotnet_diagnostic.CA1711.severity = none
 # CellTag is a byte on purpose: it is packed into a term cell, not used as a public flags enum.
 dotnet_diagnostic.CA1028.severity = none
 
+[src/DotProlog.Runtime/Machine.cs]
+# Generated predicate blocks need a capability scoped to one Machine instance. Nesting keeps its
+# privileged state access contained instead of widening the engine's private fields.
+dotnet_diagnostic.CA1034.severity = none
+
 [tests/**.cs]
 # Test methods are discovered by the runner, and xUnit theory data is often duplicated by design.
 dotnet_diagnostic.CA1707.severity = none

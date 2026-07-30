@@ -26,6 +26,16 @@ internal sealed class TermBuffer
     /// <summary>Number of cells the buffer holds.</summary>
     internal int Count => _count;
 
+    internal ReadOnlySpan<Cell> Cells => _cells.AsSpan(0, _count);
+
+    internal static TermBuffer FromCells(ReadOnlySpan<Cell> cells)
+    {
+        var buffer = new TermBuffer();
+        buffer._cells = cells.ToArray();
+        buffer._count = cells.Length;
+        return buffer;
+    }
+
     /// <summary>Discards everything copied so far.</summary>
     internal void Clear()
     {

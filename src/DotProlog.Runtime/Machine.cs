@@ -273,6 +273,30 @@ public sealed class Machine
         while (true)
         {
             bool proved = true;
+
+            if (BytecodeProgram.IsCompiledTarget(_pc))
+            {
+                var execution = new CompiledExecution(this);
+                proved = _program.ExecuteCompiled(_pc, ref execution);
+
+                if (proved)
+                {
+                    continue;
+                }
+
+                if (_halted)
+                {
+                    return RunResult.Halted;
+                }
+
+                if (!Backtrack())
+                {
+                    return RunResult.Failure;
+                }
+
+                continue;
+            }
+
             var opCode = (OpCode)code[_pc++];
 
             switch (opCode)
@@ -666,6 +690,366 @@ public sealed class Machine
         point.BuiltinId = builtin;
         point.BuiltinResume = resume;
         point.BuiltinState = state;
+    }
+
+    /// <summary>
+    /// Low-level operations used by build-time-generated C# predicate blocks.
+    /// </summary>
+    /// <remarks>
+    /// This is a generated-code contract. Every operation mutates the same explicit state used by
+    /// bytecode, so continuations and choice-point alternatives may cross either execution path.
+    /// </remarks>
+    public ref struct CompiledExecution
+    {
+        private readonly Machine _machine;
+
+        internal CompiledExecution(Machine machine) => _machine = machine;
+
+        /// <summary>Returns successfully to the current continuation.</summary>
+        public bool Stop()
+        {
+            _machine._pc = BytecodeProgram.TopLevelReturnAddress;
+            return true;
+        }
+
+        /// <summary>Allocates an environment and continues at <paramref name="next"/>.</summary>
+        public bool Allocate(int slots, int next)
+        {
+            _machine.Allocate(slots);
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Deallocates the current environment and continues.</summary>
+        public bool Deallocate(int next)
+        {
+            _machine.Deallocate();
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Calls a predicate and saves <paramref name="next"/> as its continuation.</summary>
+        public bool Call(int functorId, int arity, int next)
+        {
+            _machine._argumentCount = arity;
+            _machine._continuation = next;
+            _machine._b0 = _machine._b;
+            return _machine.TryEntryPoint(functorId, out _machine._pc);
+        }
+
+        /// <summary>Tail-calls a predicate without changing the continuation.</summary>
+        public bool Execute(int functorId, int arity)
+        {
+            _machine._argumentCount = arity;
+            _machine._b0 = _machine._b;
+            return _machine.TryEntryPoint(functorId, out _machine._pc);
+        }
+
+        /// <summary>Calls a native predicate and continues at <paramref name="next"/>.</summary>
+        public bool CallBuiltin(int builtinId, int arity, int next)
+        {
+            _machine._argumentCount = arity;
+            _machine._currentBuiltin = builtinId;
+            _machine._pc = next;
+            return _machine._program.Builtins.Implementation(builtinId)(_machine);
+        }
+
+        /// <summary>Returns to the saved continuation.</summary>
+        public bool Proceed()
+        {
+            _machine._pc = _machine._continuation;
+            return true;
+        }
+
+        /// <summary>Applies the current predicate's cut and continues.</summary>
+        public bool Cut(int next)
+        {
+            _machine.CutTo((int)_machine._stack[_machine._e + FrameCutBarrier].Integer);
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Creates a branch choice point and continues.</summary>
+        public bool TryBranch(int slot, int alternative, int next)
+        {
+            _machine._stack[_machine._e + FrameHeaderSize + slot] = Cell.Integer60(_machine._b);
+            int savedArity = _machine._argumentCount;
+            _machine._argumentCount = 0;
+            _machine.PushChoicePoint(alternative);
+            _machine._argumentCount = savedArity;
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Records the current cut barrier in an environment slot.</summary>
+        public bool MarkBarrier(int slot, int next)
+        {
+            _machine._stack[_machine._e + FrameHeaderSize + slot] = Cell.Integer60(_machine._b);
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Continues at an unconditional target.</summary>
+        public bool Jump(int target)
+        {
+            _machine._pc = target;
+            return true;
+        }
+
+        /// <summary>Cuts to the barrier stored in a slot.</summary>
+        public bool CutTo(int slot, int next)
+        {
+            _machine.CutTo((int)_machine._stack[_machine._e + FrameHeaderSize + slot].Integer);
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Applies soft cut to the branch stored in a slot.</summary>
+        public bool SoftCut(int slot, int next)
+        {
+            int barrier = (int)_machine._stack[_machine._e + FrameHeaderSize + slot].Integer;
+            if (barrier < _machine._b)
+            {
+                _machine._choicePoints[barrier].Alternative = BytecodeProgram.PopAndFailAddress;
+            }
+
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Calls the callable term in argument register zero.</summary>
+        public bool MetaCall(int next)
+        {
+            _machine._pc = next;
+            return _machine.MetaCall();
+        }
+
+        /// <summary>Pushes a Prolog exception frame.</summary>
+        public bool PushCatch(int catcherSlot, int recovery, int next)
+        {
+            int savedArity = _machine._argumentCount;
+            _machine._argumentCount = 0;
+            _machine.PushChoicePoint(BytecodeProgram.PopAndFailAddress);
+            _machine._argumentCount = savedArity;
+
+            ref ChoicePoint frame = ref _machine._choicePoints[_machine._b - 1];
+            frame.CatchRecovery = recovery;
+            frame.CatcherSlot = catcherSlot;
+            frame.CatchActive = true;
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Removes or deactivates a successful Prolog exception frame.</summary>
+        public bool PopCatch(int slot, int reactivate, int next)
+        {
+            int index = (int)_machine._stack[_machine._e + FrameHeaderSize + slot].Integer;
+            if (index < _machine._b)
+            {
+                if (index == _machine._b - 1)
+                {
+                    _machine._b--;
+                    _machine._savedTop = _machine._choicePoints[_machine._b].ArgumentBase;
+                }
+                else
+                {
+                    _machine._choicePoints[index].CatchActive = false;
+                    int savedArity = _machine._argumentCount;
+                    _machine._argumentCount = 0;
+                    _machine.PushChoicePoint(reactivate);
+                    _machine._argumentCount = savedArity;
+                }
+            }
+
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Reactivates a suspended Prolog exception frame.</summary>
+        public bool ReactivateCatch(int slot, int next)
+        {
+            int index = (int)_machine._stack[_machine._e + FrameHeaderSize + slot].Integer;
+            if (index < _machine._b)
+            {
+                _machine._choicePoints[index].CatchActive = true;
+            }
+
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Pushes a clause alternative.</summary>
+        public bool TryMeElse(int alternative, int next)
+        {
+            _machine.PushChoicePoint(alternative);
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Retargets the current clause alternative.</summary>
+        public bool RetryMeElse(int alternative, int next)
+        {
+            _machine._choicePoints[_machine._b - 1].Alternative = alternative;
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Commits the final clause alternative.</summary>
+        public bool TrustMe(int next)
+        {
+            _machine._b--;
+            _machine._savedTop = _machine._choicePoints[_machine._b].ArgumentBase;
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Copies an argument register to an environment slot.</summary>
+        public bool GetVariable(int slot, int argument, int next)
+        {
+            _machine._stack[_machine._e + FrameHeaderSize + slot] = _machine._x[argument];
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Unifies an argument register with an environment slot.</summary>
+        public bool GetValue(int slot, int argument, int next)
+        {
+            _machine._pc = next;
+            return _machine.Unify(_machine._stack[_machine._e + FrameHeaderSize + slot], _machine._x[argument]);
+        }
+
+        /// <summary>Unifies an argument register with a constant.</summary>
+        public bool GetConstant(Cell constant, int argument, int next)
+        {
+            _machine._pc = next;
+            return _machine.UnifyConstantWith(_machine._x[argument], constant);
+        }
+
+        /// <summary>Matches or builds a structure in an argument register.</summary>
+        public bool GetStructureArgument(int functorId, int argument, int next)
+        {
+            _machine._pc = next;
+            return _machine.GetStructure(functorId, _machine._x[argument]);
+        }
+
+        /// <summary>Matches or builds a structure in an environment slot.</summary>
+        public bool GetStructureSlot(int functorId, int slot, int next)
+        {
+            _machine._pc = next;
+            return _machine.GetStructure(functorId, _machine._stack[_machine._e + FrameHeaderSize + slot]);
+        }
+
+        /// <summary>Reads or writes a structure argument into an environment slot.</summary>
+        public bool UnifyVariable(int slot, int next)
+        {
+            _machine._stack[_machine._e + FrameHeaderSize + slot] = _machine._writeMode
+                ? _machine.NewVariable()
+                : _machine._heap[_machine._structureArgument++];
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Reads or writes a structure argument from an environment slot.</summary>
+        public bool UnifyValue(int slot, int next)
+        {
+            bool proved = true;
+            if (_machine._writeMode)
+            {
+                _machine.EnsureHeap(1);
+                _machine._heap[_machine._h++] = _machine._stack[_machine._e + FrameHeaderSize + slot];
+            }
+            else
+            {
+                proved = _machine.Unify(
+                    _machine._heap[_machine._structureArgument++],
+                    _machine._stack[_machine._e + FrameHeaderSize + slot]
+                );
+            }
+
+            _machine._pc = next;
+            return proved;
+        }
+
+        /// <summary>Reads or writes a constant structure argument.</summary>
+        public bool UnifyConstant(Cell constant, int next)
+        {
+            bool proved = true;
+            if (_machine._writeMode)
+            {
+                _machine.EnsureHeap(1);
+                _machine._heap[_machine._h++] = constant;
+            }
+            else
+            {
+                proved = _machine.UnifyConstantWith(_machine._heap[_machine._structureArgument++], constant);
+            }
+
+            _machine._pc = next;
+            return proved;
+        }
+
+        /// <summary>Creates a fresh variable in an environment slot and argument register.</summary>
+        public bool PutVariable(int slot, int argument, int next)
+        {
+            Cell variable = _machine.NewVariable();
+            _machine._stack[_machine._e + FrameHeaderSize + slot] = variable;
+            _machine._x[argument] = variable;
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Creates a fresh variable in an environment slot.</summary>
+        public bool InitVariable(int slot, int next)
+        {
+            _machine._stack[_machine._e + FrameHeaderSize + slot] = _machine.NewVariable();
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Copies an environment slot into an argument register.</summary>
+        public bool PutValue(int slot, int argument, int next)
+        {
+            _machine._x[argument] = _machine._stack[_machine._e + FrameHeaderSize + slot];
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Loads a constant into an argument register.</summary>
+        public bool PutConstant(Cell constant, int argument, int next)
+        {
+            _machine._x[argument] = constant;
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Begins a structure in an argument register.</summary>
+        public bool PutStructureArgument(int functorId, int argument, int next)
+        {
+            _machine._x[argument] = _machine.BeginStructure(functorId);
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Begins a structure in an environment slot.</summary>
+        public bool PutStructureSlot(int functorId, int slot, int next)
+        {
+            _machine._stack[_machine._e + FrameHeaderSize + slot] = _machine.BeginStructure(functorId);
+            _machine._pc = next;
+            return true;
+        }
+
+        /// <summary>Enters a dynamic predicate trampoline.</summary>
+        public bool EnterDynamic(int functorId)
+        {
+            return _machine.EnterDynamic(functorId);
+        }
+
+        /// <summary>Fails and lets the machine backtrack.</summary>
+        public bool Fail()
+        {
+            _ = _machine;
+            return false;
+        }
     }
 
     /// <summary>
@@ -1196,7 +1580,7 @@ public sealed class Machine
     private bool TryEntryPoint(int functorId, out int entry)
     {
         entry = _program.EntryPointOf(functorId);
-        if (entry >= 0)
+        if (_program.IsDefined(functorId))
         {
             return true;
         }
