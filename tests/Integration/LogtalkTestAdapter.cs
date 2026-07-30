@@ -104,6 +104,10 @@ internal static class LogtalkTestAdapter
                 || text.StartsWith(":- protected", StringComparison.Ordinal)
                 || text.StartsWith(":- uses", StringComparison.Ordinal)
                 || text.StartsWith(":- meta_predicate", StringComparison.Ordinal)
+                || text.StartsWith(":- if", StringComparison.Ordinal)
+                || text.StartsWith(":- elif", StringComparison.Ordinal)
+                || text.StartsWith(":- else", StringComparison.Ordinal)
+                || text.StartsWith(":- endif", StringComparison.Ordinal)
             )
             {
                 continue;

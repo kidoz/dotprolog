@@ -10,6 +10,7 @@ namespace Integration.Tests;
 public sealed class LogtalkConformanceTests
 {
     private const string OptInVariable = "DOTPROLOG_RUN_EXTERNAL_CONFORMANCE_TESTS";
+    private const string CaseVariable = "DOTPROLOG_LOGTALK_CASE_ID";
     private const string Repository = "https://github.com/LogtalkDotOrg/logtalk3.git";
     private const string Tag = "lgt31010stable";
     private const string Commit = "11dfd24eb6673250be996012489e65c0f9370a7c";
@@ -156,13 +157,22 @@ public sealed class LogtalkConformanceTests
                 ),
             ];
 
-            Assert.Equal(50, directCases.Length);
-            Assert.Equal(30, directCases.Count(test => test.OutcomeKind == "true"));
-            Assert.Equal(7, directCases.Count(test => test.OutcomeKind == "false"));
-            Assert.Equal(13, directCases.Count(test => test.OutcomeKind == "error"));
+            Assert.Equal(177, directCases.Length);
+            Assert.Equal(100, directCases.Count(test => test.OutcomeKind == "true"));
+            Assert.Equal(53, directCases.Count(test => test.OutcomeKind == "false"));
+            Assert.Equal(24, directCases.Count(test => test.OutcomeKind == "error"));
+
+            string? selectedId = Environment.GetEnvironmentVariable(CaseVariable);
+            LogtalkTestDeclaration[] casesToExecute = selectedId is null
+                ? directCases
+                : directCases.Where(test => test.Id == selectedId).ToArray();
+            Assert.True(
+                selectedId is null || casesToExecute.Length > 0,
+                $"{CaseVariable} did not select a directly executable case: {selectedId}"
+            );
 
             var failures = new List<string>();
-            foreach (LogtalkTestDeclaration test in directCases)
+            foreach (LogtalkTestDeclaration test in casesToExecute)
             {
                 if (!Execute(test, out string failure))
                 {
