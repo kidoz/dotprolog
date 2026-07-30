@@ -84,6 +84,7 @@ public sealed class NativeAotAcceptanceTests
                     "read_options",
                     "read_option_validation",
                     "stream_properties",
+                    "current_stream_domains",
                     "code_io",
                     "stream_eof_actions",
                     "stream_open_errors",

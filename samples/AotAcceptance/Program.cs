@@ -144,6 +144,14 @@ internal static class Program
                 stream_property(NativeInput, reposition(false)),
                 write(stream_properties), nl,
 
+                % Bound current-stream queries reject non-stream terms in the native image too.
+                catch(
+                    (current_output(not_a_stream), CurrentStreamDomainCaught = false),
+                    error(domain_error(stream, not_a_stream), _),
+                    CurrentStreamDomainCaught = true),
+                CurrentStreamDomainCaught == true,
+                write(current_stream_domains), nl,
+
                 % Character-code I/O shares the stream path and must preserve peek and EOF in AOT.
                 open('dotprolog-aot-code.tmp', write, CodeOut),
                 put_code(CodeOut, 65), put_code(CodeOut, 79), put_code(CodeOut, 84), close(CodeOut),
