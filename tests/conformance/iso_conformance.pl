@@ -26,6 +26,18 @@ write_gives(Term, Expected) :- with_output_to(atom(Written), write(Term)), Writt
 
 writeq_codes(Term, Expected) :- with_output_to(codes(Written), writeq(Term)), Written == Expected.
 
+repeated_arguments(1, a).
+repeated_arguments(N, Arguments) :-
+    N > 1,
+    Next is N - 1,
+    repeated_arguments(Next, Rest),
+    atom_concat('a,', Rest, Arguments).
+
+compound_source(Arity, Source) :-
+    repeated_arguments(Arity, Arguments),
+    atom_concat('f(', Arguments, Prefix),
+    atom_concat(Prefix, ')', Source).
+
 % --- 8.2 Unification ---------------------------------------------------------
 iso_case('8.2.1', (_X = 1), success).
 iso_case('8.2.1', (1 = 2), failure).
@@ -509,6 +521,11 @@ iso_case(
     '8.14.1',
     read_term_from_atom('f(999999999999999999999999999999)', _, []),
     error(representation_error(max_integer))
+).
+iso_case(
+    '8.14.1',
+    (compound_source(256, MaxAritySource), read_term_from_atom(MaxAritySource, _, [])),
+    error(representation_error(max_arity))
 ).
 iso_case('8.14.1', (read_term_from_atom('f(A,B,A)', _, [singletons(S7)]), S7 = ['B'=_]), success).
 iso_case('8.14.1', (read_term_from_atom('f(A,_,A)', _, [variables(V7)]), V7 = [_, _]), success).

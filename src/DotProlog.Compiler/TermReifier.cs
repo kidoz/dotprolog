@@ -113,6 +113,11 @@ internal static class TermReifier
 
             case CompoundTerm compound:
             {
+                if (compound.Arity >= Machine.ArgumentRegisterCount)
+                {
+                    throw PrologErrors.Representation(machine, "max_arity");
+                }
+
                 var arguments = new Cell[compound.Arity];
                 for (int i = 0; i < compound.Arity; i++)
                 {
