@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**442 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**443 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -108,8 +108,11 @@ Writing them was worth it immediately: they found these real defects.
 - Runtime term input now raises catchable `representation_error(max_integer|min_integer)` when a
   decimal or radix literal exceeds the bounded tagged-integer range. Arbitrarily long literals
   retain their sign, and a rejected stream term does not discard the following term.
+- Runtime term input enforces the advertised `max_arity` of 255. Reading a compound with 256 or
+  more arguments raises catchable `representation_error(max_arity)`, including when the compound
+  is nested, without discarding the following stream term.
 
-Beyond the conformance cases, the engine and toolchain are covered by 975 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 979 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
@@ -135,7 +138,7 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 
 | Feature | Current state |
 |---|---|
-| Complete standard clause audit | Representation limits, syntax, modes, and remaining non-stream errors still require a clause-by-clause audit |
+| Complete standard clause audit | Float representation limits, syntax, modes, and remaining non-stream errors still require a clause-by-clause audit |
 | Independent ISO verification | The repository corpus is not a substitute for a published independent suite |
 
 ## Non-ISO features absent deliberately
