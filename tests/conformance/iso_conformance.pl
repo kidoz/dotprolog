@@ -321,29 +321,52 @@ iso_case('8.15.3', iso_unreached_noncallable_body, failure).
 iso_case('8.16.1', atom_length(abcde, 5), success).
 iso_case('8.16.1', atom_length('', 0), success).
 iso_case('8.16.1', atom_length(_, _), error(instantiation_error)).
-iso_case('8.16.1', atom_length(1.23, _), success).
+iso_case('8.16.1', atom_length(1.23, _), error(type_error(atom, 1.23))).
+iso_case('8.16.1', atom_length(a, bad), error(type_error(integer, bad))).
+iso_case('8.16.1', atom_length(a, -1), error(domain_error(not_less_than_zero, -1))).
 iso_case('8.16.2', atom_concat(hello, ' world', 'hello world'), success).
 iso_case('8.16.2', (atom_concat(T1, ' world', 'hello world'), T1 == hello), success).
 iso_case('8.16.2', findall(_-_, atom_concat(_, _, abc), L1), success).
 iso_case('8.16.2', atom_concat(_, _, _), error(instantiation_error)).
+iso_case('8.16.2', atom_concat(1, b, _), error(type_error(atom, 1))).
+iso_case('8.16.2', atom_concat(a, 2, _), error(type_error(atom, 2))).
+iso_case('8.16.2', atom_concat(a, b, 3), error(type_error(atom, 3))).
 iso_case('8.16.3', sub_atom(abracadabra, 0, 5, _, abrac), success).
 iso_case('8.16.3', (sub_atom(abracadabra, _, 5, 0, S3), S3 == dabra), success).
 iso_case('8.16.3', sub_atom(_, _, _, _, _), error(instantiation_error)).
+iso_case('8.16.3', sub_atom(1, _, _, _, _), error(type_error(atom, 1))).
+iso_case('8.16.3', sub_atom(a, -1, _, _, _), error(domain_error(not_less_than_zero, -1))).
+iso_case('8.16.3', sub_atom(a, _, -1, _, _), error(domain_error(not_less_than_zero, -1))).
+iso_case('8.16.3', sub_atom(a, _, _, -1, _), error(domain_error(not_less_than_zero, -1))).
+iso_case('8.16.3', sub_atom(a, _, _, _, 1), error(type_error(atom, 1))).
 iso_case('8.16.4', atom_chars('', []), success).
 iso_case('8.16.4', atom_chars([], ['[', ']']), success).
 iso_case('8.16.4', atom_chars(abc, [a, b, c]), success).
 iso_case('8.16.4', (atom_chars(A3, [a, b, c]), A3 == abc), success).
 iso_case('8.16.4', atom_chars(_, _), error(instantiation_error)).
+iso_case('8.16.4', atom_chars(1.0, _), error(type_error(atom, 1.0))).
+iso_case('8.16.4', atom_chars(_, atom), error(type_error(list, atom))).
+iso_case('8.16.4', atom_chars(_, [ab]), error(type_error(character, ab))).
 iso_case('8.16.5', atom_codes(abc, [0'a, 0'b, 0'c]), success).
 iso_case('8.16.5', atom_codes(_, _), error(instantiation_error)).
+iso_case('8.16.5', atom_codes(1, _), error(type_error(atom, 1))).
+iso_case('8.16.5', atom_codes(_, [a]), error(type_error(integer, a))).
+iso_case('8.16.5', atom_codes(_, [-1]), error(representation_error(character_code))).
 iso_case('8.16.6', char_code(a, 0'a), success).
 iso_case('8.16.6', (char_code(C1, 0'a), C1 == a), success).
 iso_case('8.16.6', char_code(_, _), error(instantiation_error)).
+iso_case('8.16.6', char_code(ab, _), error(type_error(character, ab))).
+iso_case('8.16.6', char_code(_, a), error(type_error(integer, a))).
 iso_case('8.16.7', number_chars(33, ['3', '3']), success).
 iso_case('8.16.7', (number_chars(N1, ['3', '3']), N1 == 33), success).
 iso_case('8.16.7', number_chars(_, [a]), error(syntax_error(illegal_number))).
+iso_case('8.16.7', number_chars(atom, _), error(type_error(number, atom))).
+iso_case('8.16.7', number_chars(_, atom), error(type_error(list, atom))).
+iso_case('8.16.7', number_chars(_, ['3', ' ']), error(syntax_error(illegal_number))).
 iso_case('8.16.8', number_codes(33, [0'3, 0'3]), success).
 iso_case('8.16.8', number_codes(_, [0'a]), error(syntax_error(illegal_number))).
+iso_case('8.16.8', number_codes(_, [a]), error(type_error(integer, a))).
+iso_case('8.16.8', number_codes(_, [51, 32]), error(syntax_error(illegal_number))).
 
 % --- 8.17 Implementation defined hooks ---------------------------------------
 iso_case('8.17.1', (catch(throw(ball), Ball, true), Ball == ball), success).
@@ -784,7 +807,7 @@ iso_case('8.16.2', findall(A7-B7, atom_concat(A7, B7, ab), [''-ab, a-b, ab-'']),
 iso_case('8.16.3', findall(S5, sub_atom(abc, _, 1, _, S5), [a, b, c]), success).
 iso_case('8.16.3', (sub_atom(abc, 1, 1, A8, S6), A8 =:= 1, S6 == b), success).
 iso_case('8.16.3', sub_atom(abc, 0, 4, _, _), failure).
-iso_case('8.16.4', atom_chars(1.0, ['1', '.', '0']), success).
+iso_case('8.16.4', atom_chars('1.0', ['1', '.', '0']), success).
 iso_case('8.16.5', (atom_codes(A9, [0'a]), A9 == a), success).
 iso_case('8.16.6', char_code(_, -1), error(representation_error(character_code))).
 iso_case('8.16.7', (number_chars(N2, [' ', '3']), N2 == 3), success).

@@ -75,8 +75,40 @@ internal static class TextBuiltins
         return TryText(machine, cell, out string text) ? text : throw PrologErrors.Type(machine, "atomic", cell);
     }
 
-    private static bool AtomLength(Machine machine) =>
-        machine.Unify(machine.Argument(1), Cell.Integer60(TextArgument(machine, 0).Length));
+    private static string AtomArgument(Machine machine, int index)
+    {
+        Cell cell = machine.Argument(index);
+
+        if (cell.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        return cell.Tag == CellTag.Atom ? machine.Symbols.AtomName(cell.Index) : throw PrologErrors.Type(machine, "atom", cell);
+    }
+
+    private static bool AtomLength(Machine machine)
+    {
+        int actual = AtomArgument(machine, 0).Length;
+        Cell length = machine.Argument(1);
+
+        if (length.Tag == CellTag.Reference)
+        {
+            return machine.Unify(length, Cell.Integer60(actual));
+        }
+
+        if (length.Tag != CellTag.Integer)
+        {
+            throw PrologErrors.Type(machine, "integer", length);
+        }
+
+        if (length.Integer < 0)
+        {
+            throw PrologErrors.Domain(machine, "not_less_than_zero", length);
+        }
+
+        return length.Integer == actual;
+    }
 
     private static bool CharCode(Machine machine)
     {
@@ -161,6 +193,20 @@ internal static class TextBuiltins
     private static bool Convert(Machine machine, bool chars, bool numeric)
     {
         Cell list = machine.Argument(1);
+        Cell source = machine.Argument(0);
+
+        if (source.Tag != CellTag.Reference)
+        {
+            if (numeric && source.Tag is not (CellTag.Integer or CellTag.Float))
+            {
+                throw PrologErrors.Type(machine, "number", source);
+            }
+
+            if (!numeric && source.Tag != CellTag.Atom)
+            {
+                throw PrologErrors.Type(machine, "atom", source);
+            }
+        }
 
         // A proper list decides the direction, even when the first argument is bound: that is what
         // lets number_codes/2 check a parse rather than only produce one.
@@ -170,33 +216,30 @@ internal static class TextBuiltins
 
             if (!numeric)
             {
-                Cell bound = machine.Argument(0);
-
                 // With the first argument already bound, the question is whether those are its
                 // characters — so its text is compared. Interning an atom and unifying instead
-                // would make atom_chars(1.0, ['1', '.', '0']) fail, since a float is not an atom.
-                return bound.Tag == CellTag.Reference
-                    ? machine.Unify(bound, Cell.Atom(machine.Symbols.InternAtom(text)))
-                    : TryText(machine, bound, out string existing) && string.Equals(existing, text, StringComparison.Ordinal);
+                // keeps a bound atom comparison allocation-free.
+                return source.Tag == CellTag.Reference
+                    ? machine.Unify(source, Cell.Atom(machine.Symbols.InternAtom(text)))
+                    : string.Equals(machine.Symbols.AtomName(source.Index), text, StringComparison.Ordinal);
             }
 
             return TryParseNumber(text, out PrologNumber parsed)
-                ? machine.Unify(machine.Argument(0), ArithmeticEvaluator.ToCell(machine, parsed))
+                ? machine.Unify(source, ArithmeticEvaluator.ToCell(machine, parsed))
                 : throw machine.CreateBall(SyntaxErrorTerm(machine, "illegal_number"), "syntax_error(illegal_number)");
         }
 
-        Cell source = machine.Argument(0);
         if (source.Tag == CellTag.Reference)
         {
-            throw PrologErrors.Instantiation(machine);
+            List<Cell> elements = [];
+            Cell tail = TermList.Read(machine, list, elements);
+            throw tail.Tag == CellTag.Reference ? PrologErrors.Instantiation(machine) : PrologErrors.Type(machine, "list", list);
         }
 
-        if (numeric && source.Tag is not (CellTag.Integer or CellTag.Float))
-        {
-            throw PrologErrors.Type(machine, "number", source);
-        }
-
-        string written = TryText(machine, source, out string value) ? value : throw PrologErrors.Type(machine, "atom", source);
+        string written =
+            source.Tag == CellTag.Atom ? machine.Symbols.AtomName(source.Index)
+            : TryText(machine, source, out string value) ? value
+            : throw new InvalidOperationException("Validated text source has no textual representation.");
         return machine.Unify(list, BuildText(machine, written, chars));
     }
 
@@ -267,22 +310,30 @@ internal static class TextBuiltins
     {
         Cell first = machine.Argument(0);
         Cell second = machine.Argument(1);
-
-        if (TryText(machine, first, out string left) && TryText(machine, second, out string right))
-        {
-            return machine.Unify(machine.Argument(2), Cell.Atom(machine.Symbols.InternAtom(left + right)));
-        }
-
         Cell whole = machine.Argument(2);
-        if (whole.Tag == CellTag.Reference)
+
+        ValidateAtomOrVariable(machine, first);
+        ValidateAtomOrVariable(machine, second);
+        ValidateAtomOrVariable(machine, whole);
+
+        if (first.Tag == CellTag.Reference && whole.Tag == CellTag.Reference)
         {
             throw PrologErrors.Instantiation(machine);
         }
 
-        if (!TryText(machine, whole, out string text))
+        if (second.Tag == CellTag.Reference && whole.Tag == CellTag.Reference)
         {
-            throw PrologErrors.Type(machine, "atomic", whole);
+            throw PrologErrors.Instantiation(machine);
         }
+
+        if (first.Tag == CellTag.Atom && second.Tag == CellTag.Atom)
+        {
+            string left = machine.Symbols.AtomName(first.Index);
+            string right = machine.Symbols.AtomName(second.Index);
+            return machine.Unify(whole, Cell.Atom(machine.Symbols.InternAtom(left + right)));
+        }
+
+        string text = machine.Symbols.AtomName(whole.Index);
 
         int split = (int)state;
         if (split > text.Length)
@@ -301,6 +352,14 @@ internal static class TextBuiltins
             && machine.Unify(second, Cell.Atom(machine.Symbols.InternAtom(text[split..])));
     }
 
+    private static void ValidateAtomOrVariable(Machine machine, Cell cell)
+    {
+        if (cell.Tag is not (CellTag.Reference or CellTag.Atom))
+        {
+            throw PrologErrors.Type(machine, "atom", cell);
+        }
+    }
+
     /// <summary>
     /// <c>sub_atom(+Atom, ?Before, ?Length, ?After, ?SubAtom)</c>: every sub-atom in turn, narrowed
     /// by whichever of the four positional arguments are already bound.
@@ -312,15 +371,23 @@ internal static class TextBuiltins
     /// </param>
     private static bool SubAtom(Machine machine, long state)
     {
-        string text = TextArgument(machine, 0);
+        string text = AtomArgument(machine, 0);
         long? before = Constraint(machine, 1);
         long? length = Constraint(machine, 2);
         long? after = Constraint(machine, 3);
 
         Cell sub = machine.Argument(4);
-        return sub.Tag != CellTag.Reference && TryText(machine, sub, out string wanted)
-            ? Search(machine, text, wanted, before, after, state)
-            : Enumerate(machine, text, before, length, after, state);
+        if (sub.Tag == CellTag.Reference)
+        {
+            return Enumerate(machine, text, before, length, after, state);
+        }
+
+        if (sub.Tag != CellTag.Atom)
+        {
+            throw PrologErrors.Type(machine, "atom", sub);
+        }
+
+        return Search(machine, text, machine.Symbols.AtomName(sub.Index), before, after, state);
     }
 
     /// <summary>SubAtom is known, so the solutions are its occurrences and nothing else is scanned.</summary>
@@ -419,7 +486,8 @@ internal static class TextBuiltins
         return cell.Tag switch
         {
             CellTag.Reference => null,
-            CellTag.Integer => cell.Integer,
+            CellTag.Integer when cell.Integer >= 0 => cell.Integer,
+            CellTag.Integer => throw PrologErrors.Domain(machine, "not_less_than_zero", cell),
             _ => throw PrologErrors.Type(machine, "integer", cell),
         };
     }
@@ -499,7 +567,7 @@ internal static class TextBuiltins
     internal static bool TryParseNumber(string text, out PrologNumber number)
     {
         number = default;
-        ReadOnlySpan<char> span = text.AsSpan().Trim();
+        ReadOnlySpan<char> span = text.AsSpan().TrimStart();
 
         if (span.Length == 0)
         {

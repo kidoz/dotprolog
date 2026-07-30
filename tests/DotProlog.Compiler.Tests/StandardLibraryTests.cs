@@ -19,7 +19,7 @@ public sealed class StandardLibraryTests
     [InlineData("downcase_atom('HI', A), write(A)", "hi")]
     [InlineData("atom_concat(foo, bar, A), write(A)", "foobar")]
     [InlineData("atom_concat(A, bar, foobar), write(A)", "foo")]
-    [InlineData("atom_length(123, N), write(N)", "3")]
+    [InlineData("atom_length('123', N), write(N)", "3")]
     public void ConvertsText(string goal, string expected) => Assert.Equal(expected, PrologTestHost.RunGoal(goal));
 
     [Theory]
