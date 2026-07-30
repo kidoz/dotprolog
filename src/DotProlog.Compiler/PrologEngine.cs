@@ -507,7 +507,13 @@ public sealed class PrologEngine : IRuntimeCompiler
         ParseResult parsed = ReadTerm(text);
         if (!parsed.Success || parsed.Clauses.Count == 0)
         {
-            throw SyntaxError(machine, parsed.Diagnostics.Count > 0 ? parsed.Diagnostics[0].Id : "cannot_start_term");
+            string error = parsed.Diagnostics.Count > 0 ? parsed.Diagnostics[0].Id : "cannot_start_term";
+            throw error switch
+            {
+                DiagnosticIds.MaxIntegerExceeded => PrologErrors.Representation(machine, "max_integer"),
+                DiagnosticIds.MinIntegerExceeded => PrologErrors.Representation(machine, "min_integer"),
+                _ => SyntaxError(machine, error),
+            };
         }
 
         Dictionary<string, Cell> namedVariables = [];

@@ -106,7 +106,7 @@ internal static class TermReifier
                 return Cell.Integer60(integer.Value);
 
             case IntegerTerm integer:
-                throw new PrologException($"representation_error(max_integer) for {integer.Value}");
+                throw PrologErrors.Representation(machine, integer.Value < Cell.MinInteger ? "min_integer" : "max_integer");
 
             case FloatTerm number:
                 return Cell.Float(machine.Symbols.InternFloat(number.Value));

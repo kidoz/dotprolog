@@ -23,4 +23,10 @@ public static class DiagnosticIds
 
     /// <summary>An escape sequence inside a quoted token is not recognised.</summary>
     public const string InvalidEscape = "DPL0007";
+
+    /// <summary>A positive integer literal exceeds the implementation's storage range.</summary>
+    public const string MaxIntegerExceeded = "DPL0008";
+
+    /// <summary>A negative integer literal exceeds the implementation's storage range.</summary>
+    public const string MinIntegerExceeded = "DPL0009";
 }

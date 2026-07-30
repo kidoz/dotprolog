@@ -137,6 +137,24 @@ public sealed class TermReaderTests
         Assert.Equal(",(write(hi),nl)", Canonical(Assert.Single(result.Clauses)));
     }
 
+    [Theory]
+    [InlineData("999999999999999999999999999999", DiagnosticIds.MaxIntegerExceeded)]
+    [InlineData("+999999999999999999999999999999", DiagnosticIds.MaxIntegerExceeded)]
+    [InlineData("-999999999999999999999999999999", DiagnosticIds.MinIntegerExceeded)]
+    [InlineData("0xffffffffffffffffffffffffffffffff", DiagnosticIds.MaxIntegerExceeded)]
+    [InlineData("-0xffffffffffffffffffffffffffffffff", DiagnosticIds.MinIntegerExceeded)]
+    public void ReportsSignedIntegerRepresentationLimits(string source, string expectedId)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        ParseResult result = TermReader.ReadTerm(source, "limit.pl");
+
+        Diagnostic diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(expectedId, diagnostic.Id);
+        Assert.Equal(new SourceSpan(0, source.Length, 1, 1), diagnostic.Span);
+        Assert.Equal("limit.pl", diagnostic.FileName);
+    }
+
     [Fact]
     public void CharacterConversionChangesOnlyUnquotedTokenText()
     {

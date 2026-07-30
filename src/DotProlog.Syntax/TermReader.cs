@@ -312,7 +312,7 @@ public sealed class TermReader
         {
             case TokenKind.Integer:
                 Advance();
-                return new IntegerTerm(token.Integer, token.Span);
+                return IntegerLiteral(token, negate: false, token.Span);
 
             case TokenKind.Float:
                 Advance();
@@ -389,7 +389,7 @@ public sealed class TermReader
             SourceSpan span = token.Span.To(literal.Span);
             bool negate = name == "-";
             return literal.Kind == TokenKind.Integer
-                ? new IntegerTerm(negate ? -literal.Integer : literal.Integer, span)
+                ? IntegerLiteral(literal, negate, span)
                 : new FloatTerm(negate ? -literal.Float : literal.Float, span);
         }
 
@@ -418,6 +418,19 @@ public sealed class TermReader
         }
 
         return new AtomTerm(name, token.Span);
+    }
+
+    private IntegerTerm IntegerLiteral(Token token, bool negate, SourceSpan span)
+    {
+        if (token.IntegerOverflow)
+        {
+            string id = negate ? DiagnosticIds.MinIntegerExceeded : DiagnosticIds.MaxIntegerExceeded;
+            string limit = negate ? "minimum" : "maximum";
+            Report(id, $"Integer literal '{(negate ? "-" : string.Empty)}{token.Text}' exceeds the {limit} value.", span);
+            return new IntegerTerm(0, span);
+        }
+
+        return new IntegerTerm(negate ? -token.Integer : token.Integer, span);
     }
 
     private bool CanStartTerm(Token token)

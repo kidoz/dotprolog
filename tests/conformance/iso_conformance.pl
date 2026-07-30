@@ -485,6 +485,31 @@ iso_case('8.14.1', read_term(f(1), _, atom), error(domain_error(stream_or_alias,
 iso_case('8.14.1', read_term(no_such_stream, _, [_]), error(instantiation_error)).
 iso_case('8.14.1', read_term(no_such_stream, _, [bad]), error(domain_error(read_option, bad))).
 iso_case('8.14.1', read_term(user_output, _, [bad]), error(domain_error(read_option, bad))).
+iso_case(
+    '8.14.1',
+    read_term_from_atom('576460752303423488', _, []),
+    error(representation_error(max_integer))
+).
+iso_case(
+    '8.14.1',
+    read_term_from_atom('-576460752303423489', _, []),
+    error(representation_error(min_integer))
+).
+iso_case(
+    '8.14.1',
+    read_term_from_atom('999999999999999999999999999999', _, []),
+    error(representation_error(max_integer))
+).
+iso_case(
+    '8.14.1',
+    read_term_from_atom('-999999999999999999999999999999', _, []),
+    error(representation_error(min_integer))
+).
+iso_case(
+    '8.14.1',
+    read_term_from_atom('f(999999999999999999999999999999)', _, []),
+    error(representation_error(max_integer))
+).
 iso_case('8.14.1', (read_term_from_atom('f(A,B,A)', _, [singletons(S7)]), S7 = ['B'=_]), success).
 iso_case('8.14.1', (read_term_from_atom('f(A,_,A)', _, [variables(V7)]), V7 = [_, _]), success).
 iso_case('8.14.1', read_term_from_atom('f(A,A)', _, [singletons([])]), success).

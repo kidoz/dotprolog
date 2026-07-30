@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using System.Text;
 using DotProlog.Runtime;
 
@@ -305,19 +306,21 @@ internal sealed class Lexer
                 return new Token(TokenKind.Integer, ConvertedText(start, _position - start), SpanFrom(start), layout);
             }
 
-            long radixValue = 0;
+            BigInteger radixValue = 0;
             foreach (char digit in ConvertedText(digitsStart, _position - digitsStart))
             {
                 radixValue =
                     (radixValue * radix) + (char.IsAsciiDigit(digit) ? digit - '0' : char.ToLowerInvariant(digit) - 'a' + 10);
             }
 
+            bool overflow = radixValue > long.MaxValue;
             return new Token(
                 TokenKind.Integer,
                 ConvertedText(start, _position - start),
                 SpanFrom(start),
                 layout,
-                Integer: radixValue
+                Integer: overflow ? 0 : (long)radixValue,
+                IntegerOverflow: overflow
             );
         }
 
@@ -362,8 +365,7 @@ internal sealed class Lexer
 
         if (!long.TryParse(literal, NumberStyles.None, CultureInfo.InvariantCulture, out long integer))
         {
-            Report(DiagnosticIds.InvalidNumber, $"Integer literal '{literal}' does not fit in 64 bits.", span);
-            return new Token(TokenKind.Integer, literal, span, layout);
+            return new Token(TokenKind.Integer, literal, span, layout, IntegerOverflow: true);
         }
 
         return new Token(TokenKind.Integer, literal, span, layout, Integer: integer);
