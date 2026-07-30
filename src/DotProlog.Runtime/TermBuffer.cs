@@ -20,6 +20,7 @@ internal sealed class TermBuffer
 {
     private readonly Dictionary<int, int> _variables = [];
     private readonly List<(Cell Source, int Slot)> _work = [];
+    private readonly HashSet<int> _active = [];
     private Cell[] _cells = new Cell[32];
     private int _count;
 
@@ -51,6 +52,7 @@ internal sealed class TermBuffer
     {
         _variables.Clear();
         _work.Clear();
+        _active.Clear();
 
         int root = Reserve(1);
         _work.Add((term, root));
@@ -59,6 +61,13 @@ internal sealed class TermBuffer
         {
             (Cell source, int slot) = _work[^1];
             _work.RemoveAt(_work.Count - 1);
+
+            // A negative slot marks leaving the structure whose heap index the entry carries.
+            if (slot < 0)
+            {
+                _active.Remove(source.Index);
+                continue;
+            }
 
             Cell cell = machine.Dereference(source);
             switch (cell.Tag)
@@ -78,6 +87,16 @@ internal sealed class TermBuffer
 
                 case CellTag.Structure:
                 {
+                    // The machine's unification tolerates rational trees, but every consumer of a
+                    // detached copy — collected solutions, stored clauses, thrown balls — expects a
+                    // finite term, so a cyclic term is rejected with a catchable error.
+                    if (!_active.Add(cell.Index))
+                    {
+                        throw PrologErrors.Representation(machine, "cyclic_term");
+                    }
+
+                    _work.Add((cell, -1));
+
                     int arity = machine.Symbols.ArityOf(machine.HeapAt(cell.Index).Index);
                     int structure = Reserve(arity + 1);
                     _cells[structure] = machine.HeapAt(cell.Index);

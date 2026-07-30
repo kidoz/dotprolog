@@ -95,6 +95,36 @@ public sealed class TermBufferTests
     }
 
     [Fact]
+    public void CopyingACyclicTermRaisesACatchableRepresentationError()
+    {
+        Machine machine = NewMachine();
+        int f = machine.Symbols.InternFunctor("f", 1);
+        Cell variable = machine.CreateVariable();
+        Cell term = machine.CreateStructure(f, [variable]);
+        Assert.True(machine.Unify(variable, term));
+
+        var buffer = new TermBuffer();
+        PrologException error = Assert.Throws<PrologException>(() => buffer.Copy(machine, term));
+
+        Assert.Contains("representation_error(cyclic_term)", error.Message);
+    }
+
+    [Fact]
+    public void CopyingASharedSubtermIsNotMistakenForACycle()
+    {
+        Machine machine = NewMachine();
+        int f = machine.Symbols.InternFunctor("f", 2);
+        int g = machine.Symbols.InternFunctor("g", 1);
+        Cell shared = machine.CreateStructure(g, [Cell.Integer60(1)]);
+        Cell term = machine.CreateStructure(f, [shared, shared]);
+
+        var buffer = new TermBuffer();
+        int root = buffer.Copy(machine, term);
+
+        Assert.Equal("f(g(1),g(1))", TermWriter.ToDisplayString(machine, Rebuild(machine, buffer, root)));
+    }
+
+    [Fact]
     public void ClearDiscardsEverythingCopiedSoFar()
     {
         Machine machine = NewMachine();

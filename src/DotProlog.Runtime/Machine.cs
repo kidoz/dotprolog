@@ -44,6 +44,7 @@ public sealed class Machine
     private Cell[] _unificationStack = new Cell[256];
     private int _unificationTop;
     private readonly HashSet<ulong> _unificationVisited = [];
+    private readonly HashSet<int> _callableVisited = [];
 
     private Cell[] _occursCheckStack = new Cell[256];
     private int _occursCheckTop;
@@ -1103,6 +1104,13 @@ public sealed class Machine
         bool binary = functor.Arity == 2 && name is "," or ";" or "->" or "*->";
         bool unary = functor.Arity == 1 && name == "\\+";
 
+        // A rational control term revisits a construct it already validated; stop rather than
+        // recurse forever. The set is cleared by the two entry points before the walk starts.
+        if ((binary || unary) && !_callableVisited.Add(goal.Index))
+        {
+            return;
+        }
+
         if (binary)
         {
             RequireCallable(_heap[goal.Index + 1], whole);
@@ -1128,6 +1136,7 @@ public sealed class Machine
             throw PrologErrors.Instantiation(this);
         }
 
+        _callableVisited.Clear();
         RequireCallable(goal, goal);
     }
 
@@ -1380,6 +1389,7 @@ public sealed class Machine
         // A control construct has to be whole before any of it runs: ISO 7.8.3 makes
         // call((fail, 4)) a type error rather than a failure, even though the conjunction would
         // never reach the 4.
+        _callableVisited.Clear();
         RequireCallable(goal, goal);
 
         if (IsControlGoal(goal) && _program.RuntimeCompiler is not null)

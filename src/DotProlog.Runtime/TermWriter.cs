@@ -54,6 +54,7 @@ public static class TermWriter
 
         var writer = new Emitter(output);
         List<Item> work = [Item.OfTerm(term, TopPriority)];
+        HashSet<int> active = [];
 
         while (work.Count > 0)
         {
@@ -67,15 +68,19 @@ public static class TermWriter
                     break;
 
                 case ItemKind.ListTail:
-                    WriteListTail(machine, item.Cell, work);
+                    WriteListTail(machine, item.Cell, work, active);
                     break;
 
                 case ItemKind.PrefixGuard:
                     writer.GuardAfterPrefixOperator(sign: item.MaxPriority != 0);
                     break;
 
+                case ItemKind.Leave:
+                    active.Remove(item.MaxPriority);
+                    break;
+
                 default:
-                    WriteTerm(machine, item, output: writer, quoted, ignoreOperators, numberVariables, work);
+                    WriteTerm(machine, item, output: writer, quoted, ignoreOperators, numberVariables, work, active);
                     break;
             }
         }
@@ -107,7 +112,8 @@ public static class TermWriter
         bool quoted,
         bool ignoreOperators,
         bool numberVariables,
-        List<Item> work
+        List<Item> work,
+        HashSet<int> active
     )
     {
         Cell cell = machine.Dereference(item.Cell);
@@ -145,6 +151,16 @@ public static class TermWriter
         {
             return;
         }
+
+        // A rational term would unfold forever; re-entering a structure that is still being
+        // written is cut off with an ellipsis so the writer always terminates.
+        if (!active.Add(cell.Index))
+        {
+            output.Write("...");
+            return;
+        }
+
+        work.Add(Item.OfLeave(cell.Index));
 
         if (!ignoreOperators && functorId == machine.Symbols.ListFunctor)
         {
@@ -273,7 +289,7 @@ public static class TermWriter
         return false;
     }
 
-    private static void WriteListTail(Machine machine, Cell cell, List<Item> work)
+    private static void WriteListTail(Machine machine, Cell cell, List<Item> work, HashSet<int> active)
     {
         cell = machine.Dereference(cell);
 
@@ -285,6 +301,14 @@ public static class TermWriter
 
         if (cell.Tag == CellTag.Structure && machine.HeapAt(cell.Index).Index == machine.Symbols.ListFunctor)
         {
+            // A circular tail re-enters a cell already being written; cut it off like any cycle.
+            if (!active.Add(cell.Index))
+            {
+                work.Add(Item.OfText("|...]"));
+                return;
+            }
+
+            work.Add(Item.OfLeave(cell.Index));
             work.Add(Item.OfListTail(machine.HeapAt(cell.Index + 2)));
             work.Add(Item.OfTerm(machine.HeapAt(cell.Index + 1), ArgumentPriority));
             work.Add(Item.OfText(","));
@@ -506,6 +530,7 @@ public static class TermWriter
         Text,
         ListTail,
         PrefixGuard,
+        Leave,
     }
 
     private readonly record struct Item(ItemKind Kind, Cell Cell, string? Literal, int MaxPriority)
@@ -519,5 +544,9 @@ public static class TermWriter
         /// <summary>A marker between a prefix operator and its argument. <c>MaxPriority</c> carries
         /// whether the operator was a sign, which is the only extra bit the marker needs.</summary>
         internal static Item OfPrefixGuard(bool sign) => new(ItemKind.PrefixGuard, default, null, sign ? 1 : 0);
+
+        /// <summary>Marks leaving the structure at heap index <paramref name="index"/>, carried in
+        /// <c>MaxPriority</c>.</summary>
+        internal static Item OfLeave(int index) => new(ItemKind.Leave, default, null, index);
     }
 }

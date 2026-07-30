@@ -68,13 +68,15 @@ internal static class DatabaseBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
+        // Copied before compiling, so a cyclic clause is rejected here rather than looping the
+        // compiler's term traversal.
+        var term = new TermBuffer();
+        int root = term.Copy(machine, NormalizeClause(machine, clause));
+
         IRuntimeCompiler compiler = CompilerOf(machine);
         int address = compiler.CompileClause(machine, clause, out int functorId);
         RequireModifiable(machine, functorId);
         DynamicPredicate predicate = machine.Program.DeclareDynamic(functorId);
-
-        var term = new TermBuffer();
-        int root = term.Copy(machine, NormalizeClause(machine, clause));
 
         var entry = new DynamicClause
         {
