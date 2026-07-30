@@ -89,6 +89,14 @@ internal static class TermBuiltins
     /// </summary>
     private static bool TermVariables(Machine machine)
     {
+        Cell result = machine.Argument(1);
+        List<Cell> existing = [];
+        Cell resultTail = TermList.Read(machine, result, existing);
+        if (!TermList.IsEmpty(machine, resultTail) && resultTail.Tag != CellTag.Reference)
+        {
+            throw PrologErrors.Type(machine, "list", result);
+        }
+
         List<Cell> found = [];
         HashSet<int> seen = [];
         List<Cell> work = [machine.Argument(0)];
@@ -121,7 +129,7 @@ internal static class TermBuiltins
             }
         }
 
-        return machine.Unify(machine.Argument(1), TermList.Build(machine, CollectionsMarshal.AsSpan(found)));
+        return machine.Unify(result, TermList.Build(machine, CollectionsMarshal.AsSpan(found)));
     }
 
     private static int Order(Machine machine) => TermOrder.Compare(machine, machine.Argument(0), machine.Argument(1));

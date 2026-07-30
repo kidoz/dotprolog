@@ -116,6 +116,30 @@ public sealed class TermBuiltinTests
     }
 
     [Theory]
+    [InlineData("term_variables(t, atom)", "type_error(list,atom)")]
+    public void TermVariablesRejectsMalformedResultLists(string goal, string expected)
+    {
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+    }
+
+    [Fact]
+    public void TermVariablesPreservesTheImproperListInItsTypeError()
+    {
+        Assert.Equal(
+            "yes",
+            PrologTestHost.RunGoal(
+                "catch(term_variables(t, [A,B|a]), error(type_error(list,C),_), " + "(C = [X,Y|a], var(X), var(Y), write(yes)))"
+            )
+        );
+    }
+
+    [Fact]
+    public void TermVariablesAcceptsAndCompletesAPartialResultList()
+    {
+        Assert.Equal("yes", PrologTestHost.RunGoal("term_variables(f(X,Y), [X|Tail]), Tail == [Y], write(yes)"));
+    }
+
+    [Theory]
     [InlineData("unify_with_occurs_check(X, f(a)), X == f(a)")]
     [InlineData("unify_with_occurs_check(X, Y), X == Y")]
     [InlineData("\\+ unify_with_occurs_check(X, f(X)), var(X)")]
