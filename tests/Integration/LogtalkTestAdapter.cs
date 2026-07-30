@@ -307,6 +307,14 @@ internal static class LogtalkTestAdapter
                 continue;
             }
 
+            // OS-dispatched helpers in the pinned sources serve portability tests outside the ISO
+            // inventory. They cannot be replayed as plain Prolog and are never called by an adapted
+            // ISO declaration.
+            if (text.Contains("os::", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             if (
                 conditionalDepth > 0
                 || text.StartsWith(":-", StringComparison.Ordinal)

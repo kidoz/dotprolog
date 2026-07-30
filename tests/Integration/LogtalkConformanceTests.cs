@@ -107,6 +107,15 @@ public sealed class LogtalkConformanceTests
         Assert.True(LogtalkTestAdapter.TryReadSupportProgram(operatorSupportSource, out string operatorSupport));
         Assert.Equal(":- op(100, fx, fx).", operatorSupport);
 
+        const string osHelperSource = """
+            portability_helper :-
+                os::operating_system_type(unix).
+            test(iso_without_portability_helper, true) :-
+                {true}.
+            """;
+        Assert.True(LogtalkTestAdapter.TryReadSupportProgram(osHelperSource, out string osHelperSupport));
+        Assert.Empty(osHelperSupport);
+
         Assert.Equal(
             "((abs((X) - (3.1415927)) < 0.0000000001) -> true ; (abs((X) - (3.1415927)) < (0.00001 * max(abs(X), abs(3.1415927)))))",
             LogtalkTestAdapter.TranslateAssertion("X =~= 3.1415927")
@@ -407,8 +416,8 @@ public sealed class LogtalkConformanceTests
                 ),
             ];
 
-            Assert.Equal(745, directCases.Length);
-            Assert.Equal(439, directCases.Count(test => test.OutcomeKind == "true"));
+            Assert.Equal(748, directCases.Length);
+            Assert.Equal(442, directCases.Count(test => test.OutcomeKind == "true"));
             Assert.Equal(73, directCases.Count(test => test.OutcomeKind == "false"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "fail"));
             Assert.Equal(154, directCases.Count(test => test.OutcomeKind == "error"));
