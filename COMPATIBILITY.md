@@ -165,7 +165,7 @@ Writing them was worth it immediately: they found these real defects.
   letters and underscore start variables, other Unicode letters start atoms, and unsupported
   unquoted starts become catchable reader errors rather than host exceptions.
 
-Beyond the conformance cases, the engine and toolchain are covered by 1070 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 1071 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
@@ -191,7 +191,7 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 
 | Feature | Current state |
 |---|---|
-| Complete standard clause audit | Syntax, modes, and remaining non-stream errors still require a clause-by-clause audit |
+| Complete standard clause audit | Remaining modes and non-stream errors still require a clause-by-clause audit |
 | Independent ISO verification | The repository corpus is not a substitute for a published independent suite |
 
 ## Non-ISO features absent deliberately
