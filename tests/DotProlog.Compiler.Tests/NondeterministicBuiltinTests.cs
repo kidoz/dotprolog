@@ -98,6 +98,29 @@ public sealed class NondeterministicBuiltinTests
         Assert.Equal("yes", PrologTestHost.RunGoal("\\+ clause(nowhere(_), _), write(yes)"));
     }
 
+    [Theory]
+    [InlineData("fixed(_)", "fixed/1")]
+    [InlineData("write(_)", "write/1")]
+    public void ClauseRejectsPrivateProcedures(string head, string indicator)
+    {
+        string output = PrologTestHost.Run(
+            $"""
+            fixed(1).
+            :- initialization(catch(clause({head}, _), error(E, _), write(E))).
+            """
+        );
+
+        Assert.Equal($"permission_error(access,private_procedure,{indicator})", output);
+    }
+
+    [Theory]
+    [InlineData("clause(nowhere(_), 4)")]
+    [InlineData("assertz(visible(a)), clause(visible(_), 4)")]
+    public void ClauseRejectsANonCallableBody(string goal)
+    {
+        Assert.Equal("type_error(callable,4)", PrologTestHost.RunGoal($"catch(({goal}), error(E, _), write(E))"));
+    }
+
     [Fact]
     public void NondeterministicBuiltinsUndoTheirBindingsOnBacktracking()
     {

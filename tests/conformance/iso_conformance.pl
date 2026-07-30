@@ -185,6 +185,9 @@ iso_case('8.7.1', (a < 1), error(type_error(evaluable, a/0))).
 iso_case('8.8.1', clause(_, _), error(instantiation_error)).
 iso_case('8.8.1', clause(_, b), error(instantiation_error)).
 iso_case('8.8.1', clause(4, _), error(type_error(callable, 4))).
+iso_case('8.8.1', clause(repeat_guard(_), _), error(permission_error(access, private_procedure, repeat_guard/1))).
+iso_case('8.8.1', clause(write(_), _), error(permission_error(access, private_procedure, write/1))).
+iso_case('8.8.1', clause(iso_absent(_), 4), error(type_error(callable, 4))).
 iso_case('8.8.2', current_predicate(repeat_guard/1), success).
 iso_case('8.8.2', current_predicate(write/1), failure).
 iso_case('8.8.2', (current_predicate(repeat_guard/A10), A10 == 1), success).
@@ -205,6 +208,8 @@ iso_case('8.9.2', asserta(iso_scratch(0)), success).
 iso_case('8.9.2', asserta(_), error(instantiation_error)).
 iso_case('8.9.3', retract(_), error(instantiation_error)).
 iso_case('8.9.3', retract(iso_absent(_)), failure).
+iso_case('8.9.3', retract(repeat_guard(_)), error(permission_error(modify, static_procedure, repeat_guard/1))).
+iso_case('8.9.3', retractall(repeat_guard(_)), error(permission_error(modify, static_procedure, repeat_guard/1))).
 
 % --- 8.10 All solutions ------------------------------------------------------
 iso_case('8.10.1', findall(X5, member(X5, [1, 2]), [1, 2]), success).

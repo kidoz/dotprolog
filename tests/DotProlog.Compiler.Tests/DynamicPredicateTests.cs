@@ -129,6 +129,22 @@ public sealed class DynamicPredicateTests
         Assert.Equal("permission_error(modify,static_procedure,fixed/1)\n", output);
     }
 
+    [Theory]
+    [InlineData("retract(fixed(_))")]
+    [InlineData("retractall(fixed(_))")]
+    public void RemovingAStaticPredicateIsAPermissionError(string goal)
+    {
+        string output = PrologTestHost.Run(
+            $"""
+            fixed(1).
+
+            :- initialization(catch({goal}, error(E, _), write(E))).
+            """
+        );
+
+        Assert.Equal("permission_error(modify,static_procedure,fixed/1)", output);
+    }
+
     [Fact]
     public void AGoalDoesNotSeeClausesAssertedAfterItStarted()
     {

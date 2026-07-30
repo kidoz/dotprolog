@@ -97,6 +97,8 @@ internal static class DatabaseBuiltins
         }
 
         Cell normalized = Normalize(machine, pattern);
+        int functorId = FunctorOf(machine, normalized);
+        RequireModifiable(machine, functorId);
         DynamicPredicate? predicate = FindPredicate(machine, normalized, declareIfMissing: false);
         if (predicate is null)
         {
@@ -117,6 +119,15 @@ internal static class DatabaseBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
+        int functorId = FunctorOf(machine, head);
+        RequireClauseAccessible(machine, functorId);
+
+        Cell body = machine.Argument(1);
+        if (body.Tag is not CellTag.Reference and not CellTag.Atom and not CellTag.Structure)
+        {
+            throw PrologErrors.Type(machine, "callable", body);
+        }
+
         DynamicPredicate? predicate = FindPredicate(machine, head, declareIfMissing: false);
         if (predicate is null)
         {
@@ -124,7 +135,7 @@ internal static class DatabaseBuiltins
         }
 
         // Clauses are stored as ':-'(Head, Body), so match the caller's pair against the whole term.
-        Cell pattern = machine.CreateStructure(RuleFunctor(machine), [head, machine.Argument(1)]);
+        Cell pattern = machine.CreateStructure(RuleFunctor(machine), [head, body]);
         return MatchClause(machine, pattern, predicate, skip, erase: false);
     }
 
@@ -351,7 +362,7 @@ internal static class DatabaseBuiltins
 
     private static int RuleFunctor(Machine machine) => machine.Symbols.InternFunctor(":-", 2);
 
-    private static DynamicPredicate? FindPredicate(Machine machine, Cell clauseOrHead, bool declareIfMissing)
+    private static int FunctorOf(Machine machine, Cell clauseOrHead)
     {
         Cell head = clauseOrHead;
         if (head.Tag == CellTag.Structure && machine.HeapAt(head.Index).Index == RuleFunctor(machine))
@@ -359,14 +370,18 @@ internal static class DatabaseBuiltins
             head = machine.Dereference(machine.HeapAt(head.Index + 1));
         }
 
-        int functorId = head.Tag switch
+        return head.Tag switch
         {
             CellTag.Atom => machine.Symbols.InternFunctor(head.Index, 0),
             CellTag.Structure => machine.HeapAt(head.Index).Index,
             CellTag.Reference => throw PrologErrors.Instantiation(machine),
             _ => throw PrologErrors.Type(machine, "callable", head),
         };
+    }
 
+    private static DynamicPredicate? FindPredicate(Machine machine, Cell clauseOrHead, bool declareIfMissing)
+    {
+        int functorId = FunctorOf(machine, clauseOrHead);
         if (!declareIfMissing)
         {
             return machine.Program.FindDynamic(functorId);
@@ -374,6 +389,18 @@ internal static class DatabaseBuiltins
 
         RequireModifiable(machine, functorId);
         return machine.Program.DeclareDynamic(functorId);
+    }
+
+    /// <summary>Rejects clause inspection of static and built-in procedures, which are private.</summary>
+    private static void RequireClauseAccessible(Machine machine, int functorId)
+    {
+        if (
+            !machine.Program.IsDynamic(functorId)
+            && (machine.Program.IsDefined(functorId) || machine.Program.Builtins.TryGetId(functorId, out _))
+        )
+        {
+            throw PrologErrors.Permission(machine, "access", "private_procedure", functorId);
+        }
     }
 
     /// <summary>Rejects an attempt to change a predicate that was compiled as static.</summary>
