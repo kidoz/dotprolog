@@ -39,67 +39,6 @@ public static class CoreBuiltins
             }
         );
 
-        registry.Register(
-            "nl",
-            0,
-            static machine =>
-            {
-                machine.CurrentOutput.Write('\n');
-                return true;
-            }
-        );
-
-        registry.Register(
-            "write",
-            1,
-            static machine =>
-            {
-                TermWriter.Write(machine, machine.Argument(0), machine.CurrentOutput);
-                return true;
-            }
-        );
-
-        registry.Register(
-            "print",
-            1,
-            static machine =>
-            {
-                TermWriter.Write(machine, machine.Argument(0), machine.CurrentOutput);
-                return true;
-            }
-        );
-
-        registry.Register(
-            "writeq",
-            1,
-            static machine =>
-            {
-                TermWriter.Write(machine, machine.Argument(0), machine.CurrentOutput, quoted: true);
-                return true;
-            }
-        );
-
-        registry.Register(
-            "writeln",
-            1,
-            static machine =>
-            {
-                TermWriter.Write(machine, machine.Argument(0), machine.CurrentOutput);
-                machine.CurrentOutput.Write('\n');
-                return true;
-            }
-        );
-
-        registry.Register(
-            "write_canonical",
-            1,
-            static machine =>
-            {
-                TermWriter.Write(machine, machine.Argument(0), machine.CurrentOutput, quoted: true, ignoreOperators: true);
-                return true;
-            }
-        );
-
         registry.Register("write_term", 2, static machine => WriteTerm(machine, term: 0, options: 1));
 
         registry.Register("=", 2, static machine => machine.Unify(machine.Argument(0), machine.Argument(1)));
@@ -238,7 +177,7 @@ public static class CoreBuiltins
             }
         }
 
-        TermWriter.Write(machine, machine.Argument(term), machine.CurrentOutput, quoted, ignoreOperators);
+        StreamBuiltins.WriteCurrentTerm(machine, term, quoted, ignoreOperators);
         return true;
     }
 

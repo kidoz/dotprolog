@@ -74,6 +74,23 @@ public sealed class BinaryStreamTests : IDisposable
     }
 
     [Fact]
+    public void OneArgumentTextOutputRejectsABinaryCurrentStream()
+    {
+        string path = Path("current-text-error.bin");
+
+        Assert.Equal(
+            "yes\n",
+            PrologTestHost.RunGoal(
+                $"""
+                open('{path}', write, Out, [type(binary)]), set_output(Out),
+                  catch(write(x), error(permission_error(output, binary_stream, _), _), true),
+                set_output(user_output), close(Out), write(yes), nl
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void ReportsBinaryPropertiesAndEndStates()
     {
         string path = Path("properties.bin");

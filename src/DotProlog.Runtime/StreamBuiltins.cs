@@ -62,6 +62,12 @@ internal static class StreamBuiltins
         registry.Register("at_end_of_stream", 1, static machine => AtEnd(machine, stream: 0));
         registry.Register("set_stream_position", 2, SetStreamPosition);
 
+        registry.Register("nl", 0, static machine => WriteText(machine, stream: -1, "\n"));
+        registry.Register("write", 1, static machine => WriteTerm(machine, stream: -1, term: 0, false, false));
+        registry.Register("print", 1, static machine => WriteTerm(machine, stream: -1, term: 0, false, false));
+        registry.Register("writeq", 1, static machine => WriteTerm(machine, stream: -1, term: 0, true, false));
+        registry.Register("writeln", 1, WriteLine);
+        registry.Register("write_canonical", 1, static machine => WriteTerm(machine, stream: -1, term: 0, true, true));
         registry.Register("nl", 1, static machine => WriteText(machine, stream: 0, "\n"));
         registry.Register("write", 2, static machine => WriteTerm(machine, stream: 0, term: 1, false, false));
         registry.Register("print", 2, static machine => WriteTerm(machine, stream: 0, term: 1, false, false));
@@ -604,9 +610,9 @@ internal static class StreamBuiltins
                 candidate = UnaryProperty(machine, "eof_action", EofActionName(stream.EndOfFileAction));
                 return true;
             case 7 when stream.IsInput:
-                candidate = UnaryProperty(machine, "end_of_stream", EndStateName(stream.ObserveEnd()));
+                candidate = UnaryProperty(machine, "end_of_stream", EndStateName(ObserveEnd(machine, stream)));
                 return true;
-            case 8 when stream.TryGetPosition(out long position):
+            case 8 when TryGetPosition(machine, stream, out long position):
                 candidate = PositionProperty(machine, position);
                 return true;
             default:
@@ -649,15 +655,28 @@ internal static class StreamBuiltins
         IRuntimeCompiler compiler =
             machine.Program.RuntimeCompiler ?? throw new PrologException("Reading a term needs a compiler to parse it.");
 
-        bool read = compiler.TryReadTerm(
-            machine,
-            source.Reader!,
-            ref source.Buffer,
-            out Cell value,
-            out Cell names,
-            out Cell variables,
-            out Cell singletons
-        );
+        bool read;
+        Cell value;
+        Cell names;
+        Cell variables;
+        Cell singletons;
+        try
+        {
+            read = compiler.TryReadTerm(
+                machine,
+                source.Reader!,
+                ref source.Buffer,
+                out value,
+                out names,
+                out variables,
+                out singletons
+            );
+        }
+        catch (Exception error) when (IsIoFailure(error))
+        {
+            throw PrologErrors.System(machine);
+        }
+
         source.RecordInput(read);
 
         if (!read)
@@ -741,7 +760,7 @@ internal static class StreamBuiltins
             return machine.Unify(character, Character(machine, buffered));
         }
 
-        int next = consume ? reader.Read() : reader.Peek();
+        int next = GuardIo(machine, () => consume ? reader.Read() : reader.Peek());
         if (consume)
         {
             source.RecordInput(next >= 0);
@@ -786,7 +805,7 @@ internal static class StreamBuiltins
         }
         else
         {
-            next = consume ? source.Reader!.Read() : source.Reader!.Peek();
+            next = GuardIo(machine, () => consume ? source.Reader!.Read() : source.Reader!.Peek());
         }
 
         if (consume)
@@ -817,7 +836,7 @@ internal static class StreamBuiltins
             throw PrologErrors.Type(machine, "character", character);
         }
 
-        target.Writer!.Write(text);
+        GuardIo(machine, () => target.Writer!.Write(text));
         return true;
     }
 
@@ -841,7 +860,7 @@ internal static class StreamBuiltins
             throw PrologErrors.Representation(machine, "character_code");
         }
 
-        target.Writer!.Write((char)code.Integer);
+        GuardIo(machine, () => target.Writer!.Write((char)code.Integer));
         return true;
     }
 
@@ -860,14 +879,14 @@ internal static class StreamBuiltins
         int next;
         if (consume)
         {
-            next = input.ReadByte();
+            next = GuardIo(machine, input.ReadByte);
             source.RecordInput(next >= 0);
         }
         else
         {
-            long position = input.Position;
-            next = input.ReadByte();
-            input.Position = position;
+            long position = GuardIo(machine, () => input.Position);
+            next = GuardIo(machine, input.ReadByte);
+            GuardIo(machine, () => input.Position = position);
         }
 
         return machine.Unify(code, Cell.Integer60(next));
@@ -888,14 +907,14 @@ internal static class StreamBuiltins
             throw PrologErrors.Type(machine, "byte", code);
         }
 
-        target.BinaryStream!.WriteByte((byte)code.Integer);
+        GuardIo(machine, () => target.BinaryStream!.WriteByte((byte)code.Integer));
         return true;
     }
 
     private static bool AtEnd(Machine machine, int stream)
     {
         PrologStream source = Resolve(machine, stream, input: true, expectedType: null);
-        return source.ObserveEnd() != PrologStream.EndState.Not;
+        return ObserveEnd(machine, source) != PrologStream.EndState.Not;
     }
 
     private static void PrepareInput(Machine machine, PrologStream source, int index)
@@ -934,7 +953,7 @@ internal static class StreamBuiltins
             throw PrologErrors.Permission(machine, "reposition", "stream", machine.Argument(0));
         }
 
-        if (!stream.TrySetPosition(position))
+        if (!GuardIo(machine, () => stream.TrySetPosition(position)))
         {
             throw PrologErrors.Domain(machine, "stream_position", positionTerm);
         }
@@ -975,24 +994,102 @@ internal static class StreamBuiltins
 
     private static bool WriteText(Machine machine, int stream, string text)
     {
-        Resolve(machine, stream, input: false).Writer!.Write(text);
+        PrologStream target = Resolve(machine, stream, input: false);
+        GuardIo(machine, () => target.Writer!.Write(text));
         return true;
     }
 
     private static bool WriteTerm(Machine machine, int stream, int term, bool quoted, bool ignoreOperators)
     {
         PrologStream target = Resolve(machine, stream, input: false);
-        TermWriter.Write(machine, machine.Argument(term), target.Writer!, quoted, ignoreOperators);
+        GuardIo(machine, () => TermWriter.Write(machine, machine.Argument(term), target.Writer!, quoted, ignoreOperators));
         return true;
+    }
+
+    private static bool WriteLine(Machine machine)
+    {
+        PrologStream target = Resolve(machine, index: -1, input: false);
+        GuardIo(
+            machine,
+            () =>
+            {
+                TermWriter.Write(machine, machine.Argument(0), target.Writer!);
+                target.Writer!.Write('\n');
+            }
+        );
+        return true;
+    }
+
+    /// <summary>Writes an option-controlled term to the current text output with catchable I/O errors.</summary>
+    internal static void WriteCurrentTerm(Machine machine, int term, bool quoted, bool ignoreOperators)
+    {
+        PrologStream target = Resolve(machine, index: -1, input: false);
+        GuardIo(machine, () => TermWriter.Write(machine, machine.Argument(term), target.Writer!, quoted, ignoreOperators));
+    }
+
+    /// <summary>Writes text to the current text output with catchable I/O errors.</summary>
+    internal static void WriteCurrentText(Machine machine, string text)
+    {
+        PrologStream target = Resolve(machine, index: -1, input: false);
+        GuardIo(machine, () => target.Writer!.Write(text));
     }
 
     private static bool Flush(Machine machine, int stream)
     {
         PrologStream target = Resolve(machine, stream, input: false, expectedType: null);
-        target.Writer?.Flush();
-        target.BinaryStream?.Flush();
+        if (target.Writer is not null)
+        {
+            GuardIo(machine, target.Writer.Flush);
+        }
+
+        if (target.BinaryStream is not null)
+        {
+            GuardIo(machine, target.BinaryStream.Flush);
+        }
+
         return true;
     }
+
+    private static PrologStream.EndState ObserveEnd(Machine machine, PrologStream stream) => GuardIo(machine, stream.ObserveEnd);
+
+    private static bool TryGetPosition(Machine machine, PrologStream stream, out long position)
+    {
+        try
+        {
+            return stream.TryGetPosition(out position);
+        }
+        catch (Exception error) when (IsIoFailure(error))
+        {
+            throw PrologErrors.System(machine);
+        }
+    }
+
+    private static T GuardIo<T>(Machine machine, Func<T> operation)
+    {
+        try
+        {
+            return operation();
+        }
+        catch (Exception error) when (IsIoFailure(error))
+        {
+            throw PrologErrors.System(machine);
+        }
+    }
+
+    private static void GuardIo(Machine machine, Action operation)
+    {
+        try
+        {
+            operation();
+        }
+        catch (Exception error) when (IsIoFailure(error))
+        {
+            throw PrologErrors.System(machine);
+        }
+    }
+
+    private static bool IsIoFailure(Exception error) =>
+        error is IOException or UnauthorizedAccessException or ObjectDisposedException;
 
     private static bool ReadFromAtom(Machine machine)
     {
