@@ -118,6 +118,7 @@ public sealed class LexerTests
     [Theory]
     [InlineData(@"'\x41\'", false)]
     [InlineData(@"""\o101\""", true)]
+    [InlineData(@"'\101\'", false)]
     public void ReadsIsoNumericEscapes(string text, bool stringToken)
     {
         List<Token> tokens = Tokenize(text, out List<Diagnostic> diagnostics);
@@ -130,6 +131,7 @@ public sealed class LexerTests
     [Theory]
     [InlineData(@"0'\x41\")]
     [InlineData(@"0'\o101\")]
+    [InlineData(@"0'\101\")]
     public void ReadsIsoNumericEscapesInCharacterCodeLiterals(string text)
     {
         List<Token> tokens = Tokenize(text, out List<Diagnostic> diagnostics);
@@ -142,12 +144,21 @@ public sealed class LexerTests
     [Theory]
     [InlineData(@"'\x41'")]
     [InlineData(@"'\o101'")]
+    [InlineData(@"'\101'")]
     [InlineData(@"'\x10000\'")]
     public void RejectsMalformedIsoNumericEscapes(string text)
     {
         Tokenize(text, out List<Diagnostic> diagnostics);
 
         Assert.Equal(DiagnosticIds.InvalidEscape, Assert.Single(diagnostics).Id);
+    }
+
+    [Fact]
+    public void RejectsNonOctalDigitsInDelimitedOctalEscape()
+    {
+        Tokenize(@"'\128\'", out List<Diagnostic> diagnostics);
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == DiagnosticIds.InvalidEscape);
     }
 
     [Theory]

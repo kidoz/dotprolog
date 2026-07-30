@@ -491,7 +491,15 @@ internal sealed class Lexer
                 builder.Append('\u007f');
                 return;
             case '0':
-                builder.Append('\0');
+                if (_position < _text.Length && (_text[_position] == '\\' || IsEscapeDigit(_text[_position], 8)))
+                {
+                    ReadNumericEscape(builder, start, radix: 8, "octal", firstDigit: 0);
+                }
+                else
+                {
+                    builder.Append('\0');
+                }
+
                 return;
             case '\\' or '\'' or '"' or '`':
                 builder.Append(c);
@@ -504,6 +512,9 @@ internal sealed class Lexer
             case 'o':
                 ReadNumericEscape(builder, start, radix: 8, "octal");
                 return;
+            case >= '1' and <= '7':
+                ReadNumericEscape(builder, start, radix: 8, "octal", firstDigit: c - '0');
+                return;
 
             default:
                 Report(DiagnosticIds.InvalidEscape, $"Unrecognised escape sequence '\\{c}'.", SpanFrom(start));
@@ -511,10 +522,16 @@ internal sealed class Lexer
         }
     }
 
-    private void ReadNumericEscape(StringBuilder builder, int start, int radix, string description)
+    private void ReadNumericEscape(
+        StringBuilder builder,
+        int start,
+        int radix,
+        string description,
+        int? firstDigit = null
+    )
     {
         int digitsStart = _position;
-        int value = 0;
+        int value = firstDigit ?? 0;
         bool overflow = false;
         while (_position < _text.Length && IsEscapeDigit(_text[_position], radix))
         {
@@ -531,7 +548,7 @@ internal sealed class Lexer
             Advance();
         }
 
-        if (_position == digitsStart)
+        if (_position == digitsStart && firstDigit is null)
         {
             Report(DiagnosticIds.InvalidEscape, $"Expected {description} digits in numeric escape.", SpanFrom(start));
             return;

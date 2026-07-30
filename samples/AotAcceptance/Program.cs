@@ -56,6 +56,7 @@ internal static class Program
             native_unreached_noncallable_body :- fail, 4.
             native_quoted_fact(left 'native_quoted' right).
             native_escape('\x41\').
+            native_octal_escape('a\123\b').
             native_backquoted(`native`).
             native_extended_atom(ǅelta).
 
@@ -221,6 +222,7 @@ internal static class Program
 
                 % ISO delimited hexadecimal and octal escapes survive native publication.
                 native_escape('A'),
+                native_octal_escape(aSb),
                 NativeEscapedCode is 0'\o101\,
                 NativeEscapedCode =:= 65,
                 atom_codes(NativeEscapedSource, [39, 92, 120, 52, 49, 92, 39]),

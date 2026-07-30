@@ -34,6 +34,27 @@ public sealed class QuotedTokenTests
     }
 
     [Fact]
+    public void CompiledAndRuntimeInputReadIsoOctalEscapes()
+    {
+        Assert.Equal(
+            "yes\n",
+            PrologTestHost.Run(
+                """
+                octal('a\123\b').
+                :- initialization((octal('aSb'), write(yes), nl)).
+                """
+            )
+        );
+        Assert.Equal(
+            "yes\n",
+            PrologTestHost.RunGoal(
+                "atom_codes(Source, [39,97,92,49,50,51,92,98,39]), "
+                    + "read_term_from_atom(Source, aSb, []), write(yes), nl"
+            )
+        );
+    }
+
+    [Fact]
     public void RuntimeTermInputRejectsRawQuotedLayoutAsACatchableSyntaxError()
     {
         Assert.Equal(
