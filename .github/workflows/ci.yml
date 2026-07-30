@@ -23,7 +23,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-latest
+            rid: osx-arm64
 
     steps:
       - uses: actions/checkout@v4
@@ -75,13 +81,31 @@ jobs:
           DOTPROLOG_RUN_EXTERNAL_CONFORMANCE_TESTS: '1'
           DOTPROLOG_LOGTALK_REPORT_PATH: 'artifacts/logtalk-iso-conformance.json'
 
+      # Every release platform proves its NativeAOT tool subpackage. The portable package and
+      # pointer are present too, so one-shot execution also exercises .NET 10's RID selection.
+      - name: Pack and execute the current platform tool
+        shell: bash
+        run: |
+          dotnet pack src/DotProlog.Tool -c Release -r "${{ matrix.rid }}" \
+            -o artifacts -p:ContinuousIntegrationBuild=true
+          dotnet pack src/DotProlog.Tool -c Release -r any \
+            -o artifacts -p:ContinuousIntegrationBuild=true
+          dotnet pack src/DotProlog.Tool -c Release \
+            -o artifacts -p:ContinuousIntegrationBuild=true
+          version=$(grep -oE '<VersionPrefix>[^<]+' Directory.Build.props | cut -d'>' -f2)
+          test -f "artifacts/DotProlog.Tool.${{ matrix.rid }}.$version.nupkg"
+          test -f "artifacts/DotProlog.Tool.any.$version.nupkg"
+          dotnet tool exec --source artifacts "DotProlog.Tool@$version" \
+            run samples/HelloProlog/hello.pl |
+            grep -Fx "Hello! World!"
+
       - name: Pack
         if: matrix.os == 'ubuntu-latest'
         run: dotnet pack DotProlog.slnx -c Release --no-build -o artifacts -p:ContinuousIntegrationBuild=true
 
       - name: Test packed templates and tool
         if: matrix.os == 'ubuntu-latest'
-        run: tests/Integration/verify-packages.sh artifacts
+        run: tests/Integration/verify-packages.sh artifacts linux-x64
 
       - name: Software bill of materials
         if: matrix.os == 'ubuntu-latest'

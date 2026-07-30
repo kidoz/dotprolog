@@ -99,6 +99,11 @@ jobs:
           -c Release -r ${{ matrix.rid }} -p:PublishAot=true
           -p:ContinuousIntegrationBuild=true -o native/${{ matrix.rid }}
 
+      - name: Pack the NativeAOT tool
+        run: >
+          dotnet pack src/DotProlog.Tool -c Release -r ${{ matrix.rid }}
+          -p:ContinuousIntegrationBuild=true -o tool-package
+
       - name: Name the binary after its platform
         shell: bash
         run: |
@@ -116,9 +121,15 @@ jobs:
           path: dotprolog-sample-*
           if-no-files-found: error
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tool-${{ matrix.rid }}
+          path: tool-package/*.nupkg
+          if-no-files-found: error
+
   package:
     name: Package
-    needs: verify
+    needs: [verify, native]
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -129,11 +140,22 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: tool-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Pack the portable tool fallback
+        run: >
+          dotnet pack src/DotProlog.Tool -c Release -r any
+          -o artifacts -p:ContinuousIntegrationBuild=true
+
       - name: Pack
         run: dotnet pack DotProlog.slnx -c Release -o artifacts -p:ContinuousIntegrationBuild=true
 
       - name: Test packed templates and tool
-        run: tests/Integration/verify-packages.sh artifacts
+        run: tests/Integration/verify-packages.sh artifacts linux-x64
 
       - name: Software bill of materials
         run: |
@@ -160,12 +182,18 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
+          name: packages
+          path: downloaded/packages
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
           path: downloaded
 
       - name: Checksum every release asset
         shell: bash
         run: |
-          find downloaded -type f ! -name SHA256SUMS -print0 |
+          find downloaded/packages downloaded/native-* -type f ! -name SHA256SUMS -print0 |
             sort -z |
             while IFS= read -r -d '' file; do
               digest=$(sha256sum "$file" | cut -d' ' -f1)
@@ -209,6 +237,8 @@ jobs:
     environment: release
 
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           name: packages
@@ -226,7 +256,20 @@ jobs:
             echo "::error::NUGET_API_KEY is not configured for the release environment."
             exit 1
           fi
-          dotnet nuget push "artifacts/*.nupkg" \
+          version=$(grep -oE '<VersionPrefix>[^<]+' Directory.Build.props | cut -d'>' -f2)
+          pointer="DotProlog.Tool.$version.nupkg"
+
+          find artifacts -maxdepth 1 -name '*.nupkg' ! -name "$pointer" -print0 |
+            sort -z |
+            while IFS= read -r -d '' package; do
+              dotnet nuget push "$package" \
+                --source https://api.nuget.org/v3/index.json \
+                --api-key "$NUGET_API_KEY" \
+                --skip-duplicate
+            done
+
+          # The pointer references the RID subpackages, so it must become visible last.
+          dotnet nuget push "artifacts/$pointer" \
             --source https://api.nuget.org/v3/index.json \
             --api-key "$NUGET_API_KEY" \
             --skip-duplicate

@@ -4,10 +4,29 @@
         <RootNamespace>DotProlog.Tool</RootNamespace>
         <AssemblyName>dotnet-prolog</AssemblyName>
         <ToolCommandName>dotnet-prolog</ToolCommandName>
-        <PublishAot>false</PublishAot>
 
         <!-- Without this the tool packs as an ordinary library and cannot be installed. -->
         <PackAsTool>true</PackAsTool>
+
+        <!--
+          .NET 10 puts these implementations behind one tool package. The three release platforms
+          get NativeAOT binaries; any keeps a framework-dependent fallback for every other .NET 10
+          platform. NativeAOT packages are packed on their matching operating-system runners.
+        -->
+        <RuntimeIdentifiers>linux-x64;win-x64;osx-arm64;any</RuntimeIdentifiers>
+        <ToolPackageRuntimeIdentifiers>$(RuntimeIdentifiers)</ToolPackageRuntimeIdentifiers>
+        <PublishAot Condition="'$(RuntimeIdentifier)' != 'any'">true</PublishAot>
+        <PublishAot Condition="'$(RuntimeIdentifier)' == 'any'">false</PublishAot>
+        <SelfContained Condition="'$(RuntimeIdentifier)' == 'any'">false</SelfContained>
+        <!--
+          The pointer has no implementation, and NativeAOT packages contain native executables
+          rather than managed assemblies. The portable fallback retains its managed symbol package.
+        -->
+        <IncludeSymbols Condition="'$(RuntimeIdentifier)' != 'any'">false</IncludeSymbols>
+        <IncludeSymbols Condition="'$(RuntimeIdentifier)' == 'any'">true</IncludeSymbols>
+        <!-- Debug symbols stay in the .snupkg instead of inflating the executable tool package. -->
+        <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+        <PublishDocumentationFiles>false</PublishDocumentationFiles>
 
         <IsPackable>true</IsPackable>
         <PackageId>DotProlog.Tool</PackageId>
@@ -18,4 +37,22 @@
     <ItemGroup>
         <ProjectReference Include="..\DotProlog.Compiler\DotProlog.Compiler.csproj" />
     </ItemGroup>
+
+    <!--
+      PackTool includes the complete publish directory. Keep NativeAOT crash symbols and managed
+      PDBs out of the executable package; managed symbols remain available in the .snupkg.
+    -->
+    <Target
+        Name="RemoveToolPackageDebugFiles"
+        AfterTargets="Publish"
+        BeforeTargets="PackTool"
+        Condition="'$(_IsPacking)' == 'true' and '$(RuntimeIdentifier)' != '' and '$(RuntimeIdentifier)' != 'any'"
+    >
+        <ItemGroup>
+            <_ToolPackageDebugFile
+                Include="$(PublishDir)**\*.pdb;$(PublishDir)**\*.dbg;$(PublishDir)**\*.dSYM\**\*"
+            />
+        </ItemGroup>
+        <Delete Files="@(_ToolPackageDebugFile)" />
+    </Target>
 </Project>

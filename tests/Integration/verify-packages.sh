@@ -2,14 +2,15 @@
 
 set -euo pipefail
 
-if [[ $# -ne 1 ]]; then
-    echo "usage: $0 <package-feed>" >&2
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+    echo "usage: $0 <package-feed> [expected-tool-rid]" >&2
     exit 64
 fi
 
 repository_root=$(cd "$(dirname "$0")/../.." && pwd)
 package_feed=$(cd "$1" && pwd)
 version=$(grep -oE '<VersionPrefix>[^<]+' "$repository_root/Directory.Build.props" | cut -d'>' -f2)
+expected_tool_rid=${2:-}
 audit_root=$(mktemp -d "${TMPDIR:-/tmp}/dotprolog-package-consumer.XXXXXX")
 
 cleanup() {
@@ -51,7 +52,13 @@ dotnet new prolog-test -n Tests --DotPrologVersion "$version"
     dotnet test --project Tests.dplproj --minimum-expected-tests 2 --no-ansi
 )
 
-dotnet tool install --tool-path "$audit_root/tools" DotProlog.Tool \
-    --version "$version" --add-source "$package_feed"
-"$audit_root/tools/dotnet-prolog" run HelloProlog/main.pl |
+test -f "$package_feed/DotProlog.Tool.$version.nupkg"
+test -f "$package_feed/DotProlog.Tool.any.$version.nupkg"
+if [[ -n "$expected_tool_rid" ]]; then
+    test -f "$package_feed/DotProlog.Tool.$expected_tool_rid.$version.nupkg"
+fi
+
+# One-shot execution proves that the pointer package resolves the best RID implementation from an
+# isolated feed without leaving a global or local tool installation behind.
+dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" run HelloProlog/main.pl |
     grep -Fx "Hello from Prolog on .NET!"
