@@ -148,6 +148,36 @@ public sealed class PrologEngine : IRuntimeCompiler
     }
 
     /// <summary>
+    /// Compiles a build-time source while reporting each executable directive at its publication
+    /// point. The generated-C# backend uses the snapshots to reproduce source preparation at
+    /// application startup.
+    /// </summary>
+    internal LoadResult CompileForGeneratedCode(string text, string? fileName, Action<int> directiveObserver)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(directiveObserver);
+
+        ParseResult parsed = ReadProgramWithIncludes(text, fileName);
+        if (!parsed.Success)
+        {
+            return new LoadResult(parsed.Diagnostics, [], []);
+        }
+
+        var loader = new ProgramLoader(Program, Machine, _modules);
+        LoadResult loaded = loader.Load(
+            parsed.Clauses,
+            fileName,
+            address =>
+            {
+                directiveObserver(address);
+                return RunResult.Success;
+            }
+        );
+        List<Diagnostic> diagnostics = [.. parsed.Diagnostics, .. loaded.Diagnostics];
+        return new LoadResult(diagnostics, loaded.DirectiveAddresses, loaded.InitializationAddresses);
+    }
+
+    /// <summary>
     /// Reads a source unit while expanding ISO <c>include/1</c> declarations at their source
     /// position. All nested readers share the program's reader state.
     /// </summary>

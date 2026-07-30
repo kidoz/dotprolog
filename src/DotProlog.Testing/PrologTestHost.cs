@@ -23,4 +23,17 @@ public static class PrologTestHost
         using ITestApplication application = await builder.BuildAsync().ConfigureAwait(false);
         return await application.RunAsync().ConfigureAwait(false);
     }
+
+    /// <summary>Runs a test application using build-time-generated predicates.</summary>
+    public static async Task<int> RunAsync(string[] arguments, Func<DotProlog.Compiler.PrologEngine> engineFactory)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentNullException.ThrowIfNull(engineFactory);
+
+        ITestApplicationBuilder builder = await TestApplication.CreateBuilderAsync(arguments).ConfigureAwait(false);
+        builder.RegisterTestFramework(_ => new TestFrameworkCapabilities(), (_, _) => new PrologTestFramework(engineFactory));
+
+        using ITestApplication application = await builder.BuildAsync().ConfigureAwait(false);
+        return await application.RunAsync().ConfigureAwait(false);
+    }
 }

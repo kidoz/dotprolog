@@ -28,6 +28,19 @@ public sealed class GeneratedFacadeTests
 
         stock_level(widget, 7).
 
+        runtime_bridge(X) :- runtime_value(X).
+
+        :- dynamic dynamic_value/1.
+        dynamic_value(first).
+
+        prepared_before.
+        check_preparation :-
+            prepared_before,
+            catch((prepared_after, fail), error(existence_error(procedure, _), _), true),
+            write(prepared).
+        :- check_preparation.
+        prepared_after.
+
         split([], [], []).
         split([H|T], [H|L], R) :- split(T, L, R).
         split([H|T], L, [H|R]) :- split(T, L, R).
@@ -41,6 +54,8 @@ public sealed class GeneratedFacadeTests
         :- clr_export(colour/1, nondet, [out(colour, atom)]).
         :- clr_export(in_stock/1, semidet, [in(item, atom)]).
         :- clr_export(stock_level/2, semidet, [in(item, atom), out(level, integer)]).
+        :- clr_export(runtime_bridge/1, nondet, [out(value, atom)]).
+        :- clr_export(dynamic_value/1, nondet, [out(value, atom)]).
         :- clr_export(split/3, nondet, [in(items, list(atom)), out(left, list(atom)), out(right, list(atom))]).
         """;
 
@@ -80,7 +95,7 @@ public sealed class GeneratedFacadeTests
         moduleType = assembly.GetType("Generated.Pricing.PricingModule")!;
         Assert.NotNull(moduleType);
 
-        return moduleType.GetMethod("Create", BindingFlags.Public | BindingFlags.Static)!.Invoke(null, null)!;
+        return moduleType.GetMethod("Create", BindingFlags.Public | BindingFlags.Static, Type.EmptyTypes)!.Invoke(null, null)!;
     }
 
     private static MetadataReference[] ReferenceAssemblies()
@@ -108,6 +123,16 @@ public sealed class GeneratedFacadeTests
 
         Assert.NotNull(module);
         Assert.Contains(type.GetInterfaces(), i => i.Name == "IPricingModule");
+    }
+
+    [Fact]
+    public void GeneratedFacadeContainsCompiledBlocksInsteadOfEmbeddedSource()
+    {
+        string source = FacadeGenerator.Generate(ReadContract(), PrologSource, "pricing.pl");
+
+        Assert.Contains("RegisterCompiledBlock", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ConsultOrThrow", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("discount(Price, Percent, Result)", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -177,6 +202,71 @@ public sealed class GeneratedFacadeTests
         string source = FacadeGenerator.Generate(ReadContract(), PrologSource, "pricing.pl");
 
         Assert.Contains("public readonly record struct SplitResult(", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CompiledPredicateCallsAConsultedPredicate()
+    {
+        object unused = CreateModule(out Type type);
+        _ = unused;
+        var engine = new Compiler.PrologEngine();
+        object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
+        engine.ConsultOrThrow("runtime_value(alpha). runtime_value(beta).", "runtime.pl");
+
+        var values = (IEnumerable<string>)Call(module, type, "RuntimeBridge", CancellationToken.None)!;
+
+        Assert.Equal(["alpha", "beta"], values);
+    }
+
+    [Fact]
+    public void ConsultedPredicateCallsACompiledPredicate()
+    {
+        object unused = CreateModule(out Type type);
+        _ = unused;
+        var engine = new Compiler.PrologEngine();
+        type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine]);
+        engine.ConsultOrThrow("consulted_colour(X) :- colour(X).", "runtime.pl");
+        var host = new Runtime.PrologHost(engine.Machine);
+        Runtime.PrologPredicate predicate = host.Bind("consulted_colour", 1);
+
+        string[] values = host.CallAll(predicate, Runtime.PrologInput.Output)
+            .Select(outputs => Runtime.PrologMarshal.ToAtom(outputs[0]))
+            .ToArray();
+
+        Assert.Equal(["red", "green", "blue"], values);
+    }
+
+    [Fact]
+    public void ExecutableDirectiveRunsAgainstItsCompiledSourcePosition()
+    {
+        object unused = CreateModule(out Type type);
+        _ = unused;
+        using var output = new StringWriter();
+        var engine = new Compiler.PrologEngine { Output = output };
+
+        type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine]);
+
+        Assert.Equal("prepared", output.ToString());
+    }
+
+    [Fact]
+    public void CompiledDynamicPredicateKeepsItsLogicalDatabase()
+    {
+        object unused = CreateModule(out Type type);
+        _ = unused;
+        var engine = new Compiler.PrologEngine();
+        object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
+
+        var initial = (IEnumerable<string>)Call(module, type, "DynamicValue", CancellationToken.None)!;
+        Assert.Equal(["first"], initial);
+
+        Assert.True(engine.Query("assertz(dynamic_value(second))").Prove());
+        var updated = (IEnumerable<string>)Call(module, type, "DynamicValue", CancellationToken.None)!;
+        Assert.Equal(["first", "second"], updated);
+
+        Assert.True(engine.Query("retract(dynamic_value(first))").Prove());
+        var remaining = (IEnumerable<string>)Call(module, type, "DynamicValue", CancellationToken.None)!;
+        Assert.Equal(["second"], remaining);
     }
 
     [Fact]

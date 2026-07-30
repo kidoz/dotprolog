@@ -13,8 +13,8 @@ namespace DotProlog.Testing;
 /// — the same reasoning that keeps a <c>.pl</c> free of <c>clr_export</c>.
 /// </para>
 /// <para>
-/// Each test gets a fresh engine, so one test cannot see clauses another asserted. That costs a
-/// consult per test and is what makes a failure mean what it says.
+/// Each test gets a fresh engine, so one test cannot see clauses another asserted. Reloading the
+/// generated program for each test is what makes a failure mean what it says.
 /// </para>
 /// </remarks>
 public sealed class PrologTestRunner
@@ -22,21 +22,39 @@ public sealed class PrologTestRunner
     /// <summary>The prefix that marks a predicate as a test.</summary>
     public const string TestPrefix = "test_";
 
-    private readonly IReadOnlyList<(string Name, string Text)> _sources;
+    private readonly Func<PrologEngine> _engineFactory;
 
     /// <summary>Creates a runner over the given Prolog sources.</summary>
     /// <param name="sources">Each source file's name and contents.</param>
     public PrologTestRunner(IReadOnlyList<(string Name, string Text)> sources)
     {
         ArgumentNullException.ThrowIfNull(sources);
-        _sources = sources;
+        _engineFactory = () =>
+        {
+            var engine = new PrologEngine();
+            foreach ((string name, string text) in sources)
+            {
+                engine.ConsultOrThrow(text, name);
+            }
+
+            engine.RunPendingGoals();
+            return engine;
+        };
+    }
+
+    /// <summary>Creates a runner over a build-time-generated engine factory.</summary>
+    public PrologTestRunner(Func<PrologEngine> engineFactory)
+    {
+        ArgumentNullException.ThrowIfNull(engineFactory);
+        _engineFactory = engineFactory;
     }
 
     /// <summary>Finds every test predicate, in the order the sources declare them.</summary>
     public IReadOnlyList<PrologTest> Discover()
     {
-        var engine = new PrologEngine { Output = TextWriter.Null, Input = TextReader.Null };
-        Load(engine);
+        PrologEngine engine = _engineFactory();
+        engine.Output = TextWriter.Null;
+        engine.Input = TextReader.Null;
 
         List<PrologTest> tests = [];
         HashSet<string> seen = new(StringComparer.Ordinal);
@@ -65,12 +83,12 @@ public sealed class PrologTestRunner
     {
         var output = new StringWriter();
         // Input is empty rather than the console: a test that reads would otherwise block the run.
-        var engine = new PrologEngine { Output = output, Input = TextReader.Null };
+        PrologEngine engine = _engineFactory();
+        engine.Output = output;
+        engine.Input = TextReader.Null;
 
         try
         {
-            Load(engine);
-
             int functorId = engine.Program.Symbols.InternFunctor(test.Name, 0);
             RunResult result = engine.Machine.Solve(functorId);
 
@@ -85,15 +103,5 @@ public sealed class PrologTestRunner
         {
             return PrologTestResult.Failed($"{test.Name} threw {error.Message}", output.ToString());
         }
-    }
-
-    private void Load(PrologEngine engine)
-    {
-        foreach ((string name, string text) in _sources)
-        {
-            engine.ConsultOrThrow(text, name);
-        }
-
-        engine.RunPendingGoals();
     }
 }

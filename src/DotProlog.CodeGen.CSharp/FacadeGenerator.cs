@@ -14,17 +14,17 @@ namespace DotProlog.CodeGen.CSharp;
 /// <c>nondet</c> return an enumerable that streams solutions as the caller pulls them.
 /// </para>
 /// <para>
-/// The module's Prolog source is embedded as a constant and consulted when the facade is created.
-/// Embedding compiled bytecode instead would start faster and would let a facade run against
-/// <c>DotProlog.Runtime</c> alone; that is a later step, and it changes nothing about this surface.
+/// The module's Prolog source is lowered at build time into direct-threaded generated C# blocks.
+/// Runtime consultation remains available through the engine, but constructing a facade does not
+/// parse or compile its build-time source.
 /// </para>
 /// </remarks>
 public static class FacadeGenerator
 {
     /// <summary>Generates the facade source for <paramref name="contract"/>.</summary>
     /// <param name="contract">The module surface to generate.</param>
-    /// <param name="prologSource">The module's Prolog source, embedded and consulted at construction.</param>
-    /// <param name="sourceName">Name reported in diagnostics if the embedded source fails to load.</param>
+    /// <param name="prologSource">The module's Prolog source, compiled into generated C# blocks.</param>
+    /// <param name="sourceName">Name reported in build-time diagnostics.</param>
     public static string Generate(ModuleContract contract, string prologSource, string sourceName)
     {
         ArgumentNullException.ThrowIfNull(contract);
@@ -42,7 +42,17 @@ public static class FacadeGenerator
 
         AppendResultTypes(text, contract);
         AppendInterface(text, contract);
-        AppendImplementation(text, contract, prologSource, sourceName);
+        string compiledProgram = CompiledProgramEmitter.Generate(
+            [(sourceName, prologSource)],
+            "__CompiledModule",
+            out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics
+        );
+        if (diagnostics.Any(diagnostic => diagnostic.Severity == DotProlog.Syntax.DiagnosticSeverity.Error))
+        {
+            throw new ArgumentException($"{sourceName} did not compile: {string.Join("; ", diagnostics)}", nameof(prologSource));
+        }
+
+        AppendImplementation(text, contract, compiledProgram);
 
         return text.ToString();
     }
@@ -89,7 +99,7 @@ public static class FacadeGenerator
         text.AppendLine();
     }
 
-    private static void AppendImplementation(StringBuilder text, ModuleContract contract, string prologSource, string sourceName)
+    private static void AppendImplementation(StringBuilder text, ModuleContract contract, string compiledProgram)
     {
         string type = $"{contract.ClrTypeName}Module";
 
@@ -102,8 +112,6 @@ public static class FacadeGenerator
         );
         text.AppendLine(CultureInfo.InvariantCulture, $"public sealed partial class {type} : I{type}");
         text.AppendLine("{");
-        text.AppendLine(CultureInfo.InvariantCulture, $"    private const string PrologSource = {Literal(prologSource)};");
-        text.AppendLine();
         text.AppendLine("    private readonly global::DotProlog.Runtime.PrologHost _host;");
 
         foreach (ContractExport export in contract.Exports)
@@ -133,8 +141,21 @@ public static class FacadeGenerator
         text.AppendLine(CultureInfo.InvariantCulture, $"    public static I{type} Create()");
         text.AppendLine("    {");
         text.AppendLine("        var engine = new global::DotProlog.Compiler.PrologEngine();");
-        text.AppendLine(CultureInfo.InvariantCulture, $"        engine.ConsultOrThrow(PrologSource, {Literal(sourceName)});");
-        text.AppendLine("        engine.RunPendingGoals();");
+        text.AppendLine("        return Create(engine);");
+        text.AppendLine("    }");
+        text.AppendLine();
+        text.AppendLine("    /// <summary>Loads the module into an existing engine.</summary>");
+        text.AppendLine(
+            CultureInfo.InvariantCulture,
+            $"    public static I{type} Create(global::DotProlog.Compiler.PrologEngine engine)"
+        );
+        text.AppendLine("    {");
+        text.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(engine);");
+        text.AppendLine("        int[] initialization = __CompiledModule.Install(engine);");
+        text.AppendLine("        foreach (int target in initialization)");
+        text.AppendLine("        {");
+        text.AppendLine("            engine.Machine.Run(target);");
+        text.AppendLine("        }");
         text.AppendLine(CultureInfo.InvariantCulture, $"        return new {type}(engine);");
         text.AppendLine("    }");
 
@@ -144,6 +165,8 @@ public static class FacadeGenerator
             AppendMethod(text, export);
         }
 
+        text.AppendLine();
+        text.Append(compiledProgram);
         text.AppendLine("}");
     }
 

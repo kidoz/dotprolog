@@ -8,9 +8,9 @@ namespace DotProlog.CodeGen.CSharp;
 /// you can write a program in rather than only a library other languages call.
 /// </summary>
 /// <remarks>
-/// The program's sources are embedded and consulted at startup, then its <c>:- initialization</c>
-/// goals run. Exit codes follow the <c>dotnet prolog</c> tool: the code <c>halt/1</c> asked for, 1 for
-/// a goal that failed, and 70 for a ball nothing caught.
+/// The program's sources are lowered to generated C# at build time, then its
+/// <c>:- initialization</c> goals run. Exit codes follow the <c>dotnet prolog</c> tool: the code
+/// <c>halt/1</c> asked for, 1 for a goal that failed, and 70 for a ball nothing caught.
 /// </remarks>
 public static class EntryPointGenerator
 {
@@ -28,26 +28,38 @@ public static class EntryPointGenerator
         ArgumentNullException.ThrowIfNull(@namespace);
         ArgumentNullException.ThrowIfNull(sources);
 
+        string compiledProgram = CompiledProgramEmitter.Generate(
+            sources,
+            "__CompiledTests",
+            out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics
+        );
+        if (diagnostics.Any(diagnostic => diagnostic.Severity == DotProlog.Syntax.DiagnosticSeverity.Error))
+        {
+            throw new ArgumentException($"Prolog tests did not compile: {string.Join("; ", diagnostics)}", nameof(sources));
+        }
+
         var text = new StringBuilder();
 
         AppendHeader(text, @namespace);
         text.AppendLine("/// <summary>Entry point for a Prolog test project.</summary>");
         text.AppendLine(CultureInfo.InvariantCulture, $"internal static class {TypeName}");
         text.AppendLine("{");
-        AppendSources(text, sources);
-        text.AppendLine();
         text.AppendLine("    private static global::System.Threading.Tasks.Task<int> Main(string[] args) =>");
-        text.AppendLine("        global::DotProlog.Testing.PrologTestHost.RunAsync(");
-        text.AppendLine("            args,");
-        text.AppendLine("            [");
-
-        for (int i = 0; i < sources.Count; i++)
-        {
-            text.AppendLine(CultureInfo.InvariantCulture, $"                ({Literal(sources[i].Name)}, Source{i}),");
-        }
-
-        text.AppendLine("            ]");
-        text.AppendLine("        );");
+        text.AppendLine("        global::DotProlog.Testing.PrologTestHost.RunAsync(args, CreateEngine);");
+        text.AppendLine();
+        text.AppendLine("    private static global::DotProlog.Compiler.PrologEngine CreateEngine()");
+        text.AppendLine("    {");
+        text.AppendLine("        var engine = new global::DotProlog.Compiler.PrologEngine();");
+        text.AppendLine("        int[] initialization = __CompiledTests.Install(engine);");
+        text.AppendLine("        foreach (int target in initialization)");
+        text.AppendLine("        {");
+        text.AppendLine("            engine.Machine.Run(target);");
+        text.AppendLine("        }");
+        text.AppendLine();
+        text.AppendLine("        return engine;");
+        text.AppendLine("    }");
+        text.AppendLine();
+        text.Append(compiledProgram);
         text.AppendLine("}");
 
         return text.ToString();
@@ -63,14 +75,6 @@ public static class EntryPointGenerator
         text.AppendLine();
     }
 
-    private static void AppendSources(StringBuilder text, IReadOnlyList<(string Name, string Text)> sources)
-    {
-        for (int i = 0; i < sources.Count; i++)
-        {
-            text.AppendLine(CultureInfo.InvariantCulture, $"    private const string Source{i} = {Literal(sources[i].Text)};");
-        }
-    }
-
     /// <summary>Generates the entry point for <paramref name="sources"/>.</summary>
     /// <param name="namespace">Namespace to generate into.</param>
     /// <param name="sources">Each source file's name and contents, consulted in order.</param>
@@ -78,6 +82,16 @@ public static class EntryPointGenerator
     {
         ArgumentNullException.ThrowIfNull(@namespace);
         ArgumentNullException.ThrowIfNull(sources);
+
+        string compiledProgram = CompiledProgramEmitter.Generate(
+            sources,
+            "__CompiledProgram",
+            out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics
+        );
+        if (diagnostics.Any(diagnostic => diagnostic.Severity == DotProlog.Syntax.DiagnosticSeverity.Error))
+        {
+            throw new ArgumentException($"Prolog sources did not compile: {string.Join("; ", diagnostics)}", nameof(sources));
+        }
 
         var text = new StringBuilder();
 
@@ -91,29 +105,21 @@ public static class EntryPointGenerator
         text.AppendLine(CultureInfo.InvariantCulture, $"internal static class {TypeName}");
         text.AppendLine("{");
 
-        for (int i = 0; i < sources.Count; i++)
-        {
-            text.AppendLine(CultureInfo.InvariantCulture, $"    private const string Source{i} = {Literal(sources[i].Text)};");
-        }
-
-        text.AppendLine();
         text.AppendLine("    private static int Main()");
         text.AppendLine("    {");
         text.AppendLine("        var engine = new global::DotProlog.Compiler.PrologEngine();");
-        text.AppendLine();
-
-        for (int i = 0; i < sources.Count; i++)
-        {
-            text.AppendLine(
-                CultureInfo.InvariantCulture,
-                $"        engine.ConsultOrThrow(Source{i}, {Literal(sources[i].Name)});"
-            );
-        }
-
-        text.AppendLine();
+        text.AppendLine("        int[] initialization = __CompiledProgram.Install(engine);");
         text.AppendLine("        try");
         text.AppendLine("        {");
-        text.AppendLine("            global::DotProlog.Runtime.RunResult result = engine.RunPendingGoals();");
+        text.AppendLine("            global::DotProlog.Runtime.RunResult result = global::DotProlog.Runtime.RunResult.Success;");
+        text.AppendLine("            foreach (int target in initialization)");
+        text.AppendLine("            {");
+        text.AppendLine("                result = engine.Machine.Run(target);");
+        text.AppendLine("                if (result is global::DotProlog.Runtime.RunResult.Halted)");
+        text.AppendLine("                {");
+        text.AppendLine("                    break;");
+        text.AppendLine("                }");
+        text.AppendLine("            }");
         text.AppendLine("            global::System.Console.Out.Flush();");
         text.AppendLine();
         text.AppendLine("            return result switch");
@@ -130,6 +136,8 @@ public static class EntryPointGenerator
         text.AppendLine("            return 70;");
         text.AppendLine("        }");
         text.AppendLine("    }");
+        text.AppendLine();
+        text.Append(compiledProgram);
         text.AppendLine("}");
 
         return text.ToString();

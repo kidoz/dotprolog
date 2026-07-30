@@ -21,6 +21,10 @@ public sealed class PrologTestFramework : ITestFramework, IDataProducer
     /// <param name="sources">Each source file's name and contents.</param>
     public PrologTestFramework(IReadOnlyList<(string Name, string Text)> sources) => _runner = new PrologTestRunner(sources);
 
+    /// <summary>Creates a framework over a build-time-generated engine factory.</summary>
+    public PrologTestFramework(Func<DotProlog.Compiler.PrologEngine> engineFactory) =>
+        _runner = new PrologTestRunner(engineFactory);
+
     /// <inheritdoc />
     public string Uid => "DotProlog.TestFramework";
 

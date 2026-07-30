@@ -76,7 +76,7 @@
     <Target
         Name="GeneratePrologFacade"
         BeforeTargets="BeforeCompile;CoreCompile"
-        Inputs="@(PrologCompile);@(PrologContract)"
+        Inputs="@(PrologCompile);@(PrologContract);$(DotPrologTasksAssembly)"
         Outputs="$(DotPrologGeneratedPath).generated"
     >
         <Error
