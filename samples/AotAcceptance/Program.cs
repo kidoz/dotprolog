@@ -263,11 +263,22 @@ internal static class Program
 
                 % Oversized float literals remain finite-only runtime input after trimming.
                 catch(
-                    read_term_from_atom('1e9999', _, []),
+                    read_term_from_atom('1.0e9999', _, []),
                     error(syntax_error(float_overflow), _),
                     FloatOverflowCaught = true),
                 FloatOverflowCaught == true,
-                read_term_from_atom('1e-9999', Underflow, []), Underflow =:= 0.0,
+                read_term_from_atom('1.0e-9999', Underflow, []), Underflow =:= 0.0,
+                catch(
+                    read_term_from_atom('1e2', _, []),
+                    error(syntax_error(_), _),
+                    ExponentWithoutPointCaught = true),
+                ExponentWithoutPointCaught == true,
+                \+ atom_number('1e2', _),
+                catch(
+                    number_codes(_, [49, 101, 50]),
+                    error(syntax_error(illegal_number), _),
+                    NumberExponentCaught = true),
+                NumberExponentCaught == true,
                 write(float_read_limits), nl,
 
                 % halt/1 validates its ISO input mode before it can stop the native process.
