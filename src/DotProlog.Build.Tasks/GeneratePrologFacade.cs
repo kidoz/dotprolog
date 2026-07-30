@@ -120,8 +120,36 @@ public sealed class GeneratePrologFacade : Task
             Log.LogMessage(MessageImportance.Normal, $"Generated {target} from {Path.GetFileName(contractPath)}.");
         }
 
+        RemoveStaleOutputs(generated);
+
         GeneratedFiles = [.. generated];
         return !Log.HasLoggedErrors;
+    }
+
+    /// <summary>
+    /// Deletes generated files a previous build wrote but this one did not, so a renamed or removed
+    /// contract cannot leave its old facade behind to be compiled. The directory is task-owned,
+    /// which is what makes deleting unrecognised <c>.g.cs</c> files safe.
+    /// </summary>
+    private void RemoveStaleOutputs(List<ITaskItem> generated)
+    {
+        HashSet<string> expected = new(StringComparer.OrdinalIgnoreCase);
+        foreach (ITaskItem item in generated)
+        {
+            expected.Add(Path.GetFullPath(item.ItemSpec));
+        }
+
+        foreach (string file in Directory.EnumerateFiles(OutputPath, "*.g.cs", SearchOption.AllDirectories))
+        {
+            string path = Path.GetFullPath(file);
+            if (expected.Contains(path))
+            {
+                continue;
+            }
+
+            File.Delete(path);
+            Log.LogMessage(MessageImportance.Normal, $"Deleted stale generated file {path}.");
+        }
     }
 
     private bool TryFindSource(string moduleName, out string path)

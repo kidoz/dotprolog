@@ -70,13 +70,31 @@
     />
 
     <!--
+      Timestamps cannot see a deleted or renamed source: the file is simply absent from the glob,
+      and every remaining input is older than the stamp. Writing the input list to a file — only
+      when it differs — turns a changed file list into a fresh timestamp the generation target's
+      Inputs comparison does see.
+    -->
+    <Target Name="_DotPrologRecordInputs" BeforeTargets="GeneratePrologFacade">
+        <MakeDir Directories="$(DotPrologGeneratedPath)" />
+
+        <WriteLinesToFile
+            File="$(DotPrologGeneratedPath).inputs"
+            Lines="@(PrologCompile->'%(FullPath)');@(PrologContract->'%(FullPath)')"
+            Overwrite="true"
+            WriteOnlyWhenDifferent="true"
+        />
+    </Target>
+
+    <!--
       The facade has to exist before the C# compiler runs, which is why this is hooked ahead of
-      CoreCompile rather than as a post-build step.
+      CoreCompile rather than as a post-build step. The project file is an input because properties
+      it sets, such as RootNamespace, shape the generated code.
     -->
     <Target
         Name="GeneratePrologFacade"
         BeforeTargets="BeforeCompile;CoreCompile"
-        Inputs="@(PrologCompile);@(PrologContract);$(DotPrologTasksAssembly)"
+        Inputs="@(PrologCompile);@(PrologContract);$(DotPrologTasksAssembly);$(MSBuildProjectFullPath);$(DotPrologGeneratedPath).inputs"
         Outputs="$(DotPrologGeneratedPath).generated"
     >
         <Error
@@ -120,5 +138,18 @@
         <ItemGroup>
             <Compile Include="$(DotPrologGeneratedPath)**\*.g.cs" Exclude="@(Compile)" />
         </ItemGroup>
+    </Target>
+
+    <!--
+      The generated files live outside IntermediateOutputPath, so the incremental-clean cache that
+      FileWrites feeds filters them out; without this target they survive a clean.
+    -->
+    <Target Name="CleanPrologFacade" AfterTargets="Clean">
+        <ItemGroup>
+            <_DotPrologCleanFile Include="$(DotPrologGeneratedPath)**\*.g.cs" />
+            <_DotPrologCleanFile Include="$(DotPrologGeneratedPath).generated;$(DotPrologGeneratedPath).inputs" />
+        </ItemGroup>
+
+        <Delete Files="@(_DotPrologCleanFile)" />
     </Target>
 </Project>
