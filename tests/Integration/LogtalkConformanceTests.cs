@@ -117,6 +117,12 @@ public sealed class LogtalkConformanceTests
             "catch((1^true), _, fail)",
             LogtalkTestAdapter.TranslateConditionalGoal(conditional[0].ConditionalGoal!)
         );
+        Assert.Equal(
+            "[error((type_error(callable, 1)), _), error((type_error(callable, ':'(user, 1))), _)]",
+            LogtalkTestAdapter.TranslateErrorAlternatives(
+                "[type_error(callable, 1), type_error(callable, ':'(user, 1))]"
+            )
+        );
 
         const string findallSource = """
             test(iso_findall_escape, variant(L, [1, 2])) :-
@@ -127,6 +133,29 @@ public sealed class LogtalkConformanceTests
         );
         Assert.True(LogtalkTestAdapter.TryUnwrapBackendGoal(findall, out string findallGoal));
         Assert.Equal("findall(X, ((between(1, 2, X))), L)", findallGoal);
+
+        var adapterEngine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
+        var errors = new LogtalkTestDeclaration(
+            "fixture.lgt",
+            "iso_errors",
+            "errors([type_error(atom,1), type_error(integer,1)])",
+            null,
+            "{throw(error(type_error(integer,1),context))}",
+            false,
+            null
+        );
+        Assert.True(Execute(errors, adapterEngine, out string errorsFailure), errorsFailure);
+
+        var ball = new LogtalkTestDeclaration(
+            "fixture.lgt",
+            "iso_ball",
+            "ball(bla)",
+            null,
+            "{throw(bla)}",
+            false,
+            null
+        );
+        Assert.True(Execute(ball, adapterEngine, out string ballFailure), ballFailure);
     }
 
     [Fact]
@@ -228,7 +257,17 @@ public sealed class LogtalkConformanceTests
             [
                 .. declarations.Where(test =>
                     !test.Disabled
-                    && test.OutcomeKind is "true" or "false" or "fail" or "error" or "variant"
+                    && test.OutcomeKind
+                        is "true"
+                            or "false"
+                            or "fail"
+                            or "error"
+                            or "errors"
+                            or "ball"
+                            or "exists"
+                            or "subsumes"
+                            or "variant"
+                            or "deterministic"
                     && supportByPath.ContainsKey(test.SourcePath)
                     && LogtalkTestAdapter.TryUnwrapBackendGoal(test, out _)
                     && (
@@ -238,12 +277,15 @@ public sealed class LogtalkConformanceTests
                 ),
             ];
 
-            Assert.Equal(417, directCases.Length);
+            Assert.Equal(461, directCases.Length);
             Assert.Equal(279, directCases.Count(test => test.OutcomeKind == "true"));
             Assert.Equal(72, directCases.Count(test => test.OutcomeKind == "false"));
             Assert.Equal(2, directCases.Count(test => test.OutcomeKind == "fail"));
             Assert.Equal(53, directCases.Count(test => test.OutcomeKind == "error"));
             Assert.Equal(11, directCases.Count(test => test.OutcomeKind == "variant"));
+            Assert.Equal(41, directCases.Count(test => test.OutcomeKind == "exists"));
+            Assert.Equal(2, directCases.Count(test => test.OutcomeKind == "subsumes"));
+            Assert.Single(directCases, test => test.OutcomeKind == "deterministic");
 
             string? selectedId = Environment.GetEnvironmentVariable(CaseVariable);
             LogtalkTestDeclaration[] casesToExecute = SelectCasesToExecute(directCases, selectedId);
@@ -410,9 +452,16 @@ public sealed class LogtalkConformanceTests
         {
             "true" when test.Outcome == "true" => $"({goal})",
             "true" => $"(({goal}), ({LogtalkTestAdapter.TranslateAssertion(ArgumentOf(test.Outcome, "true"))}))",
+            "exists" => $"(({goal}), ({LogtalkTestAdapter.TranslateAssertion(ArgumentOf(test.Outcome, "exists"))}))",
             "false" or "fail" => $"\\+ ({goal})",
             "error" => $"catch((({goal}), fail), error(ExternalError, _), ExternalError = ({ArgumentOf(test.Outcome, "error")}))",
+            "errors" =>
+                $"catch((({goal}), fail), ExternalBall, "
+                    + $"member(ExternalBall, {LogtalkTestAdapter.TranslateErrorAlternatives(ArgumentOf(test.Outcome, "errors"))}))",
+            "ball" => $"catch((({goal}), fail), ExternalBall, ExternalBall = ({ArgumentOf(test.Outcome, "ball")}))",
+            "subsumes" => SubsumesAssertion(goal, test.Outcome),
             "variant" => VariantAssertion(goal, test.Outcome),
+            "deterministic" when test.Outcome == "deterministic" => $"({goal})",
             _ => throw new InvalidOperationException($"Unsupported direct expectation: {test.Outcome}"),
         };
 
@@ -428,6 +477,12 @@ public sealed class LogtalkConformanceTests
             if (result != RunResult.Success)
             {
                 failure = $"expected {test.Outcome}, got {result} | {assertion}";
+                return false;
+            }
+
+            if (test.OutcomeKind == "deterministic" && engine.Machine.HasAlternatives)
+            {
+                failure = $"expected deterministic success, but the goal left a choice point | {assertion}";
                 return false;
             }
         }
@@ -453,6 +508,20 @@ public sealed class LogtalkConformanceTests
         string left = arguments[..separator].Trim();
         string right = arguments[(separator + 1)..].Trim();
         return $"(({goal}), subsumes_term(({left}), ({right})), subsumes_term(({right}), ({left})))";
+    }
+
+    private static string SubsumesAssertion(string goal, string outcome)
+    {
+        string arguments = ArgumentOf(outcome, "subsumes");
+        int separator = LogtalkTestAdapter.FindArgumentSeparator(arguments);
+        if (separator < 0)
+        {
+            throw new InvalidDataException($"Malformed subsumes expectation: {outcome}");
+        }
+
+        string expected = arguments[..separator].Trim();
+        string actual = arguments[(separator + 1)..].Trim();
+        return $"(({goal}), subsumes_term(({expected}), ({actual})))";
     }
 
     private static string ArgumentOf(string outcome, string functor)

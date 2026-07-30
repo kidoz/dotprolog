@@ -434,6 +434,24 @@ internal static class LogtalkTestAdapter
     internal static string TranslateConditionalGoal(string condition) =>
         condition.Replace('{', '(').Replace('}', ')');
 
+    /// <summary>Wraps each accepted lgtunit error term in the ISO <c>error/2</c> ball shape.</summary>
+    internal static string TranslateErrorAlternatives(string errors)
+    {
+        string list = errors.Trim();
+        if (list.Length < 2 || list[0] != '[' || list[^1] != ']')
+        {
+            throw new InvalidDataException($"Malformed lgtunit errors expectation: {errors}");
+        }
+
+        List<string> alternatives = SplitTopLevel(list[1..^1], ',');
+        if (alternatives.Count == 0 || alternatives.Any(alternative => alternative.Length == 0))
+        {
+            throw new InvalidDataException($"Malformed lgtunit errors expectation: {errors}");
+        }
+
+        return $"[{string.Join(", ", alternatives.Select(alternative => $"error(({alternative}), _)"))}]";
+    }
+
     /// <summary>Finds the comma separating two opaque expectation arguments.</summary>
     internal static int FindArgumentSeparator(string arguments) => FindTopLevel(arguments, ",");
 
