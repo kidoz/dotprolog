@@ -179,16 +179,18 @@ public sealed class LogtalkConformanceTests
             [
                 .. declarations.Where(test =>
                     !test.Disabled
-                    && test.OutcomeKind is "true" or "false" or "error"
+                    && test.OutcomeKind is "true" or "false" or "fail" or "error" or "variant"
                     && supportByPath.ContainsKey(test.SourcePath)
                     && LogtalkTestAdapter.TryUnwrapBackendGoal(test, out _)
                 ),
             ];
 
-            Assert.Equal(328, directCases.Length);
+            Assert.Equal(330, directCases.Length);
             Assert.Equal(227, directCases.Count(test => test.OutcomeKind == "true"));
             Assert.Equal(63, directCases.Count(test => test.OutcomeKind == "false"));
+            Assert.Single(directCases, test => test.OutcomeKind == "fail");
             Assert.Equal(38, directCases.Count(test => test.OutcomeKind == "error"));
+            Assert.Single(directCases, test => test.OutcomeKind == "variant");
 
             string? selectedId = Environment.GetEnvironmentVariable(CaseVariable);
             LogtalkTestDeclaration[] casesToExecute = selectedId is null
@@ -283,8 +285,9 @@ public sealed class LogtalkConformanceTests
         {
             "true" when test.Outcome == "true" => $"({goal})",
             "true" => $"(({goal}), ({LogtalkTestAdapter.TranslateAssertion(ArgumentOf(test.Outcome, "true"))}))",
-            "false" => $"\\+ ({goal})",
+            "false" or "fail" => $"\\+ ({goal})",
             "error" => $"catch((({goal}), fail), error(ExternalError, _), ExternalError = ({ArgumentOf(test.Outcome, "error")}))",
+            "variant" => VariantAssertion(goal, test.Outcome),
             _ => throw new InvalidOperationException($"Unsupported direct expectation: {test.Outcome}"),
         };
 
@@ -325,6 +328,20 @@ public sealed class LogtalkConformanceTests
 
         failure = string.Empty;
         return true;
+    }
+
+    private static string VariantAssertion(string goal, string outcome)
+    {
+        string arguments = ArgumentOf(outcome, "variant");
+        int separator = LogtalkTestAdapter.FindArgumentSeparator(arguments);
+        if (separator < 0)
+        {
+            throw new InvalidDataException($"Malformed variant expectation: {outcome}");
+        }
+
+        string left = arguments[..separator].Trim();
+        string right = arguments[(separator + 1)..].Trim();
+        return $"(({goal}), subsumes_term(({left}), ({right})), subsumes_term(({right}), ({left})))";
     }
 
     private static string ArgumentOf(string outcome, string functor)

@@ -266,6 +266,9 @@ internal static class LogtalkTestAdapter
         return $"(({difference} < 0.0000000001) -> true ; ({difference} < (0.00001 * max(abs({left}), abs({right})))))";
     }
 
+    /// <summary>Finds the comma separating two opaque expectation arguments.</summary>
+    internal static int FindArgumentSeparator(string arguments) => FindTopLevel(arguments, ",");
+
     private static List<string> SplitClauses(string source)
     {
         var clauses = new List<string>();
