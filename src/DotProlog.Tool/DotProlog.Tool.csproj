@@ -51,9 +51,7 @@
         Condition="'$(_IsPacking)' == 'true' and '$(RuntimeIdentifier)' != '' and '$(RuntimeIdentifier)' != 'any'"
     >
         <ItemGroup>
-            <_ToolPackageDebugFile
-                Include="$(PublishDir)**\*.pdb;$(PublishDir)**\*.dbg;$(PublishDir)**\*.dSYM\**\*"
-            />
+            <_ToolPackageDebugFile Include="$(PublishDir)**\*.pdb;$(PublishDir)**\*.dbg;$(PublishDir)**\*.dSYM\**\*" />
         </ItemGroup>
         <Delete Files="@(_ToolPackageDebugFile)" />
     </Target>

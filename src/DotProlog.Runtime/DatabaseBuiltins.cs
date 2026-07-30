@@ -434,7 +434,7 @@ internal static class DatabaseBuiltins
                         argument.Tag == CellTag.Reference ? machine.CreateStructure(call, [argument])
                         : argument.Tag == CellTag.Structure && rewritten.TryGetValue(argument.Index, out Cell replacement)
                             ? replacement
-                            : argument;
+                        : argument;
                 }
 
                 rewritten.Add(current.Index, machine.CreateStructure(functor, arguments));
@@ -473,8 +473,7 @@ internal static class DatabaseBuiltins
         int functorId = machine.HeapAt(goal.Index).Index;
         Functor functor = machine.Symbols.GetFunctor(functorId);
         string name = machine.Symbols.AtomName(functor.NameAtom);
-        return (functor.Arity == 2 && name is "," or ";" or "->" or "*->")
-            || (functor.Arity == 1 && name == "\\+");
+        return (functor.Arity == 2 && name is "," or ";" or "->" or "*->") || (functor.Arity == 1 && name == "\\+");
     }
 
     private static int FunctorOf(Machine machine, Cell clauseOrHead)

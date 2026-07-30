@@ -232,10 +232,7 @@ public sealed class TermReaderTests
     {
         var operators = new OperatorTable();
 
-        ParseResult result = TermReader.ReadProgram(
-            ":- op(100, xfx, [temporary_operator, ',']).",
-            operators: operators
-        );
+        ParseResult result = TermReader.ReadProgram(":- op(100, xfx, [temporary_operator, ',']).", operators: operators);
 
         Assert.True(result.Success);
         Assert.False(operators.IsOperator("temporary_operator"));

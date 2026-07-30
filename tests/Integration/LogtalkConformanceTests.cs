@@ -138,10 +138,7 @@ public sealed class LogtalkConformanceTests
         );
         Assert.Equal("catch({1^true}, _, fail)", conditional[0].ConditionalGoal);
         Assert.Equal("\\+ (catch({1^true}, _, fail))", conditional[1].ConditionalGoal);
-        Assert.Equal(
-            "catch((1^true), _, fail)",
-            LogtalkTestAdapter.TranslateConditionalGoal(conditional[0].ConditionalGoal!)
-        );
+        Assert.Equal("catch((1^true), _, fail)", LogtalkTestAdapter.TranslateConditionalGoal(conditional[0].ConditionalGoal!));
         Assert.Equal(
             "(current_logtalk_flag(prolog_dialect, Dialect), '$logtalk_is_windows')",
             LogtalkTestAdapter.TranslateConditionalGoal(
@@ -150,18 +147,14 @@ public sealed class LogtalkConformanceTests
         );
         Assert.Equal(
             "[error((type_error(callable, 1)), _), error((type_error(callable, ':'(user, 1))), _)]",
-            LogtalkTestAdapter.TranslateErrorAlternatives(
-                "[type_error(callable, 1), type_error(callable, ':'(user, 1))]"
-            )
+            LogtalkTestAdapter.TranslateErrorAlternatives("[type_error(callable, 1), type_error(callable, ':'(user, 1))]")
         );
 
         const string findallSource = """
             test(iso_findall_escape, variant(L, [1, 2])) :-
                 findall(X, {between(1, 2, X)}, L).
             """;
-        LogtalkTestDeclaration findall = Assert.Single(
-            LogtalkTestAdapter.ReadDeclarations(findallSource, "findall.lgt")
-        );
+        LogtalkTestDeclaration findall = Assert.Single(LogtalkTestAdapter.ReadDeclarations(findallSource, "findall.lgt"));
         Assert.True(LogtalkTestAdapter.TryUnwrapBackendGoal(findall, out string findallGoal));
         Assert.Equal("findall(X, ((between(1, 2, X))), L)", findallGoal);
 
@@ -171,9 +164,7 @@ public sealed class LogtalkConformanceTests
                 helper(X),
                 {atom(X)}.
             """;
-        LogtalkTestDeclaration mixed = Assert.Single(
-            LogtalkTestAdapter.ReadDeclarations(mixedSource, "mixed.lgt")
-        );
+        LogtalkTestDeclaration mixed = Assert.Single(LogtalkTestAdapter.ReadDeclarations(mixedSource, "mixed.lgt"));
         Assert.True(LogtalkTestAdapter.TryUnwrapBackendGoal(mixed, out string mixedGoal));
         Assert.Equal(
             """
@@ -190,9 +181,7 @@ public sealed class LogtalkConformanceTests
                 assertion(Vars == [B]),
                 (variant(Pair, pair(_, _)) -> true; fail).
             """;
-        LogtalkTestDeclaration helper = Assert.Single(
-            LogtalkTestAdapter.ReadDeclarations(helperSource, "helpers.lgt")
-        );
+        LogtalkTestDeclaration helper = Assert.Single(LogtalkTestAdapter.ReadDeclarations(helperSource, "helpers.lgt"));
         Assert.True(LogtalkTestAdapter.TryUnwrapBackendGoal(helper, out string helperGoal));
         Assert.Equal(
             """
@@ -237,8 +226,7 @@ public sealed class LogtalkConformanceTests
         Assert.Equal(
             RunResult.Success,
             textInputEngine.RunGoal(
-                "'$logtalk_set_text_output'(q), write(w), "
-                    + "'$logtalk_text_output_assertion'(qw, Assertion), call(Assertion)",
+                "'$logtalk_set_text_output'(q), write(w), " + "'$logtalk_text_output_assertion'(qw, Assertion), call(Assertion)",
                 out IReadOnlyList<DotProlog.Syntax.Diagnostic> textOutputDiagnostics
             )
         );
@@ -266,15 +254,7 @@ public sealed class LogtalkConformanceTests
         );
         Assert.True(Execute(errors, adapterEngine, out string errorsFailure), errorsFailure);
 
-        var ball = new LogtalkTestDeclaration(
-            "fixture.lgt",
-            "iso_ball",
-            "ball(bla)",
-            null,
-            "{throw(bla)}",
-            false,
-            null
-        );
+        var ball = new LogtalkTestDeclaration("fixture.lgt", "iso_ball", "ball(bla)", null, "{throw(bla)}", false, null);
         Assert.True(Execute(ball, adapterEngine, out string ballFailure), ballFailure);
 
         const string quickCheckSource = """
@@ -282,18 +262,13 @@ public sealed class LogtalkConformanceTests
                 {term_variables(T, Vs1), term_variables(T, Vs2), Vs1 == Vs2}.
             quick_check(iso_quick_fixture, twice(+term)).
             """;
-        Assert.True(
-            LogtalkTestAdapter.TryReadSupportProgram(quickCheckSource, out string quickCheckSupport)
-        );
+        Assert.True(LogtalkTestAdapter.TryReadSupportProgram(quickCheckSource, out string quickCheckSupport));
         var quickCheckEngine = CreateAdapterEngine(Path.GetTempPath());
         quickCheckEngine.ConsultOrThrow(quickCheckSupport, "quick-check-fixture.lgt");
         LogtalkTestDeclaration quickCheck = Assert.Single(
             LogtalkTestAdapter.ReadDeclarations(quickCheckSource, "quick-check-fixture.lgt")
         );
-        Assert.True(
-            ExecuteQuickCheck(quickCheck, quickCheckEngine, out string quickCheckFailure),
-            quickCheckFailure
-        );
+        Assert.True(ExecuteQuickCheck(quickCheck, quickCheckEngine, out string quickCheckFailure), quickCheckFailure);
     }
 
     [Fact]
@@ -428,14 +403,8 @@ public sealed class LogtalkConformanceTests
                             or "deterministic"
                             or "quick_check"
                     && supportByPath.ContainsKey(test.SourcePath)
-                    && (
-                        test.OutcomeKind == "quick_check"
-                        || LogtalkTestAdapter.TryUnwrapBackendGoal(test, out _)
-                    )
-                    && (
-                        !conditionalAlternates.Contains((test.SourcePath, test.Id))
-                        || applicableConditionalCases.Contains(test)
-                    )
+                    && (test.OutcomeKind == "quick_check" || LogtalkTestAdapter.TryUnwrapBackendGoal(test, out _))
+                    && (!conditionalAlternates.Contains((test.SourcePath, test.Id)) || applicableConditionalCases.Contains(test))
                 ),
             ];
 
@@ -467,8 +436,7 @@ public sealed class LogtalkConformanceTests
                         engines,
                         out PrologEngine engine,
                         out string failure
-                    )
-                    || !Execute(test, engine, out failure)
+                    ) || !Execute(test, engine, out failure)
                 )
                 {
                     failures.Add($"{test.SourcePath} | {test.Id} | {failure}");
@@ -484,13 +452,7 @@ public sealed class LogtalkConformanceTests
             if (reportPath is not null)
             {
                 Assert.Null(selectedId);
-                await WriteReportAsync(
-                    reportPath,
-                    declarations,
-                    directCases,
-                    nonApplicableCases,
-                    executionResults
-                );
+                await WriteReportAsync(reportPath, declarations, directCases, nonApplicableCases, executionResults);
             }
 
             Assert.True(failures.Count == 0, $"Independent ISO cases failed:\n{string.Join('\n', failures)}");
@@ -517,11 +479,7 @@ public sealed class LogtalkConformanceTests
 
         var engine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
         engine.Program.Builtins.Register("current_logtalk_flag", 2, CurrentLogtalkFlag);
-        engine.Program.Builtins.Register(
-            "$logtalk_is_windows",
-            0,
-            static _ => OperatingSystem.IsWindows()
-        );
+        engine.Program.Builtins.Register("$logtalk_is_windows", 0, static _ => OperatingSystem.IsWindows());
         string condition = LogtalkTestAdapter.TranslateConditionalGoal(declaration.ConditionalGoal);
         try
         {
@@ -543,24 +501,15 @@ public sealed class LogtalkConformanceTests
     private static bool CurrentLogtalkFlag(Machine machine)
     {
         Cell flag = machine.Argument(0);
-        if (
-            flag.Tag != CellTag.Atom
-            || machine.Symbols.AtomName(flag.Index) != "prolog_dialect"
-        )
+        if (flag.Tag != CellTag.Atom || machine.Symbols.AtomName(flag.Index) != "prolog_dialect")
         {
             return false;
         }
 
-        return machine.Unify(
-            machine.Argument(1),
-            Cell.Atom(machine.Symbols.InternAtom("dotprolog"))
-        );
+        return machine.Unify(machine.Argument(1), Cell.Atom(machine.Symbols.InternAtom("dotprolog")));
     }
 
-    private static LogtalkTestDeclaration[] SelectCasesToExecute(
-        LogtalkTestDeclaration[] directCases,
-        string? selectedId
-    )
+    private static LogtalkTestDeclaration[] SelectCasesToExecute(LogtalkTestDeclaration[] directCases, string? selectedId)
     {
         if (selectedId is null)
         {
@@ -615,11 +564,7 @@ public sealed class LogtalkConformanceTests
         var namedInputPaths = new Dictionary<string, string>(StringComparer.Ordinal);
         var fixturePaths = new Dictionary<string, string>(StringComparer.Ordinal);
         engine.Program.Builtins.Register("$logtalk_set_text_input", 1, SetTextInput);
-        engine.Program.Builtins.Register(
-            "$logtalk_set_text_input",
-            2,
-            machine => SetNamedTextInput(machine, namedInputPaths)
-        );
+        engine.Program.Builtins.Register("$logtalk_set_text_input", 2, machine => SetNamedTextInput(machine, namedInputPaths));
         engine.Program.Builtins.Register(
             "$logtalk_delete_text_input",
             1,
@@ -632,43 +577,23 @@ public sealed class LogtalkConformanceTests
         engine.Program.Builtins.Register("$logtalk_text_output_contents", 1, TextOutputContents);
         engine.Program.Builtins.Register("$logtalk_text_output_contents", 2, NamedTextOutputContents);
         engine.Program.Builtins.Register("$logtalk_check_text_output", 2, CheckNamedTextOutput);
-        engine.Program.Builtins.Register(
-            "$logtalk_file_path",
-            2,
-            machine => FilePath(machine, filesRoot, fixturePaths)
-        );
+        engine.Program.Builtins.Register("$logtalk_file_path", 2, machine => FilePath(machine, filesRoot, fixturePaths));
         engine.Program.Builtins.Register("$logtalk_create_text_file", 2, CreateTextFile);
         engine.Program.Builtins.Register("$logtalk_create_binary_file", 2, CreateBinaryFile);
-        engine.Program.Builtins.Register(
-            "$logtalk_closed_input_stream",
-            2,
-            static machine => ClosedStream(machine, input: true)
-        );
+        engine.Program.Builtins.Register("$logtalk_closed_input_stream", 2, static machine => ClosedStream(machine, input: true));
         engine.Program.Builtins.Register(
             "$logtalk_closed_output_stream",
             2,
             static machine => ClosedStream(machine, input: false)
         );
-        engine.Program.Builtins.Register(
-            "$logtalk_create_binary_output",
-            2,
-            machine => CreateBinaryOutput(machine, filesRoot)
-        );
+        engine.Program.Builtins.Register("$logtalk_create_binary_output", 2, machine => CreateBinaryOutput(machine, filesRoot));
         engine.Program.Builtins.Register(
             "$logtalk_set_named_binary_output",
             2,
             machine => SetNamedBinaryOutput(machine, filesRoot)
         );
-        engine.Program.Builtins.Register(
-            "$logtalk_binary_output_assertion",
-            2,
-            BinaryOutputAssertion
-        );
-        engine.Program.Builtins.Register(
-            "$logtalk_binary_output_assertion",
-            3,
-            NamedBinaryOutputAssertion
-        );
+        engine.Program.Builtins.Register("$logtalk_binary_output_assertion", 2, BinaryOutputAssertion);
+        engine.Program.Builtins.Register("$logtalk_binary_output_assertion", 3, NamedBinaryOutputAssertion);
         engine.Program.Builtins.Register(
             "$logtalk_suppress_text_output",
             0,
@@ -695,10 +620,7 @@ public sealed class LogtalkConformanceTests
     private static bool SetNamedTextInput(Machine machine, Dictionary<string, string> paths)
     {
         Cell alias = machine.Argument(0);
-        if (
-            alias.Tag != CellTag.Atom
-            || !TryReadTextContents(machine, machine.Argument(1), out string input)
-        )
+        if (alias.Tag != CellTag.Atom || !TryReadTextContents(machine, machine.Argument(1), out string input))
         {
             return false;
         }
@@ -714,10 +636,7 @@ public sealed class LogtalkConformanceTests
     private static bool DeleteNamedTextInput(Machine machine, Dictionary<string, string> paths)
     {
         Cell alias = machine.Argument(0);
-        if (
-            alias.Tag != CellTag.Atom
-            || !paths.Remove(machine.Symbols.AtomName(alias.Index), out string? path)
-        )
+        if (alias.Tag != CellTag.Atom || !paths.Remove(machine.Symbols.AtomName(alias.Index), out string? path))
         {
             return false;
         }
@@ -740,10 +659,7 @@ public sealed class LogtalkConformanceTests
     private static bool SetNamedTextOutput(Machine machine)
     {
         Cell alias = machine.Argument(0);
-        if (
-            alias.Tag != CellTag.Atom
-            || !TryReadTextContents(machine, machine.Argument(1), out string initial)
-        )
+        if (alias.Tag != CellTag.Atom || !TryReadTextContents(machine, machine.Argument(1), out string initial))
         {
             return false;
         }
@@ -818,11 +734,7 @@ public sealed class LogtalkConformanceTests
         return output == expected;
     }
 
-    private static bool FilePath(
-        Machine machine,
-        string filesRoot,
-        Dictionary<string, string> fixturePaths
-    )
+    private static bool FilePath(Machine machine, string filesRoot, Dictionary<string, string> fixturePaths)
     {
         Cell name = machine.Argument(0);
         if (name.Tag != CellTag.Atom)
@@ -838,19 +750,13 @@ public sealed class LogtalkConformanceTests
             fixturePaths.Add(fixture, path);
         }
 
-        return machine.Unify(
-            machine.Argument(1),
-            Cell.Atom(machine.Symbols.InternAtom(path.Replace('\\', '/')))
-        );
+        return machine.Unify(machine.Argument(1), Cell.Atom(machine.Symbols.InternAtom(path.Replace('\\', '/'))));
     }
 
     private static bool CreateTextFile(Machine machine)
     {
         Cell path = machine.Argument(0);
-        if (
-            path.Tag != CellTag.Atom
-            || !TryReadTextContents(machine, machine.Argument(1), out string contents)
-        )
+        if (path.Tag != CellTag.Atom || !TryReadTextContents(machine, machine.Argument(1), out string contents))
         {
             return false;
         }
@@ -862,10 +768,7 @@ public sealed class LogtalkConformanceTests
     private static bool CreateBinaryFile(Machine machine)
     {
         Cell path = machine.Argument(0);
-        if (
-            path.Tag != CellTag.Atom
-            || !TryReadBytes(machine, machine.Argument(1), out byte[] contents)
-        )
+        if (path.Tag != CellTag.Atom || !TryReadBytes(machine, machine.Argument(1), out byte[] contents))
         {
             return false;
         }
@@ -883,17 +786,8 @@ public sealed class LogtalkConformanceTests
         }
 
         string path = Path.GetTempFileName();
-        PrologStream stream = machine.Streams.Open(
-            path,
-            input ? "read" : "write",
-            alias: null,
-            "text",
-            reposition: false
-        );
-        Cell handle = machine.CreateStructure(
-            machine.Symbols.InternFunctor("$stream", 1),
-            [Cell.Integer60(stream.Id)]
-        );
+        PrologStream stream = machine.Streams.Open(path, input ? "read" : "write", alias: null, "text", reposition: false);
+        Cell handle = machine.CreateStructure(machine.Symbols.InternFunctor("$stream", 1), [Cell.Integer60(stream.Id)]);
         machine.Streams.Close(stream);
         File.Delete(path);
         return machine.Unify(machine.Argument(0), handle);
@@ -909,10 +803,7 @@ public sealed class LogtalkConformanceTests
             return false;
         }
 
-        Cell handle = machine.CreateStructure(
-            machine.Symbols.InternFunctor("$stream", 1),
-            [Cell.Integer60(stream.Id)]
-        );
+        Cell handle = machine.CreateStructure(machine.Symbols.InternFunctor("$stream", 1), [Cell.Integer60(stream.Id)]);
         return machine.Unify(machine.Argument(1), handle);
     }
 
@@ -921,13 +812,7 @@ public sealed class LogtalkConformanceTests
         Cell alias = machine.Argument(0);
         return alias.Tag == CellTag.Atom
             && TryReadBytes(machine, machine.Argument(1), out byte[] initial)
-            && TryOpenBinaryOutput(
-                machine,
-                filesRoot,
-                machine.Symbols.AtomName(alias.Index),
-                initial,
-                out _
-            );
+            && TryOpenBinaryOutput(machine, filesRoot, machine.Symbols.AtomName(alias.Index), initial, out _);
     }
 
     private static bool TryOpenBinaryOutput(
@@ -952,10 +837,7 @@ public sealed class LogtalkConformanceTests
             return false;
         }
 
-        return machine.Unify(
-            machine.Argument(1),
-            EqualityAssertion(machine, machine.Argument(0), ByteList(machine, output))
-        );
+        return machine.Unify(machine.Argument(1), EqualityAssertion(machine, machine.Argument(0), ByteList(machine, output)));
     }
 
     private static bool NamedBinaryOutputAssertion(Machine machine)
@@ -963,27 +845,16 @@ public sealed class LogtalkConformanceTests
         Cell alias = machine.Argument(0);
         if (
             alias.Tag != CellTag.Atom
-            || !TryTakeBinaryOutput(
-                machine,
-                machine.Streams.ByAlias(machine.Symbols.AtomName(alias.Index)),
-                out byte[] output
-            )
+            || !TryTakeBinaryOutput(machine, machine.Streams.ByAlias(machine.Symbols.AtomName(alias.Index)), out byte[] output)
         )
         {
             return false;
         }
 
-        return machine.Unify(
-            machine.Argument(2),
-            EqualityAssertion(machine, machine.Argument(1), ByteList(machine, output))
-        );
+        return machine.Unify(machine.Argument(2), EqualityAssertion(machine, machine.Argument(1), ByteList(machine, output)));
     }
 
-    private static bool TryTakeBinaryOutput(
-        Machine machine,
-        PrologStream? stream,
-        out byte[] output
-    )
+    private static bool TryTakeBinaryOutput(Machine machine, PrologStream? stream, out byte[] output)
     {
         if (stream is null || stream.IsPermanent)
         {
@@ -1011,10 +882,7 @@ public sealed class LogtalkConformanceTests
     {
         var bytes = new List<byte>();
 
-        while (
-            item.Tag == CellTag.Structure
-            && machine.HeapAt(item.Index).Index == machine.Symbols.ListFunctor
-        )
+        while (item.Tag == CellTag.Structure && machine.HeapAt(item.Index).Index == machine.Symbols.ListFunctor)
         {
             Cell head = machine.Dereference(machine.HeapAt(item.Index + 1));
             if (head.Tag != CellTag.Integer || head.Integer is < byte.MinValue or > byte.MaxValue)
@@ -1067,10 +935,7 @@ public sealed class LogtalkConformanceTests
 
     private static Cell CharacterList(Machine machine, string text)
     {
-        Cell[] characters =
-        [
-            .. text.Select(character => Cell.Atom(machine.Symbols.InternAtom(character.ToString()))),
-        ];
+        Cell[] characters = [.. text.Select(character => Cell.Atom(machine.Symbols.InternAtom(character.ToString())))];
         return machine.CreateList(characters, Cell.Atom(machine.Symbols.EmptyList));
     }
 
@@ -1084,10 +949,7 @@ public sealed class LogtalkConformanceTests
         }
         else
         {
-            while (
-                item.Tag == CellTag.Structure
-                && machine.HeapAt(item.Index).Index == machine.Symbols.ListFunctor
-            )
+            while (item.Tag == CellTag.Structure && machine.HeapAt(item.Index).Index == machine.Symbols.ListFunctor)
             {
                 Cell head = machine.Dereference(machine.HeapAt(item.Index + 1));
                 if (head.Tag != CellTag.Atom)
@@ -1140,9 +1002,7 @@ public sealed class LogtalkConformanceTests
                 passed = executionResults.Count(result => result.Value == "passed"),
                 failed = executionResults.Count(result => result.Value.StartsWith("failed:", StringComparison.Ordinal)),
                 unsupported = declarations.Count(test =>
-                    !test.Disabled
-                    && !nonApplicableCases.Contains(test)
-                    && !directCases.Contains(test)
+                    !test.Disabled && !nonApplicableCases.Contains(test) && !directCases.Contains(test)
                 ),
             },
             cases = declarations.Select(test => new
@@ -1181,9 +1041,8 @@ public sealed class LogtalkConformanceTests
             "exists" => $"(({goal}), ({LogtalkTestAdapter.TranslateAssertion(ArgumentOf(test.Outcome, "exists"))}))",
             "false" or "fail" => $"\\+ ({goal})",
             "error" => $"catch((({goal}), fail), error(ExternalError, _), ExternalError = ({ArgumentOf(test.Outcome, "error")}))",
-            "errors" =>
-                $"catch((({goal}), fail), ExternalBall, "
-                    + $"member(ExternalBall, {LogtalkTestAdapter.TranslateErrorAlternatives(ArgumentOf(test.Outcome, "errors"))}))",
+            "errors" => $"catch((({goal}), fail), ExternalBall, "
+                + $"member(ExternalBall, {LogtalkTestAdapter.TranslateErrorAlternatives(ArgumentOf(test.Outcome, "errors"))}))",
             "ball" => $"catch((({goal}), fail), ExternalBall, ExternalBall = ({ArgumentOf(test.Outcome, "ball")}))",
             "subsumes" => SubsumesAssertion(goal, test.Outcome),
             "variant" => VariantAssertion(goal, test.Outcome),
@@ -1222,28 +1081,15 @@ public sealed class LogtalkConformanceTests
         return true;
     }
 
-    private static bool ExecuteQuickCheck(
-        LogtalkTestDeclaration test,
-        PrologEngine engine,
-        out string failure
-    )
+    private static bool ExecuteQuickCheck(LogtalkTestDeclaration test, PrologEngine engine, out string failure)
     {
         (string property, IReadOnlyList<string> inputs) = test.Id switch
         {
-            "iso_term_variables_2_01" or "iso_quick_fixture" => (
-                "twice",
-                GenerateTermInputs(seed: 13211)
-            ),
+            "iso_term_variables_2_01" or "iso_quick_fixture" => ("twice", GenerateTermInputs(seed: 13211)),
             "iso_term_variables_2_02" => ("chain", GenerateTermInputs(seed: 13212)),
-            "iso_number_chars_2_14" => (
-                "round_trip",
-                GenerateIntegerInputs(seed: 16714)
-            ),
+            "iso_number_chars_2_14" => ("round_trip", GenerateIntegerInputs(seed: 16714)),
             "iso_number_chars_2_15" => ("round_trip", GenerateFloatInputs(seed: 16715)),
-            "iso_number_codes_2_12" => (
-                "round_trip",
-                GenerateIntegerInputs(seed: 16812)
-            ),
+            "iso_number_codes_2_12" => ("round_trip", GenerateIntegerInputs(seed: 16812)),
             "iso_number_codes_2_13" => ("round_trip", GenerateFloatInputs(seed: 16813)),
             _ => throw new InvalidOperationException($"Unsupported QuickCheck declaration: {test.Id}"),
         };
@@ -1253,15 +1099,10 @@ public sealed class LogtalkConformanceTests
             string goal = $"{property}({inputs[trial]})";
             try
             {
-                RunResult result = engine.RunGoal(
-                    goal,
-                    out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics
-                );
+                RunResult result = engine.RunGoal(goal, out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics);
                 if (diagnostics.Count > 0)
                 {
-                    failure =
-                        $"QuickCheck trial {trial + 1} did not compile: "
-                        + $"{string.Join("; ", diagnostics)} | {goal}";
+                    failure = $"QuickCheck trial {trial + 1} did not compile: " + $"{string.Join("; ", diagnostics)} | {goal}";
                     return false;
                 }
 
@@ -1334,16 +1175,12 @@ public sealed class LogtalkConformanceTests
             2 => random.Next(-1000, 1001).ToString(CultureInfo.InvariantCulture),
             3 => FloatLiteral(random.Next(-1000, 1001) * random.NextDouble()),
             4 => $"f({GenerateTerm(random, depth - 1)})",
-            5 =>
-                $"pair({GenerateTerm(random, depth - 1)},{GenerateTerm(random, depth - 1)})",
-            6 =>
-                $"[{GenerateTerm(random, depth - 1)},{GenerateTerm(random, depth - 1)}]",
-            7 =>
-                $"[{GenerateTerm(random, depth - 1)}|{GenerateTerm(random, depth - 1)}]",
-            _ =>
-                $"node({GenerateTerm(random, depth - 1)},"
-                    + $"{GenerateTerm(random, depth - 1)},"
-                    + $"{GenerateTerm(random, depth - 1)})",
+            5 => $"pair({GenerateTerm(random, depth - 1)},{GenerateTerm(random, depth - 1)})",
+            6 => $"[{GenerateTerm(random, depth - 1)},{GenerateTerm(random, depth - 1)}]",
+            7 => $"[{GenerateTerm(random, depth - 1)}|{GenerateTerm(random, depth - 1)}]",
+            _ => $"node({GenerateTerm(random, depth - 1)},"
+                + $"{GenerateTerm(random, depth - 1)},"
+                + $"{GenerateTerm(random, depth - 1)})",
         };
     }
 

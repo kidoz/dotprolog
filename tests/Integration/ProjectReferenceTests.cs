@@ -94,20 +94,10 @@ public sealed class ProjectReferenceTests
 
         Assert.True(buildExit == 0, $"Full MSBuild could not host the .NET facade generator:\n{buildLog}");
 
-        string generated = Path.Combine(
-            RepositoryLayout.Root,
-            "samples",
-            "PricingRules",
-            "obj",
-            "prolog",
-            "PricingModule.g.cs"
-        );
+        string generated = Path.Combine(RepositoryLayout.Root, "samples", "PricingRules", "obj", "prolog", "PricingModule.g.cs");
         Assert.True(File.Exists(generated), $"No generated facade at {generated}.");
 
-        (int runExit, string output) = await Run(
-            "dotnet",
-            ["run", "--project", console, "-c", "Release", "--no-build"]
-        );
+        (int runExit, string output) = await Run("dotnet", ["run", "--project", console, "-c", "Release", "--no-build"]);
         Assert.True(runExit == 0, $"Running the full-MSBuild output failed:\n{output}");
         Assert.Contains("100 less 15% = 85", output, StringComparison.Ordinal);
     }

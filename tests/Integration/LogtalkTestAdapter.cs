@@ -102,9 +102,7 @@ internal static class LogtalkTestAdapter
                 string quickCheckHead = text[quickCheckStart..].Trim();
                 if (!quickCheckHead.EndsWith('.'))
                 {
-                    throw new InvalidDataException(
-                        $"{relativePath}: quick-check declaration has no full stop: {quickCheckHead}"
-                    );
+                    throw new InvalidDataException($"{relativePath}: quick-check declaration has no full stop: {quickCheckHead}");
                 }
 
                 quickCheckHead = quickCheckHead[..^1].Trim();
@@ -114,14 +112,9 @@ internal static class LogtalkTestAdapter
                 }
 
                 List<string> quickCheckArguments = SplitTopLevel(quickCheckHead[12..^1], ',');
-                if (
-                    quickCheckArguments.Count != 2
-                    || !quickCheckArguments[0].StartsWith("iso_", StringComparison.Ordinal)
-                )
+                if (quickCheckArguments.Count != 2 || !quickCheckArguments[0].StartsWith("iso_", StringComparison.Ordinal))
                 {
-                    throw new InvalidDataException(
-                        $"{relativePath}: malformed ISO quick-check declaration: {quickCheckHead}"
-                    );
+                    throw new InvalidDataException($"{relativePath}: malformed ISO quick-check declaration: {quickCheckHead}");
                 }
 
                 declarations.Add(
@@ -488,12 +481,8 @@ internal static class LogtalkTestAdapter
 
             int functorStart = current;
             bool dispatchedAssertion = source.AsSpan(current).StartsWith("^^assertion(", StringComparison.Ordinal);
-            bool dispatchedTextInput = source
-                .AsSpan(current)
-                .StartsWith("^^set_text_input(", StringComparison.Ordinal);
-            bool dispatchedTextOutput = source
-                .AsSpan(current)
-                .StartsWith("^^set_text_output(", StringComparison.Ordinal);
+            bool dispatchedTextInput = source.AsSpan(current).StartsWith("^^set_text_input(", StringComparison.Ordinal);
+            bool dispatchedTextOutput = source.AsSpan(current).StartsWith("^^set_text_output(", StringComparison.Ordinal);
             bool dispatchedTextOutputAssertion = source
                 .AsSpan(current)
                 .StartsWith("^^text_output_assertion(", StringComparison.Ordinal);
@@ -503,15 +492,9 @@ internal static class LogtalkTestAdapter
             bool dispatchedTextInputAssertion = source
                 .AsSpan(current)
                 .StartsWith("^^text_input_assertion(", StringComparison.Ordinal);
-            bool dispatchedCheckTextOutput = source
-                .AsSpan(current)
-                .StartsWith("^^check_text_output(", StringComparison.Ordinal);
-            bool dispatchedFilePath = source
-                .AsSpan(current)
-                .StartsWith("^^file_path(", StringComparison.Ordinal);
-            bool dispatchedCreateTextFile = source
-                .AsSpan(current)
-                .StartsWith("^^create_text_file(", StringComparison.Ordinal);
+            bool dispatchedCheckTextOutput = source.AsSpan(current).StartsWith("^^check_text_output(", StringComparison.Ordinal);
+            bool dispatchedFilePath = source.AsSpan(current).StartsWith("^^file_path(", StringComparison.Ordinal);
+            bool dispatchedCreateTextFile = source.AsSpan(current).StartsWith("^^create_text_file(", StringComparison.Ordinal);
             bool dispatchedCreateBinaryFile = source
                 .AsSpan(current)
                 .StartsWith("^^create_binary_file(", StringComparison.Ordinal);
@@ -521,9 +504,7 @@ internal static class LogtalkTestAdapter
             bool dispatchedClosedOutputStream = source
                 .AsSpan(current)
                 .StartsWith("^^closed_output_stream(", StringComparison.Ordinal);
-            bool dispatchedSetBinaryOutput = source
-                .AsSpan(current)
-                .StartsWith("^^set_binary_output(", StringComparison.Ordinal);
+            bool dispatchedSetBinaryOutput = source.AsSpan(current).StartsWith("^^set_binary_output(", StringComparison.Ordinal);
             bool dispatchedBinaryOutputAssertion = source
                 .AsSpan(current)
                 .StartsWith("^^binary_output_assertion(", StringComparison.Ordinal);
@@ -622,8 +603,7 @@ internal static class LogtalkTestAdapter
 
                 string left = variantArguments[0];
                 string right = variantArguments[1];
-                replacement =
-                    $"(subsumes_term(({left}), ({right})), subsumes_term(({right}), ({left})))";
+                replacement = $"(subsumes_term(({left}), ({right})), subsumes_term(({right}), ({left})))";
             }
             else
             {
@@ -756,10 +736,7 @@ internal static class LogtalkTestAdapter
 
         string head = clause[..neck].Trim();
         return head is "setup" or "cleanup"
-            && (
-                clause.Contains("^^", StringComparison.Ordinal)
-                || clause.Contains("::", StringComparison.Ordinal)
-            );
+            && (clause.Contains("^^", StringComparison.Ordinal) || clause.Contains("::", StringComparison.Ordinal));
     }
 
     private static bool TryUnwrapBackendBody(string source, out string goal)
@@ -827,11 +804,7 @@ internal static class LogtalkTestAdapter
         condition
             .Replace('{', '(')
             .Replace('}', ')')
-            .Replace(
-                "os::operating_system_type(windows)",
-                "'$logtalk_is_windows'",
-                StringComparison.Ordinal
-            );
+            .Replace("os::operating_system_type(windows)", "'$logtalk_is_windows'", StringComparison.Ordinal);
 
     /// <summary>Wraps each accepted lgtunit error term in the ISO <c>error/2</c> ball shape.</summary>
     internal static string TranslateErrorAlternatives(string errors)
@@ -1153,9 +1126,7 @@ internal static class LogtalkTestAdapter
                     return $"\\+ ({string.Join(" ; ", _previous)})";
                 }
 
-                return _previous.Count == 0
-                    ? _current
-                    : $"\\+ ({string.Join(" ; ", _previous)}), ({_current})";
+                return _previous.Count == 0 ? _current : $"\\+ ({string.Join(" ; ", _previous)}), ({_current})";
             }
         }
 

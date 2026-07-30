@@ -522,13 +522,7 @@ internal sealed class Lexer
         }
     }
 
-    private void ReadNumericEscape(
-        StringBuilder builder,
-        int start,
-        int radix,
-        string description,
-        int? firstDigit = null
-    )
+    private void ReadNumericEscape(StringBuilder builder, int start, int radix, string description, int? firstDigit = null)
     {
         int digitsStart = _position;
         int value = firstDigit ?? 0;

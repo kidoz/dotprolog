@@ -103,9 +103,7 @@ public sealed class OperatorDeclarationTests
         Assert.Equal(
             "permission_error(create,operator,plusplus)",
             PrologTestHost.RunGoal(
-                "op(30, xfy, plusplus), "
-                    + "catch(op(50, yf, plusplus), error(E, _), write(E)), "
-                    + "op(0, xfy, plusplus)"
+                "op(30, xfy, plusplus), " + "catch(op(50, yf, plusplus), error(E, _), write(E)), " + "op(0, xfy, plusplus)"
             )
         );
     }

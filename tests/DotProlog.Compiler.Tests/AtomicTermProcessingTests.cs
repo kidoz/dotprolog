@@ -49,9 +49,7 @@ public sealed class AtomicTermProcessingTests
         Assert.Equal(
             "yes",
             PrologTestHost.RunGoal(
-                $"{predicate}(0.000000000001, Text), "
-                    + $"{predicate}(Value, Text), "
-                    + "Value == 0.000000000001, write(yes)"
+                $"{predicate}(0.000000000001, Text), " + $"{predicate}(Value, Text), " + "Value == 0.000000000001, write(yes)"
             )
         );
 }
