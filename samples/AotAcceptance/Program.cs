@@ -181,6 +181,16 @@ internal static class Program
                 CompareDomainCaught == true,
                 write(compare_order_errors), nl,
 
+                % arg/3 preserves ISO instantiation and negative-index errors after trimming.
+                catch(arg(1, _, _), error(instantiation_error, _), ArgTermCaught = true),
+                ArgTermCaught == true,
+                catch(
+                    arg(-1, native_arg(value), _),
+                    error(domain_error(not_less_than_zero, -1), _),
+                    ArgIndexCaught = true),
+                ArgIndexCaught == true,
+                write(arg_errors), nl,
+
                 % current_op/3 validates bound ISO filter domains before enumeration.
                 catch(
                     current_op(a, _, _),

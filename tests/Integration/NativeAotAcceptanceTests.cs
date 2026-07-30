@@ -88,6 +88,7 @@ public sealed class NativeAotAcceptanceTests
                     "float_read_limits",
                     "halt_status_errors",
                     "compare_order_errors",
+                    "arg_errors",
                     "current_op_filter_errors",
                     "current_op_snapshot",
                     "database_permission_errors",
