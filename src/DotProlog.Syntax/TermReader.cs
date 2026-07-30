@@ -295,7 +295,7 @@ public sealed class TermReader
 
     private static string? InfixName(Token token)
     {
-        if (token.Kind == TokenKind.Atom && !token.Quoted)
+        if (token.Kind == TokenKind.Atom)
         {
             return token.Text;
         }
@@ -393,12 +393,7 @@ public sealed class TermReader
                 : FloatLiteral(literal, negate, span);
         }
 
-        if (
-            !token.Quoted
-            && _operators.TryGetPrefix(name, out PrologOperator prefix)
-            && prefix.Priority <= maxPriority
-            && CanStartTerm(next)
-        )
+        if (_operators.TryGetPrefix(name, out PrologOperator prefix) && prefix.Priority <= maxPriority && CanStartTerm(next))
         {
             Advance();
             SyntaxTerm? operand = ParseTerm(prefix.RightPriority, out _);
@@ -412,10 +407,7 @@ public sealed class TermReader
         }
 
         Advance();
-        if (!token.Quoted)
-        {
-            priority = _operators.MaxPriority(name);
-        }
+        priority = _operators.MaxPriority(name);
 
         return new AtomTerm(name, token.Span);
     }
@@ -463,7 +455,6 @@ public sealed class TermReader
         // but in '- - 1' the inner '-' is a prefix operator and may.
         if (
             token.Kind == TokenKind.Atom
-            && !token.Quoted
             && _operators.TryGetInfixOrPostfix(token.Text, out _)
             && !_operators.TryGetPrefix(token.Text, out _)
         )

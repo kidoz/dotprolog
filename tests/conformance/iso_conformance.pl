@@ -264,7 +264,7 @@ iso_case('8.14.3', op(a, xfy, iso_bad), error(type_error(integer, a))).
 iso_case('8.14.3', op(30, a, iso_bad), error(domain_error(operator_specifier, a))).
 iso_case('8.14.3', op(1300, xfx, iso_bad), error(domain_error(operator_priority, 1300))).
 iso_case('8.14.3', op(30, xfy, 0), error(type_error(atom, 0))).
-iso_case('8.14.3', op(30, xfx, ','), error(permission_error(modify, operator, ','/2))).
+iso_case('8.14.3', op(30, xfx, ','), error(permission_error(modify, operator, '/'(',', 2)))).
 
 % --- 8.15 Logic and control --------------------------------------------------
 iso_case('8.15.1', \+ true, failure).
@@ -439,6 +439,15 @@ iso_case('7.2.1', reads_as('a :- b, c', ':-'(a, ','(b, c))), success).
 iso_case('7.2.1', reads_as('\\+ a', \+(a)), success).
 iso_case('7.2.1', reads_as('f(-)', f(-)), success).
 iso_case('7.2.1', reads_as('[-]', [-]), success).
+iso_case('7.2.1', reads_as('left ''is'' right', is(left, right)), success).
+iso_case(
+    '7.2.1',
+    (
+        atom_codes(QuotedPrefix, [39, 100, 121, 110, 97, 109, 105, 99, 39, 32, 112, 114, 101, 100, 105, 99, 97, 116, 101]),
+        reads_as(QuotedPrefix, dynamic(predicate))
+    ),
+    success
+).
 
 % --- 7.10 Writing terms -------------------------------------------------------
 iso_case('7.10.5', writeq_gives(foo, foo), success).

@@ -93,10 +93,13 @@ public sealed class TermReaderTests
         Assert.Equal("p(,(a,b))", ReadSingle("p((a, b))."));
     }
 
-    [Fact]
-    public void QuotedAtomIsNotTreatedAsAnOperator()
+    [Theory]
+    [InlineData("left 'is' right.", "is(left,right)")]
+    [InlineData("'dynamic' predicate.", "dynamic(predicate)")]
+    [InlineData("p('+', q).", "p(+,q)")]
+    public void QuotedOperatorNamesRetainTheirOperatorMeaning(string source, string expected)
     {
-        Assert.Equal("p(+,q)", ReadSingle("p('+', q)."));
+        Assert.Equal(expected, ReadSingle(source));
     }
 
     [Fact]

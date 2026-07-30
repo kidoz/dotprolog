@@ -23,6 +23,36 @@ public sealed class OperatorDeclarationTests
     }
 
     [Fact]
+    public void AQuotedDeclaredOperatorIsUsableLaterInTheSameFile()
+    {
+        Assert.Equal(
+            "yes",
+            PrologTestHost.Run(
+                """
+                :- op(650, xfx, quoted_infix).
+
+                fact(left 'quoted_infix' right).
+
+                :- initialization((fact(quoted_infix(left, right)), write(yes))).
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void RuntimeTermInputUsesQuotedOperatorNames()
+    {
+        Assert.Equal(
+            "yes",
+            PrologTestHost.RunGoal(
+                "op(650, xfx, quoted_infix), "
+                    + "read_term_from_atom('left ''quoted_infix'' right', quoted_infix(left, right), []), "
+                    + "op(0, xfx, quoted_infix), write(yes)"
+            )
+        );
+    }
+
+    [Fact]
     public void ADeclaredOperatorIsUsedWhenWriting() =>
         Assert.Equal(
             "alice likes bob",

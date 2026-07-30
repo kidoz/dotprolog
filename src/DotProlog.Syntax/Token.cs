@@ -10,7 +10,7 @@ namespace DotProlog.Syntax;
 /// </param>
 /// <param name="Integer">Value of an <see cref="TokenKind.Integer"/> token.</param>
 /// <param name="Float">Value of a <see cref="TokenKind.Float"/> token.</param>
-/// <param name="Quoted">Whether an atom token was written in quotes, which suppresses operator interpretation.</param>
+/// <param name="Quoted">Whether an atom token was written in quotes.</param>
 /// <param name="IntegerOverflow">Whether an integer token exceeds the lexer storage range.</param>
 /// <param name="FloatOverflow">Whether a float token exceeds the finite implementation range.</param>
 internal readonly record struct Token(
