@@ -64,6 +64,22 @@ public sealed class StreamSystemErrorTests
         Assert.Empty(diagnostics);
     }
 
+    [Theory]
+    [InlineData("false", "catchable")]
+    [InlineData("true", "forced")]
+    public void CloseNormalizesDisposedOutputAccordingToForce(string force, string expected)
+    {
+        var engine = new PrologEngine { Output = new DisposedWriter() };
+        string goal =
+            force == "true"
+                ? "close(user_output, [force(true)]), write(forced)"
+                : "catch(close(user_output, [force(false)]), error(system_error, _), true), write(catchable)";
+
+        Assert.Equal(RunResult.Success, engine.RunGoal(goal, out IReadOnlyList<Diagnostic> diagnostics));
+        Assert.Equal(expected, engine.Output.ToString());
+        Assert.Empty(diagnostics);
+    }
+
     private sealed class FailingReader : TextReader
     {
         public override int Peek() => throw new IOException("peek failed");
@@ -82,5 +98,10 @@ public sealed class StreamSystemErrorTests
         public override void Write(string? value) => throw new IOException("text write failed");
 
         public override void Flush() => throw new IOException("flush failed");
+    }
+
+    private sealed class DisposedWriter : StringWriter
+    {
+        public override void Flush() => throw new ObjectDisposedException(nameof(DisposedWriter));
     }
 }

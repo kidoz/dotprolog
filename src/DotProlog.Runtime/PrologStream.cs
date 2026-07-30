@@ -251,7 +251,7 @@ public sealed class PrologStream
         {
             close();
         }
-        catch (Exception error) when (force && error is IOException or UnauthorizedAccessException)
+        catch (Exception error) when (force && error is IOException or UnauthorizedAccessException or ObjectDisposedException)
         {
             // force(true) exists so cleanup code can reclaim the stream despite resource errors.
         }

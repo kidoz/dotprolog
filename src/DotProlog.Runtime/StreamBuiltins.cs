@@ -364,7 +364,7 @@ internal static class StreamBuiltins
         {
             machine.Streams.Close(stream, force);
         }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        catch (Exception error) when (IsIoFailure(error))
         {
             throw PrologErrors.System(machine);
         }
