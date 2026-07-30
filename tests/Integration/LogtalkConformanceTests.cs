@@ -218,6 +218,16 @@ public sealed class LogtalkConformanceTests
         );
         Assert.Empty(textOutputDiagnostics);
 
+        Assert.Equal(
+            RunResult.Success,
+            textInputEngine.RunGoal(
+                "'$logtalk_set_text_output'(out, q), write(out, w), "
+                    + "'$logtalk_text_output_assertion'(out, qw, Assertion), call(Assertion)",
+                out IReadOnlyList<DotProlog.Syntax.Diagnostic> namedTextOutputDiagnostics
+            )
+        );
+        Assert.Empty(namedTextOutputDiagnostics);
+
         var adapterEngine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
         var errors = new LogtalkTestDeclaration(
             "fixture.lgt",
@@ -361,11 +371,11 @@ public sealed class LogtalkConformanceTests
                 ),
             ];
 
-            Assert.Equal(715, directCases.Length);
-            Assert.Equal(419, directCases.Count(test => test.OutcomeKind == "true"));
+            Assert.Equal(729, directCases.Length);
+            Assert.Equal(429, directCases.Count(test => test.OutcomeKind == "true"));
             Assert.Equal(73, directCases.Count(test => test.OutcomeKind == "false"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "fail"));
-            Assert.Equal(144, directCases.Count(test => test.OutcomeKind == "error"));
+            Assert.Equal(148, directCases.Count(test => test.OutcomeKind == "error"));
             Assert.Equal(13, directCases.Count(test => test.OutcomeKind == "variant"));
             Assert.Equal(41, directCases.Count(test => test.OutcomeKind == "exists"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "subsumes"));
@@ -494,8 +504,12 @@ public sealed class LogtalkConformanceTests
         var engine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
         engine.Program.Builtins.Register("$logtalk_set_text_input", 1, SetTextInput);
         engine.Program.Builtins.Register("$logtalk_set_text_output", 1, SetTextOutput);
+        engine.Program.Builtins.Register("$logtalk_set_text_output", 2, SetNamedTextOutput);
         engine.Program.Builtins.Register("$logtalk_text_output_assertion", 2, TextOutputAssertion);
+        engine.Program.Builtins.Register("$logtalk_text_output_assertion", 3, NamedTextOutputAssertion);
         engine.Program.Builtins.Register("$logtalk_text_output_contents", 1, TextOutputContents);
+        engine.Program.Builtins.Register("$logtalk_text_output_contents", 2, NamedTextOutputContents);
+        engine.Program.Builtins.Register("$logtalk_check_text_output", 2, CheckNamedTextOutput);
         engine.Program.Builtins.Register(
             "$logtalk_suppress_text_output",
             0,
@@ -530,6 +544,29 @@ public sealed class LogtalkConformanceTests
         return true;
     }
 
+    private static bool SetNamedTextOutput(Machine machine)
+    {
+        Cell alias = machine.Argument(0);
+        if (
+            alias.Tag != CellTag.Atom
+            || !TryReadTextContents(machine, machine.Argument(1), out string initial)
+        )
+        {
+            return false;
+        }
+
+        string path = Path.GetTempFileName();
+        PrologStream stream = machine.Streams.Open(
+            path,
+            "write",
+            machine.Symbols.AtomName(alias.Index),
+            "text",
+            reposition: false
+        );
+        stream.Writer!.Write(initial);
+        return true;
+    }
+
     private static bool TextOutputAssertion(Machine machine)
     {
         if (machine.Output is not StringWriter output)
@@ -537,11 +574,20 @@ public sealed class LogtalkConformanceTests
             return false;
         }
 
-        Cell expected = machine.Argument(0);
-        Cell actual = Cell.Atom(machine.Symbols.InternAtom(output.ToString()));
-        Cell assertion = machine.CreateStructure(machine.Symbols.InternFunctor("==", 2), [expected, actual]);
+        Cell assertion = EqualityAssertion(machine, machine.Argument(0), output.ToString());
         machine.Output = TextWriter.Null;
         return machine.Unify(machine.Argument(1), assertion);
+    }
+
+    private static bool NamedTextOutputAssertion(Machine machine)
+    {
+        if (!TryTakeNamedTextOutput(machine, machine.Argument(0), out string output))
+        {
+            return false;
+        }
+
+        Cell assertion = EqualityAssertion(machine, machine.Argument(1), output);
+        return machine.Unify(machine.Argument(2), assertion);
     }
 
     private static bool TextOutputContents(Machine machine)
@@ -551,13 +597,69 @@ public sealed class LogtalkConformanceTests
             return false;
         }
 
-        Cell[] characters =
-        [
-            .. output.ToString().Select(character => Cell.Atom(machine.Symbols.InternAtom(character.ToString()))),
-        ];
-        Cell contents = machine.CreateList(characters, Cell.Atom(machine.Symbols.EmptyList));
+        Cell contents = CharacterList(machine, output.ToString());
         machine.Output = TextWriter.Null;
         return machine.Unify(machine.Argument(0), contents);
+    }
+
+    private static bool NamedTextOutputContents(Machine machine)
+    {
+        if (!TryTakeNamedTextOutput(machine, machine.Argument(0), out string output))
+        {
+            return false;
+        }
+
+        return machine.Unify(machine.Argument(1), CharacterList(machine, output));
+    }
+
+    private static bool CheckNamedTextOutput(Machine machine)
+    {
+        if (
+            !TryTakeNamedTextOutput(machine, machine.Argument(0), out string output)
+            || !TryReadTextContents(machine, machine.Argument(1), out string expected)
+        )
+        {
+            return false;
+        }
+
+        return output == expected;
+    }
+
+    private static bool TryTakeNamedTextOutput(Machine machine, Cell alias, out string output)
+    {
+        if (alias.Tag != CellTag.Atom)
+        {
+            output = string.Empty;
+            return false;
+        }
+
+        PrologStream? stream = machine.Streams.ByAlias(machine.Symbols.AtomName(alias.Index));
+        if (stream?.Writer is null)
+        {
+            output = string.Empty;
+            return false;
+        }
+
+        string path = stream.Name;
+        machine.Streams.Close(stream);
+        output = File.ReadAllText(path);
+        File.Delete(path);
+        return true;
+    }
+
+    private static Cell EqualityAssertion(Machine machine, Cell expected, string actual) =>
+        machine.CreateStructure(
+            machine.Symbols.InternFunctor("==", 2),
+            [expected, Cell.Atom(machine.Symbols.InternAtom(actual))]
+        );
+
+    private static Cell CharacterList(Machine machine, string text)
+    {
+        Cell[] characters =
+        [
+            .. text.Select(character => Cell.Atom(machine.Symbols.InternAtom(character.ToString()))),
+        ];
+        return machine.CreateList(characters, Cell.Atom(machine.Symbols.EmptyList));
     }
 
     private static bool TryReadTextContents(Machine machine, Cell item, out string contents)

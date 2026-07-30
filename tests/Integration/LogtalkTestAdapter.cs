@@ -446,6 +446,9 @@ internal static class LogtalkTestAdapter
             bool dispatchedTextOutputContents = source
                 .AsSpan(current)
                 .StartsWith("^^text_output_contents(", StringComparison.Ordinal);
+            bool dispatchedCheckTextOutput = source
+                .AsSpan(current)
+                .StartsWith("^^check_text_output(", StringComparison.Ordinal);
             if (
                 source.AsSpan(current).StartsWith("^^", StringComparison.Ordinal)
                 && !dispatchedAssertion
@@ -453,6 +456,7 @@ internal static class LogtalkTestAdapter
                 && !dispatchedTextOutput
                 && !dispatchedTextOutputAssertion
                 && !dispatchedTextOutputContents
+                && !dispatchedCheckTextOutput
             )
             {
                 translated = string.Empty;
@@ -465,6 +469,7 @@ internal static class LogtalkTestAdapter
                 || dispatchedTextOutput
                 || dispatchedTextOutputAssertion
                 || dispatchedTextOutputContents
+                || dispatchedCheckTextOutput
             )
             {
                 functorStart += 2;
@@ -477,6 +482,7 @@ internal static class LogtalkTestAdapter
                 : IsFunctorCallAt(source, functorStart, "set_text_output") ? "set_text_output"
                 : IsFunctorCallAt(source, functorStart, "text_output_assertion") ? "text_output_assertion"
                 : IsFunctorCallAt(source, functorStart, "text_output_contents") ? "text_output_contents"
+                : IsFunctorCallAt(source, functorStart, "check_text_output") ? "check_text_output"
                 : null;
             if (functor is null)
             {
@@ -520,8 +526,14 @@ internal static class LogtalkTestAdapter
             else
             {
                 List<string> hostArguments = SplitTopLevel(arguments, ',');
-                int requiredArity = functor == "text_output_assertion" ? 2 : 1;
-                if (hostArguments.Count != requiredArity)
+                bool supportedArity = functor switch
+                {
+                    "set_text_input" => hostArguments.Count == 1,
+                    "set_text_output" or "text_output_contents" => hostArguments.Count is 1 or 2,
+                    "text_output_assertion" => hostArguments.Count is 2 or 3,
+                    _ => hostArguments.Count == 2,
+                };
+                if (!supportedArity)
                 {
                     translated = string.Empty;
                     return false;
@@ -532,7 +544,8 @@ internal static class LogtalkTestAdapter
                     "set_text_input" => "$logtalk_set_text_input",
                     "set_text_output" => "$logtalk_set_text_output",
                     "text_output_assertion" => "$logtalk_text_output_assertion",
-                    _ => "$logtalk_text_output_contents",
+                    "text_output_contents" => "$logtalk_text_output_contents",
+                    _ => "$logtalk_check_text_output",
                 };
                 replacement = $"'{hostFunctor}'({arguments})";
             }
