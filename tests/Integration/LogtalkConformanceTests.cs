@@ -96,6 +96,17 @@ public sealed class LogtalkConformanceTests
             """,
             supportProgram
         );
+
+        const string operatorSupportSource = """
+            :- op(100, fx, fx).
+            :- object(tests).
+            test(iso_operator, true) :-
+                {true}.
+            :- end_object.
+            """;
+        Assert.True(LogtalkTestAdapter.TryReadSupportProgram(operatorSupportSource, out string operatorSupport));
+        Assert.Equal(":- op(100, fx, fx).", operatorSupport);
+
         Assert.Equal(
             "((abs((X) - (3.1415927)) < 0.0000000001) -> true ; (abs((X) - (3.1415927)) < (0.00001 * max(abs(X), abs(3.1415927)))))",
             LogtalkTestAdapter.TranslateAssertion("X =~= 3.1415927")
@@ -340,11 +351,11 @@ public sealed class LogtalkConformanceTests
                 ),
             ];
 
-            Assert.Equal(681, directCases.Length);
-            Assert.Equal(393, directCases.Count(test => test.OutcomeKind == "true"));
+            Assert.Equal(696, directCases.Length);
+            Assert.Equal(405, directCases.Count(test => test.OutcomeKind == "true"));
             Assert.Equal(73, directCases.Count(test => test.OutcomeKind == "false"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "fail"));
-            Assert.Equal(139, directCases.Count(test => test.OutcomeKind == "error"));
+            Assert.Equal(142, directCases.Count(test => test.OutcomeKind == "error"));
             Assert.Equal(13, directCases.Count(test => test.OutcomeKind == "variant"));
             Assert.Equal(41, directCases.Count(test => test.OutcomeKind == "exists"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "subsumes"));

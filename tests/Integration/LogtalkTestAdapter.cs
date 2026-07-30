@@ -259,6 +259,18 @@ internal static class LogtalkTestAdapter
                 continue;
             }
 
+            if (TryReadDirectiveArgument(text, "op", out _))
+            {
+                if (conditionalDepth > 0)
+                {
+                    program = string.Empty;
+                    return false;
+                }
+
+                support.Add(text);
+                continue;
+            }
+
             if (
                 conditionalDepth > 0
                 || text.StartsWith(":-", StringComparison.Ordinal)
