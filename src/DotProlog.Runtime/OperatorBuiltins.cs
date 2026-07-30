@@ -61,11 +61,21 @@ internal static class OperatorBuiltins
         };
 
         // A list of names is one declaration each, which is how the ISO table itself is written.
-        List<Cell> targets =
-            names.Tag == CellTag.Structure && machine.HeapAt(names.Index).Index == machine.Symbols.ListFunctor
-                ? TermList.ReadProper(machine, names)
-                : [names];
+        List<Cell> targets;
+        if (names.Tag == CellTag.Atom)
+        {
+            targets = [names];
+        }
+        else if (names.Tag == CellTag.Structure && machine.HeapAt(names.Index).Index == machine.Symbols.ListFunctor)
+        {
+            targets = TermList.ReadProper(machine, names);
+        }
+        else
+        {
+            throw PrologErrors.Type(machine, "list", names);
+        }
 
+        var definitions = new List<(Cell Name, string Text)>(targets.Count);
         foreach (Cell target in targets)
         {
             Cell name = machine.Dereference(target);
@@ -81,13 +91,20 @@ internal static class OperatorBuiltins
             }
 
             string text = machine.Symbols.AtomName(name.Index);
-
-            // ',' is not redefinable: argument lists and conjunction both depend on what it means.
-            if (text == ",")
+            OperatorDefinitionConflict conflict = machine.Operators.DefinitionConflict((int)priority.Integer, specifier, text);
+            if (conflict != OperatorDefinitionConflict.None)
             {
-                throw PrologErrors.Permission(machine, "modify", "operator", machine.Symbols.InternFunctor(",", 2));
+                string operation = conflict == OperatorDefinitionConflict.Create ? "create" : "modify";
+                throw PrologErrors.Permission(machine, operation, "operator", name);
             }
 
+            definitions.Add((name, text));
+        }
+
+        // Validate the whole list before changing the table so a later invalid name cannot leave
+        // earlier names installed.
+        foreach ((_, string text) in definitions)
+        {
             machine.Operators.Define((int)priority.Integer, specifier, text);
         }
 

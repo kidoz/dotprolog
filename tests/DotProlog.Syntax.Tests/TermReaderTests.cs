@@ -226,4 +226,18 @@ public sealed class TermReaderTests
         Assert.True(result.Success);
         Assert.Equal("fixx", Canonical(result.Clauses[^1]));
     }
+
+    [Fact]
+    public void ARejectedOperatorDirectiveDoesNotPartiallyChangeTheReaderTable()
+    {
+        var operators = new OperatorTable();
+
+        ParseResult result = TermReader.ReadProgram(
+            ":- op(100, xfx, [temporary_operator, ',']).",
+            operators: operators
+        );
+
+        Assert.True(result.Success);
+        Assert.False(operators.IsOperator("temporary_operator"));
+    }
 }

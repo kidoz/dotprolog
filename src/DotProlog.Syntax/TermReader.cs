@@ -151,14 +151,23 @@ public sealed class TermReader
             return;
         }
 
-        // A malformed declaration is left alone here and reported when it runs as a goal, so that
-        // there is one place that decides what op/3 rejects.
-        foreach (SyntaxTerm name in NamesOf(declaration.Arguments[2]))
+        // A malformed declaration is left alone here and reported when it runs as a goal. Validate
+        // the whole name list before changing the reader table so directives are atomic too.
+        SyntaxTerm[] names = [.. NamesOf(declaration.Arguments[2])];
+        if (
+            names.Any(name =>
+                name is not AtomTerm atom
+                || _operators.DefinitionConflict((int)priority.Value, specifier.Value, atom.Name)
+                    != OperatorDefinitionConflict.None
+            )
+        )
         {
-            if (name is AtomTerm { Name: not "," } atom)
-            {
-                _operators.Define((int)priority.Value, specifier.Value, atom.Name);
-            }
+            return;
+        }
+
+        foreach (AtomTerm atom in names.Cast<AtomTerm>())
+        {
+            _operators.Define((int)priority.Value, specifier.Value, atom.Name);
         }
     }
 

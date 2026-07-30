@@ -89,6 +89,42 @@ public sealed class OperatorTable
         return priority;
     }
 
+    /// <summary>
+    /// Reports the ISO permission conflict that would prevent a definition. This is shared with the
+    /// reader so an invalid <c>op/3</c> directive never changes parsing before the runtime goal
+    /// raises its error.
+    /// </summary>
+    internal OperatorDefinitionConflict DefinitionConflict(int priority, OperatorType type, string name)
+    {
+        if (name == ",")
+        {
+            return OperatorDefinitionConflict.Modify;
+        }
+
+        if (priority == 0)
+        {
+            return OperatorDefinitionConflict.None;
+        }
+
+        if (name is "[]" or "{}" || (name == "|" && priority <= 1000))
+        {
+            return OperatorDefinitionConflict.Create;
+        }
+
+        bool requestedInfix = type is OperatorType.Xfx or OperatorType.Xfy or OperatorType.Yfx;
+        bool requestedPostfix = type is OperatorType.Xf or OperatorType.Yf;
+        if (
+            (requestedInfix || requestedPostfix)
+            && _infixOrPostfix.TryGetValue(name, out PrologOperator existing)
+            && existing.IsInfix != requestedInfix
+        )
+        {
+            return OperatorDefinitionConflict.Create;
+        }
+
+        return OperatorDefinitionConflict.None;
+    }
+
     private void DefineDefaults()
     {
         Define(1200, OperatorType.Xfx, ":-");
@@ -145,4 +181,11 @@ public sealed class OperatorTable
                 .OrderBy(entry => entry.Name, StringComparer.Ordinal)
                 .ThenBy(entry => entry.Type),
         ]);
+}
+
+internal enum OperatorDefinitionConflict
+{
+    None,
+    Create,
+    Modify,
 }

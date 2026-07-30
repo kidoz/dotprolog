@@ -279,8 +279,8 @@ iso_case('8.14.3', op(30, _, iso_bad), error(instantiation_error)).
 iso_case('8.14.3', op(a, xfy, iso_bad), error(type_error(integer, a))).
 iso_case('8.14.3', op(30, a, iso_bad), error(domain_error(operator_specifier, a))).
 iso_case('8.14.3', op(1300, xfx, iso_bad), error(domain_error(operator_priority, 1300))).
-iso_case('8.14.3', op(30, xfy, 0), error(type_error(atom, 0))).
-iso_case('8.14.3', op(30, xfx, ','), error(permission_error(modify, operator, '/'(',', 2)))).
+iso_case('8.14.3', op(30, xfy, 0), error(type_error(list, 0))).
+iso_case('8.14.3', op(30, xfx, ','), error(permission_error(modify, operator, ','))).
 
 % --- 8.15 Logic and control --------------------------------------------------
 iso_case('8.15.1', \+ true, failure).

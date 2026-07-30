@@ -84,12 +84,43 @@ public sealed class OperatorDeclarationTests
     [InlineData("op(-1, xfx, foo)", "domain_error(operator_priority,-1)")]
     [InlineData("op(700, nonsense, foo)", "domain_error(operator_specifier,nonsense)")]
     [InlineData("op(700, 7, foo)", "type_error(atom,7)")]
-    [InlineData("op(700, xfx, 7)", "type_error(atom,7)")]
+    [InlineData("op(700, xfx, 7)", "type_error(list,7)")]
+    [InlineData("op(500, xfy, [])", "permission_error(create,operator,[])")]
+    [InlineData("op(500, xfy, [[]])", "permission_error(create,operator,[])")]
+    [InlineData("op(500, xfy, {})", "permission_error(create,operator,{})")]
+    [InlineData("op(500, xfy, [{}])", "permission_error(create,operator,{})")]
+    [InlineData("op(1000, xfy, '|')", "permission_error(create,operator,(|))")]
+    [InlineData("op(1000, fx, '|')", "permission_error(create,operator,(|))")]
     // The culprit prints as (,) rather than ',' because write/1 does not quote, and an operator
     // atom in an argument position is bracketed so that the output still reads back.
-    [InlineData("op(700, xfx, ',')", "permission_error(modify,operator,(,)/2)")]
+    [InlineData("op(700, xfx, ',')", "permission_error(modify,operator,(,))")]
     public void RejectsBadDeclarations(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+
+    [Fact]
+    public void RejectsAnInfixAndPostfixDefinitionForTheSameName()
+    {
+        Assert.Equal(
+            "permission_error(create,operator,plusplus)",
+            PrologTestHost.RunGoal(
+                "op(30, xfy, plusplus), "
+                    + "catch(op(50, yf, plusplus), error(E, _), write(E)), "
+                    + "op(0, xfy, plusplus)"
+            )
+        );
+    }
+
+    [Fact]
+    public void ARejectedNameListDoesNotInstallEarlierNames()
+    {
+        Assert.Equal(
+            "yes",
+            PrologTestHost.RunGoal(
+                "catch(op(100, xfx, [temporary_operator, ',']), error(_, _), true), "
+                    + "\\+ current_op(_, _, temporary_operator), write(yes)"
+            )
+        );
+    }
 
     [Fact]
     public void CurrentOpFindsADefinition() =>
