@@ -200,11 +200,30 @@ public sealed class ExecutionTests
     }
 
     [Fact]
-    public void AGoalThatIsNotCallableIsReportedNotIgnored()
+    public void AGoalThatIsNotCallableRaisesACatchableRuntimeError()
     {
-        (_, _, IReadOnlyList<Diagnostic> diagnostics) = PrologTestHost.Execute("p :- 42.");
+        string output = PrologTestHost.Run(
+            """
+            p :- 42.
+            :- initialization(catch(p, error(E, _), write(E))).
+            """
+        );
 
-        Assert.Equal(CompilerDiagnosticIds.UnsupportedGoal, Assert.Single(diagnostics).Id);
+        Assert.Equal("type_error(callable,42)", output);
+    }
+
+    [Fact]
+    public void AnUnreachableNonCallableGoalDoesNotRaiseAnError()
+    {
+        Assert.Equal(
+            "yes",
+            PrologTestHost.Run(
+                """
+                p :- fail, 42.
+                :- initialization((\+ p, write(yes))).
+                """
+            )
+        );
     }
 
     [Theory]

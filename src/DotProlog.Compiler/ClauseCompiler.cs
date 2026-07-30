@@ -200,7 +200,9 @@ internal sealed class ClauseCompiler
 
         if (goal is not (AtomTerm or CompoundTerm))
         {
-            Report(CompilerDiagnosticIds.UnsupportedGoal, "A goal must be a callable term.", goal.Span);
+            // ISO treats this as an execution error, not a source rejection. Emitting a meta-call
+            // keeps the error catchable and preserves control flow: fail, 4 never evaluates 4.
+            EmitMetaCall(goal, isLast);
             return;
         }
 

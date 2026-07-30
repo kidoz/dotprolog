@@ -294,6 +294,8 @@ iso_case('8.15.3', call(fail), failure).
 iso_case('8.15.3', call(_), error(instantiation_error)).
 iso_case('8.15.3', call(4), error(type_error(callable, 4))).
 iso_case('8.15.3', call((fail, 4)), error(type_error(callable, (fail, 4)))).
+iso_case('8.15.3', iso_noncallable_body, error(type_error(callable, 4))).
+iso_case('8.15.3', iso_unreached_noncallable_body, failure).
 
 % --- 8.16 Atomic term processing ---------------------------------------------
 iso_case('8.16.1', atom_length(abcde, 5), success).
@@ -349,6 +351,8 @@ iso_case('8.18.1', halt(stopped), error(type_error(integer, stopped))).
 
 % Used by 8.15.3; a goal that is defined so the case tests control flow, not existence.
 repeat_guard(0).
+iso_noncallable_body :- 4.
+iso_unreached_noncallable_body :- fail, 4.
 
 % --- 7.1 Terms, read back from text ------------------------------------------
 iso_case('7.1.1', reads_as('foo', foo), success).

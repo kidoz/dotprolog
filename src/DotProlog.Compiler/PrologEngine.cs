@@ -398,6 +398,11 @@ public sealed class PrologEngine : IRuntimeCompiler
             throw PrologErrors.Type(machine, "callable", headCell);
         }
 
+        if (hasBody && bodyCell.Tag is not (CellTag.Reference or CellTag.Atom or CellTag.Structure))
+        {
+            throw PrologErrors.Type(machine, "callable", bodyCell);
+        }
+
         SyntaxTerm term = TermReifier.ToSyntax(machine, clause);
         SyntaxTerm head = term;
         SyntaxTerm? body = null;
