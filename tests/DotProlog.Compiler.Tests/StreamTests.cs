@@ -334,6 +334,39 @@ public sealed class StreamTests : IDisposable
     public void ReportsCharacterCodeErrors(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
 
+    [Theory]
+    [InlineData("get_char(1)", "type_error(in_character,1)")]
+    [InlineData("get_char(foo)", "type_error(in_character,foo)")]
+    [InlineData("peek_char('')", "type_error(in_character,'')")]
+    public void ReportsInputCharacterErrorsWithoutReading(string operation, string expected)
+    {
+        string path = Path("character-errors.txt");
+        File.WriteAllText(path, "a");
+
+        Assert.Equal(
+            $"{expected} yes\n",
+            PrologTestHost.RunGoal(
+                $"open('{path}', read, S), set_input(S), "
+                    + $"catch({operation}, error(E, _), writeq(E)), "
+                    + "get_char(a), set_input(user_input), close(S), write(' yes'), nl"
+            )
+        );
+    }
+
+    [Fact]
+    public void EndOfFileIsAValidBoundInputCharacter()
+    {
+        string path = Path("empty.txt");
+        File.WriteAllText(path, string.Empty);
+
+        Assert.Equal(
+            "yes\n",
+            PrologTestHost.RunGoal(
+                $"open('{path}', read, S), get_char(S, end_of_file), " + "peek_char(S, end_of_file), close(S), write(yes), nl"
+            )
+        );
+    }
+
     [Fact]
     public void AClosedStreamIsGoneRatherThanReused()
     {

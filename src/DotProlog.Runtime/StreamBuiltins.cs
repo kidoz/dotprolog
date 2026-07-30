@@ -716,6 +716,16 @@ internal static class StreamBuiltins
     {
         PrologStream source = Resolve(machine, stream, input: true);
         PrepareInput(machine, source, stream);
+        Cell character = machine.Argument(target);
+        if (character.Tag != CellTag.Reference)
+        {
+            string? atom = character.Tag == CellTag.Atom ? machine.Symbols.AtomName(character.Index) : null;
+            if (atom is null || (atom.Length != 1 && atom != "end_of_file"))
+            {
+                throw PrologErrors.Type(machine, "in_character", character);
+            }
+        }
+
         TextReader reader = source.Reader!;
 
         // Whatever a term read left behind has to be consumed before the reader itself is touched.
@@ -728,7 +738,7 @@ internal static class StreamBuiltins
                 source.RecordInput(read: true);
             }
 
-            return machine.Unify(machine.Argument(target), Character(machine, buffered));
+            return machine.Unify(character, Character(machine, buffered));
         }
 
         int next = consume ? reader.Read() : reader.Peek();
@@ -738,7 +748,7 @@ internal static class StreamBuiltins
         }
 
         return machine.Unify(
-            machine.Argument(target),
+            character,
             next < 0 ? Cell.Atom(machine.Symbols.InternAtom("end_of_file")) : Character(machine, (char)next)
         );
     }
