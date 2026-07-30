@@ -1,0 +1,150 @@
+namespace Integration.Tests;
+
+/// <summary>
+/// Builds a temporary <c>.dplproj</c> twice and then renames its module, proving that an unchanged
+/// build skips facade generation, that a rename deletes the stale facade instead of compiling it,
+/// and that <c>dotnet clean</c> removes the generated files.
+/// </summary>
+/// <remarks>
+/// Incremental behaviour is MSBuild behaviour, so like <see cref="ProjectReferenceTests"/> this can
+/// only be checked by running MSBuild. The rename case matters because it is invisible to
+/// timestamps: the old files are simply absent from the glob.
+/// </remarks>
+public sealed class IncrementalBuildTests : IDisposable
+{
+    private const string OptInVariable = "DOTPROLOG_RUN_AOT_TESTS";
+
+    private readonly string _project = CreateProjectDirectory();
+
+    private static string CreateProjectDirectory()
+    {
+        string path = Directory.CreateTempSubdirectory("dotprolog-incremental").FullName;
+
+        // macOS puts temporary files under /var, a symlink to /private/var. MSBuild computes
+        // relative paths between projects from the literal strings, which then miss by one level,
+        // so the real path is what the project file has to live at.
+        return OperatingSystem.IsMacOS() && path.StartsWith("/var/", StringComparison.Ordinal) ? "/private" + path : path;
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        try
+        {
+            Directory.Delete(_project, recursive: true);
+        }
+        catch (IOException)
+        {
+            // A leftover temporary directory is not worth failing the run over.
+        }
+    }
+
+    [Fact]
+    public async Task GenerationIsSkippedWhenNothingChangedAndARenamedModuleLeavesNoStaleFacade()
+    {
+        Assert.SkipUnless(
+            Environment.GetEnvironmentVariable(OptInVariable) == "1",
+            $"Set {OptInVariable}=1 to run the toolchain integration tests."
+        );
+
+        // The task assembly is loaded by MSBuild, so it has to exist before the project builds.
+        (int taskExit, string taskLog) = await Run(
+            "dotnet",
+            ["build", "-nodereuse:false", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
+        );
+
+        Assert.True(taskExit == 0, $"Building the task failed:\n{taskLog}");
+
+        WriteProjectFile();
+        WriteModule("rules", "Rules");
+
+        string generatedPath = Path.Combine(_project, "obj", "prolog");
+        string stamp = Path.Combine(generatedPath, ".generated");
+        string rulesFacade = Path.Combine(generatedPath, "RulesModule.g.cs");
+
+        (int firstExit, string firstLog) = await Build();
+        Assert.True(firstExit == 0, $"The first build failed:\n{firstLog}");
+        Assert.True(File.Exists(rulesFacade), $"No generated facade at {rulesFacade}.");
+        DateTime generatedAt = File.GetLastWriteTimeUtc(stamp);
+
+        // Nothing changed, so the stamp the generation target touches must not move.
+        (int secondExit, string secondLog) = await Build();
+        Assert.True(secondExit == 0, $"The second build failed:\n{secondLog}");
+        Assert.Equal(generatedAt, File.GetLastWriteTimeUtc(stamp));
+
+        // A rename changes no surviving file's timestamp; only the recorded input list sees it.
+        File.Delete(Path.Combine(_project, "rules.pl"));
+        File.Delete(Path.Combine(_project, "rules.dpli"));
+        WriteModule("pricing", "Pricing");
+
+        (int thirdExit, string thirdLog) = await Build();
+        Assert.True(thirdExit == 0, $"The build after the rename failed:\n{thirdLog}");
+        Assert.True(File.Exists(Path.Combine(generatedPath, "PricingModule.g.cs")), "The renamed module was not generated.");
+        Assert.False(File.Exists(rulesFacade), $"The stale facade {rulesFacade} survived the rename.");
+
+        // A deletion is the truly timestamp-invisible change: every file that remains is untouched,
+        // and only the recorded input list can tell this build from the one before it.
+        WriteModule("extra", "Extra");
+        string extraFacade = Path.Combine(generatedPath, "ExtraModule.g.cs");
+
+        (int fourthExit, string fourthLog) = await Build();
+        Assert.True(fourthExit == 0, $"The build with a second module failed:\n{fourthLog}");
+        Assert.True(File.Exists(extraFacade), $"No generated facade at {extraFacade}.");
+
+        File.Delete(Path.Combine(_project, "extra.pl"));
+        File.Delete(Path.Combine(_project, "extra.dpli"));
+
+        (int fifthExit, string fifthLog) = await Build();
+        Assert.True(fifthExit == 0, $"The build after the deletion failed:\n{fifthLog}");
+        Assert.False(File.Exists(extraFacade), $"The stale facade {extraFacade} survived the deletion.");
+
+        // The generated files live outside IntermediateOutputPath, so Clean needs its own proof.
+        (int cleanExit, string cleanLog) = await Run(
+            "dotnet",
+            ["clean", "-nodereuse:false", Path.Combine(_project, "Incremental.dplproj"), "--nologo"]
+        );
+
+        Assert.True(cleanExit == 0, $"Cleaning failed:\n{cleanLog}");
+        Assert.False(File.Exists(stamp), "Clean left the generation stamp behind.");
+        Assert.Empty(Directory.GetFiles(generatedPath, "*.g.cs", SearchOption.AllDirectories));
+    }
+
+    private void WriteProjectFile()
+    {
+        string source = Path.Combine(RepositoryLayout.Root, "src");
+
+        File.WriteAllText(
+            Path.Combine(_project, "Incremental.dplproj"),
+            $"""
+            <Project Sdk="Microsoft.NET.Sdk">
+                <Import Project="{source}/DotProlog.Sdk/Sdk/Sdk.props" />
+                <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <RootNamespace>Incremental.Rules</RootNamespace>
+                    <NoWarn>$(NoWarn);CS1591</NoWarn>
+                    <DotPrologTasksAssembly>{source}/DotProlog.Build.Tasks/bin/$(Configuration)/net10.0/DotProlog.Build.Tasks.dll</DotPrologTasksAssembly>
+                </PropertyGroup>
+                <ItemGroup>
+                    <ProjectReference Include="{source}/DotProlog.Compiler/DotProlog.Compiler.csproj" />
+                </ItemGroup>
+                <Import Project="{source}/DotProlog.Sdk/Sdk/Sdk.targets" />
+            </Project>
+            """
+        );
+    }
+
+    private void WriteModule(string module, string clrName)
+    {
+        File.WriteAllText(Path.Combine(_project, $"{module}.pl"), "value(one).\n");
+        File.WriteAllText(
+            Path.Combine(_project, $"{module}.dpli"),
+            $":- clr_module('{clrName}').\n:- clr_export(value/1, nondet, [out(value, atom)]).\n"
+        );
+    }
+
+    private Task<(int ExitCode, string Log)> Build() =>
+        Run("dotnet", ["build", "-nodereuse:false", Path.Combine(_project, "Incremental.dplproj"), "--nologo"]);
+
+    private static Task<(int ExitCode, string Log)> Run(string fileName, string[] arguments) =>
+        ChildProcess.RunAsync(fileName, arguments, RepositoryLayout.Root);
+}
