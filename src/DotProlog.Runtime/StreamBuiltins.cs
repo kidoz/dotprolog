@@ -286,6 +286,10 @@ internal static class StreamBuiltins
         {
             throw PrologErrors.Permission(machine, "open", "source_sink", file);
         }
+        catch (Exception error) when (error is ArgumentException or NotSupportedException)
+        {
+            throw PrologErrors.Domain(machine, "source_sink", file);
+        }
 
         return machine.Unify(target, StreamTerm(machine, stream));
     }

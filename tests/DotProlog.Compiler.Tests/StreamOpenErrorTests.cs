@@ -51,6 +51,21 @@ public sealed class StreamOpenErrorTests : IDisposable
         Assert.Empty(Directory.EnumerateFileSystemEntries(_directory));
     }
 
+    [Theory]
+    [InlineData("read")]
+    [InlineData("write")]
+    public void InvalidHostPathRemainsACatchableSourceSinkDomainError(string mode)
+    {
+        Assert.Equal(
+            "yes",
+            PrologTestHost.RunGoal(
+                $"atom_codes(SourceSink, [0]), "
+                    + $"catch(open(SourceSink, {mode}, _), error(domain_error(source_sink, SourceSink), _), write(yes))"
+            )
+        );
+        Assert.Empty(Directory.EnumerateFileSystemEntries(_directory));
+    }
+
     [Fact]
     public void DuplicateAliasDoesNotReplaceTheOpenStreamOrTouchTheSecondFile()
     {
