@@ -84,6 +84,7 @@ public sealed class NativeAotAcceptanceTests
                     "predicate_info",
                     "prolog_flags",
                     "character_conversion",
+                    "numeric_escape_syntax",
                     "read_options",
                     "read_option_validation",
                     "integer_representation_errors",

@@ -55,6 +55,7 @@ internal static class Program
             native_noncallable_body :- 4.
             native_unreached_noncallable_body :- fail, 4.
             native_quoted_fact(left 'native_quoted' right).
+            native_escape('\x41\').
 
             main :-
                 greeting(G), write(G), nl,
@@ -193,6 +194,14 @@ internal static class Program
                 char_conversion(DoubleQuote, DoubleQuote),
                 char_conversion(a, a),
                 write(character_conversion), nl,
+
+                % ISO delimited hexadecimal and octal escapes survive native publication.
+                native_escape('A'),
+                NativeEscapedCode is 0'\o101\,
+                NativeEscapedCode =:= 65,
+                atom_codes(NativeEscapedSource, [39, 92, 120, 52, 49, 92, 39]),
+                read_term_from_atom(NativeEscapedSource, 'A', []),
+                write(numeric_escape_syntax), nl,
 
                 % ISO read options retain source order, sharing, and named-singleton identity.
                 read_term_from_atom('f(A,B,A,_C,_)', ReadOptionsTerm,
