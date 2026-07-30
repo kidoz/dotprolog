@@ -191,6 +191,33 @@ internal static class Program
                 ArgIndexCaught == true,
                 write(arg_errors), nl,
 
+                % Term construction enforces list shape, atomic heads, and the advertised arity.
+                catch(
+                    (_ =.. [native | invalid_tail]),
+                    error(type_error(list, [native | invalid_tail]), _),
+                    UnivListCaught = true),
+                UnivListCaught == true,
+                catch(
+                    (_ =.. [native(value)]),
+                    error(type_error(atomic, native(value)), _),
+                    UnivHeadCaught = true),
+                UnivHeadCaught == true,
+                functor(NativeMaximum, native_functor, 255),
+                functor(NativeMaximum, native_functor, NativeArity),
+                NativeArity =:= 255,
+                catch(
+                    functor(_, native_functor, 256),
+                    error(representation_error(max_arity), _),
+                    FunctorArityCaught = true),
+                FunctorArityCaught == true,
+                length(NativeUnivArgs, 256),
+                catch(
+                    (_ =.. [native_univ | NativeUnivArgs]),
+                    error(representation_error(max_arity), _),
+                    UnivArityCaught = true),
+                UnivArityCaught == true,
+                write(term_construction_errors), nl,
+
                 % current_op/3 validates bound ISO filter domains before enumeration.
                 catch(
                     current_op(a, _, _),
