@@ -125,6 +125,17 @@ internal static class Program
                 ReadSingletons = ['B'=ReadB, '_C'=ReadC],
                 write(read_options), nl,
 
+                % Invalid read options are rejected before they can consume the next stream term.
+                open('dotprolog-aot-read-options.tmp', write, ReadOptionOut),
+                write(ReadOptionOut, 'first .'), close(ReadOptionOut),
+                open('dotprolog-aot-read-options.tmp', read, ReadOptionIn),
+                catch(
+                    read_term(ReadOptionIn, _, [nonsense(x)]),
+                    error(domain_error(read_option, nonsense(x)), _),
+                    true),
+                read(ReadOptionIn, first), close(ReadOptionIn),
+                write(read_option_validation), nl,
+
                 % Open streams and their ISO metadata are explicit runtime state, not reflection.
                 current_input(NativeInput), current_stream(NativeInput),
                 stream_property(NativeInput, mode(read)),

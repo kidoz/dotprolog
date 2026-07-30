@@ -82,6 +82,7 @@ public sealed class NativeAotAcceptanceTests
                     "prolog_flags",
                     "character_conversion",
                     "read_options",
+                    "read_option_validation",
                     "stream_properties",
                     "code_io",
                     "stream_eof_actions",
