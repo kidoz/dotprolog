@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**402 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**413 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -87,6 +87,9 @@ Writing them was worth it immediately: they found these real defects.
 - `get_char/1,2` and `peek_char/1,2` now validate bound inputs as the ISO `in_character` type before
   consuming anything. One-character atoms and `end_of_file` are accepted; other terms raise the
   exact `type_error(in_character, Culprit)`.
+- Character, code, and byte I/O now apply ISO error priority when more than one argument is invalid:
+  explicit stream variables win first, value type checks precede stream lookup, and character-code
+  representation checks follow stream permissions.
 - Host reader and writer failures now become catchable ISO `system_error` terms throughout stream
   input, output, EOF inspection, positioning, formatting, flushing, and closing. Implicit-current
   output predicates also enforce the same text/binary permissions as explicit-stream calls.
@@ -97,7 +100,7 @@ Writing them was worth it immediately: they found these real defects.
   Unknown options, variable elements, and partial lists therefore raise their ISO errors without
   consuming the next term.
 
-Beyond the conformance cases, the engine and toolchain are covered by 918 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 933 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
@@ -123,7 +126,7 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 
 | Feature | Current state |
 |---|---|
-| Complete stream surface | The final term/stream I/O error clauses still require an audit |
+| Complete stream surface | Open, close, and term I/O multi-error priority still requires an audit |
 
 ## Non-ISO features absent deliberately
 
