@@ -80,11 +80,14 @@ internal static class LogtalkTestAdapter
     }
 
     /// <summary>
-    /// Whether a source contains only the Logtalk object/test wrapper and no helpers or conditional
-    /// compilation whose backend-dependent branch would first need adaptation.
+    /// Extracts unconditional source-local Prolog helpers while rejecting Logtalk-specific or
+    /// backend-conditional support code that cannot yet be translated mechanically.
     /// </summary>
-    internal static bool CanExecuteWithoutSupportClauses(string source)
+    internal static bool TryReadSupportProgram(string source, out string program)
     {
+        var support = new List<string>();
+        bool conditional = false;
+
         foreach (string clause in SplitClauses(source))
         {
             string text = TrimLeadingTrivia(clause);
@@ -104,29 +107,111 @@ internal static class LogtalkTestAdapter
                 || text.StartsWith(":- protected", StringComparison.Ordinal)
                 || text.StartsWith(":- uses", StringComparison.Ordinal)
                 || text.StartsWith(":- meta_predicate", StringComparison.Ordinal)
-                || text.StartsWith(":- if", StringComparison.Ordinal)
-                || text.StartsWith(":- elif", StringComparison.Ordinal)
-                || text.StartsWith(":- else", StringComparison.Ordinal)
-                || text.StartsWith(":- endif", StringComparison.Ordinal)
             )
             {
                 continue;
             }
 
-            // Backend conditions select different declarations or helpers and must be accounted for
-            // by the later conditional-compilation adapter, not guessed here.
+            if (
+                text.StartsWith(":- if", StringComparison.Ordinal)
+                || text.StartsWith(":- elif", StringComparison.Ordinal)
+                || text.StartsWith(":- else", StringComparison.Ordinal)
+                || text.StartsWith(":- endif", StringComparison.Ordinal)
+            )
+            {
+                conditional = true;
+                continue;
+            }
+
+            // These declarations only describe how a Prolog system may lay out source predicates.
+            if (
+                text.StartsWith(":- multifile", StringComparison.Ordinal)
+                || text.StartsWith(":- discontiguous", StringComparison.Ordinal)
+            )
+            {
+                continue;
+            }
+
+            if (text.StartsWith(":- dynamic", StringComparison.Ordinal))
+            {
+                support.Add(text);
+                continue;
+            }
+
+            if (
+                text.StartsWith(":-", StringComparison.Ordinal)
+                || text.Contains("^^", StringComparison.Ordinal)
+                || text.Contains("::", StringComparison.Ordinal)
+                || !TryTranslateSupportClause(text, out string translated)
+            )
+            {
+                program = string.Empty;
+                return false;
+            }
+
+            support.Add(translated);
+        }
+
+        // Selecting a backend branch requires evaluating Logtalk flags. Files without helper
+        // clauses remain safe because their enabled test declaration is already explicit.
+        if (conditional && support.Count > 0)
+        {
+            program = string.Empty;
             return false;
         }
 
+        program = string.Join(Environment.NewLine, support);
         return true;
     }
 
     /// <summary>
     /// Unwraps one or more conjoined Logtalk backend escapes, leaving each Prolog goal unchanged.
     /// </summary>
-    internal static bool TryUnwrapBackendGoal(LogtalkTestDeclaration declaration, out string goal)
+    internal static bool TryUnwrapBackendGoal(LogtalkTestDeclaration declaration, out string goal) =>
+        TryUnwrapBackendBody(declaration.Body, out goal);
+
+    private static bool TryTranslateSupportClause(string clause, out string translated)
     {
-        string body = declaration.Body.Trim();
+        int neck = FindTopLevel(clause, ":-");
+        if (neck < 0)
+        {
+            if (clause.Contains('{') || clause.Contains('}'))
+            {
+                translated = string.Empty;
+                return false;
+            }
+
+            translated = clause;
+            return true;
+        }
+
+        string body = clause[(neck + 2)..].Trim();
+        if (!body.EndsWith('.'))
+        {
+            translated = string.Empty;
+            return false;
+        }
+
+        body = body[..^1].Trim();
+        if (!body.Contains('{') && !body.Contains('}'))
+        {
+            translated = clause;
+            return true;
+        }
+
+        if (!TryUnwrapBackendBody(body, out string backendGoal))
+        {
+            translated = string.Empty;
+            return false;
+        }
+
+        translated = $"{clause[..(neck + 2)]}{Environment.NewLine}    {backendGoal}.";
+        return true;
+    }
+
+    private static bool TryUnwrapBackendBody(string source, out string goal)
+    {
+        string body = source.Trim();
         List<string> parts = SplitTopLevel(body, ',');
         var goals = new List<string>(parts.Count);
 
@@ -159,6 +244,11 @@ internal static class LogtalkTestAdapter
     /// </summary>
     internal static string TranslateAssertion(string assertion)
     {
+        if (TryUnwrapBackendBody(assertion, out string backendAssertion))
+        {
+            assertion = backendAssertion;
+        }
+
         int approximateEquality = FindTopLevel(assertion, "=~=");
         if (approximateEquality < 0)
         {

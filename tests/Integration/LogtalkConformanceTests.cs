@@ -23,6 +23,12 @@ public sealed class LogtalkConformanceTests
     {
         const string source = """
             % A dot and comma inside terms are not declaration boundaries.
+            :- dynamic(state/1).
+            :- discontiguous(helper/1).
+
+            helper(X) :-
+                {atom(X)}.
+
             test(iso_fixture_01, true(X == 1.0)) :-
                 {X = 1.0},
                 {Y = pair(a, b)}.
@@ -67,10 +73,20 @@ public sealed class LogtalkConformanceTests
 
         Assert.True(LogtalkTestAdapter.TryUnwrapBackendGoal(declarations[0], out string firstGoal));
         Assert.Equal("(X = 1.0), (Y = pair(a, b))", firstGoal);
+        Assert.True(LogtalkTestAdapter.TryReadSupportProgram(source, out string supportProgram));
+        Assert.Equal(
+            """
+            :- dynamic(state/1).
+            helper(X) :-
+                (atom(X)).
+            """,
+            supportProgram
+        );
         Assert.Equal(
             "((abs((X) - (3.1415927)) < 0.0000000001) -> true ; (abs((X) - (3.1415927)) < (0.00001 * max(abs(X), abs(3.1415927)))))",
             LogtalkTestAdapter.TranslateAssertion("X =~= 3.1415927")
         );
+        Assert.Equal("(current_predicate(foo/1))", LogtalkTestAdapter.TranslateAssertion("{current_predicate(foo/1)}"));
     }
 
     [Fact]
@@ -150,20 +166,29 @@ public sealed class LogtalkConformanceTests
                 outcomeKinds
             );
 
+            var supportByPath = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach ((string path, string source) in sourceByPath)
+            {
+                if (LogtalkTestAdapter.TryReadSupportProgram(source, out string support))
+                {
+                    supportByPath.Add(path, support);
+                }
+            }
+
             LogtalkTestDeclaration[] directCases =
             [
                 .. declarations.Where(test =>
                     !test.Disabled
                     && test.OutcomeKind is "true" or "false" or "error"
-                    && LogtalkTestAdapter.CanExecuteWithoutSupportClauses(sourceByPath[test.SourcePath])
+                    && supportByPath.ContainsKey(test.SourcePath)
                     && LogtalkTestAdapter.TryUnwrapBackendGoal(test, out _)
                 ),
             ];
 
-            Assert.Equal(177, directCases.Length);
-            Assert.Equal(100, directCases.Count(test => test.OutcomeKind == "true"));
-            Assert.Equal(53, directCases.Count(test => test.OutcomeKind == "false"));
-            Assert.Equal(24, directCases.Count(test => test.OutcomeKind == "error"));
+            Assert.Equal(328, directCases.Length);
+            Assert.Equal(227, directCases.Count(test => test.OutcomeKind == "true"));
+            Assert.Equal(63, directCases.Count(test => test.OutcomeKind == "false"));
+            Assert.Equal(38, directCases.Count(test => test.OutcomeKind == "error"));
 
             string? selectedId = Environment.GetEnvironmentVariable(CaseVariable);
             LogtalkTestDeclaration[] casesToExecute = selectedId is null
@@ -178,7 +203,7 @@ public sealed class LogtalkConformanceTests
             var executionResults = new Dictionary<LogtalkTestDeclaration, string>();
             foreach (LogtalkTestDeclaration test in casesToExecute)
             {
-                if (!Execute(test, out string failure))
+                if (!Execute(test, supportByPath[test.SourcePath], out string failure))
                 {
                     failures.Add($"{test.SourcePath} | {test.Id} | {failure}");
                     executionResults.Add(test, $"failed: {failure}");
@@ -246,7 +271,7 @@ public sealed class LogtalkConformanceTests
         await File.WriteAllTextAsync(path, json, TestContext.Current.CancellationToken);
     }
 
-    private static bool Execute(LogtalkTestDeclaration test, out string failure)
+    private static bool Execute(LogtalkTestDeclaration test, string supportProgram, out string failure)
     {
         if (!LogtalkTestAdapter.TryUnwrapBackendGoal(test, out string goal))
         {
@@ -267,6 +292,18 @@ public sealed class LogtalkConformanceTests
 
         try
         {
+            if (supportProgram.Length > 0)
+            {
+                LoadResult loaded = engine.ConsultText(supportProgram, test.SourcePath);
+                if (!loaded.Success)
+                {
+                    failure = $"support program did not compile: {string.Join("; ", loaded.Diagnostics)}";
+                    return false;
+                }
+
+                engine.RunPendingGoals();
+            }
+
             RunResult result = engine.RunGoal(assertion, out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics);
             if (diagnostics.Count > 0)
             {
