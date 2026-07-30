@@ -175,8 +175,11 @@ public sealed class ProgramLoader
                 PredicateIndicator sourceIndicator = SourceIndicatorOf(unit.Module, functorId);
                 if (_modules.IsMultifile(unit.Module, sourceIndicator))
                 {
-                    IReadOnlyList<(SyntaxTerm Head, SyntaxTerm? Body)> multifileClauses =
-                        _modules.AppendMultifileClauses(unit.Module, sourceIndicator, pending[functorId]);
+                    IReadOnlyList<(SyntaxTerm Head, SyntaxTerm? Body)> multifileClauses = _modules.AppendMultifileClauses(
+                        unit.Module,
+                        sourceIndicator,
+                        pending[functorId]
+                    );
                     EmitPredicate(functorId, multifileClauses, diagnostics, fileName);
                     continue;
                 }
@@ -374,13 +377,7 @@ public sealed class ProgramLoader
         }
         catch (PrologException exception)
         {
-            Report(
-                diagnostics,
-                CompilerDiagnosticIds.EnsureLoadedNotFound,
-                exception.Message,
-                file.Span,
-                fileName
-            );
+            Report(diagnostics, CompilerDiagnosticIds.EnsureLoadedNotFound, exception.Message, file.Span, fileName);
         }
     }
 
@@ -781,10 +778,7 @@ public sealed class ProgramLoader
                 continue;
             }
 
-            int functorId = _program.Symbols.InternFunctor(
-                ModuleTable.QualifiedName(module, indicator.Name),
-                indicator.Arity
-            );
+            int functorId = _program.Symbols.InternFunctor(ModuleTable.QualifiedName(module, indicator.Name), indicator.Arity);
             _program.DeclareDynamic(functorId, _userPredicates);
             declared.Add(functorId);
         }
@@ -903,8 +897,7 @@ public sealed class ProgramLoader
     {
         Functor functor = _program.Symbols.GetFunctor(functorId);
         string compiledName = _program.Symbols.AtomName(functor.NameAtom);
-        string sourceName =
-            module == ModuleTable.UserModule ? compiledName : compiledName[(module.Length + 1)..];
+        string sourceName = module == ModuleTable.UserModule ? compiledName : compiledName[(module.Length + 1)..];
         return new PredicateIndicator(sourceName, functor.Arity);
     }
 }

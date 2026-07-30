@@ -135,7 +135,8 @@ internal static class LogtalkTestAdapter
                 continue;
             }
 
-            bool disabled = text.StartsWith("- test(iso", StringComparison.Ordinal)
+            bool disabled =
+                text.StartsWith("- test(iso", StringComparison.Ordinal)
                 || (directiveFixture && text.StartsWith("- test(", StringComparison.Ordinal));
             int testStart =
                 disabled ? 2

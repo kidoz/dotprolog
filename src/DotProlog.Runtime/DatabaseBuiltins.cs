@@ -347,9 +347,7 @@ internal static class DatabaseBuiltins
     {
         if (path.Tag != CellTag.Atom)
         {
-            throw path.Tag == CellTag.Reference
-                ? PrologErrors.Instantiation(machine)
-                : PrologErrors.Type(machine, "atom", path);
+            throw path.Tag == CellTag.Reference ? PrologErrors.Instantiation(machine) : PrologErrors.Type(machine, "atom", path);
         }
 
         return machine.Symbols.AtomName(path.Index);

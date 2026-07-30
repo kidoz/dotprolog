@@ -18,6 +18,7 @@ public sealed class LogtalkConformanceTests
     private const string Repository = "https://github.com/LogtalkDotOrg/logtalk3.git";
     private const string Tag = "lgt31010stable";
     private const string Commit = "11dfd24eb6673250be996012489e65c0f9370a7c";
+
     [Fact]
     public void AdapterPreservesDeclarationsExpectationsAndCharacterCodeSyntax()
     {
@@ -176,9 +177,7 @@ public sealed class LogtalkConformanceTests
             test(include_1_01, true(L == [1,2,3])) :-
                 findall(X, {a(X)}, L).
             """;
-        Assert.Single(
-            LogtalkTestAdapter.ReadDeclarations(directiveFixtureSource, "directives/include_1/tests.lgt")
-        );
+        Assert.Single(LogtalkTestAdapter.ReadDeclarations(directiveFixtureSource, "directives/include_1/tests.lgt"));
         Assert.Empty(LogtalkTestAdapter.ReadDeclarations(directiveFixtureSource, "ordinary/tests.lgt"));
 
         const string helperSource = """
@@ -349,10 +348,7 @@ public sealed class LogtalkConformanceTests
             ];
 
             Require(declarations.Length == 802, $"Expected 802 declarations, got {declarations.Length}.");
-            Require(
-                declarations.Count(test => !test.Disabled) == 773,
-                "The enabled declaration inventory changed."
-            );
+            Require(declarations.Count(test => !test.Disabled) == 773, "The enabled declaration inventory changed.");
             Require(declarations.Count(test => test.Disabled) == 29, "The disabled declaration inventory changed.");
 
             Dictionary<string, int> outcomeKinds = declarations
@@ -361,24 +357,22 @@ public sealed class LogtalkConformanceTests
                 .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
 
             Dictionary<string, int> expectedOutcomeKinds = new(StringComparer.Ordinal)
-                {
-                    ["ball"] = 1,
-                    ["deterministic"] = 1,
-                    ["error"] = 154,
-                    ["errors"] = 17,
-                    ["exists"] = 41,
-                    ["fail"] = 3,
-                    ["false"] = 74,
-                    ["quick_check"] = 6,
-                    ["subsumes"] = 3,
-                    ["true"] = 460,
-                    ["variant"] = 13,
-                };
+            {
+                ["ball"] = 1,
+                ["deterministic"] = 1,
+                ["error"] = 154,
+                ["errors"] = 17,
+                ["exists"] = 41,
+                ["fail"] = 3,
+                ["false"] = 74,
+                ["quick_check"] = 6,
+                ["subsumes"] = 3,
+                ["true"] = 460,
+                ["variant"] = 13,
+            };
             Require(
                 expectedOutcomeKinds.Count == outcomeKinds.Count
-                    && expectedOutcomeKinds.All(item =>
-                        outcomeKinds.TryGetValue(item.Key, out int count) && count == item.Value
-                    ),
+                    && expectedOutcomeKinds.All(item => outcomeKinds.TryGetValue(item.Key, out int count) && count == item.Value),
                 "The enabled outcome-kind inventory changed."
             );
 
@@ -453,10 +447,7 @@ public sealed class LogtalkConformanceTests
             );
             Require(directCases.Count(test => test.OutcomeKind == "errors") == 17, "The errors-case inventory changed.");
             Require(directCases.Count(test => test.OutcomeKind == "ball") == 1, "The ball-case inventory changed.");
-            Require(
-                directCases.Count(test => test.OutcomeKind == "quick_check") == 6,
-                "The QuickCheck inventory changed."
-            );
+            Require(directCases.Count(test => test.OutcomeKind == "quick_check") == 6, "The QuickCheck inventory changed.");
 
             LogtalkTestDeclaration[] casesToExecute = SelectCasesToExecute(directCases, selectedId);
 
@@ -613,12 +604,7 @@ public sealed class LogtalkConformanceTests
         return true;
     }
 
-    private static bool TryLoadDirectiveFixture(
-        string sourcePath,
-        string testsRoot,
-        PrologEngine engine,
-        out string failure
-    )
+    private static bool TryLoadDirectiveFixture(string sourcePath, string testsRoot, PrologEngine engine, out string failure)
     {
         string directory = Path.Combine(testsRoot, Path.GetDirectoryName(sourcePath)!);
         string[] files = sourcePath switch
@@ -1093,10 +1079,7 @@ public sealed class LogtalkConformanceTests
         writer.WriteStartObject("summary");
         writer.WriteNumber("total", declarations.Length);
         writer.WriteNumber("enabled", declarations.Count(test => !test.Disabled));
-        writer.WriteNumber(
-            "applicable",
-            declarations.Count(test => !test.Disabled && !nonApplicableCases.Contains(test))
-        );
+        writer.WriteNumber("applicable", declarations.Count(test => !test.Disabled && !nonApplicableCases.Contains(test)));
         writer.WriteNumber("disabled", declarations.Count(test => test.Disabled));
         writer.WriteNumber("not_applicable", nonApplicableCases.Count);
         writer.WriteNumber("passed", executionResults.Count(result => result.Value == "passed"));
@@ -1106,9 +1089,7 @@ public sealed class LogtalkConformanceTests
         );
         writer.WriteNumber(
             "unsupported",
-            declarations.Count(test =>
-                !test.Disabled && !nonApplicableCases.Contains(test) && !directCases.Contains(test)
-            )
+            declarations.Count(test => !test.Disabled && !nonApplicableCases.Contains(test) && !directCases.Contains(test))
         );
         writer.WriteEndObject();
         writer.WriteStartArray("cases");

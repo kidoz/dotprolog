@@ -8,11 +8,7 @@ internal static class NativeConformanceProgram
     {
         string? reportPath = args.Length > 0 ? args[0] : null;
 
-        await LogtalkConformanceTests.RunPinnedIsoCorpusAsync(
-            selectedId: null,
-            reportPath,
-            CancellationToken.None
-        );
+        await LogtalkConformanceTests.RunPinnedIsoCorpusAsync(selectedId: null, reportPath, CancellationToken.None);
         await Console.Out.WriteLineAsync("NativeAOT independent ISO conformance: 768/768 passed.");
         return 0;
     }

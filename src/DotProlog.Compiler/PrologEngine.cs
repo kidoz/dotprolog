@@ -127,11 +127,7 @@ public sealed class PrologEngine : IRuntimeCompiler
         }
 
         var loader = new ProgramLoader(Program, Machine, _modules);
-        LoadResult loaded = loader.Load(
-            parsed.Clauses,
-            fileName,
-            Machine.IsRunning ? null : ExecutePreparationDirective
-        );
+        LoadResult loaded = loader.Load(parsed.Clauses, fileName, Machine.IsRunning ? null : ExecutePreparationDirective);
         List<Diagnostic> diagnostics = [.. parsed.Diagnostics, .. loaded.Diagnostics];
 
         // Which module a file declared is what use_module/1 needs to know when it is imported later.
