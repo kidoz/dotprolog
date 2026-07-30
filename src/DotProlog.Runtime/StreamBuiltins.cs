@@ -146,6 +146,14 @@ internal static class StreamBuiltins
         return stream;
     }
 
+    private static void ValidateExplicitStreamInstantiation(Machine machine, int index)
+    {
+        if (index >= 0 && machine.Argument(index).Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+    }
+
     private static Cell StreamCulprit(Machine machine, int index, PrologStream stream) =>
         index < 0 ? StreamTerm(machine, stream) : machine.Argument(index);
 
@@ -769,8 +777,7 @@ internal static class StreamBuiltins
 
     private static bool GetChar(Machine machine, int stream, int target, bool consume)
     {
-        PrologStream source = Resolve(machine, stream, input: true);
-        PrepareInput(machine, source, stream);
+        ValidateExplicitStreamInstantiation(machine, stream);
         Cell character = machine.Argument(target);
         if (character.Tag != CellTag.Reference)
         {
@@ -781,6 +788,8 @@ internal static class StreamBuiltins
             }
         }
 
+        PrologStream source = Resolve(machine, stream, input: true);
+        PrepareInput(machine, source, stream);
         TextReader reader = source.Reader!;
 
         // Whatever a term read left behind has to be consumed before the reader itself is touched.
@@ -812,21 +821,19 @@ internal static class StreamBuiltins
 
     private static bool GetCode(Machine machine, int stream, int target, bool consume)
     {
-        PrologStream source = Resolve(machine, stream, input: true);
-        PrepareInput(machine, source, stream);
+        ValidateExplicitStreamInstantiation(machine, stream);
         Cell code = machine.Argument(target);
 
-        if (code.Tag != CellTag.Reference)
+        if (code.Tag != CellTag.Reference && code.Tag != CellTag.Integer)
         {
-            if (code.Tag != CellTag.Integer)
-            {
-                throw PrologErrors.Type(machine, "integer", code);
-            }
+            throw PrologErrors.Type(machine, "integer", code);
+        }
 
-            if (code.Integer is < -1 or > char.MaxValue)
-            {
-                throw PrologErrors.Representation(machine, "in_character_code");
-            }
+        PrologStream source = Resolve(machine, stream, input: true);
+        PrepareInput(machine, source, stream);
+        if (code.Tag == CellTag.Integer && code.Integer is < -1 or > char.MaxValue)
+        {
+            throw PrologErrors.Representation(machine, "in_character_code");
         }
 
         int next;
@@ -854,7 +861,7 @@ internal static class StreamBuiltins
 
     private static bool PutChar(Machine machine, int stream, int source)
     {
-        PrologStream target = Resolve(machine, stream, input: false);
+        ValidateExplicitStreamInstantiation(machine, stream);
         Cell character = machine.Argument(source);
 
         if (character.Tag == CellTag.Reference)
@@ -872,13 +879,14 @@ internal static class StreamBuiltins
             throw PrologErrors.Type(machine, "character", character);
         }
 
+        PrologStream target = Resolve(machine, stream, input: false);
         GuardIo(machine, () => target.Writer!.Write(text));
         return true;
     }
 
     private static bool PutCode(Machine machine, int stream, int source)
     {
-        PrologStream target = Resolve(machine, stream, input: false);
+        ValidateExplicitStreamInstantiation(machine, stream);
         Cell code = machine.Argument(source);
 
         if (code.Tag == CellTag.Reference)
@@ -891,6 +899,7 @@ internal static class StreamBuiltins
             throw PrologErrors.Type(machine, "integer", code);
         }
 
+        PrologStream target = Resolve(machine, stream, input: false);
         if (code.Integer is < 0 or > char.MaxValue)
         {
             throw PrologErrors.Representation(machine, "character_code");
@@ -902,8 +911,7 @@ internal static class StreamBuiltins
 
     private static bool GetByte(Machine machine, int stream, int target, bool consume)
     {
-        PrologStream source = Resolve(machine, stream, input: true, expectedType: "binary");
-        PrepareInput(machine, source, stream);
+        ValidateExplicitStreamInstantiation(machine, stream);
         Cell code = machine.Argument(target);
 
         if (code.Tag != CellTag.Reference && (code.Tag != CellTag.Integer || code.Integer is < -1 or > byte.MaxValue))
@@ -911,6 +919,8 @@ internal static class StreamBuiltins
             throw PrologErrors.Type(machine, "in_byte", code);
         }
 
+        PrologStream source = Resolve(machine, stream, input: true, expectedType: "binary");
+        PrepareInput(machine, source, stream);
         Stream input = source.BinaryStream!;
         int next;
         if (consume)
@@ -930,7 +940,7 @@ internal static class StreamBuiltins
 
     private static bool PutByte(Machine machine, int stream, int source)
     {
-        PrologStream target = Resolve(machine, stream, input: false, expectedType: "binary");
+        ValidateExplicitStreamInstantiation(machine, stream);
         Cell code = machine.Argument(source);
 
         if (code.Tag == CellTag.Reference)
@@ -943,6 +953,7 @@ internal static class StreamBuiltins
             throw PrologErrors.Type(machine, "byte", code);
         }
 
+        PrologStream target = Resolve(machine, stream, input: false, expectedType: "binary");
         GuardIo(machine, () => target.BinaryStream!.WriteByte((byte)code.Integer));
         return true;
     }

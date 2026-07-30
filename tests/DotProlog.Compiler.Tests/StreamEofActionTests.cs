@@ -82,6 +82,38 @@ public sealed class StreamEofActionTests : IDisposable
         );
     }
 
+    [Theory]
+    [InlineData("get_char(S, bad)", "type_error(in_character,bad)")]
+    [InlineData("get_code(S, bad)", "type_error(integer,bad)")]
+    public void InvalidCharacterInputTakesPriorityOverPastEndPermission(string operation, string expected)
+    {
+        string path = Path("past-end-priority.txt");
+        File.WriteAllText(path, string.Empty);
+
+        Assert.Equal(
+            expected,
+            PrologTestHost.RunGoal(
+                $"open('{path}', read, S, [eof_action(error)]), get_code(S, -1), "
+                    + $"catch({operation}, error(E, _), write(E)), close(S, [force(true)])"
+            )
+        );
+    }
+
+    [Fact]
+    public void InvalidByteInputTakesPriorityOverPastEndPermission()
+    {
+        string path = Path("past-end-priority.bin");
+        File.WriteAllBytes(path, []);
+
+        Assert.Equal(
+            "type_error(in_byte,256)",
+            PrologTestHost.RunGoal(
+                $"open('{path}', read, S, [type(binary), eof_action(error)]), get_byte(S, -1), "
+                    + "catch(get_byte(S, 256), error(E, _), write(E)), close(S, [force(true)])"
+            )
+        );
+    }
+
     [Fact]
     public void ResetRechecksTheSourceAfterPastEnd()
     {

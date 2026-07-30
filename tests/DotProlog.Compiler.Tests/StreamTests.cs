@@ -355,6 +355,18 @@ public sealed class StreamTests : IDisposable
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
 
     [Theory]
+    [InlineData("get_char(_, bad)", "instantiation_error")]
+    [InlineData("get_char(no_such_stream, bad)", "type_error(in_character,bad)")]
+    [InlineData("get_code(no_such_stream, bad)", "type_error(integer,bad)")]
+    [InlineData("get_code(user_output, -2)", "permission_error(input,stream,user_output)")]
+    [InlineData("put_char(user_input, _)", "instantiation_error")]
+    [InlineData("put_char(no_such_stream, bad)", "type_error(character,bad)")]
+    [InlineData("put_code(no_such_stream, bad)", "type_error(integer,bad)")]
+    [InlineData("put_code(user_input, -1)", "permission_error(output,stream,user_input)")]
+    public void ReportsIsoCharacterIoErrorPriority(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+
+    [Theory]
     [InlineData("get_char(1)", "type_error(in_character,1)")]
     [InlineData("get_char(foo)", "type_error(in_character,foo)")]
     [InlineData("peek_char('')", "type_error(in_character,'')")]

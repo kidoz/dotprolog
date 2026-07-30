@@ -203,6 +203,14 @@ public sealed class BinaryStreamTests : IDisposable
     }
 
     [Theory]
+    [InlineData("get_byte(_, 256)", "instantiation_error")]
+    [InlineData("get_byte(no_such_stream, 256)", "type_error(in_byte,256)")]
+    [InlineData("put_byte(user_output, _)", "instantiation_error")]
+    [InlineData("put_byte(no_such_stream, 256)", "type_error(byte,256)")]
+    public void ReportsIsoByteIoErrorPriority(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+
+    [Theory]
     [InlineData("type(other)", "domain_error(stream_option,type(other))")]
     [InlineData("type(1)", "domain_error(stream_option,type(1))")]
     [InlineData("unknown(value)", "domain_error(stream_option,unknown(value))")]
