@@ -181,6 +181,17 @@ internal static class Program
                 StreamDomainCaught == true,
                 write(stream_error_terms), nl,
 
+                % Bound character-input modes are validated before the stream is consumed.
+                open('dotprolog-aot-code.tmp', read, CharacterMode),
+                catch(
+                    (get_char(CharacterMode, invalid), CharacterModeCaught = false),
+                    error(type_error(in_character, invalid), _),
+                    CharacterModeCaught = true),
+                CharacterModeCaught == true,
+                get_char(CharacterMode, 'A'),
+                close(CharacterMode),
+                write(character_input_modes), nl,
+
                 % Binary streams and byte predicates use raw storage without reflection or encoding.
                 open('dotprolog-aot-byte.tmp', write, ByteOut, [type(binary)]),
                 stream_property(ByteOut, type(binary)),
