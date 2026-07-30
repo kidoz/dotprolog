@@ -102,6 +102,25 @@ public sealed class GrammarTests
         Assert.Equal("yes", Run("Body = ([hello], name), ( phrase(Body, [hello, world]) -> write(yes) ; write(no) )"));
 
     [Fact]
+    public void PhraseTreatsARunTimeIfThenElseAsOneConstruct() =>
+        // A disjunction reading would offer the else branch as a second solution.
+        Assert.Equal("[then]", Run("findall(Y, phrase(({member(_, [1])} -> {Y = then} ; {Y = else}), [], []), L), write(L)"));
+
+    [Fact]
+    public void PhraseTakesTheElseBranchWhenTheConditionFails() =>
+        Assert.Equal("else", Run("phrase(({fail} -> {Y = then} ; {Y = else}), [], []), write(Y)"));
+
+    [Fact]
+    public void PhraseSupportsARunTimeSoftCut() =>
+        Assert.Equal(
+            "[then(1),then(2)]-[else]",
+            Run(
+                "findall(Y, phrase(({member(N, [1, 2])} *-> {Y = then(N)} ; {Y = else}), [], []), L), "
+                    + "findall(Z, phrase(({fail} *-> {Z = then} ; {Z = else}), [], []), M), write(L-M)"
+            )
+        );
+
+    [Fact]
     public void AnAssertedGrammarRuleIsTranslatedToo() =>
         Assert.Equal("yes", PrologTestHost.RunGoal("assertz((late --> [z])), ( phrase(late, [z]) -> write(yes) ; write(no) )"));
 

@@ -283,8 +283,15 @@ internal static class StandardLibrary
 
         '$phrase'(Body, _, _) :- var(Body), !, throw(error(instantiation_error, phrase/3)).
         '$phrase'((A, B), S0, S) :- !, '$phrase'(A, S0, S1), '$phrase'(B, S1, S).
+        % An if-then-else is one construct, not a disjunction of two goals, so it is matched
+        % before the plain (A ; B) clause can split it.
+        '$phrase'((C -> T ; E), S0, S) :- !,
+            ( '$phrase'(C, S0, S1) -> '$phrase'(T, S1, S) ; '$phrase'(E, S0, S) ).
+        '$phrase'((C *-> T ; E), S0, S) :- !,
+            ( '$phrase'(C, S0, S1) *-> '$phrase'(T, S1, S) ; '$phrase'(E, S0, S) ).
         '$phrase'((A ; B), S0, S) :- !, ( '$phrase'(A, S0, S) ; '$phrase'(B, S0, S) ).
         '$phrase'((A -> B), S0, S) :- !, ( '$phrase'(A, S0, S1) -> '$phrase'(B, S1, S) ).
+        '$phrase'((A *-> B), S0, S) :- !, ( '$phrase'(A, S0, S1) *-> '$phrase'(B, S1, S) ).
         '$phrase'(\+ A, S0, S) :- !, \+ '$phrase'(A, S0, _), S = S0.
         '$phrase'(!, S, S) :- !.
         '$phrase'({Goal}, S, S) :- !, call(Goal).
