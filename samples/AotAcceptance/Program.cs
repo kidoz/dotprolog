@@ -201,6 +201,29 @@ internal static class Program
                 SourceSinkDomainCaught == true,
                 write(source_sink_domains), nl,
 
+                % Option shape, stream domains, and option semantics follow ISO error priority.
+                catch(
+                    (open(1, sideways, bound, []), OpenPriorityCaught = false),
+                    error(uninstantiation_error(bound), _),
+                    OpenPriorityCaught = true),
+                OpenPriorityCaught == true,
+                catch(
+                    (close(no_such_stream, [bad]), ClosePriorityCaught = false),
+                    error(domain_error(close_option, bad), _),
+                    ClosePriorityCaught = true),
+                ClosePriorityCaught == true,
+                catch(
+                    (read_term(no_such_stream, _, [bad]), ReadPriorityCaught = false),
+                    error(domain_error(read_option, bad), _),
+                    ReadPriorityCaught = true),
+                ReadPriorityCaught == true,
+                catch(
+                    (write_term(f(1), x, atom), WritePriorityCaught = false),
+                    error(type_error(list, atom), _),
+                    WritePriorityCaught = true),
+                WritePriorityCaught == true,
+                write(stream_option_error_priority), nl,
+
                 % Permission culprits stay as stream designators, and malformed handles never wrap.
                 catch(
                     (set_input(user_output), StreamPermissionCaught = false),
