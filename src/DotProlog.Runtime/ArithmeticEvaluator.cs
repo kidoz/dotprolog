@@ -165,7 +165,9 @@ public static class ArithmeticEvaluator
                 case "/":
                     if (right.AsDouble == 0)
                     {
-                        throw PrologErrors.Evaluation(machine, left.AsDouble == 0 ? "undefined" : "zero_divisor");
+                        // An integer zero divisor is zero_divisor even for 0/0; only the float
+                        // 0.0/0.0, whose IEEE result is NaN, is undefined.
+                        throw PrologErrors.Evaluation(machine, real && left.AsDouble == 0 ? "undefined" : "zero_divisor");
                     }
 
                     return FloatResult(machine, left.AsDouble / right.AsDouble);

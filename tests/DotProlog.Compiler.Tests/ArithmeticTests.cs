@@ -90,6 +90,9 @@ public sealed class ArithmeticTests
     }
 
     [Theory]
+    [InlineData("1 / 0", "zero_divisor")]
+    // An integer zero divisor is zero_divisor even for 0/0; only float 0.0/0.0 is undefined.
+    [InlineData("0 / 0", "zero_divisor")]
     [InlineData("1.0 / 0.0", "zero_divisor")]
     [InlineData("0.0 / 0.0", "undefined")]
     [InlineData("sqrt(-1)", "undefined")]
