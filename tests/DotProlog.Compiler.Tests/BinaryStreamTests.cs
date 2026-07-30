@@ -121,8 +121,8 @@ public sealed class BinaryStreamTests : IDisposable
     }
 
     [Theory]
-    [InlineData("write(binary_out, x)", "permission_error(output,binary_stream,binary_out/0)")]
-    [InlineData("put_code(binary_out, 65)", "permission_error(output,binary_stream,binary_out/0)")]
+    [InlineData("write(binary_out, x)", "permission_error(output,binary_stream,binary_out)")]
+    [InlineData("put_code(binary_out, 65)", "permission_error(output,binary_stream,binary_out)")]
     public void TextOutputRejectsBinaryStreams(string operation, string expected)
     {
         string path = Path("wrong-output.bin");
@@ -134,9 +134,9 @@ public sealed class BinaryStreamTests : IDisposable
     }
 
     [Theory]
-    [InlineData("read(binary_in, _)", "permission_error(input,binary_stream,binary_in/0)")]
-    [InlineData("get_code(binary_in, _)", "permission_error(input,binary_stream,binary_in/0)")]
-    [InlineData("peek_char(binary_in, _)", "permission_error(input,binary_stream,binary_in/0)")]
+    [InlineData("read(binary_in, _)", "permission_error(input,binary_stream,binary_in)")]
+    [InlineData("get_code(binary_in, _)", "permission_error(input,binary_stream,binary_in)")]
+    [InlineData("peek_char(binary_in, _)", "permission_error(input,binary_stream,binary_in)")]
     public void TextInputRejectsBinaryStreams(string operation, string expected)
     {
         string path = Path("wrong-input.bin");
@@ -149,9 +149,9 @@ public sealed class BinaryStreamTests : IDisposable
     }
 
     [Theory]
-    [InlineData("get_byte(user_input, _)", "permission_error(input,text_stream,user_input/0)")]
-    [InlineData("peek_byte(user_input, _)", "permission_error(input,text_stream,user_input/0)")]
-    [InlineData("put_byte(user_output, 0)", "permission_error(output,text_stream,user_output/0)")]
+    [InlineData("get_byte(user_input, _)", "permission_error(input,text_stream,user_input)")]
+    [InlineData("peek_byte(user_input, _)", "permission_error(input,text_stream,user_input)")]
+    [InlineData("put_byte(user_output, 0)", "permission_error(output,text_stream,user_output)")]
     public void ByteOperationsRejectTextStreams(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
 

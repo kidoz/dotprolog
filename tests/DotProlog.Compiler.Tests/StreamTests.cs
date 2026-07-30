@@ -312,8 +312,12 @@ public sealed class StreamTests : IDisposable
     [InlineData("open(f, sideways, _)", "domain_error(io_mode,sideways)")]
     [InlineData("close(nowhere)", "existence_error(stream,nowhere)")]
     [InlineData("read(nowhere, _)", "existence_error(stream,nowhere)")]
-    [InlineData("write(user_input, x)", "permission_error(output,stream,user_input/0)")]
-    [InlineData("read(user_output, _)", "permission_error(input,stream,user_output/0)")]
+    [InlineData("read('$stream'(-1), _)", "domain_error(stream_or_alias,$stream(-1))")]
+    [InlineData("write('$stream'(4294967299), x)", "domain_error(stream_or_alias,$stream(4294967299))")]
+    [InlineData("get_code('$stream'(foo), _)", "domain_error(stream_or_alias,$stream(foo))")]
+    [InlineData("set_input('$stream'(4294967299))", "domain_error(stream_or_alias,$stream(4294967299))")]
+    [InlineData("write(user_input, x)", "permission_error(output,stream,user_input)")]
+    [InlineData("read(user_output, _)", "permission_error(input,stream,user_output)")]
     public void ReportsBadStreamArguments(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
 
@@ -326,7 +330,7 @@ public sealed class StreamTests : IDisposable
     [InlineData("put_code(-1)", "representation_error(character_code)")]
     [InlineData("put_code(65536)", "representation_error(character_code)")]
     [InlineData("get_code(f(1), _)", "domain_error(stream_or_alias,f(1))")]
-    [InlineData("put_code(user_input, 97)", "permission_error(output,stream,user_input/0)")]
+    [InlineData("put_code(user_input, 97)", "permission_error(output,stream,user_input)")]
     public void ReportsCharacterCodeErrors(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
 

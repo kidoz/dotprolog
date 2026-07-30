@@ -388,8 +388,14 @@ iso_case('8.11.6', close(user_output, atom), error(type_error(list, atom))).
 iso_case('8.11.7', (current_output(S4), \+ var(S4)), success).
 iso_case('8.11.8', set_output(no_such_stream), error(existence_error(stream, no_such_stream))).
 iso_case('8.11.8', set_input(no_such_stream), error(existence_error(stream, no_such_stream))).
-iso_case('8.11.8', set_input(user_output), error(permission_error(input, stream, user_output/0))).
-iso_case('8.11.8', set_output(user_input), error(permission_error(output, stream, user_input/0))).
+iso_case('8.11.8', set_input(user_output), error(permission_error(input, stream, user_output))).
+iso_case('8.11.8', set_output(user_input), error(permission_error(output, stream, user_input))).
+iso_case('8.11.8', set_input('$stream'(-1)), error(domain_error(stream_or_alias, '$stream'(-1)))).
+iso_case(
+    '8.11.8',
+    set_output('$stream'(4294967299)),
+    error(domain_error(stream_or_alias, '$stream'(4294967299)))
+).
 iso_case('8.11.11', set_stream_position(user_input, _), error(instantiation_error)).
 iso_case('8.11.11', set_stream_position(user_input, foo), error(domain_error(stream_position, foo))).
 iso_case(
@@ -405,42 +411,42 @@ iso_case(
 iso_case(
     '8.11.11',
     set_stream_position(user_input, '$stream_position'(0, 0, 0, 0)),
-    error(permission_error(reposition, stream, user_input/0))
+    error(permission_error(reposition, stream, user_input))
 ).
 
 % --- 8.12 Character input and output ------------------------------------------
 iso_case('8.12.1', get_char(no_such_stream, _), error(existence_error(stream, no_such_stream))).
-iso_case('8.12.1', get_char(user_output, _), error(permission_error(input, stream, user_output/0))).
+iso_case('8.12.1', get_char(user_output, _), error(permission_error(input, stream, user_output))).
 iso_case('8.12.1', get_code(-1), success).
 iso_case('8.12.1', get_code(a), error(type_error(integer, a))).
 iso_case('8.12.1', get_code(-2), error(representation_error(in_character_code))).
-iso_case('8.12.1', get_code(user_output, _), error(permission_error(input, stream, user_output/0))).
+iso_case('8.12.1', get_code(user_output, _), error(permission_error(input, stream, user_output))).
 iso_case('8.12.1', get_code(no_such_stream, _), error(existence_error(stream, no_such_stream))).
 iso_case('8.12.1', get_code(f(1), _), error(domain_error(stream_or_alias, f(1)))).
 iso_case('8.12.2', peek_char(no_such_stream, _), error(existence_error(stream, no_such_stream))).
 iso_case('8.12.3', peek_code(-1), success).
 iso_case('8.12.3', peek_code(a), error(type_error(integer, a))).
-iso_case('8.12.3', peek_code(user_output, _), error(permission_error(input, stream, user_output/0))).
+iso_case('8.12.3', peek_code(user_output, _), error(permission_error(input, stream, user_output))).
 iso_case('8.12.3', put_char(user_output, _), error(instantiation_error)).
 iso_case('8.12.3', put_char(user_output, ab), error(type_error(character, ab))).
-iso_case('8.12.3', put_char(user_input, a), error(permission_error(output, stream, user_input/0))).
+iso_case('8.12.3', put_char(user_input, a), error(permission_error(output, stream, user_input))).
 iso_case('8.12.5', (with_output_to(codes(C2), put_code(97)), C2 == [97]), success).
 iso_case('8.12.5', put_code(_), error(instantiation_error)).
 iso_case('8.12.5', put_code(a), error(type_error(integer, a))).
 iso_case('8.12.5', put_code(-1), error(representation_error(character_code))).
-iso_case('8.12.5', put_code(user_input, 97), error(permission_error(output, stream, user_input/0))).
+iso_case('8.12.5', put_code(user_input, 97), error(permission_error(output, stream, user_input))).
 
 % --- 8.13 Byte input and output -----------------------------------------------
 iso_case('8.13.1', get_byte(no_such_stream, _), error(existence_error(stream, no_such_stream))).
-iso_case('8.13.1', get_byte(user_output, _), error(permission_error(input, stream, user_output/0))).
-iso_case('8.13.1', get_byte(user_input, _), error(permission_error(input, text_stream, user_input/0))).
-iso_case('8.13.2', peek_byte(user_input, _), error(permission_error(input, text_stream, user_input/0))).
-iso_case('8.13.3', put_byte(user_input, 0), error(permission_error(output, stream, user_input/0))).
-iso_case('8.13.3', put_byte(user_output, 0), error(permission_error(output, text_stream, user_output/0))).
+iso_case('8.13.1', get_byte(user_output, _), error(permission_error(input, stream, user_output))).
+iso_case('8.13.1', get_byte(user_input, _), error(permission_error(input, text_stream, user_input))).
+iso_case('8.13.2', peek_byte(user_input, _), error(permission_error(input, text_stream, user_input))).
+iso_case('8.13.3', put_byte(user_input, 0), error(permission_error(output, stream, user_input))).
+iso_case('8.13.3', put_byte(user_output, 0), error(permission_error(output, text_stream, user_output))).
 
 % --- 8.14 Term input and output -----------------------------------------------
 iso_case('8.14.1', read_term(no_such_stream, _, []), error(existence_error(stream, no_such_stream))).
-iso_case('8.14.1', read_term(user_output, _, []), error(permission_error(input, stream, user_output/0))).
+iso_case('8.14.1', read_term(user_output, _, []), error(permission_error(input, stream, user_output))).
 iso_case('8.14.1', (read_term_from_atom('f(A,B,A)', _, [singletons(S7)]), S7 = ['B'=_]), success).
 iso_case('8.14.1', (read_term_from_atom('f(A,_,A)', _, [variables(V7)]), V7 = [_, _]), success).
 iso_case('8.14.1', read_term_from_atom('f(A,A)', _, [singletons([])]), success).

@@ -60,6 +60,17 @@ public sealed class StreamOpenErrorTests : IDisposable
     }
 
     [Fact]
+    public void ExistingSourceThatCannotBeOpenedReportsPermissionError()
+    {
+        string directory = _directory.Replace("\\", "/", StringComparison.Ordinal);
+
+        Assert.Equal(
+            $"permission_error(open,source_sink,'{directory}')",
+            PrologTestHost.RunGoal($"catch(open('{directory}', read, _), error(E, _), writeq(E))")
+        );
+    }
+
+    [Fact]
     public void RightmostAliasIsTheOnlyOneApplied()
     {
         string path = Path("rightmost.txt");

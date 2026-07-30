@@ -176,7 +176,7 @@ public sealed class StreamPositionTests : IDisposable
         string path = Path("disabled.txt");
 
         Assert.Equal(
-            "permission_error(reposition,stream,fixed/0)\n",
+            "permission_error(reposition,stream,fixed)\n",
             PrologTestHost.RunGoal(
                 $"""
                 open('{path}', write, _, [alias(fixed), reposition(false)]),
@@ -192,10 +192,7 @@ public sealed class StreamPositionTests : IDisposable
     [InlineData("set_stream_position(_, foo)", "instantiation_error")]
     [InlineData("set_stream_position(user_input, _)", "instantiation_error")]
     [InlineData("set_stream_position(user_input, foo)", "domain_error(stream_position,foo)")]
-    [InlineData(
-        "set_stream_position(user_input, '$stream_position'(0,0,0,0))",
-        "permission_error(reposition,stream,user_input/0)"
-    )]
+    [InlineData("set_stream_position(user_input, '$stream_position'(0,0,0,0))", "permission_error(reposition,stream,user_input)")]
     [InlineData("set_stream_position(no_such_stream, '$stream_position'(0,0,0,0))", "existence_error(stream,no_such_stream)")]
     [InlineData("set_stream_position(f(1), '$stream_position'(0,0,0,0))", "domain_error(stream_or_alias,f(1))")]
     [InlineData(

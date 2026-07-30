@@ -108,22 +108,9 @@ internal static class StreamBuiltins
             {
                 resolved = machine.Streams.ByAlias(machine.Symbols.AtomName(cell.Index));
             }
-            else if (cell.Tag == CellTag.Structure)
+            else if (TryStreamHandle(machine, cell, out int id))
             {
-                Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(cell.Index).Index);
-
-                if (machine.Symbols.AtomName(functor.NameAtom) != StreamFunctor || functor.Arity != 1)
-                {
-                    throw PrologErrors.Domain(machine, "stream_or_alias", cell);
-                }
-
-                Cell id = machine.Dereference(machine.HeapAt(cell.Index + 1));
-                if (id.Tag != CellTag.Integer)
-                {
-                    throw PrologErrors.Domain(machine, "stream_or_alias", cell);
-                }
-
-                resolved = machine.Streams.ById((int)id.Integer);
+                resolved = machine.Streams.ById(id);
             }
             else
             {
@@ -135,12 +122,7 @@ internal static class StreamBuiltins
 
         if (input != stream.IsInput)
         {
-            throw PrologErrors.Permission(
-                machine,
-                input ? "input" : "output",
-                "stream",
-                machine.Symbols.InternFunctor(stream.Alias ?? stream.Name, 0)
-            );
+            throw PrologErrors.Permission(machine, input ? "input" : "output", "stream", StreamCulprit(machine, index, stream));
         }
 
         if (expectedType is not null && stream.Type != expectedType)
@@ -149,12 +131,15 @@ internal static class StreamBuiltins
                 machine,
                 input ? "input" : "output",
                 stream.Type == "binary" ? "binary_stream" : "text_stream",
-                machine.Symbols.InternFunctor(stream.Alias ?? stream.Name, 0)
+                StreamCulprit(machine, index, stream)
             );
         }
 
         return stream;
     }
+
+    private static Cell StreamCulprit(Machine machine, int index, PrologStream stream) =>
+        index < 0 ? StreamTerm(machine, stream) : machine.Argument(index);
 
     private static PrologException Existence(Machine machine, string kind, Cell culprit)
     {
@@ -660,7 +645,7 @@ internal static class StreamBuiltins
     private static bool Read(Machine machine, int stream, int term, int options)
     {
         PrologStream source = Resolve(machine, stream, input: true);
-        PrepareInput(machine, source);
+        PrepareInput(machine, source, stream);
         IRuntimeCompiler compiler =
             machine.Program.RuntimeCompiler ?? throw new PrologException("Reading a term needs a compiler to parse it.");
 
@@ -730,7 +715,7 @@ internal static class StreamBuiltins
     private static bool GetChar(Machine machine, int stream, int target, bool consume)
     {
         PrologStream source = Resolve(machine, stream, input: true);
-        PrepareInput(machine, source);
+        PrepareInput(machine, source, stream);
         TextReader reader = source.Reader!;
 
         // Whatever a term read left behind has to be consumed before the reader itself is touched.
@@ -763,7 +748,7 @@ internal static class StreamBuiltins
     private static bool GetCode(Machine machine, int stream, int target, bool consume)
     {
         PrologStream source = Resolve(machine, stream, input: true);
-        PrepareInput(machine, source);
+        PrepareInput(machine, source, stream);
         Cell code = machine.Argument(target);
 
         if (code.Tag != CellTag.Reference)
@@ -853,7 +838,7 @@ internal static class StreamBuiltins
     private static bool GetByte(Machine machine, int stream, int target, bool consume)
     {
         PrologStream source = Resolve(machine, stream, input: true, expectedType: "binary");
-        PrepareInput(machine, source);
+        PrepareInput(machine, source, stream);
         Cell code = machine.Argument(target);
 
         if (code.Tag != CellTag.Reference && (code.Tag != CellTag.Integer || code.Integer is < -1 or > byte.MaxValue))
@@ -903,7 +888,7 @@ internal static class StreamBuiltins
         return source.ObserveEnd() != PrologStream.EndState.Not;
     }
 
-    private static void PrepareInput(Machine machine, PrologStream source)
+    private static void PrepareInput(Machine machine, PrologStream source, int index)
     {
         if (!source.IsPastEnd)
         {
@@ -913,7 +898,7 @@ internal static class StreamBuiltins
         switch (source.EndOfFileAction)
         {
             case PrologStream.EofAction.Error:
-                throw PrologErrors.Permission(machine, "input", "past_end_of_stream", StreamTerm(machine, source));
+                throw PrologErrors.Permission(machine, "input", "past_end_of_stream", StreamCulprit(machine, index, source));
             case PrologStream.EofAction.Reset:
                 source.ResetEnd();
                 break;
@@ -936,12 +921,7 @@ internal static class StreamBuiltins
 
         if (!stream.Reposition)
         {
-            throw PrologErrors.Permission(
-                machine,
-                "reposition",
-                "stream",
-                machine.Symbols.InternFunctor(stream.Alias ?? stream.Name, 0)
-            );
+            throw PrologErrors.Permission(machine, "reposition", "stream", machine.Argument(0));
         }
 
         if (!stream.TrySetPosition(position))
