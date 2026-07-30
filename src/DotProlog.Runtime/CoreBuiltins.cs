@@ -117,6 +117,8 @@ public static class CoreBuiltins
             }
         );
 
+        registry.RegisterNondeterministic("repeat", 0, static machine => Repeat(machine, 0), Repeat);
+
         // between/3 is the simplest nondeterministic native predicate, and the clearest example of one.
         registry.RegisterNondeterministic("between", 3, static machine => Between(machine, long.MinValue), Between);
 
@@ -337,6 +339,13 @@ public static class CoreBuiltins
         extra.CopyTo(arguments, functor.Arity);
 
         return machine.Unify(target, machine.CreateStructure(machine.Symbols.InternFunctor(functor.NameAtom, arity), arguments));
+    }
+
+    /// <summary><c>repeat/0</c>: succeeds now and on every subsequent retry.</summary>
+    private static bool Repeat(Machine machine, long state)
+    {
+        machine.PushRetry(state);
+        return true;
     }
 
     /// <summary>

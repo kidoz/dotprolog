@@ -15,6 +15,26 @@ public sealed class NondeterministicBuiltinTests
         """;
 
     [Fact]
+    public void RepeatSucceeds()
+    {
+        Assert.Equal("yes", PrologTestHost.RunGoal("repeat, !, write(yes)"));
+    }
+
+    [Fact]
+    public void RepeatReentersOnBacktrackingUntilCut()
+    {
+        Assert.Equal(
+            "3",
+            PrologTestHost.RunGoal(
+                "assertz(repeat_count(0)), "
+                    + "repeat, "
+                    + "retract(repeat_count(N)), Next is N + 1, assertz(repeat_count(Next)), "
+                    + "Next >= 3, !, retractall(repeat_count(_)), write(Next)"
+            )
+        );
+    }
+
+    [Fact]
     public void BetweenEnumeratesItsRange()
     {
         Assert.Equal("[1,2,3,4,5]\n", PrologTestHost.RunGoal("findall(X, between(1, 5, X), L), write(L), nl"));

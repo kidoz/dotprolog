@@ -273,6 +273,21 @@ iso_case('8.15.1', \+ _, error(instantiation_error)).
 iso_case('8.15.1', \+ 4, error(type_error(callable, 4))).
 iso_case('8.15.2', once(!), success).
 iso_case('8.15.2', once(fail), failure).
+iso_case('8.15.3', (repeat, !), success).
+iso_case(
+    '8.15.3',
+    (
+        assertz(iso_repeat_count(0)),
+        repeat,
+        retract(iso_repeat_count(N10)),
+        N11 is N10 + 1,
+        assertz(iso_repeat_count(N11)),
+        N11 >= 3,
+        !,
+        retractall(iso_repeat_count(_))
+    ),
+    success
+).
 iso_case('8.15.3', (repeat_guard(0) -> true ; true), success).
 iso_case('8.15.3', call(!), success).
 iso_case('8.15.3', call(fail), failure).
