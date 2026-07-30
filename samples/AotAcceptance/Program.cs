@@ -191,6 +191,21 @@ internal static class Program
                 CurrentOpNameCaught == true,
                 write(current_op_filter_errors), nl,
 
+                % Operator enumeration retains the table version from its first solution.
+                op(333, xfx, native_snapshot_old),
+                findall(
+                    OldName,
+                    (current_op(_, _, OldName), op(0, xfx, native_snapshot_old)),
+                    OldOperatorNames),
+                member(native_snapshot_old, OldOperatorNames),
+                findall(
+                    NewName,
+                    (current_op(_, _, NewName), op(333, xfx, native_snapshot_new)),
+                    NewOperatorNames),
+                \+ member(native_snapshot_new, NewOperatorNames),
+                op(0, xfx, native_snapshot_new),
+                write(current_op_snapshot), nl,
+
                 % Open streams and their ISO metadata are explicit runtime state, not reflection.
                 current_input(NativeInput), current_stream(NativeInput),
                 stream_property(NativeInput, mode(read)),
