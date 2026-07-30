@@ -32,6 +32,7 @@ internal static class TermBuiltins
         registry.Register("callable", 1, static machine => machine.Argument(0).Tag is CellTag.Atom or CellTag.Structure);
         registry.Register("is_list", 1, static machine => TermList.IsProper(machine, machine.Argument(0)));
         registry.Register("ground", 1, static machine => IsGround(machine, machine.Argument(0)));
+        registry.Register("acyclic_term", 1, static machine => IsAcyclic(machine, machine.Argument(0)));
     }
 
     private static void RegisterComparisons(BuiltinRegistry registry, SymbolTable symbols)
@@ -456,6 +457,51 @@ internal static class TermBuiltins
             for (int i = 1; i <= arity; i++)
             {
                 work.Add(machine.HeapAt(cell.Index + i));
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsAcyclic(Machine machine, Cell term)
+    {
+        var state = new Dictionary<int, bool>();
+        List<(Cell Cell, bool Exit)> work = [(term, false)];
+
+        while (work.Count > 0)
+        {
+            (Cell cell, bool exit) = work[^1];
+            work.RemoveAt(work.Count - 1);
+            cell = machine.Dereference(cell);
+
+            if (cell.Tag != CellTag.Structure)
+            {
+                continue;
+            }
+
+            if (exit)
+            {
+                state[cell.Index] = true;
+                continue;
+            }
+
+            if (state.TryGetValue(cell.Index, out bool complete))
+            {
+                if (!complete)
+                {
+                    return false;
+                }
+
+                continue;
+            }
+
+            state.Add(cell.Index, false);
+            work.Add((cell, true));
+
+            int arity = machine.Symbols.ArityOf(machine.HeapAt(cell.Index).Index);
+            for (int i = arity; i >= 1; i--)
+            {
+                work.Add((machine.HeapAt(cell.Index + i), false));
             }
         }
 

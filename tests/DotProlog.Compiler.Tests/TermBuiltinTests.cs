@@ -46,6 +46,17 @@ public sealed class TermBuiltinTests
     }
 
     [Theory]
+    [InlineData("acyclic_term(X)")]
+    [InlineData("acyclic_term(f(X,X))")]
+    [InlineData("X = f(Y), acyclic_term(f(X,X,Y))")]
+    [InlineData("X = f(X), \\+ acyclic_term(X)")]
+    [InlineData("X = f(Y), Y = g(X), \\+ acyclic_term(X)")]
+    public void AcyclicTermDetectsFiniteAndRationalTrees(string goal)
+    {
+        Assert.Equal("yes", PrologTestHost.RunGoal($"{goal}, write(yes)"));
+    }
+
+    [Theory]
     [InlineData("a == a")]
     [InlineData("f(X) == f(X)")]
     [InlineData("a \\== b")]
