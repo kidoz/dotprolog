@@ -155,6 +155,23 @@ public sealed class TermReaderTests
         Assert.Equal("limit.pl", diagnostic.FileName);
     }
 
+    [Theory]
+    [InlineData("1e9999", 0, 6)]
+    [InlineData("+1e9999", 0, 7)]
+    [InlineData("-1e9999", 0, 7)]
+    [InlineData("f(1e9999)", 2, 6)]
+    public void ReportsFloatOverflowWithItsSourceSpan(string source, int start, int length)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        ParseResult result = TermReader.ReadTerm(source, "limit.pl");
+
+        Diagnostic diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticIds.FloatOverflow, diagnostic.Id);
+        Assert.Equal(new SourceSpan(start, length, 1, start + 1), diagnostic.Span);
+        Assert.Equal("limit.pl", diagnostic.FileName);
+    }
+
     [Fact]
     public void CharacterConversionChangesOnlyUnquotedTokenText()
     {

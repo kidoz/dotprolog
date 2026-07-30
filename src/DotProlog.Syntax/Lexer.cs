@@ -360,7 +360,7 @@ internal sealed class Lexer
         if (isFloat)
         {
             double value = double.Parse(literal, CultureInfo.InvariantCulture);
-            return new Token(TokenKind.Float, literal, span, layout, Float: value);
+            return new Token(TokenKind.Float, literal, span, layout, Float: value, FloatOverflow: double.IsInfinity(value));
         }
 
         if (!long.TryParse(literal, NumberStyles.None, CultureInfo.InvariantCulture, out long integer))

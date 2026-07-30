@@ -512,6 +512,7 @@ public sealed class PrologEngine : IRuntimeCompiler
             {
                 DiagnosticIds.MaxIntegerExceeded => PrologErrors.Representation(machine, "max_integer"),
                 DiagnosticIds.MinIntegerExceeded => PrologErrors.Representation(machine, "min_integer"),
+                DiagnosticIds.FloatOverflow => SyntaxError(machine, "float_overflow"),
                 _ => SyntaxError(machine, error),
             };
         }

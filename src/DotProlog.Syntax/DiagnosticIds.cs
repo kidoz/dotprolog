@@ -29,4 +29,7 @@ public static class DiagnosticIds
 
     /// <summary>A negative integer literal exceeds the implementation's storage range.</summary>
     public const string MinIntegerExceeded = "DPL0009";
+
+    /// <summary>A floating-point literal exceeds the finite implementation range.</summary>
+    public const string FloatOverflow = "DPL0010";
 }

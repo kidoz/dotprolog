@@ -12,6 +12,7 @@ namespace DotProlog.Syntax;
 /// <param name="Float">Value of a <see cref="TokenKind.Float"/> token.</param>
 /// <param name="Quoted">Whether an atom token was written in quotes, which suppresses operator interpretation.</param>
 /// <param name="IntegerOverflow">Whether an integer token exceeds the lexer storage range.</param>
+/// <param name="FloatOverflow">Whether a float token exceeds the finite implementation range.</param>
 internal readonly record struct Token(
     TokenKind Kind,
     string Text,
@@ -20,7 +21,8 @@ internal readonly record struct Token(
     long Integer = 0,
     double Float = 0,
     bool Quoted = false,
-    bool IntegerOverflow = false
+    bool IntegerOverflow = false,
+    bool FloatOverflow = false
 )
 {
     /// <summary>Whether this token is the punctuation <paramref name="text"/>.</summary>

@@ -90,6 +90,17 @@ public sealed class LexerTests
     }
 
     [Fact]
+    public void RetainsFloatOverflowForReaderDiagnostics()
+    {
+        List<Token> tokens = Tokenize("1e9999", out List<Diagnostic> diagnostics);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(TokenKind.Float, tokens[0].Kind);
+        Assert.True(tokens[0].FloatOverflow);
+        Assert.True(double.IsPositiveInfinity(tokens[0].Float));
+    }
+
+    [Fact]
     public void SkipsLineAndBlockComments()
     {
         List<Token> tokens = Tokenize("a % trailing\n/* block\n   comment */ b.", out List<Diagnostic> diagnostics);

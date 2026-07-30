@@ -316,7 +316,7 @@ public sealed class TermReader
 
             case TokenKind.Float:
                 Advance();
-                return new FloatTerm(token.Float, token.Span);
+                return FloatLiteral(token, negate: false, token.Span);
 
             case TokenKind.String:
                 Advance();
@@ -390,7 +390,7 @@ public sealed class TermReader
             bool negate = name == "-";
             return literal.Kind == TokenKind.Integer
                 ? IntegerLiteral(literal, negate, span)
-                : new FloatTerm(negate ? -literal.Float : literal.Float, span);
+                : FloatLiteral(literal, negate, span);
         }
 
         if (
@@ -431,6 +431,20 @@ public sealed class TermReader
         }
 
         return new IntegerTerm(negate ? -token.Integer : token.Integer, span);
+    }
+
+    private FloatTerm FloatLiteral(Token token, bool negate, SourceSpan span)
+    {
+        if (token.FloatOverflow)
+        {
+            Report(
+                DiagnosticIds.FloatOverflow,
+                $"Floating-point literal '{(negate ? "-" : string.Empty)}{token.Text}' exceeds the finite range.",
+                span
+            );
+        }
+
+        return new FloatTerm(negate ? -token.Float : token.Float, span);
     }
 
     private bool CanStartTerm(Token token)
