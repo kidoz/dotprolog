@@ -8,6 +8,36 @@ namespace Integration.Tests;
 /// </summary>
 internal static class LogtalkTestAdapter
 {
+    private const string TextInputAssertionSupport = """
+        '$logtalk_text_input_assertion'(Expected, Assertion) :-
+            current_input(Stream),
+            atom_length(Expected, Length),
+            Limit is Length + 1,
+            '$logtalk_read_text_input'(Stream, Chars, Limit),
+            atom_chars(Contents, Chars),
+            Assertion = (Expected == Contents).
+
+        '$logtalk_text_input_assertion'(Alias, Expected, Assertion) :-
+            atom_length(Expected, Length),
+            Limit is Length + 1,
+            '$logtalk_read_text_input'(Alias, Chars, Limit),
+            atom_chars(Contents, Chars),
+            close(Alias),
+            '$logtalk_delete_text_input'(Alias),
+            Assertion = (Expected == Contents).
+
+        '$logtalk_read_text_input'(Stream, Chars, Countdown) :-
+            get_char(Stream, Char),
+            ( Char == end_of_file ->
+                Chars = []
+            ; Countdown =< 0 ->
+                Chars = []
+            ; Chars = [Char| Rest],
+              Next is Countdown - 1,
+              '$logtalk_read_text_input'(Stream, Rest, Next)
+            ).
+        """;
+
     /// <summary>Reads every enabled and explicitly disabled <c>iso_*</c> declaration in one source.</summary>
     internal static IReadOnlyList<LogtalkTestDeclaration> ReadDeclarations(string source, string relativePath)
     {
@@ -292,6 +322,11 @@ internal static class LogtalkTestAdapter
             return false;
         }
 
+        if (source.Contains("^^text_input_assertion(", StringComparison.Ordinal))
+        {
+            support.Add(TextInputAssertionSupport);
+        }
+
         program = string.Join(Environment.NewLine, support);
         return true;
     }
@@ -446,6 +481,9 @@ internal static class LogtalkTestAdapter
             bool dispatchedTextOutputContents = source
                 .AsSpan(current)
                 .StartsWith("^^text_output_contents(", StringComparison.Ordinal);
+            bool dispatchedTextInputAssertion = source
+                .AsSpan(current)
+                .StartsWith("^^text_input_assertion(", StringComparison.Ordinal);
             bool dispatchedCheckTextOutput = source
                 .AsSpan(current)
                 .StartsWith("^^check_text_output(", StringComparison.Ordinal);
@@ -456,6 +494,7 @@ internal static class LogtalkTestAdapter
                 && !dispatchedTextOutput
                 && !dispatchedTextOutputAssertion
                 && !dispatchedTextOutputContents
+                && !dispatchedTextInputAssertion
                 && !dispatchedCheckTextOutput
             )
             {
@@ -469,6 +508,7 @@ internal static class LogtalkTestAdapter
                 || dispatchedTextOutput
                 || dispatchedTextOutputAssertion
                 || dispatchedTextOutputContents
+                || dispatchedTextInputAssertion
                 || dispatchedCheckTextOutput
             )
             {
@@ -482,6 +522,7 @@ internal static class LogtalkTestAdapter
                 : IsFunctorCallAt(source, functorStart, "set_text_output") ? "set_text_output"
                 : IsFunctorCallAt(source, functorStart, "text_output_assertion") ? "text_output_assertion"
                 : IsFunctorCallAt(source, functorStart, "text_output_contents") ? "text_output_contents"
+                : IsFunctorCallAt(source, functorStart, "text_input_assertion") ? "text_input_assertion"
                 : IsFunctorCallAt(source, functorStart, "check_text_output") ? "check_text_output"
                 : null;
             if (functor is null)
@@ -528,9 +569,10 @@ internal static class LogtalkTestAdapter
                 List<string> hostArguments = SplitTopLevel(arguments, ',');
                 bool supportedArity = functor switch
                 {
-                    "set_text_input" => hostArguments.Count == 1,
+                    "set_text_input" => hostArguments.Count is 1 or 2,
                     "set_text_output" or "text_output_contents" => hostArguments.Count is 1 or 2,
                     "text_output_assertion" => hostArguments.Count is 2 or 3,
+                    "text_input_assertion" => hostArguments.Count is 2 or 3,
                     _ => hostArguments.Count == 2,
                 };
                 if (!supportedArity)
@@ -545,6 +587,7 @@ internal static class LogtalkTestAdapter
                     "set_text_output" => "$logtalk_set_text_output",
                     "text_output_assertion" => "$logtalk_text_output_assertion",
                     "text_output_contents" => "$logtalk_text_output_contents",
+                    "text_input_assertion" => "$logtalk_text_input_assertion",
                     _ => "$logtalk_check_text_output",
                 };
                 replacement = $"'{hostFunctor}'({arguments})";

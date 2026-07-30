@@ -211,6 +211,16 @@ public sealed class LogtalkConformanceTests
         Assert.Equal(
             RunResult.Success,
             textInputEngine.RunGoal(
+                "'$logtalk_set_text_input'(input_alias, 'a.'), read(input_alias, a), "
+                    + "close(input_alias), '$logtalk_delete_text_input'(input_alias)",
+                out IReadOnlyList<DotProlog.Syntax.Diagnostic> namedTextInputDiagnostics
+            )
+        );
+        Assert.Empty(namedTextInputDiagnostics);
+
+        Assert.Equal(
+            RunResult.Success,
+            textInputEngine.RunGoal(
                 "'$logtalk_set_text_output'(q), write(w), "
                     + "'$logtalk_text_output_assertion'(qw, Assertion), call(Assertion)",
                 out IReadOnlyList<DotProlog.Syntax.Diagnostic> textOutputDiagnostics
@@ -371,8 +381,8 @@ public sealed class LogtalkConformanceTests
                 ),
             ];
 
-            Assert.Equal(729, directCases.Length);
-            Assert.Equal(429, directCases.Count(test => test.OutcomeKind == "true"));
+            Assert.Equal(734, directCases.Length);
+            Assert.Equal(434, directCases.Count(test => test.OutcomeKind == "true"));
             Assert.Equal(73, directCases.Count(test => test.OutcomeKind == "false"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "fail"));
             Assert.Equal(148, directCases.Count(test => test.OutcomeKind == "error"));
@@ -502,7 +512,18 @@ public sealed class LogtalkConformanceTests
     private static PrologEngine CreateAdapterEngine()
     {
         var engine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
+        var namedInputPaths = new Dictionary<string, string>(StringComparer.Ordinal);
         engine.Program.Builtins.Register("$logtalk_set_text_input", 1, SetTextInput);
+        engine.Program.Builtins.Register(
+            "$logtalk_set_text_input",
+            2,
+            machine => SetNamedTextInput(machine, namedInputPaths)
+        );
+        engine.Program.Builtins.Register(
+            "$logtalk_delete_text_input",
+            1,
+            machine => DeleteNamedTextInput(machine, namedInputPaths)
+        );
         engine.Program.Builtins.Register("$logtalk_set_text_output", 1, SetTextOutput);
         engine.Program.Builtins.Register("$logtalk_set_text_output", 2, SetNamedTextOutput);
         engine.Program.Builtins.Register("$logtalk_text_output_assertion", 2, TextOutputAssertion);
@@ -530,6 +551,40 @@ public sealed class LogtalkConformanceTests
         }
 
         machine.Input = new StringReader(input);
+        return true;
+    }
+
+    private static bool SetNamedTextInput(Machine machine, Dictionary<string, string> paths)
+    {
+        Cell alias = machine.Argument(0);
+        if (
+            alias.Tag != CellTag.Atom
+            || !TryReadTextContents(machine, machine.Argument(1), out string input)
+        )
+        {
+            return false;
+        }
+
+        string aliasName = machine.Symbols.AtomName(alias.Index);
+        string path = Path.GetTempFileName();
+        File.WriteAllText(path, input);
+        _ = machine.Streams.Open(path, "read", aliasName, "text", reposition: false);
+        paths.Add(aliasName, path);
+        return true;
+    }
+
+    private static bool DeleteNamedTextInput(Machine machine, Dictionary<string, string> paths)
+    {
+        Cell alias = machine.Argument(0);
+        if (
+            alias.Tag != CellTag.Atom
+            || !paths.Remove(machine.Symbols.AtomName(alias.Index), out string? path)
+        )
+        {
+            return false;
+        }
+
+        File.Delete(path);
         return true;
     }
 
