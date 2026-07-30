@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**447 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**450 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -121,8 +121,11 @@ Writing them was worth it immediately: they found these real defects.
 - `compare/3` validates a bound order before comparing its terms. A non-atom raises
   `type_error(atom, Culprit)`, while an atom outside `<`, `=`, and `>` raises
   `domain_error(order, Culprit)` instead of ordinary failure.
+- `current_op/3` validates bound filters before enumeration. Invalid priorities and specifiers raise
+  their ISO domain errors, and a non-atom operator name raises `type_error(atom, Culprit)` rather
+  than being treated as a query with no solutions.
 
-Beyond the conformance cases, the engine and toolchain are covered by 996 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 1001 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 

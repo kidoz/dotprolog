@@ -235,6 +235,7 @@ Every error the engine raises is a catchable `error(Formal, Context)` term, so `
 `halt/1` validates its status before terminating: variables and non-integers remain catchable input
 errors instead of being converted to exit code zero.
 `compare/3` likewise distinguishes an invalid output type from an atom outside the order domain.
+`current_op/3` validates bound priority, specifier, and name filters before enumeration.
 
 ```prolog
 report(Rows) :-
@@ -375,7 +376,7 @@ A control term assembled at run time and passed to `call/1` is lowered to VM byt
 same control-construct compiler used for source clauses. Its cut is transparent within that
 meta-called goal and opaque to the caller, as ISO specifies.
 
-DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 447 conformance cases encoded
+DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 450 conformance cases encoded
 from ISO/IEC 13211-1, all passing, but those are its own reading of the standard rather than an
 independent suite — see [COMPATIBILITY.md](COMPATIBILITY.md), which also lists the known
 differences.
