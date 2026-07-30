@@ -18,6 +18,15 @@ public static class PrologErrors
         return Build(machine, Cell.Atom(machine.Symbols.InternAtom("instantiation_error")), "instantiation_error");
     }
 
+    /// <summary>A term that was required to be a variable was already instantiated.</summary>
+    public static PrologException Uninstantiation(Machine machine, Cell culprit)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+
+        Cell formal = machine.CreateStructure(machine.Symbols.InternFunctor("uninstantiation_error", 1), [culprit]);
+        return Build(machine, formal, $"uninstantiation_error({TermWriter.ToDisplayString(machine, culprit, quoted: true)})");
+    }
+
     /// <summary>A term was the wrong type: <c>type_error(Expected, Culprit)</c>.</summary>
     public static PrologException Type(Machine machine, string expected, Cell culprit)
     {

@@ -361,6 +361,7 @@ iso_case('8.11.5', open(_, read, _), error(instantiation_error)).
 iso_case('8.11.5', open(f, _, _), error(instantiation_error)).
 iso_case('8.11.5', open(f, sideways, _), error(domain_error(io_mode, sideways))).
 iso_case('8.11.5', open(1, read, _), error(type_error(atom, 1))).
+iso_case('8.11.5', open(f, read, bound), error(uninstantiation_error(bound))).
 iso_case('8.11.5', open(f, write, _, [type(other)]), error(domain_error(stream_option, type(other)))).
 iso_case('8.11.5', open(f, write, _, [type(1)]), error(domain_error(stream_option, type(1)))).
 iso_case('8.11.5', open(f, write, _, [type(_)]), error(instantiation_error)).
@@ -370,6 +371,11 @@ iso_case('8.11.5', open(f, write, _, [reposition(_)]), error(instantiation_error
 iso_case('8.11.5', open(f, write, _, [eof_action(other)]), error(domain_error(stream_option, eof_action(other)))).
 iso_case('8.11.5', open(f, write, _, [eof_action(1)]), error(domain_error(stream_option, eof_action(1)))).
 iso_case('8.11.5', open(f, write, _, [eof_action(_)]), error(instantiation_error)).
+iso_case(
+    '8.11.5',
+    open(f, write, _, [alias(user_output)]),
+    error(permission_error(open, source_sink, alias(user_output)))
+).
 iso_case('8.11.6', close(_), error(instantiation_error)).
 iso_case('8.11.6', close(no_such_stream), error(existence_error(stream, no_such_stream))).
 iso_case('8.11.6', close(user_output, [force(false)]), success).

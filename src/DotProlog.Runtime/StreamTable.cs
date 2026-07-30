@@ -102,6 +102,11 @@ public sealed class StreamTable
     {
         ArgumentNullException.ThrowIfNull(path);
 
+        if (alias is not null && ByAlias(alias) is not null)
+        {
+            throw new InvalidOperationException($"The stream alias '{alias}' is already in use.");
+        }
+
         PrologStream stream =
             type == "binary"
                 ? OpenBinary(path, mode, alias, reposition, eofAction)

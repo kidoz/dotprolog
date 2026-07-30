@@ -198,6 +198,21 @@ internal static class StreamBuiltins
 
         OpenOptions openOptions =
             options < 0 ? new OpenOptions(null, "text", true, PrologStream.EofAction.EofCode) : ReadOpenOptions(machine, options);
+        Cell target = machine.Argument(2);
+        if (target.Tag != CellTag.Reference)
+        {
+            throw PrologErrors.Uninstantiation(machine, target);
+        }
+
+        if (openOptions.Alias is not null && machine.Streams.ByAlias(openOptions.Alias) is not null)
+        {
+            Cell alias = machine.CreateStructure(
+                machine.Symbols.InternFunctor("alias", 1),
+                [Cell.Atom(machine.Symbols.InternAtom(openOptions.Alias))]
+            );
+            throw PrologErrors.Permission(machine, "open", "source_sink", alias);
+        }
+
         string path = machine.Symbols.AtomName(file.Index);
 
         PrologStream stream;
@@ -212,12 +227,16 @@ internal static class StreamBuiltins
                 openOptions.EofAction
             );
         }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
         {
             throw Existence(machine, "source_sink", file);
         }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            throw PrologErrors.Permission(machine, "open", "source_sink", file);
+        }
 
-        return machine.Unify(machine.Argument(2), StreamTerm(machine, stream));
+        return machine.Unify(target, StreamTerm(machine, stream));
     }
 
     /// <summary>Reads the supported ISO options of <c>open/4</c>; unknown options are rejected.</summary>
