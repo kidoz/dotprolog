@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**510 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**533 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -36,8 +36,10 @@ Writing them was worth it immediately: they found these real defects.
 - `X =.. [_, a]` gave a type error where the standard says `instantiation_error`.
 - `call((fail, 4))` failed instead of raising `type_error(callable, (fail,4))`; a meta-called goal
   is now checked whole before any of it runs.
-- `atom_chars(1.0, ['1', '.', '0'])` failed. With its first argument already bound the predicate
-  built an atom from the list and unified, so a number could never match; it now compares text.
+- Atomic term predicates accepted numbers where ISO requires atoms, omitted several bound-argument
+  checks, and treated negative sub-atom positions as ordinary failure. They now enforce atom,
+  number, integer, character, list, and non-negative domains with ISO error terms; number
+  conversion also distinguishes permitted leading layout from invalid trailing layout.
 - `call((!, fail ; true))` succeeded because the cut could not prune the meta-called disjunction.
   Meta-called control now goes through the same bytecode lowering and cut barriers as source-level
   control.
@@ -165,7 +167,7 @@ Writing them was worth it immediately: they found these real defects.
   letters and underscore start variables, other Unicode letters start atoms, and unsupported
   unquoted starts become catchable reader errors rather than host exceptions.
 
-Beyond the conformance cases, the engine and toolchain are covered by 1071 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 1102 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
