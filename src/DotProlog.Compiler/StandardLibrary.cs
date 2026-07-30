@@ -332,15 +332,18 @@ internal static class StandardLibrary
 
         '$group_pairs'([], []).
         '$group_pairs'([K-V|T], [K-[V|Vs]|Groups]) :-
-            '$same_key'(K, T, Vs, Rest),
+            '$take_variant_keys'(K, T, Vs, Rest),
             '$group_pairs'(Rest, Groups).
 
-        '$same_key'(K, [K1-V|T], Vs, Rest) :-
-            K == K1,
+        '$take_variant_keys'(_, [], [], []).
+        '$take_variant_keys'(K, [K1-V|T], [V|Vs], Rest) :-
+            subsumes_term(K, K1),
+            subsumes_term(K1, K),
             !,
-            Vs = [V|Vs1],
-            '$same_key'(K, T, Vs1, Rest).
-        '$same_key'(_, Rest, [], Rest).
+            K = K1,
+            '$take_variant_keys'(K, T, Vs, Rest).
+        '$take_variant_keys'(K, [Pair|T], Vs, [Pair|Rest]) :-
+            '$take_variant_keys'(K, T, Vs, Rest).
 
         % The free variables of a goal are those a solution can bind and the caller
         % can therefore see grouped. Control constructs are walked into so that a

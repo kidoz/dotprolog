@@ -46,6 +46,27 @@ public sealed class BagofTests
     public void BagofKeepsDuplicatesAndSolutionOrder() =>
         Assert.Equal("[b,a,b]", PrologTestHost.RunGoal("bagof(X, member(X, [b, a, b]), L), write(L)"));
 
+    [Fact]
+    public void BagofAlignsVariablesAcrossVariantWitnesses()
+    {
+        Assert.Equal("yes", PrologTestHost.RunGoal("bagof(X, (X=Y;X=Z), S), S == [Y,Z], write(yes)"));
+    }
+
+    [Fact]
+    public void SetofAlignsVariablesAcrossVariantWitnesses()
+    {
+        Assert.Equal("yes", PrologTestHost.RunGoal("setof(X, (X=Y;X=Z), S), (S == [Y,Z]; S == [Z,Y]), write(yes)"));
+    }
+
+    [Fact]
+    public void SetofResultUnificationBindsVariablesSharedWithItsGoal()
+    {
+        Assert.Equal(
+            "yes",
+            PrologTestHost.RunGoal("setof(X, member(X,[f(b,U),f(c,V)]), [f(b,a),f(c,a)]), U == a, V == a, write(yes)")
+        );
+    }
+
     [Theory]
     [InlineData("bagof(X, member(X, []), _)")]
     [InlineData("setof(X, member(X, []), _)")]
