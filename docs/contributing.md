@@ -15,6 +15,7 @@ Its individual commands are:
 
 ```console
 just format-check
+just docs
 just build
 just test
 ```
@@ -24,6 +25,7 @@ Without `just`:
 ```console
 dotnet tool restore
 dotnet csharpier check .
+uv run --locked --only-group docs mkdocs build --strict
 dotnet build DotProlog.slnx
 dotnet test --solution DotProlog.slnx --no-ansi
 ```

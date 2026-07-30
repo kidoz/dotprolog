@@ -8,6 +8,7 @@ are exercised in CI, but they are not yet available from NuGet.org.
 - The [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - Git
 - Optional: [just](https://just.systems/) for the repository shortcuts
+- [uv](https://docs.astral.sh/uv/) when running the documentation checks or the full `just check`
 
 Check the SDK selected by the repository:
 

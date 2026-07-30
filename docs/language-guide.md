@@ -47,6 +47,20 @@ Ordinary Prolog failure and backtracking do not use CLR exceptions.
 Dynamic predicates support `asserta/1`, `assertz/1`, `retract/1`, `retractall/1`, `clause/2`, and
 `abolish/1`.
 
+`findall(Template, Goal, Answers)` returns one list and uses `[]` when `Goal` has no solutions.
+`bagof(Template, Goal, Answers)` instead groups answers by each free variable in `Goal` and fails
+when a group has no solutions. For example, with `kind(apple, fruit)`, `kind(pear, fruit)`, and
+`kind(carrot, vegetable)`, backtracking over `bagof(Item, kind(Item, Kind), Items)` produces:
+
+```text
+Kind = fruit,     Items = [apple,pear]
+Kind = vegetable, Items = [carrot]
+```
+
+Quantify a variable with `^` when it should not create groups:
+`bagof(Item, Kind^kind(Item, Kind), Items)`. `setof/3` uses the same grouping rules, then sorts each
+group in standard order and removes duplicates.
+
 ```prolog
 :- dynamic item/1.
 
