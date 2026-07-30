@@ -81,6 +81,8 @@ Writing them was worth it immediately: they found these real defects.
 - A non-variable value outside the ISO `source_sink` domain now raises
   `domain_error(source_sink, Culprit)` from `open/3,4` instead of treating every source/sink as an
   atom-typed argument.
+- Source/sink atoms that cannot denote a host pathname, including embedded null characters, now
+  remain catchable as `domain_error(source_sink, Culprit)` instead of leaking a .NET exception.
 - Stream permission errors now retain the caller's actual alias or handle as their culprit instead
   of manufacturing a predicate indicator. Malformed negative and oversized stream handles are
   rejected as domain errors rather than wrapping to another live identifier.
