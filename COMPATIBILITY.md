@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**413 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**437 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -98,6 +98,7 @@ Writing them was worth it immediately: they found these real defects.
 - Host reader and writer failures now become catchable ISO `system_error` terms throughout stream
   input, output, EOF inspection, positioning, formatting, flushing, and closing. Implicit-current
   output predicates also enforce the same text/binary permissions as explicit-stream calls.
+  Closing a disposed host stream follows the same rule, while `force(true)` suppresses the failure.
 - `write_term/3` now writes to an explicit stream, and the ISO `quoted/1`, `ignore_ops/1`, and
   `numbervars/1` options are strict booleans with rightmost precedence. Numbered variables use the
   portable `A` through `Z`, `A1`, `B1`, and later naming sequence.
@@ -105,7 +106,7 @@ Writing them was worth it immediately: they found these real defects.
   Unknown options, variable elements, and partial lists therefore raise their ISO errors without
   consuming the next term.
 
-Beyond the conformance cases, the engine and toolchain are covered by 933 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 961 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
@@ -131,7 +132,8 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 
 | Feature | Current state |
 |---|---|
-| Complete stream surface | Open, close, and term I/O multi-error priority still requires an audit |
+| Complete standard clause audit | Representation limits, syntax, modes, and remaining non-stream errors still require a clause-by-clause audit |
+| Independent ISO verification | The repository corpus is not a substitute for a published independent suite |
 
 ## Non-ISO features absent deliberately
 
