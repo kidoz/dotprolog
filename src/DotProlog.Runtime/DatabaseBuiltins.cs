@@ -15,9 +15,21 @@ internal static class DatabaseBuiltins
         registry.Register("assertz", 1, static machine => Assert(machine, atEnd: true));
         registry.Register("assert", 1, static machine => Assert(machine, atEnd: true));
         registry.Register("asserta", 1, static machine => Assert(machine, atEnd: false));
-        // Nondeterministic: on redo, both resume the clause list where they left off.
-        registry.RegisterNondeterministic("retract", 1, static machine => Retract(machine, 0), Retract);
-        registry.RegisterNondeterministic("clause", 2, static machine => Clause(machine, 0), Clause);
+        // Nondeterministic: on redo, both resume the clause list where they left off. The generation
+        // is snapshotted on the first call and carried through every redo, so the whole enumeration
+        // sees exactly the clauses that existed when it started — the logical update view.
+        registry.RegisterNondeterministic(
+            "retract",
+            1,
+            static machine => Retract(machine, machine.Program.Generation, resumed: false),
+            static (machine, generation) => Retract(machine, (int)generation, resumed: true)
+        );
+        registry.RegisterNondeterministic(
+            "clause",
+            2,
+            static machine => Clause(machine, machine.Program.Generation, resumed: false),
+            static (machine, generation) => Clause(machine, (int)generation, resumed: true)
+        );
         registry.RegisterNondeterministic(
             "current_predicate",
             1,
@@ -86,9 +98,9 @@ internal static class DatabaseBuiltins
 
     /// <summary>
     /// Retracts a clause unifying with the argument, and on redo retracts a further one, as ISO
-    /// requires. <paramref name="skip"/> is how many clauses of the predicate to pass over first.
+    /// requires. <paramref name="generation"/> fixes which clauses the whole call can see.
     /// </summary>
-    private static bool Retract(Machine machine, long skip)
+    private static bool Retract(Machine machine, int generation, bool resumed)
     {
         Cell pattern = machine.Argument(0);
         if (pattern.Tag == CellTag.Reference)
@@ -105,13 +117,14 @@ internal static class DatabaseBuiltins
             return false;
         }
 
-        return MatchClause(machine, normalized, predicate, skip, erase: true);
+        DynamicClause? from = resumed ? machine.BuiltinCursor : predicate.First;
+        return MatchClause(machine, normalized, from, generation, erase: true);
     }
 
     /// <summary>
     /// <c>clause(Head, Body)</c>: enumerates the clauses of a dynamic predicate without removing them.
     /// </summary>
-    private static bool Clause(Machine machine, long skip)
+    private static bool Clause(Machine machine, int generation, bool resumed)
     {
         Cell head = machine.Argument(0);
         if (head.Tag == CellTag.Reference)
@@ -136,12 +149,14 @@ internal static class DatabaseBuiltins
 
         // Clauses are stored as ':-'(Head, Body), so match the caller's pair against the whole term.
         Cell pattern = machine.CreateStructure(RuleFunctor(machine), [head, body]);
-        return MatchClause(machine, pattern, predicate, skip, erase: false);
+        DynamicClause? from = resumed ? machine.BuiltinCursor : predicate.First;
+        return MatchClause(machine, pattern, from, generation, erase: false);
     }
 
     /// <summary>
-    /// Finds the first clause at or after <paramref name="skip"/> that unifies with
-    /// <paramref name="pattern"/>, and offers the rest on backtracking.
+    /// Finds the first clause at or after <paramref name="from"/> visible at
+    /// <paramref name="generation"/> that unifies with <paramref name="pattern"/>, and offers the
+    /// rest on backtracking.
     /// </summary>
     /// <remarks>
     /// The choice point is pushed <em>before</em> the binding unification, not after. A choice point
@@ -150,14 +165,11 @@ internal static class DatabaseBuiltins
     /// The match is therefore tried first with <see cref="Machine.CanUnify"/>, which leaves nothing
     /// behind, and only repeated for real once the choice point is in place.
     /// </remarks>
-    private static bool MatchClause(Machine machine, Cell pattern, DynamicPredicate predicate, long skip, bool erase)
+    private static bool MatchClause(Machine machine, Cell pattern, DynamicClause? from, int generation, bool erase)
     {
-        int generation = machine.Program.Generation;
-        long position = 0;
-
-        for (DynamicClause? clause = predicate.First; clause is not null; clause = clause.Next, position++)
+        for (DynamicClause? clause = from; clause is not null; clause = clause.Next)
         {
-            if (position < skip || !clause.IsVisibleAt(generation))
+            if (!clause.IsVisibleAt(generation))
             {
                 continue;
             }
@@ -168,9 +180,9 @@ internal static class DatabaseBuiltins
                 continue;
             }
 
-            if (clause.Next is not null)
+            if (DynamicPredicate.FirstVisible(clause.Next, generation) is DynamicClause next)
             {
-                machine.PushRetry(position + 1);
+                machine.PushRetry(generation, next);
             }
 
             machine.Unify(pattern, candidate);

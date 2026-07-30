@@ -223,6 +223,48 @@ public sealed class DynamicPredicateTests
     }
 
     [Fact]
+    public void RetractDoesNotSeeClausesAssertedAfterItStarted()
+    {
+        // The logical update view again: p(99) is asserted mid-enumeration, so retract(p(X))
+        // must never reach it, even though 99 > 50 would succeed.
+        Assert.Equal(
+            "no\n",
+            PrologTestHost.Run($"{Declared}\n:- initialization((\\+ (retract(p(X)), assertz(p(99)), X > 50), write(no), nl)).")
+        );
+    }
+
+    [Fact]
+    public void AssertaBetweenRetractSolutionsDoesNotDisturbTheEnumeration()
+    {
+        Assert.Equal(
+            "[1,2]\n",
+            PrologTestHost.Run($"{Declared}\n:- initialization((findall(X, (retract(p(X)), asserta(p(0))), L), write(L), nl)).")
+        );
+    }
+
+    [Fact]
+    public void ClauseDoesNotSeeClausesAssertedAfterItStarted()
+    {
+        Assert.Equal(
+            "no\n",
+            PrologTestHost.Run(
+                $"{Declared}\n:- initialization((\\+ (clause(p(X), true), assertz(p(99)), X > 50), write(no), nl))."
+            )
+        );
+    }
+
+    [Fact]
+    public void AssertaBetweenClauseSolutionsDoesNotDisturbTheEnumeration()
+    {
+        Assert.Equal(
+            "[1,2]\n",
+            PrologTestHost.Run(
+                $"{Declared}\n:- initialization((findall(X, (clause(p(X), true), asserta(p(0))), L), write(L), nl))."
+            )
+        );
+    }
+
+    [Fact]
     public void AssertedClausesBacktrackLikeCompiledOnes()
     {
         Assert.Equal("2\n", PrologTestHost.RunGoal("assertz(q(1)), assertz(q(2)), assertz(q(3)), q(X), X > 1, write(X), nl"));

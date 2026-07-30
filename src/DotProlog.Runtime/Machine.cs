@@ -404,9 +404,11 @@ public sealed class Machine
                     ChoicePoint point = _choicePoints[_b - 1];
                     _b--;
                     _savedTop = _choicePoints[_b].ArgumentBase;
+                    _choicePoints[_b].NextClause = null;
 
                     _currentBuiltin = point.BuiltinId;
                     _pc = point.BuiltinResume;
+                    BuiltinCursor = point.NextClause;
                     proved = _program.Builtins.Retry(point.BuiltinId)(this, point.BuiltinState);
 
                     code = _program.Code;
@@ -691,6 +693,19 @@ public sealed class Machine
         point.BuiltinResume = resume;
         point.BuiltinState = state;
     }
+
+    /// <summary>
+    /// Offers a further solution together with a clause cursor. Held as a node reference rather
+    /// than a position so that <c>asserta/1</c> between solutions cannot shift the enumeration.
+    /// </summary>
+    internal void PushRetry(long state, DynamicClause cursor)
+    {
+        PushRetry(state);
+        _choicePoints[_b - 1].NextClause = cursor;
+    }
+
+    /// <summary>The clause cursor saved by the choice point the current retry is resuming.</summary>
+    internal DynamicClause? BuiltinCursor { get; private set; }
 
     /// <summary>
     /// Low-level operations used by build-time-generated C# predicate blocks.
