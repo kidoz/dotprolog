@@ -169,11 +169,10 @@ Writing them was worth it immediately: they found these real defects.
 - Extended source classification is explicit: ASCII digits start numbers, Unicode uppercase
   letters and underscore start variables, other Unicode letters start atoms, and unsupported
   unquoted starts become catchable reader errors rather than host exceptions.
-- The standard order of terms ranked every float before every integer. Numbers now compare by
-  value across kinds, with a float immediately preceding an integer it equals, and the
-  comparison stays exact near 2^59 where a double no longer holds every tagged integer. This
-  reaches `@</2` and friends, `compare/3`, `sort/2,4`, `msort/2`, `keysort/2`, `predsort/3`,
-  and `setof/3`.
+- The standard order of terms keeps every float before every integer, the strict reading of
+  7.2.1 that the pinned independent corpus also encodes (`iso_sort_2_02`). Ordering numbers by
+  value across kinds is SWI-Prolog's documented deviation, not ISO, so DotProlog deliberately
+  does not follow it.
 - Integer `0/0` raised `evaluation_error(undefined)`. An integer zero divisor now always raises
   `evaluation_error(zero_divisor)`; only the float `0.0/0.0`, whose IEEE result is NaN, stays
   `undefined`. `/2` on two integers keeps its documented processor choice of float division.
@@ -198,7 +197,7 @@ Writing them was worth it immediately: they found these real defects.
   the reader rejects. The named ISO escapes `\a \b \f \n \r \t \v` and delimited `\x...\` hex
   escapes for the rest now round-trip every control character.
 
-Beyond the conformance cases, the engine and toolchain are covered by 1247 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 1308 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 

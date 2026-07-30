@@ -84,13 +84,14 @@ iso_case('8.4.1', (aardvark @< zebra), success).
 iso_case('8.4.1', (short @< short), failure).
 iso_case('8.4.1', (foo(a, b) @< north(a)), failure).
 iso_case('8.4.1', (1.0 @< 1), success).
-% 7.2.1: numbers are ordered by value, so kinds interleave and only equal values
-% put the float first.
-iso_case('8.4.1', (1 @< 2.5), success).
+% 7.2.1: every float precedes every integer, regardless of value. The pinned
+% independent corpus (predicates/sort_2/tests.lgt, iso_sort_2_02) encodes the
+% same reading; ordering numbers by value is SWI-Prolog's documented deviation.
+iso_case('8.4.1', (1 @< 2.5), failure).
 iso_case('8.4.1', (2.5 @< 3), success).
-iso_case('8.4.1', (2.5 @< 2), failure).
+iso_case('8.4.1', (2.5 @< 2), success).
 iso_case('8.4.2', compare(<, 1, 2), success).
-iso_case('8.4.2', compare(<, 1, 2.5), success).
+iso_case('8.4.2', compare(>, 1, 2.5), success).
 iso_case('8.4.2', compare(=, 1, 1), success).
 iso_case('8.4.2', compare(>, 2, 1), success).
 iso_case('8.4.2', compare(1, a, b), error(type_error(atom, 1))).
@@ -855,7 +856,7 @@ iso_case('8.16.8', number_codes(_, [49, 101, 50]), error(syntax_error(illegal_nu
 iso_case('sort/2', sort([b, a, b], [a, b]), success).
 iso_case('sort/2', sort([], []), success).
 iso_case('msort/2', msort([b, a, b], [a, b, b]), success).
-iso_case('msort/2', msort([3, 2.5, 1, 0.5], [0.5, 1, 2.5, 3]), success).
+iso_case('msort/2', msort([3, 2.5, 1, 0.5], [0.5, 2.5, 1, 3]), success).
 iso_case('keysort/2', keysort([b-1, a-2], [a-2, b-1]), success).
 iso_case('keysort/2', keysort([a-1, a-2], [a-1, a-2]), success).
 iso_case('sort/4', sort(0, @>=, [1, 2, 2], [2, 2, 1]), success).
