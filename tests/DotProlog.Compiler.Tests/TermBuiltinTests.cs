@@ -56,6 +56,7 @@ public sealed class TermBuiltinTests
     [InlineData("f(a) @< g(a,b)")]
     [InlineData("1 @< 2")]
     [InlineData("1.0 @< 1")]
+    [InlineData("8.0 @< 1")]
     [InlineData("a @=< a")]
     [InlineData("b @> a")]
     public void StandardOrderComparisonsHold(string goal)

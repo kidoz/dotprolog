@@ -1,9 +1,9 @@
 namespace DotProlog.Runtime;
 
 /// <summary>
-/// The standard order of terms: <c>Variable @&lt; Number @&lt; Atom @&lt; Compound</c>. Numbers compare by
-/// value, and a float precedes an integer of equal value. Compound terms compare by arity, then by
-/// functor name, then argument by argument.
+/// The ISO standard order of terms: <c>Variable @&lt; Float @&lt; Integer @&lt; Atom @&lt; Compound</c>.
+/// Numbers of the same type compare by value. Compound terms compare by arity, then by functor name,
+/// then argument by argument.
 /// </summary>
 /// <remarks>
 /// Traversal is iterative over an explicit work list, so comparing deeply nested terms cannot
@@ -124,29 +124,21 @@ public static class TermOrder
 
     private static int CompareNumbers(Machine machine, Cell a, Cell b)
     {
-        if (a.Tag == CellTag.Integer && b.Tag == CellTag.Integer)
+        if (a.Tag == CellTag.Integer)
         {
             return a.Integer.CompareTo(b.Integer);
         }
 
-        double left = a.Tag == CellTag.Integer ? a.Integer : machine.Symbols.GetFloat(a.Index);
-        double right = b.Tag == CellTag.Integer ? b.Integer : machine.Symbols.GetFloat(b.Index);
-        int value = left.CompareTo(right);
-        if (value != 0)
-        {
-            return value;
-        }
-
-        // Equal in value but not in type: a float precedes an integer.
-        return a.Tag == CellTag.Float ? -1 : 1;
+        return machine.Symbols.GetFloat(a.Index).CompareTo(machine.Symbols.GetFloat(b.Index));
     }
 
     private static int RankOf(Cell cell) =>
         cell.Tag switch
         {
             CellTag.Reference => 0,
-            CellTag.Float or CellTag.Integer => 1,
-            CellTag.Atom => 2,
-            _ => 3,
+            CellTag.Float => 1,
+            CellTag.Integer => 2,
+            CellTag.Atom => 3,
+            _ => 4,
         };
 }

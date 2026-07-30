@@ -123,6 +123,7 @@ public sealed class StandardLibraryTests
     [InlineData("msort([c, a, b, a], L), write(L)", "[a,a,b,c]")]
     [InlineData("sort([c, a, b, a], L), write(L)", "[a,b,c]")]
     [InlineData("sort([2, 1.0, 1], L), write(L)", "[1.0,1,2]")]
+    [InlineData("sort([1, 8.0, 2, 7.0], L), write(L)", "[7.0,8.0,1,2]")]
     [InlineData("sort(0, @>=, [1, 2, 2, 3], L), write(L)", "[3,2,2,1]")]
     [InlineData("sort(0, @>, [1, 2, 2, 3], L), write(L)", "[3,2,1]")]
     [InlineData("sort(2, @<, [f(1, b), f(2, a)], L), write(L)", "[f(2,a),f(1,b)]")]
