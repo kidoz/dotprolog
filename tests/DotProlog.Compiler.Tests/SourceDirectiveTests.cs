@@ -212,6 +212,64 @@ public sealed class SourceDirectiveTests : IDisposable
         Assert.Equal("[first,second]", RunFile(main));
     }
 
+    [Fact]
+    public void ExecutableDirectiveSeesOnlyClausesPreparedBeforeItsSourcePosition()
+    {
+        var output = new StringWriter();
+        var engine = new PrologEngine { Output = output, Input = TextReader.Null };
+
+        LoadResult loaded = engine.ConsultText(
+            """
+            value(before).
+            :- (findall(X, value(X), Xs), write(Xs)).
+            value(after).
+            :- initialization((findall(X, value(X), Xs), write(Xs))).
+            """,
+            "ordered.pl"
+        );
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal("[before]", output.ToString());
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("[before][before,after]", output.ToString());
+    }
+
+    [Fact]
+    public void DynamicClausesKeepSourceOrderAcrossAnExecutableDirective()
+    {
+        string output = PrologTestHost.Run(
+            """
+            :- dynamic value/1.
+            value(before).
+            :- assertz(value(directive)).
+            value(after).
+            :- initialization((findall(X, value(X), Xs), write(Xs))).
+            """
+        );
+
+        Assert.Equal("[before,directive,after]", output);
+    }
+
+    [Fact]
+    public void RuntimeConsultQueuesDirectivesUntilTheMachineReturns()
+    {
+        string dependency = Write(
+            "dependency.pl",
+            """
+            loaded.
+            :- write(directive).
+            """
+        );
+        var output = new StringWriter();
+        var engine = new PrologEngine { Output = output, Input = TextReader.Null };
+
+        Assert.Equal(RunResult.Success, engine.RunGoal($"consult('{dependency}')", out _));
+        Assert.Equal("", output.ToString());
+        Assert.Equal(RunResult.Success, engine.RunGoal("loaded", out _));
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("directive", output.ToString());
+    }
+
     [Theory]
     [InlineData(":- discontiguous value.", CompilerDiagnosticIds.InvalidDiscontiguousDeclaration)]
     [InlineData(":- discontiguous value/ -1.", CompilerDiagnosticIds.InvalidDiscontiguousDeclaration)]

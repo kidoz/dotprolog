@@ -7,12 +7,6 @@ namespace DotProlog.Compiler;
 /// Lowers read clauses into a <see cref="BytecodeProgram"/>: groups clauses by predicate, chains the
 /// alternatives with try/retry/trust, and compiles directives into anonymous goal blocks.
 /// </summary>
-/// <remarks>
-/// Directives are collected while reading and run after the whole unit is compiled, not at the point
-/// they appear. That differs from consulting a file clause by clause, and only matters for a
-/// directive that depends on clauses defined earlier in the same file being callable before later
-/// ones are read.
-/// </remarks>
 public sealed class ProgramLoader
 {
     private readonly BytecodeProgram _program;
@@ -53,7 +47,15 @@ public sealed class ProgramLoader
     /// <summary>Lowers <paramref name="clauses"/> into the program.</summary>
     /// <param name="clauses">Clauses and directives in source order.</param>
     /// <param name="fileName">File name used in diagnostics, when known.</param>
-    public LoadResult Load(IReadOnlyList<SyntaxTerm> clauses, string? fileName = null)
+    /// <param name="directiveExecutor">
+    /// Optional executor for ordinary directives. When present, each directive runs at its source
+    /// position; otherwise its address is returned for a non-reentrant runtime consult to queue.
+    /// </param>
+    public LoadResult Load(
+        IReadOnlyList<SyntaxTerm> clauses,
+        string? fileName = null,
+        Func<int, RunResult>? directiveExecutor = null
+    )
     {
         ArgumentNullException.ThrowIfNull(clauses);
 
@@ -68,69 +70,124 @@ public sealed class ProgramLoader
         DeclareMultifilePredicates(unit, diagnostics, fileName);
 
         var resolver = new ModuleResolver(_modules, unit.Module, unit.Defines);
-        List<int> predicateOrder = [];
-        Dictionary<int, List<(SyntaxTerm Head, SyntaxTerm? Body)>> predicates = [];
-
-        foreach ((SyntaxTerm head, SyntaxTerm? body) in unit.Clauses)
-        {
-            SyntaxTerm resolvedHead = resolver.ResolveHead(head);
-            SyntaxTerm? resolvedBody = body is null ? null : resolver.ResolveGoal(body);
-
-            if (!TryGetHeadFunctor(resolvedHead, out int functorId))
-            {
-                Report(
-                    diagnostics,
-                    CompilerDiagnosticIds.InvalidClauseHead,
-                    "A clause head must be an atom or a compound term.",
-                    head.Span,
-                    fileName
-                );
-                continue;
-            }
-
-            if (!predicates.TryGetValue(functorId, out List<(SyntaxTerm, SyntaxTerm?)>? bucket))
-            {
-                bucket = [];
-                predicates[functorId] = bucket;
-                predicateOrder.Add(functorId);
-            }
-
-            bucket.Add((resolvedHead, resolvedBody));
-        }
-
-        foreach (SyntaxTerm goal in unit.Directives)
-        {
-            CompileDirective(resolver.ResolveGoal(goal), diagnostics, directives, initialization, fileName);
-        }
-
         HashSet<int> dynamicPredicates = DeclareDynamicPredicates(unit, resolver, diagnostics, fileName);
+        Dictionary<int, List<(SyntaxTerm Head, SyntaxTerm? Body)>> accumulated = [];
+        Dictionary<int, List<(SyntaxTerm Head, SyntaxTerm? Body)>> pending = [];
+        List<int> dirtyOrder = [];
+        HashSet<int> dirty = [];
+        bool halted = false;
 
-        foreach (int functorId in predicateOrder)
+        foreach (LoadItem item in unit.Items)
         {
-            if (dynamicPredicates.Contains(functorId) || _program.IsDynamic(functorId))
+            if (item is ClauseItem clause)
             {
-                EmitDynamicClauses(functorId, predicates[functorId], diagnostics, fileName);
+                SyntaxTerm resolvedHead = resolver.ResolveHead(clause.Head);
+                SyntaxTerm? resolvedBody = clause.Body is null ? null : resolver.ResolveGoal(clause.Body);
+
+                if (!TryGetHeadFunctor(resolvedHead, out int functorId))
+                {
+                    Report(
+                        diagnostics,
+                        CompilerDiagnosticIds.InvalidClauseHead,
+                        "A clause head must be an atom or a compound term.",
+                        clause.Head.Span,
+                        fileName
+                    );
+                    continue;
+                }
+
+                if (!accumulated.TryGetValue(functorId, out List<(SyntaxTerm, SyntaxTerm?)>? allClauses))
+                {
+                    allClauses = [];
+                    accumulated[functorId] = allClauses;
+                }
+
+                allClauses.Add((resolvedHead, resolvedBody));
+
+                if (!pending.TryGetValue(functorId, out List<(SyntaxTerm, SyntaxTerm?)>? newClauses))
+                {
+                    newClauses = [];
+                    pending[functorId] = newClauses;
+                }
+
+                newClauses.Add((resolvedHead, resolvedBody));
+                if (dirty.Add(functorId))
+                {
+                    dirtyOrder.Add(functorId);
+                }
+
                 continue;
             }
 
-            PredicateIndicator sourceIndicator = SourceIndicatorOf(unit.Module, functorId);
-            if (_modules.IsMultifile(unit.Module, sourceIndicator))
+            FlushPredicates();
+            SyntaxTerm goal = ((DirectiveItem)item).Goal;
+            if (goal is CompoundTerm { Name: "ensure_loaded", Arity: 1 } ensureLoaded)
             {
-                IReadOnlyList<(SyntaxTerm Head, SyntaxTerm? Body)> accumulated = _modules.AppendMultifileClauses(
-                    unit.Module,
-                    sourceIndicator,
-                    predicates[functorId]
-                );
-                EmitPredicate(functorId, accumulated, diagnostics, fileName);
+                EnsureLoaded(ensureLoaded, diagnostics, fileName);
                 continue;
             }
 
-            EmitPredicate(functorId, predicates[functorId], diagnostics, fileName);
+            int address = CompileDirective(resolver.ResolveGoal(goal), diagnostics, out bool deferred, fileName);
+            if (address < 0)
+            {
+                continue;
+            }
+
+            if (deferred)
+            {
+                initialization.Add(address);
+                continue;
+            }
+
+            if (directiveExecutor is null)
+            {
+                directives.Add(address);
+                continue;
+            }
+
+            RunResult result = directiveExecutor(address);
+            if (result == RunResult.Halted)
+            {
+                halted = true;
+                break;
+            }
+        }
+
+        if (!halted)
+        {
+            FlushPredicates();
         }
 
         PublishExports(unit);
         Module = unit.Module;
         return new LoadResult(diagnostics, directives, initialization);
+
+        void FlushPredicates()
+        {
+            foreach (int functorId in dirtyOrder)
+            {
+                if (dynamicPredicates.Contains(functorId) || _program.IsDynamic(functorId))
+                {
+                    EmitDynamicClauses(functorId, pending[functorId], diagnostics, fileName);
+                    continue;
+                }
+
+                PredicateIndicator sourceIndicator = SourceIndicatorOf(unit.Module, functorId);
+                if (_modules.IsMultifile(unit.Module, sourceIndicator))
+                {
+                    IReadOnlyList<(SyntaxTerm Head, SyntaxTerm? Body)> multifileClauses =
+                        _modules.AppendMultifileClauses(unit.Module, sourceIndicator, pending[functorId]);
+                    EmitPredicate(functorId, multifileClauses, diagnostics, fileName);
+                    continue;
+                }
+
+                EmitPredicate(functorId, accumulated[functorId], diagnostics, fileName);
+            }
+
+            pending.Clear();
+            dirty.Clear();
+            dirtyOrder.Clear();
+        }
     }
 
     /// <summary>The module the last load declared, or <c>user</c>.</summary>
@@ -192,10 +249,6 @@ public sealed class ProgramLoader
                         DeclareMeta(meta.Arguments[0], diagnostics, fileName);
                         continue;
 
-                    case CompoundTerm { Name: "ensure_loaded", Arity: 1 } ensureLoaded:
-                        EnsureLoaded(ensureLoaded, diagnostics, fileName);
-                        continue;
-
                     case CompoundTerm { Name: "multifile", Arity: 1 } multifile:
                         unit.Multifile.Add(multifile.Arguments[0]);
                         AddDeclaredPredicates(multifile.Arguments[0], unit.Defines);
@@ -238,7 +291,7 @@ public sealed class ProgramLoader
                     _program.Flags.DoubleQuotes = selected;
                 }
 
-                unit.Directives.Add(goal);
+                unit.Items.Add(new DirectiveItem(goal));
                 continue;
             }
 
@@ -283,7 +336,7 @@ public sealed class ProgramLoader
                     continue;
             }
 
-            unit.Clauses.Add((head, body));
+            unit.Items.Add(new ClauseItem(head, body));
         }
     }
 
@@ -648,14 +701,18 @@ public sealed class ProgramLoader
 
         internal HashSet<PredicateIndicator> Defines { get; } = [];
 
-        internal List<(SyntaxTerm Head, SyntaxTerm? Body)> Clauses { get; } = [];
-
-        internal List<SyntaxTerm> Directives { get; } = [];
-
         internal List<SyntaxTerm> Dynamic { get; } = [];
 
         internal List<SyntaxTerm> Multifile { get; } = [];
+
+        internal List<LoadItem> Items { get; } = [];
     }
+
+    private abstract record LoadItem;
+
+    private sealed record ClauseItem(SyntaxTerm Head, SyntaxTerm? Body) : LoadItem;
+
+    private sealed record DirectiveItem(SyntaxTerm Goal) : LoadItem;
 
     /// <summary>
     /// Applies a valid <c>double_quotes</c> directive while collecting, because it changes how
@@ -778,25 +835,13 @@ public sealed class ProgramLoader
     private static void Report(List<Diagnostic> diagnostics, string id, string message, SourceSpan span, string? fileName) =>
         diagnostics.Add(new Diagnostic(id, DiagnosticSeverity.Error, message, span, fileName));
 
-    private void CompileDirective(
-        SyntaxTerm goal,
-        List<Diagnostic> diagnostics,
-        List<int> directives,
-        List<int> initialization,
-        string? fileName
-    )
+    private int CompileDirective(SyntaxTerm goal, List<Diagnostic> diagnostics, out bool deferred, string? fileName)
     {
-        bool deferred = goal is CompoundTerm { Name: "initialization", Arity: 1 };
+        deferred = goal is CompoundTerm { Name: "initialization", Arity: 1 };
         SyntaxTerm actual = deferred ? ((CompoundTerm)goal).Arguments[0] : goal;
 
         var compiler = new ClauseCompiler(_program, _constants, diagnostics, fileName);
-        int address = compiler.Compile(new AtomTerm("$directive", actual.Span), actual);
-        if (address < 0)
-        {
-            return;
-        }
-
-        (deferred ? initialization : directives).Add(address);
+        return compiler.Compile(new AtomTerm("$directive", actual.Span), actual);
     }
 
     private void EmitPredicate(

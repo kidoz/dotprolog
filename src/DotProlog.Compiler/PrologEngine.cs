@@ -19,6 +19,7 @@ public sealed class PrologEngine : IRuntimeCompiler
     private readonly List<int> _pendingInitialization = [];
     private readonly HashSet<string> _loadedSourceFiles = new(PathComparer);
     private readonly HashSet<string> _loadingSourceFiles = new(PathComparer);
+    private bool _preparationHalted;
 
     /// <summary>Creates an engine with the core builtins registered and an empty program.</summary>
     public PrologEngine()
@@ -126,7 +127,11 @@ public sealed class PrologEngine : IRuntimeCompiler
         }
 
         var loader = new ProgramLoader(Program, Machine, _modules);
-        LoadResult loaded = loader.Load(parsed.Clauses, fileName);
+        LoadResult loaded = loader.Load(
+            parsed.Clauses,
+            fileName,
+            Machine.IsRunning ? null : ExecutePreparationDirective
+        );
         List<Diagnostic> diagnostics = [.. parsed.Diagnostics, .. loaded.Diagnostics];
 
         // Which module a file declared is what use_module/1 needs to know when it is imported later.
@@ -287,6 +292,14 @@ public sealed class PrologEngine : IRuntimeCompiler
     /// </summary>
     public RunResult RunPendingGoals()
     {
+        if (_preparationHalted)
+        {
+            _preparationHalted = false;
+            _pendingDirectives.Clear();
+            _pendingInitialization.Clear();
+            return RunResult.Halted;
+        }
+
         RunResult result = RunQueue(_pendingDirectives, "directive");
         if (result == RunResult.Halted)
         {
@@ -295,6 +308,21 @@ public sealed class PrologEngine : IRuntimeCompiler
         }
 
         return RunQueue(_pendingInitialization, "initialization goal");
+    }
+
+    private RunResult ExecutePreparationDirective(int address)
+    {
+        RunResult result = Machine.Run(address);
+        if (result == RunResult.Failure)
+        {
+            Output.Write("Warning: directive failed.\n");
+        }
+        else if (result == RunResult.Halted)
+        {
+            _preparationHalted = true;
+        }
+
+        return result;
     }
 
     /// <summary>

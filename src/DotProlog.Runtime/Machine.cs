@@ -126,6 +126,9 @@ public sealed class Machine
     /// <summary>The program being executed.</summary>
     public BytecodeProgram Program => _program;
 
+    /// <summary>Whether the dispatch loop is currently executing a Prolog goal.</summary>
+    public bool IsRunning { get; private set; }
+
     /// <summary>The program's symbol table.</summary>
     public SymbolTable Symbols => _symbols;
 
@@ -227,24 +230,37 @@ public sealed class Machine
 
     private RunResult Dispatch()
     {
-        while (true)
+        if (IsRunning)
         {
-            try
+            throw new InvalidOperationException("A Prolog machine cannot be entered recursively.");
+        }
+
+        IsRunning = true;
+        try
+        {
+            while (true)
             {
-                RunResult result = Execute();
-                _solutionPending = result == RunResult.Success;
-                return result;
-            }
-            catch (PrologException error) when (error.HasBall && HasCatchFrame())
-            {
-                // Re-enter the dispatch loop at the recovery goal. If no catcher matches after all,
-                // UnwindToCatch reports it and the ball continues out to the host.
-                if (!UnwindToCatch(error))
+                try
                 {
-                    _solutionPending = false;
-                    throw;
+                    RunResult result = Execute();
+                    _solutionPending = result == RunResult.Success;
+                    return result;
+                }
+                catch (PrologException error) when (error.HasBall && HasCatchFrame())
+                {
+                    // Re-enter the dispatch loop at the recovery goal. If no catcher matches after all,
+                    // UnwindToCatch reports it and the ball continues out to the host.
+                    if (!UnwindToCatch(error))
+                    {
+                        _solutionPending = false;
+                        throw;
+                    }
                 }
             }
+        }
+        finally
+        {
+            IsRunning = false;
         }
     }
 
