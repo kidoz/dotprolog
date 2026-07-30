@@ -2,12 +2,13 @@
 
 ## Supported versions
 
-DotProlog has not had a release yet. Once 0.1.0 ships, the latest released minor version is the
-one that receives security fixes; older ones do not.
+The only release so far is 0.1.0, published on GitHub only: packages and checksums are attached to
+the `v0.1.0` tag, and nothing has been published to NuGet.org. 0.1.1 is upcoming. The latest
+released minor version is the one that receives security fixes; older ones do not.
 
 | Version | Supported |
 |---|---|
-| 0.1.x | Once released |
+| 0.1.x | Latest release only |
 
 ## Reporting a vulnerability
 
