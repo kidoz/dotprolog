@@ -79,6 +79,25 @@ public sealed class GrammarTests
         Assert.Equal("none", Run("phrase(optional(X), [], _), write(X)"));
 
     [Fact]
+    public void AStaticGrammarSoftCutRetainsEveryConditionSolution()
+    {
+        Assert.Equal(
+            "[a,b]-[else]",
+            PrologTestHost.Run(
+                """
+                soft(X) --> ({member(X, [a, b])} *-> [] ; {X = else}).
+                fallback(X) --> ({fail} *-> {X = then} ; {X = else}).
+                :- initialization((
+                    findall(X, phrase(soft(X), []), Xs),
+                    findall(Y, phrase(fallback(Y), []), Ys),
+                    write(Xs-Ys)
+                )).
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void ACutInARuleCommitsToIt() => Assert.Equal("[1,2,3]", Run("phrase(greedy(G), [1, 2, 3]), write(G)"));
 
     [Fact]

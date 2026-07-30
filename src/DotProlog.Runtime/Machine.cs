@@ -7,7 +7,7 @@ namespace DotProlog.Runtime;
 /// <remarks>
 /// The engine owns its control state. Prolog calls are jumps inside a single dispatch loop rather
 /// than CLR method calls, so recursion depth is bounded by the machine's own stacks; failure is a
-/// return value rather than an exception. See <c>.agents/contexts/conventions/STYLE_PROFILE.md</c>.
+/// return value rather than an exception.
 /// </remarks>
 public sealed class Machine
 {
@@ -1430,6 +1430,11 @@ public sealed class Machine
         }
 
         _argumentCount = arity;
+
+        if (_program.IsStrictIsoExtension(functorId))
+        {
+            throw PrologErrors.Permission(this, "access", "implementation_specific_feature", functorId);
+        }
 
         if (_program.Builtins.TryGetId(functorId, out int builtinId))
         {

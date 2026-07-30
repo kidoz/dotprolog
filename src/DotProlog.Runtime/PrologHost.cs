@@ -36,6 +36,11 @@ public sealed class PrologHost
         ArgumentNullException.ThrowIfNull(name);
 
         int functorId = _machine.Symbols.InternFunctor(name, arity);
+        if (_machine.Program.IsStrictIsoExtension(functorId))
+        {
+            throw PrologErrors.Permission(_machine, "access", "implementation_specific_feature", functorId);
+        }
+
         if (!_machine.Program.IsDefined(functorId) && _machine.Program.Flags.Unknown == UnknownProcedureAction.Error)
         {
             throw PrologErrors.UndefinedProcedure(_machine, functorId);

@@ -18,6 +18,9 @@ internal sealed class ClauseCompiler
     private readonly ConstantPool _constants;
     private readonly List<Diagnostic> _diagnostics;
     private readonly string? _fileName;
+    private readonly IReadOnlySet<int>? _unitDefinitions;
+    private readonly bool _enforceStrictIso;
+    private readonly bool _allowQueryBindings;
     private readonly Dictionary<string, int> _slots = new(StringComparer.Ordinal);
     private int _slotCount;
     private bool _failed;
@@ -25,12 +28,23 @@ internal sealed class ClauseCompiler
     /// <summary>Environment slot holding the barrier a <c>!</c> should cut to, or -1 for the clause barrier.</summary>
     private int _cutSlot = -1;
 
-    internal ClauseCompiler(BytecodeProgram program, ConstantPool constants, List<Diagnostic> diagnostics, string? fileName)
+    internal ClauseCompiler(
+        BytecodeProgram program,
+        ConstantPool constants,
+        List<Diagnostic> diagnostics,
+        string? fileName,
+        IReadOnlySet<int>? unitDefinitions = null,
+        bool trustedImplementation = false,
+        bool allowQueryBindings = false
+    )
     {
         _program = program;
         _constants = constants;
         _diagnostics = diagnostics;
         _fileName = fileName;
+        _unitDefinitions = unitDefinitions;
+        _enforceStrictIso = program.LanguageMode == PrologLanguageMode.StrictIso && !trustedImplementation;
+        _allowQueryBindings = allowQueryBindings;
     }
 
     /// <summary>
@@ -226,6 +240,16 @@ internal sealed class ClauseCompiler
 
         int functorId = _program.Symbols.InternFunctor(name, arity);
 
+        if (IsStrictIsoExtension(functorId, name, arity))
+        {
+            Report(
+                CompilerDiagnosticIds.StrictIsoViolation,
+                $"{name}/{arity} is an implementation-specific feature and is not available in strict ISO mode.",
+                goal.Span
+            );
+            return;
+        }
+
         if (_program.Builtins.TryGetId(functorId, out int builtinId))
         {
             _program.Emit(OpCode.CallBuiltin, builtinId, arity);
@@ -274,6 +298,16 @@ internal sealed class ClauseCompiler
                 return true;
 
             case "*->" when goal.Arity == 2:
+                if (_enforceStrictIso)
+                {
+                    Report(
+                        CompilerDiagnosticIds.StrictIsoViolation,
+                        "*->/2 is an implementation-specific control construct and is not available in strict ISO mode.",
+                        goal.Span
+                    );
+                    return true;
+                }
+
                 // A bare soft-cut if-then is just a conjunction: every solution of the condition is kept.
                 CompileSequence(new CompoundTerm(",", [goal.Arguments[0], goal.Arguments[1]], goal.Span), isLast);
                 return true;
@@ -299,6 +333,16 @@ internal sealed class ClauseCompiler
 
         if (left is CompoundTerm { Name: "*->", Arity: 2 } softIfThen)
         {
+            if (_enforceStrictIso)
+            {
+                Report(
+                    CompilerDiagnosticIds.StrictIsoViolation,
+                    "*->/2 is an implementation-specific control construct and is not available in strict ISO mode.",
+                    softIfThen.Span
+                );
+                return;
+            }
+
             CompileIfThenElse(softIfThen.Arguments[0], softIfThen.Arguments[1], right, soft: true, isLast);
             return;
         }
@@ -541,6 +585,22 @@ internal sealed class ClauseCompiler
     }
 
     private int FunctorOf(CompoundTerm term) => _program.Symbols.InternFunctor(term.Name, term.Arity);
+
+    private bool IsStrictIsoExtension(int functorId, string name, int arity)
+    {
+        if (
+            !_enforceStrictIso
+            || (_allowQueryBindings && name == "$bindings" && arity == 1)
+            || IsoLanguageProfile.IsStandardPredicate(name, arity)
+            || (_unitDefinitions?.Contains(functorId) ?? false)
+            || _program.IsUserPredicate(functorId)
+        )
+        {
+            return false;
+        }
+
+        return _program.Builtins.TryGetId(functorId, out _) || _program.IsDefined(functorId);
+    }
 
     private bool ResolveSlot(VariableTerm variable, out int slot)
     {

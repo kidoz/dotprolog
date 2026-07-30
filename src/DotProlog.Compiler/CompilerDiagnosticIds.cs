@@ -53,4 +53,7 @@ public static class CompilerDiagnosticIds
 
     /// <summary>A module import is not exported by its source module or conflicts with another import.</summary>
     public const string InvalidModuleImport = "DPL1017";
+
+    /// <summary>User code names an implementation-specific feature while strict ISO mode is active.</summary>
+    public const string StrictIsoViolation = "DPL1018";
 }

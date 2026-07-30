@@ -31,7 +31,18 @@ public static class ArithmeticEvaluator
                 throw PrologErrors.Instantiation(machine);
 
             case CellTag.Atom:
-                return EvaluateConstant(machine, machine.Symbols.AtomName(cell.Index));
+            {
+                string constantName = machine.Symbols.AtomName(cell.Index);
+                if (
+                    machine.Program.LanguageMode == PrologLanguageMode.StrictIso
+                    && !IsoLanguageProfile.IsStandardEvaluable(constantName, 0)
+                )
+                {
+                    throw PrologErrors.NotEvaluable(machine, constantName, 0);
+                }
+
+                return EvaluateConstant(machine, constantName);
+            }
 
             case CellTag.Structure:
                 break;
@@ -43,6 +54,13 @@ public static class ArithmeticEvaluator
         int functorId = machine.HeapAt(cell.Index).Index;
         Functor functor = machine.Symbols.GetFunctor(functorId);
         string name = machine.Symbols.AtomName(functor.NameAtom);
+        if (
+            machine.Program.LanguageMode == PrologLanguageMode.StrictIso
+            && !IsoLanguageProfile.IsStandardEvaluable(name, functor.Arity)
+        )
+        {
+            throw Unevaluable(machine, functorId);
+        }
 
         return functor.Arity switch
         {

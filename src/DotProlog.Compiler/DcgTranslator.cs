@@ -1,3 +1,4 @@
+using DotProlog.Runtime;
 using DotProlog.Syntax;
 
 namespace DotProlog.Compiler;
@@ -30,12 +31,14 @@ internal sealed class DcgTranslator
 
     private readonly List<Diagnostic> _diagnostics;
     private readonly string? _fileName;
+    private readonly bool _strictIso;
     private int _next;
 
-    private DcgTranslator(List<Diagnostic> diagnostics, string? fileName)
+    private DcgTranslator(List<Diagnostic> diagnostics, string? fileName, PrologLanguageMode languageMode)
     {
         _diagnostics = diagnostics;
         _fileName = fileName;
+        _strictIso = languageMode == PrologLanguageMode.StrictIso;
     }
 
     /// <summary>
@@ -46,11 +49,12 @@ internal sealed class DcgTranslator
         CompoundTerm rule,
         List<Diagnostic> diagnostics,
         string? fileName,
+        PrologLanguageMode languageMode,
         out SyntaxTerm head,
         out SyntaxTerm body
     )
     {
-        var translator = new DcgTranslator(diagnostics, fileName);
+        var translator = new DcgTranslator(diagnostics, fileName, languageMode);
         return translator.Translate(rule, out head, out body);
     }
 
@@ -160,6 +164,22 @@ internal sealed class DcgTranslator
                 return true;
             }
 
+            case CompoundTerm
+            {
+                Name: ";",
+                Arity: 2,
+                Arguments: [CompoundTerm { Name: "*->", Arity: 2 } softIfThen, SyntaxTerm alternative],
+            } when !_strictIso:
+                return TryTranslateSoftIf(
+                    softIfThen.Arguments[0],
+                    softIfThen.Arguments[1],
+                    alternative,
+                    start,
+                    end,
+                    element.Span,
+                    out goal
+                );
+
             // Both branches of a disjunction consume the same input and leave the same remainder.
             case CompoundTerm { Name: ";", Arity: 2 }
             or CompoundTerm { Name: "|", Arity: 2 }:
@@ -192,6 +212,17 @@ internal sealed class DcgTranslator
                 return true;
             }
 
+            case CompoundTerm { Name: "*->", Arity: 2 } softIfThen when !_strictIso:
+                return TryTranslateSoftIf(
+                    softIfThen.Arguments[0],
+                    softIfThen.Arguments[1],
+                    alternative: null,
+                    start,
+                    end,
+                    element.Span,
+                    out goal
+                );
+
             // Negation consumes nothing, whether or not the goal inside it would have.
             case CompoundTerm { Name: "\\+", Arity: 1 } negation:
             {
@@ -205,7 +236,7 @@ internal sealed class DcgTranslator
                 return true;
             }
 
-            case CompoundTerm { Name: "call" } call:
+            case CompoundTerm { Name: "call", Arity: 1 } call:
                 goal = new CompoundTerm("call", [.. call.Arguments, start, end], element.Span);
                 return true;
 
@@ -218,6 +249,43 @@ internal sealed class DcgTranslator
                 Report(element, "A grammar rule body may not contain a number.");
                 return false;
         }
+    }
+
+    private bool TryTranslateSoftIf(
+        SyntaxTerm conditionBody,
+        SyntaxTerm thenBody,
+        SyntaxTerm? alternative,
+        SyntaxTerm start,
+        SyntaxTerm end,
+        SourceSpan span,
+        out SyntaxTerm goal
+    )
+    {
+        VariableTerm middle = NewVariable(span);
+        if (
+            !TryTranslateBody(conditionBody, start, middle, out SyntaxTerm condition)
+            || !TryTranslateBody(thenBody, middle, end, out SyntaxTerm then)
+        )
+        {
+            goal = conditionBody;
+            return false;
+        }
+
+        var soft = new CompoundTerm("*->", [condition, then], span);
+        if (alternative is null)
+        {
+            goal = soft;
+            return true;
+        }
+
+        if (!TryTranslateBody(alternative, start, end, out SyntaxTerm otherwise))
+        {
+            goal = alternative;
+            return false;
+        }
+
+        goal = new CompoundTerm(";", [soft, otherwise], span);
+        return true;
     }
 
     /// <summary>

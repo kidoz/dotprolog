@@ -70,6 +70,12 @@ public sealed class ProgramLoader
         DeclareMultifilePredicates(unit, diagnostics, fileName);
 
         var resolver = new ModuleResolver(_modules, unit.Module, unit.Defines);
+        HashSet<int> unitDefinitions =
+        [
+            .. unit.Defines.Select(indicator =>
+                _program.Symbols.InternFunctor(ModuleTable.QualifiedName(unit.Module, indicator.Name), indicator.Arity)
+            ),
+        ];
         HashSet<int> dynamicPredicates = DeclareDynamicPredicates(unit, resolver, diagnostics, fileName);
         Dictionary<int, List<(SyntaxTerm Head, SyntaxTerm? Body)>> accumulated = [];
         Dictionary<int, List<(SyntaxTerm Head, SyntaxTerm? Body)>> pending = [];
@@ -127,7 +133,7 @@ public sealed class ProgramLoader
                 continue;
             }
 
-            int address = CompileDirective(resolver.ResolveGoal(goal), diagnostics, out bool deferred, fileName);
+            int address = CompileDirective(resolver.ResolveGoal(goal), diagnostics, out bool deferred, fileName, unitDefinitions);
             if (address < 0)
             {
                 continue;
@@ -168,7 +174,7 @@ public sealed class ProgramLoader
             {
                 if (dynamicPredicates.Contains(functorId) || _program.IsDynamic(functorId))
                 {
-                    EmitDynamicClauses(functorId, pending[functorId], diagnostics, fileName);
+                    EmitDynamicClauses(functorId, pending[functorId], diagnostics, fileName, unitDefinitions);
                     continue;
                 }
 
@@ -180,11 +186,11 @@ public sealed class ProgramLoader
                         sourceIndicator,
                         pending[functorId]
                     );
-                    EmitPredicate(functorId, multifileClauses, diagnostics, fileName);
+                    EmitPredicate(functorId, multifileClauses, diagnostics, fileName, unitDefinitions);
                     continue;
                 }
 
-                EmitPredicate(functorId, accumulated[functorId], diagnostics, fileName);
+                EmitPredicate(functorId, accumulated[functorId], diagnostics, fileName, unitDefinitions);
             }
 
             pending.Clear();
@@ -321,7 +327,13 @@ public sealed class ProgramLoader
             // rest of the loader and the whole compiler never learn that DCGs exist.
             if (clause is CompoundTerm { Name: "-->", Arity: 2 } grammarRule)
             {
-                if (GrammarHeadIsReserved(grammarRule.Arguments[0], out SyntaxTerm culprit))
+                if (
+                    GrammarHeadIsReserved(
+                        grammarRule.Arguments[0],
+                        _program.LanguageMode == PrologLanguageMode.StrictIso,
+                        out SyntaxTerm culprit
+                    )
+                )
                 {
                     Report(
                         diagnostics,
@@ -333,7 +345,16 @@ public sealed class ProgramLoader
                     continue;
                 }
 
-                if (!DcgTranslator.TryTranslate(grammarRule, diagnostics, fileName, out head, out SyntaxTerm translated))
+                if (
+                    !DcgTranslator.TryTranslate(
+                        grammarRule,
+                        diagnostics,
+                        fileName,
+                        _program.LanguageMode,
+                        out head,
+                        out SyntaxTerm translated
+                    )
+                )
                 {
                     continue;
                 }
@@ -407,7 +428,7 @@ public sealed class ProgramLoader
         return _program.Builtins.TryGetId(functor, out _) || (_program.IsDefined(functor) && !_program.IsUserPredicate(functor));
     }
 
-    private static bool GrammarHeadIsReserved(SyntaxTerm head, out SyntaxTerm culprit)
+    private static bool GrammarHeadIsReserved(SyntaxTerm head, bool strictIso, out SyntaxTerm culprit)
     {
         culprit = head;
         SyntaxTerm nonTerminal = head is CompoundTerm { Name: ",", Arity: 2 } semicontext ? semicontext.Arguments[0] : head;
@@ -416,7 +437,8 @@ public sealed class ProgramLoader
         return nonTerminal switch
         {
             AtomTerm { Name: "[]" or "!" } => true,
-            CompoundTerm { Name: "," or ";" or "|" or "->" or "*->", Arity: 2 } => true,
+            CompoundTerm { Name: "," or ";" or "|" or "->", Arity: 2 } => true,
+            CompoundTerm { Name: "*->", Arity: 2 } => !strictIso,
             CompoundTerm { Name: "\\+" or "{}" or "call", Arity: 1 } => true,
             CompoundTerm { Name: ".", Arity: 2 } => true,
             _ => false,
@@ -901,7 +923,8 @@ public sealed class ProgramLoader
         int functorId,
         List<(SyntaxTerm Head, SyntaxTerm? Body)> clauses,
         List<Diagnostic> diagnostics,
-        string? fileName
+        string? fileName,
+        IReadOnlySet<int> unitDefinitions
     )
     {
         DynamicPredicate predicate = _program.DeclareDynamic(functorId, _userPredicates);
@@ -910,7 +933,14 @@ public sealed class ProgramLoader
 
         foreach ((SyntaxTerm head, SyntaxTerm? body) in clauses)
         {
-            var compiler = new ClauseCompiler(_program, _constants, diagnostics, fileName);
+            var compiler = new ClauseCompiler(
+                _program,
+                _constants,
+                diagnostics,
+                fileName,
+                unitDefinitions,
+                trustedImplementation: !_userPredicates
+            );
             int address = compiler.Compile(head, body);
             if (address < 0)
             {
@@ -941,12 +971,25 @@ public sealed class ProgramLoader
     private static void Report(List<Diagnostic> diagnostics, string id, string message, SourceSpan span, string? fileName) =>
         diagnostics.Add(new Diagnostic(id, DiagnosticSeverity.Error, message, span, fileName));
 
-    private int CompileDirective(SyntaxTerm goal, List<Diagnostic> diagnostics, out bool deferred, string? fileName)
+    private int CompileDirective(
+        SyntaxTerm goal,
+        List<Diagnostic> diagnostics,
+        out bool deferred,
+        string? fileName,
+        IReadOnlySet<int> unitDefinitions
+    )
     {
         deferred = goal is CompoundTerm { Name: "initialization", Arity: 1 };
         SyntaxTerm actual = deferred ? ((CompoundTerm)goal).Arguments[0] : goal;
 
-        var compiler = new ClauseCompiler(_program, _constants, diagnostics, fileName);
+        var compiler = new ClauseCompiler(
+            _program,
+            _constants,
+            diagnostics,
+            fileName,
+            unitDefinitions,
+            trustedImplementation: !_userPredicates
+        );
         return compiler.Compile(new AtomTerm("$directive", actual.Span), actual);
     }
 
@@ -954,7 +997,8 @@ public sealed class ProgramLoader
         int functorId,
         IReadOnlyList<(SyntaxTerm Head, SyntaxTerm? Body)> clauses,
         List<Diagnostic> diagnostics,
-        string? fileName
+        string? fileName,
+        IReadOnlySet<int> unitDefinitions
     )
     {
         int entry = _program.CodeLength;
@@ -980,7 +1024,14 @@ public sealed class ProgramLoader
                 }
             }
 
-            var compiler = new ClauseCompiler(_program, _constants, diagnostics, fileName);
+            var compiler = new ClauseCompiler(
+                _program,
+                _constants,
+                diagnostics,
+                fileName,
+                unitDefinitions,
+                trustedImplementation: !_userPredicates
+            );
             compiler.Compile(clauses[i].Head, clauses[i].Body);
         }
 

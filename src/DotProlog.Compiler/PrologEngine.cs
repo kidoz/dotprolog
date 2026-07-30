@@ -24,10 +24,14 @@ public sealed class PrologEngine : IRuntimeCompiler
     private readonly Dictionary<string, (int Address, int ArgumentCount)> _controlGoals = new(StringComparer.Ordinal);
     private bool _preparationHalted;
 
-    /// <summary>Creates an engine with the core builtins registered and an empty program.</summary>
+    /// <summary>Creates an extended-mode engine with the core builtins registered and an empty program.</summary>
     public PrologEngine()
+        : this(PrologLanguageMode.Extended) { }
+
+    /// <summary>Creates an engine using <paramref name="languageMode"/>.</summary>
+    public PrologEngine(PrologLanguageMode languageMode)
     {
-        Program = new BytecodeProgram();
+        Program = new BytecodeProgram(languageMode);
         CoreBuiltins.RegisterAll(Program);
         Machine = new Machine(Program);
         Program.RuntimeCompiler = this;
@@ -415,7 +419,7 @@ public sealed class PrologEngine : IRuntimeCompiler
         }
 
         List<Diagnostic> diagnostics = [];
-        var compiler = new ClauseCompiler(Program, new ConstantPool(Program), diagnostics, null);
+        var compiler = new ClauseCompiler(Program, new ConstantPool(Program), diagnostics, null, allowQueryBindings: true);
         int address = compiler.Compile(new AtomTerm("$query", goal.Span), body);
 
         return address < 0
@@ -685,7 +689,16 @@ public sealed class PrologEngine : IRuntimeCompiler
         // assertz((greeting --> [hello])) defines greeting//0 rather than a clause of -->/2.
         if (term is CompoundTerm { Name: "-->", Arity: 2 } grammarRule)
         {
-            if (!DcgTranslator.TryTranslate(grammarRule, diagnostics, null, out head, out SyntaxTerm translated))
+            if (
+                !DcgTranslator.TryTranslate(
+                    grammarRule,
+                    diagnostics,
+                    null,
+                    Program.LanguageMode,
+                    out head,
+                    out SyntaxTerm translated
+                )
+            )
             {
                 throw PrologErrors.Type(machine, "callable", whole);
             }

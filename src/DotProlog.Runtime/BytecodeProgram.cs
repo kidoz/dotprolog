@@ -38,9 +38,19 @@ public sealed class BytecodeProgram
     private readonly Dictionary<int, int> _staticAliasTargets = [];
     private readonly List<(CompiledPredicateBlock Block, CompiledProgram Program)> _compiledBlocks = [];
 
-    /// <summary>Creates an empty program with its own symbol table and builtin registry.</summary>
+    /// <summary>Creates an empty extended-mode program with its own symbol table and builtin registry.</summary>
     public BytecodeProgram()
+        : this(PrologLanguageMode.Extended) { }
+
+    /// <summary>Creates an empty program in <paramref name="languageMode"/>.</summary>
+    public BytecodeProgram(PrologLanguageMode languageMode)
     {
+        if (languageMode is not PrologLanguageMode.Extended and not PrologLanguageMode.StrictIso)
+        {
+            throw new ArgumentOutOfRangeException(nameof(languageMode), languageMode, "Unknown Prolog language mode.");
+        }
+
+        LanguageMode = languageMode;
         Symbols = new SymbolTable();
         Builtins = new BuiltinRegistry(Symbols);
         Array.Fill(_entryPoints, Undefined);
@@ -51,6 +61,9 @@ public sealed class BytecodeProgram
         _code[RedoBuiltinAddress] = (int)OpCode.RedoBuiltin;
         CodeLength = 5;
     }
+
+    /// <summary>The immutable language profile selected before source preparation.</summary>
+    public PrologLanguageMode LanguageMode { get; }
 
     /// <summary>The atoms, functors, and floats this program refers to.</summary>
     public SymbolTable Symbols { get; }
@@ -145,6 +158,23 @@ public sealed class BytecodeProgram
         && functorId < _userPredicates.Length
         && _userPredicates[functorId]
         && EntryPointOf(functorId) != Undefined;
+
+    /// <summary>Whether a resolved predefined procedure is excluded by the selected strict profile.</summary>
+    internal bool IsStrictIsoExtension(int functorId)
+    {
+        if (LanguageMode != PrologLanguageMode.StrictIso || IsUserPredicate(functorId))
+        {
+            return false;
+        }
+
+        Functor functor = Symbols.GetFunctor(functorId);
+        if (IsoLanguageProfile.IsStandardPredicate(Symbols.AtomName(functor.NameAtom), functor.Arity))
+        {
+            return false;
+        }
+
+        return Builtins.TryGetId(functorId, out _) || IsDefined(functorId);
+    }
 
     /// <summary>
     /// The current clause generation. A goal snapshots this when it starts, and then sees exactly the
