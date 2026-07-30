@@ -161,8 +161,11 @@ Writing them was worth it immediately: they found these real defects.
 - ISO floats require a decimal point with digits on both sides before an exponent. Exponent-only
   spellings are rejected consistently by term input and number conversion, and single-term input
   no longer accepts an otherwise valid prefix while ignoring trailing tokens.
+- Extended source classification is explicit: ASCII digits start numbers, Unicode uppercase
+  letters and underscore start variables, other Unicode letters start atoms, and unsupported
+  unquoted starts become catchable reader errors rather than host exceptions.
 
-Beyond the conformance cases, the engine and toolchain are covered by 1066 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 1070 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
