@@ -1,8 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <RootNamespace>Integration.Tests</RootNamespace>
-        <!-- Slow integration tests are intentionally skipped unless their opt-in variables are set. -->
-        <TestingPlatformCommandLineArguments>$(TestingPlatformCommandLineArguments) --ignore-exit-code 8</TestingPlatformCommandLineArguments>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(NativeConformanceRunner)' == 'true'">
