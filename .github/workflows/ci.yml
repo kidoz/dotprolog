@@ -62,6 +62,18 @@ jobs:
         env:
           DOTPROLOG_RUN_AOT_TESTS: '1'
 
+      # One platform inventories the independently maintained ISO cases at their pinned upstream
+      # revision. The executable adapter remains a separate gate while unsupported wrappers are
+      # being eliminated; this step ensures upstream drift or incomplete accounting cannot hide.
+      - name: Inventory independent ISO conformance corpus
+        if: matrix.os == 'ubuntu-latest'
+        run: >-
+          dotnet test tests/Integration/Integration.Tests.csproj
+          -c Release --no-build --no-ansi --
+          --filter-class Integration.Tests.LogtalkConformanceTests
+        env:
+          DOTPROLOG_RUN_EXTERNAL_CONFORMANCE_TESTS: '1'
+
       - name: Pack
         if: matrix.os == 'ubuntu-latest'
         run: dotnet pack DotProlog.slnx -c Release --no-build -o artifacts -p:ContinuousIntegrationBuild=true
