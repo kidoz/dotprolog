@@ -25,6 +25,34 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - Language guide: language-guide.md
+  - Book:
+      - Introduction: book/index.md
+      - 1. Getting ready: book/01-getting-ready.md
+      - 2. Facts and questions: book/02-facts-and-questions.md
+      - 3. Rules: book/03-rules.md
+      - 4. Unification and search: book/04-unification-and-search.md
+      - 5. Recursion: book/05-recursion.md
+      - 6. Lists: book/06-lists.md
+      - 7. Numbers and arithmetic: book/07-numbers-and-arithmetic.md
+      - 8. Making decisions: book/08-making-decisions.md
+      - 9. Collecting answers: book/09-collecting-answers.md
+      - 10. Words and text: book/10-words-and-text.md
+      - 11. Project, a text adventure: book/11-project-text-adventure.md
+      - 12. Prolog meets .NET: book/12-prolog-meets-dotnet.md
+      - На русском:
+          - Введение: book/ru/index.md
+          - 1. Подготовка: book/ru/01-getting-ready.md
+          - 2. Факты и вопросы: book/ru/02-facts-and-questions.md
+          - 3. Правила: book/ru/03-rules.md
+          - 4. Унификация и поиск: book/ru/04-unification-and-search.md
+          - 5. Рекурсия: book/ru/05-recursion.md
+          - 6. Списки: book/ru/06-lists.md
+          - 7. Числа и арифметика: book/ru/07-numbers-and-arithmetic.md
+          - 8. Принятие решений: book/ru/08-making-decisions.md
+          - 9. Сбор ответов: book/ru/09-collecting-answers.md
+          - 10. Слова и текст: book/ru/10-words-and-text.md
+          - 11. Проект, текстовый квест: book/ru/11-project-text-adventure.md
+          - 12. Пролог и .NET: book/ru/12-prolog-meets-dotnet.md
   - .NET integration: dotnet-integration.md
   - Architecture: architecture/index.md
   - Contributing: contributing.md

@@ -46,6 +46,8 @@ Hello! World!
 ## Where to go next
 
 - [Getting started](getting-started.md) — build the repository and run a program.
+- [A Gentle Introduction to Prolog](book/index.md) — a free beginner book, in English and Russian,
+  that teaches Prolog from zero using DotProlog.
 - [Language guide](language-guide.md) — learn the supported Prolog surface and current limits.
 - [.NET integration](dotnet-integration.md) — embed the engine or consume a `.dplproj`.
 - [Architecture](architecture/index.md) — understand the bytecode VM and NativeAOT design.

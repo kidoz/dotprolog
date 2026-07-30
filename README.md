@@ -7,7 +7,9 @@ A Prolog language implementation for .NET 10, written in C# 14.
 The goal is a first-class Prolog experience on the .NET SDK, the way C# and F# have one: `.dplproj` projects, a `plc` compiler, `dotnet prolog`, `dotnet new` templates, and NativeAOT publishing.
 
 Read the [DotProlog documentation](docs/index.md) for setup, language support, .NET integration,
-and architecture.
+and architecture. New to Prolog — or to programming? Start with
+[A Gentle Introduction to Prolog](docs/book/index.md), a free beginner book in English and
+Russian whose examples all run on DotProlog.
 
 **Status: early, but usable.** `dotnet new prolog-console` through `dotnet publish -p:PublishAot=true`
 works today, and `dotnet test` discovers Prolog tests under Microsoft.Testing.Platform. What is
