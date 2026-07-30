@@ -168,6 +168,19 @@ internal static class Program
                 close(AliasOut, [force(true)]),
                 write(stream_open_errors), nl,
 
+                % Permission culprits stay as stream designators, and malformed handles never wrap.
+                catch(
+                    (set_input(user_output), StreamPermissionCaught = false),
+                    error(permission_error(input, stream, user_output), _),
+                    StreamPermissionCaught = true),
+                StreamPermissionCaught == true,
+                catch(
+                    (set_input('$stream'(-1)), StreamDomainCaught = false),
+                    error(domain_error(stream_or_alias, '$stream'(-1)), _),
+                    StreamDomainCaught = true),
+                StreamDomainCaught == true,
+                write(stream_error_terms), nl,
+
                 % Binary streams and byte predicates use raw storage without reflection or encoding.
                 open('dotprolog-aot-byte.tmp', write, ByteOut, [type(binary)]),
                 stream_property(ByteOut, type(binary)),
