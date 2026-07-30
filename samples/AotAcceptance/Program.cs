@@ -92,6 +92,17 @@ internal static class Program
                 \+ unify_with_occurs_check(Cycle, f(Cycle)), var(Cycle),
                 write(occurs_check), nl,
 
+                % ISO repeat/0 retains its infinite retry point in the native runtime.
+                assertz(native_repeat_count(0)),
+                repeat,
+                retract(native_repeat_count(RepeatCount)),
+                NextRepeatCount is RepeatCount + 1,
+                assertz(native_repeat_count(NextRepeatCount)),
+                NextRepeatCount >= 3,
+                !,
+                retractall(native_repeat_count(_)),
+                write(repeat_control), nl,
+
                 % Predicate enumeration uses explicit program metadata, never reflection.
                 assertz(inspected(value)),
                 current_predicate(inspected/1), \+ current_predicate(write/1),
