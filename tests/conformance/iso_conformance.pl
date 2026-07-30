@@ -104,8 +104,10 @@ iso_case('8.5.2', arg(1, foo(a, b), a), success).
 iso_case('8.5.2', arg(3, foo(a, b), _), failure).
 iso_case('8.5.2', arg(0, foo(a, b), _), failure).
 iso_case('8.5.2', arg(_, foo(a), _), error(instantiation_error)).
+iso_case('8.5.2', arg(1, _, _), error(instantiation_error)).
 iso_case('8.5.2', arg(a, foo(a), _), error(type_error(integer, a))).
 iso_case('8.5.2', arg(1, atom, _), error(type_error(compound, atom))).
+iso_case('8.5.2', arg(-1, foo(a), _), error(domain_error(not_less_than_zero, -1))).
 iso_case('8.5.3', (foo(a, b) =.. [foo, a, b]), success).
 iso_case('8.5.3', (foo =.. [foo]), success).
 iso_case('8.5.3', (1 =.. [1]), success).

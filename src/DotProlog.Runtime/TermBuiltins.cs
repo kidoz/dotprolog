@@ -222,7 +222,11 @@ internal static class TermBuiltins
 
         if (index.Tag == CellTag.Reference)
         {
-            // The nondeterministic form of arg/3 needs a builtin that can create choice points.
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        if (term.Tag == CellTag.Reference)
+        {
             throw PrologErrors.Instantiation(machine);
         }
 
@@ -236,8 +240,13 @@ internal static class TermBuiltins
             throw PrologErrors.Type(machine, "compound", term);
         }
 
+        if (index.Integer < 0)
+        {
+            throw PrologErrors.Domain(machine, "not_less_than_zero", index);
+        }
+
         int arity = machine.Symbols.ArityOf(machine.HeapAt(term.Index).Index);
-        if (index.Integer < 1 || index.Integer > arity)
+        if (index.Integer == 0 || index.Integer > arity)
         {
             return false;
         }

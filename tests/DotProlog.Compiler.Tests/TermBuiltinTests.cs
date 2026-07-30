@@ -150,6 +150,14 @@ public sealed class TermBuiltinTests
     }
 
     [Theory]
+    [InlineData("arg(1, _, _)", "instantiation_error")]
+    [InlineData("arg(-1, f(a), _)", "domain_error(not_less_than_zero,-1)")]
+    public void ArgReportsIsoModeAndDomainErrors(string goal, string expected)
+    {
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+    }
+
+    [Theory]
     [InlineData("f(a,b) =.. L", "[f,a,b]")]
     [InlineData("foo =.. L", "[foo]")]
     [InlineData("42 =.. L", "[42]")]
