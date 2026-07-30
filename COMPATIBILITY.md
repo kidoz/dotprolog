@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**445 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**447 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -118,8 +118,11 @@ Writing them was worth it immediately: they found these real defects.
 - `halt/1` now validates its input mode before requesting process termination. A variable raises
   `instantiation_error`, and any non-integer status raises `type_error(integer, Culprit)` instead of
   silently terminating with status zero.
+- `compare/3` validates a bound order before comparing its terms. A non-atom raises
+  `type_error(atom, Culprit)`, while an atom outside `<`, `=`, and `>` raises
+  `domain_error(order, Culprit)` instead of ordinary failure.
 
-Beyond the conformance cases, the engine and toolchain are covered by 994 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 996 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
