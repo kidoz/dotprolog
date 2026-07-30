@@ -95,6 +95,7 @@ public sealed class NativeAotAcceptanceTests
                     "term_construction_errors",
                     "current_op_filter_errors",
                     "current_op_snapshot",
+                    "quoted_operator_syntax",
                     "database_permission_errors",
                     "stream_properties",
                     "current_stream_domains",

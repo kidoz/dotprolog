@@ -49,10 +49,12 @@ internal static class Program
 
         // Everything from here on is decided at run time, inside a fully native executable.
         string script = $$"""
+            :- op(650, xfx, native_quoted).
             :- initialization(main).
 
             native_noncallable_body :- 4.
             native_unreached_noncallable_body :- fail, 4.
+            native_quoted_fact(left 'native_quoted' right).
 
             main :-
                 greeting(G), write(G), nl,
@@ -316,6 +318,14 @@ internal static class Program
                 \+ member(native_snapshot_new, NewOperatorNames),
                 op(0, xfx, native_snapshot_new),
                 write(current_op_snapshot), nl,
+
+                % Quoting an operator name does not suppress its ISO operator role.
+                native_quoted_fact(native_quoted(left, right)),
+                read_term_from_atom(
+                    'left ''native_quoted'' right',
+                    native_quoted(left, right),
+                    []),
+                write(quoted_operator_syntax), nl,
 
                 % Database inspection and removal preserve ISO procedure permissions after trimming.
                 catch(
