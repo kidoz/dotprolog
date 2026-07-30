@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**437 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**442 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -105,8 +105,11 @@ Writing them was worth it immediately: they found these real defects.
 - `read_term/2,3` now validates its complete option list before asking the stream for input.
   Unknown options, variable elements, and partial lists therefore raise their ISO errors without
   consuming the next term.
+- Runtime term input now raises catchable `representation_error(max_integer|min_integer)` when a
+  decimal or radix literal exceeds the bounded tagged-integer range. Arbitrarily long literals
+  retain their sign, and a rejected stream term does not discard the following term.
 
-Beyond the conformance cases, the engine and toolchain are covered by 961 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 975 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
