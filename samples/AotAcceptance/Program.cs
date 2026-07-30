@@ -115,6 +115,32 @@ internal static class Program
                 \+ native_unreached_noncallable_body,
                 write(compiled_goal_errors), nl,
 
+                % Meta-control validates executed goals and the resulting call/N arity.
+                catch(once(_), error(instantiation_error, _), OnceGoalCaught = true),
+                OnceGoalCaught == true,
+                catch(
+                    catch(4, never, true),
+                    error(type_error(callable, 4), _),
+                    CatchGoalCaught = true),
+                CatchGoalCaught == true,
+                catch(
+                    catch(throw(native_ball), native_ball, 4),
+                    error(type_error(callable, 4), _),
+                    RecoveryGoalCaught = true),
+                RecoveryGoalCaught == true,
+                functor(NativeCallFact, native_call_limit, 255),
+                assertz(NativeCallFact),
+                functor(NativeAllowedCall, native_call_limit, 248),
+                call(NativeAllowedCall, a, b, c, d, e, f, g),
+                abolish(native_call_limit/255),
+                functor(NativeOversizedCall, native_call_limit, 249),
+                catch(
+                    call(NativeOversizedCall, a, b, c, d, e, f, g),
+                    error(representation_error(max_arity), _),
+                    CallArityCaught = true),
+                CallArityCaught == true,
+                write(control_error_audit), nl,
+
                 % Predicate enumeration uses explicit program metadata, never reflection.
                 assertz(inspected(value)),
                 current_predicate(inspected/1), \+ current_predicate(write/1),

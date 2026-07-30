@@ -80,6 +80,7 @@ public sealed class NativeAotAcceptanceTests
                     "occurs_check",
                     "repeat_control",
                     "compiled_goal_errors",
+                    "control_error_audit",
                     "predicate_info",
                     "prolog_flags",
                     "character_conversion",
