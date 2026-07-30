@@ -311,7 +311,8 @@ collisions before it touches the requested source/sink. Stream permission errors
 alias or handle as the culprit, and malformed handles cannot wrap to another live stream. Bound
 character-input targets are validated before any character is consumed. Host reader and writer
 failures remain recoverable through `catch/3` as `system_error`. `write_term/2,3` supports the ISO
-`quoted`, `ignore_ops`, and `numbervars` options with exact boolean validation.
+`quoted`, `ignore_ops`, and `numbervars` options with exact boolean validation. `read_term/2,3`
+rejects malformed options before consuming the next term.
 
 ```prolog
 main :-
@@ -361,7 +362,7 @@ A control term assembled at run time and passed to `call/1` is lowered to VM byt
 same control-construct compiler used for source clauses. Its cut is transparent within that
 meta-called goal and opaque to the caller, as ISO specifies.
 
-DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 397 conformance cases encoded
+DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 400 conformance cases encoded
 from ISO/IEC 13211-1, all passing, but those are its own reading of the standard rather than an
 independent suite — see [COMPATIBILITY.md](COMPATIBILITY.md), which also lists the known
 differences.
