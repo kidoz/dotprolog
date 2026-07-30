@@ -170,7 +170,7 @@ Writing them was worth it immediately: they found these real defects.
   letters and underscore start variables, other Unicode letters start atoms, and unsupported
   unquoted starts become catchable reader errors rather than host exceptions.
 
-Beyond the conformance cases, the engine and toolchain are covered by 1121 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 1204 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
