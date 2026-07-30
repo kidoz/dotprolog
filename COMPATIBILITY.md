@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**549 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**563 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -169,8 +169,36 @@ Writing them was worth it immediately: they found these real defects.
 - Extended source classification is explicit: ASCII digits start numbers, Unicode uppercase
   letters and underscore start variables, other Unicode letters start atoms, and unsupported
   unquoted starts become catchable reader errors rather than host exceptions.
+- The standard order of terms ranked every float before every integer. Numbers now compare by
+  value across kinds, with a float immediately preceding an integer it equals, and the
+  comparison stays exact near 2^59 where a double no longer holds every tagged integer. This
+  reaches `@</2` and friends, `compare/3`, `sort/2,4`, `msort/2`, `keysort/2`, `predsort/3`,
+  and `setof/3`.
+- Integer `0/0` raised `evaluation_error(undefined)`. An integer zero divisor now always raises
+  `evaluation_error(zero_divisor)`; only the float `0.0/0.0`, whose IEEE result is NaN, stays
+  `undefined`. `/2` on two integers keeps its documented processor choice of float division.
+- `atom_chars/2`, `atom_codes/2`, `number_chars/2`, and `number_codes/2` parsed the list even
+  when the first argument was bound, so `atom_chars(abc, [X, Y, Z])` raised
+  `instantiation_error`. A bound first argument now decides the direction: it is converted and
+  the result unified with the list, filling unbound elements and failing on a wrong-length list.
+- `atom_number/2` and the number conversions let an oversized float literal become an unprintable
+  IEEE infinity and wrapped an oversized radix literal to an arbitrary small integer. They now
+  raise the reader path's `syntax_error(float_overflow)` and
+  `representation_error(max_integer|min_integer)`, the latter also replacing the incidental
+  `evaluation_error(int_overflow)` on oversized decimal input.
+- `format/3` accepted only the `user_output` and `user_error` aliases and routed both through the
+  current output, so `with_output_to/2` captured error text. Stream arguments now resolve through
+  the same handle and alias path as `write/2` — real `'$stream'(N)` handles and user aliases
+  work, direction and existence are checked, and `user_error` reaches the error stream.
+  `format/2,3` also reject leftover arguments, and `tab/1` rejects a float count.
+- `phrase/2,3` treated a run-time `(C -> T ; E)` as a plain disjunction and offered the else
+  branch as an extra solution. If-then-else and the soft-cut `*->` forms are now single
+  constructs, mirroring the DCG translation of `->`.
+- `writeq/1` left carriage returns and most other control characters raw between quotes, which
+  the reader rejects. The named ISO escapes `\a \b \f \n \r \t \v` and delimited `\x...\` hex
+  escapes for the rest now round-trip every control character.
 
-Beyond the conformance cases, the engine and toolchain are covered by 1204 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 1247 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 

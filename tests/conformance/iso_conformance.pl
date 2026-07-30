@@ -84,7 +84,13 @@ iso_case('8.4.1', (aardvark @< zebra), success).
 iso_case('8.4.1', (short @< short), failure).
 iso_case('8.4.1', (foo(a, b) @< north(a)), failure).
 iso_case('8.4.1', (1.0 @< 1), success).
+% 7.2.1: numbers are ordered by value, so kinds interleave and only equal values
+% put the float first.
+iso_case('8.4.1', (1 @< 2.5), success).
+iso_case('8.4.1', (2.5 @< 3), success).
+iso_case('8.4.1', (2.5 @< 2), failure).
 iso_case('8.4.2', compare(<, 1, 2), success).
+iso_case('8.4.2', compare(<, 1, 2.5), success).
 iso_case('8.4.2', compare(=, 1, 1), success).
 iso_case('8.4.2', compare(>, 2, 1), success).
 iso_case('8.4.2', compare(1, a, b), error(type_error(atom, 1))).
@@ -141,6 +147,8 @@ iso_case('8.6.1', (_ is foo), error(type_error(evaluable, foo/0))).
 iso_case('8.6.1', (_ is _), error(instantiation_error)).
 iso_case('8.6.1', (_ is 1 + a), error(type_error(evaluable, a/0))).
 iso_case('8.6.1', (_ is 1 // 0), error(evaluation_error(zero_divisor))).
+iso_case('8.6.1', (_ is 1 / 0), error(evaluation_error(zero_divisor))).
+iso_case('8.6.1', (_ is 0 / 0), error(evaluation_error(zero_divisor))).
 iso_case('8.6.1', (foo is 1 + 1), failure).
 iso_case('8.6.1', (X10 is 6 / 3, float(X10), X10 =:= 2.0), success).
 iso_case('8.6.1', (_ is 1.0 / 0.0), error(evaluation_error(zero_divisor))).
@@ -359,11 +367,15 @@ iso_case('8.16.4', atom_chars('', []), success).
 iso_case('8.16.4', atom_chars([], ['[', ']']), success).
 iso_case('8.16.4', atom_chars(abc, [a, b, c]), success).
 iso_case('8.16.4', (atom_chars(A3, [a, b, c]), A3 == abc), success).
+% A bound first argument is converted and unified with the list, whatever it holds.
+iso_case('8.16.4', (atom_chars(abc, [C4, C5, C6]), [C4, C5, C6] == [a, b, c]), success).
+iso_case('8.16.4', atom_chars(abc, [_, _]), failure).
 iso_case('8.16.4', atom_chars(_, _), error(instantiation_error)).
 iso_case('8.16.4', atom_chars(1.0, _), error(type_error(atom, 1.0))).
 iso_case('8.16.4', atom_chars(_, atom), error(type_error(list, atom))).
 iso_case('8.16.4', atom_chars(_, [ab]), error(type_error(character, ab))).
 iso_case('8.16.5', atom_codes(abc, [0'a, 0'b, 0'c]), success).
+iso_case('8.16.5', (atom_codes(abc, [C7 | _]), C7 == 0'a), success).
 iso_case('8.16.5', atom_codes(_, _), error(instantiation_error)).
 iso_case('8.16.5', atom_codes(1, _), error(type_error(atom, 1))).
 iso_case('8.16.5', atom_codes(_, [a]), error(type_error(integer, a))).
@@ -375,6 +387,7 @@ iso_case('8.16.6', char_code(ab, _), error(type_error(character, ab))).
 iso_case('8.16.6', char_code(_, a), error(type_error(integer, a))).
 iso_case('8.16.7', number_chars(33, ['3', '3']), success).
 iso_case('8.16.7', (number_chars(N1, ['3', '3']), N1 == 33), success).
+iso_case('8.16.7', (number_chars(33, [C8, C9]), [C8, C9] == ['3', '3']), success).
 iso_case('8.16.7', number_chars(_, [a]), error(syntax_error(illegal_number))).
 iso_case('8.16.7', number_chars(atom, _), error(type_error(number, atom))).
 iso_case('8.16.7', number_chars(_, atom), error(type_error(list, atom))).
@@ -383,6 +396,12 @@ iso_case('8.16.8', number_codes(33, [0'3, 0'3]), success).
 iso_case('8.16.8', number_codes(_, [0'a]), error(syntax_error(illegal_number))).
 iso_case('8.16.8', number_codes(_, [a]), error(type_error(integer, a))).
 iso_case('8.16.8', number_codes(_, [51, 32]), error(syntax_error(illegal_number))).
+iso_case('8.16.8', (number_codes(33, L1), L1 == [0'3, 0'3]), success).
+iso_case(
+    '8.16.8',
+    (atom_codes('1000000000000000000', L2), number_codes(_, L2)),
+    error(representation_error(max_integer))
+).
 
 % --- 8.17 Implementation defined hooks ---------------------------------------
 iso_case('8.17.1', (catch(throw(ball), Ball, true), Ball == ball), success).
@@ -543,6 +562,7 @@ iso_case('7.10.5', writeq_gives(1.0, '1.0'), success).
 iso_case('7.10.5', write_gives('a b', 'a b'), success).
 % A quoted atom is written so that it reads back: quote, backslash, n, quote.
 iso_case('7.10.5', writeq_codes('\n', [39, 92, 110, 39]), success).
+iso_case('7.10.5', writeq_codes('a\rb', [39, 97, 92, 114, 98, 39]), success).
 iso_case('7.10.5', writeq_codes('a b', [39, 97, 32, 98, 39]), success).
 iso_case('7.10.5', writeq_codes('', [39, 39]), success).
 
@@ -835,6 +855,7 @@ iso_case('8.16.8', number_codes(_, [49, 101, 50]), error(syntax_error(illegal_nu
 iso_case('sort/2', sort([b, a, b], [a, b]), success).
 iso_case('sort/2', sort([], []), success).
 iso_case('msort/2', msort([b, a, b], [a, b, b]), success).
+iso_case('msort/2', msort([3, 2.5, 1, 0.5], [0.5, 1, 2.5, 3]), success).
 iso_case('keysort/2', keysort([b-1, a-2], [a-2, b-1]), success).
 iso_case('keysort/2', keysort([a-1, a-2], [a-1, a-2]), success).
 iso_case('sort/4', sort(0, @>=, [1, 2, 2], [2, 2, 1]), success).
