@@ -9,5 +9,6 @@
 
     <ItemGroup>
         <InternalsVisibleTo Include="DotProlog.CodeGen.CSharp.Tests" />
+        <InternalsVisibleTo Include="Integration.Tests" />
     </ItemGroup>
 </Project>

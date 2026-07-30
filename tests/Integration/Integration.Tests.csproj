@@ -17,7 +17,17 @@
         <NoWarn>$(NoWarn);IL2104;IL3000;IL3053</NoWarn>
     </PropertyGroup>
 
+    <PropertyGroup Condition="'$(CompiledConformanceRunner)' == 'true'">
+        <DefineConstants>$(DefineConstants);COMPILED_CONFORMANCE_RUNNER</DefineConstants>
+        <StartupObject>Integration.Tests.NativeConformanceProgram</StartupObject>
+    </PropertyGroup>
+
+    <ItemGroup Condition="'$(CompiledConformanceSource)' != ''">
+        <Compile Include="$(CompiledConformanceSource)" Link="CompiledConformance.g.cs" />
+    </ItemGroup>
+
     <ItemGroup>
+        <ProjectReference Include="..\..\src\DotProlog.CodeGen.CSharp\DotProlog.CodeGen.CSharp.csproj" />
         <ProjectReference Include="..\..\src\DotProlog.Compiler\DotProlog.Compiler.csproj" />
     </ItemGroup>
 </Project>

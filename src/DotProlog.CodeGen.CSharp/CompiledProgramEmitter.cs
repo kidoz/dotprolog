@@ -13,6 +13,13 @@ internal static class CompiledProgramEmitter
         IReadOnlyList<(string Name, string Text)> sources,
         string typeName,
         out IReadOnlyList<Diagnostic> diagnostics
+    ) => Generate(sources, typeName, [], out diagnostics);
+
+    internal static string Generate(
+        IReadOnlyList<(string Name, string Text)> sources,
+        string typeName,
+        IReadOnlyList<(string Name, int Arity)> hostBuiltins,
+        out IReadOnlyList<Diagnostic> diagnostics
     )
     {
         var engine = new PrologEngine
@@ -21,6 +28,11 @@ internal static class CompiledProgramEmitter
             Error = TextWriter.Null,
             Input = TextReader.Null,
         };
+        foreach ((string name, int arity) in hostBuiltins)
+        {
+            engine.Program.Builtins.Register(name, arity, static _ => false);
+        }
+
         int codeStart = engine.Program.CodeLength;
         List<Diagnostic> allDiagnostics = [];
         List<int> initialization = [];

@@ -93,6 +93,7 @@ jobs:
         run: dotnet test --solution DotProlog.slnx -c Release --no-build --no-ansi
         env:
           DOTPROLOG_RUN_AOT_TESTS: '1'
+          DOTPROLOG_RUN_COMPILED_CONFORMANCE_TESTS: '1'
           DOTPROLOG_RUN_FULL_MSBUILD_TESTS: '1'
 
       # One platform inventories every independently maintained ISO case at its pinned revision and

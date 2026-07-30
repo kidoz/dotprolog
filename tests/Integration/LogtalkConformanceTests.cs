@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using DotProlog.Compiler;
@@ -13,6 +14,8 @@ namespace Integration.Tests;
 public sealed class LogtalkConformanceTests
 {
     private const string OptInVariable = "DOTPROLOG_RUN_EXTERNAL_CONFORMANCE_TESTS";
+    private const string CompiledOptInVariable = "DOTPROLOG_RUN_COMPILED_CONFORMANCE_TESTS";
+    private const string AotOptInVariable = "DOTPROLOG_RUN_AOT_TESTS";
     private const string CaseVariable = "DOTPROLOG_LOGTALK_CASE_ID";
     private const string ReportVariable = "DOTPROLOG_LOGTALK_REPORT_PATH";
     private const string Repository = "https://github.com/LogtalkDotOrg/logtalk3.git";
@@ -292,6 +295,40 @@ public sealed class LogtalkConformanceTests
         );
     }
 
+    [Fact]
+    public async Task PinnedIsoCorpusExecutesThroughGeneratedCSharpAndBothBoundaries()
+    {
+        Assert.SkipUnless(
+            Environment.GetEnvironmentVariable(CompiledOptInVariable) == "1",
+            $"Set {CompiledOptInVariable}=1 to run the generated-C# conformance matrix."
+        );
+
+        await RunPinnedIsoCorpusAsync(
+            selectedId: null,
+            reportPath: null,
+            TestContext.Current.CancellationToken,
+            generatedMatrix: true
+        );
+    }
+
+    [Fact]
+    public async Task PinnedGeneratedCSharpMatrixExecutesUnderNativeAot()
+    {
+        Assert.SkipUnless(
+            Environment.GetEnvironmentVariable(CompiledOptInVariable) == "1"
+                && Environment.GetEnvironmentVariable(AotOptInVariable) == "1",
+            $"Set {CompiledOptInVariable}=1 and {AotOptInVariable}=1 to run the generated NativeAOT matrix."
+        );
+
+        await RunPinnedIsoCorpusAsync(
+            selectedId: null,
+            reportPath: null,
+            TestContext.Current.CancellationToken,
+            generatedMatrix: true,
+            generatedNativeAot: true
+        );
+    }
+
     /// <summary>
     /// Runs the pinned corpus without a test-framework dependency in the execution path, allowing
     /// the same implementation to be used by the direct NativeAOT entry point.
@@ -299,7 +336,9 @@ public sealed class LogtalkConformanceTests
     internal static async Task RunPinnedIsoCorpusAsync(
         string? selectedId,
         string? reportPath,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        bool generatedMatrix = false,
+        bool generatedNativeAot = false
     )
     {
         string checkout = Path.Combine(Path.GetTempPath(), $"dotprolog-logtalk-{Environment.ProcessId}");
@@ -450,6 +489,20 @@ public sealed class LogtalkConformanceTests
             Require(directCases.Count(test => test.OutcomeKind == "quick_check") == 6, "The QuickCheck inventory changed.");
 
             LogtalkTestDeclaration[] casesToExecute = SelectCasesToExecute(directCases, selectedId);
+
+            if (generatedMatrix)
+            {
+                Require(selectedId is null, "The generated matrix requires the complete inventory.");
+                await RunGeneratedMatrixAsync(
+                    directCases,
+                    supportByPath,
+                    testsRoot,
+                    checkout,
+                    generatedNativeAot,
+                    cancellationToken
+                );
+                return;
+            }
 
             var failures = new List<string>();
             var executionResults = new Dictionary<LogtalkTestDeclaration, string>();
@@ -604,27 +657,43 @@ public sealed class LogtalkConformanceTests
         return true;
     }
 
+    internal static void LoadAdapterSupport(PrologEngine engine, string sourcePath, string supportProgram, string testsRoot)
+    {
+        if (LogtalkTestAdapter.IsIsoDirectiveFixture(sourcePath))
+        {
+            if (!TryLoadDirectiveFixture(sourcePath, testsRoot, engine, out string fixtureFailure))
+            {
+                throw new InvalidOperationException(fixtureFailure);
+            }
+
+            return;
+        }
+
+        if (supportProgram.Length == 0)
+        {
+            return;
+        }
+
+        LoadResult loaded = engine.ConsultText(supportProgram, sourcePath);
+        if (!loaded.Success)
+        {
+            throw new InvalidOperationException($"support program did not compile: {string.Join("; ", loaded.Diagnostics)}");
+        }
+
+        if (engine.RunPendingGoals() is not RunResult.Success)
+        {
+            throw new InvalidOperationException("support program initialization failed");
+        }
+    }
+
     private static bool TryLoadDirectiveFixture(string sourcePath, string testsRoot, PrologEngine engine, out string failure)
     {
-        string directory = Path.Combine(testsRoot, Path.GetDirectoryName(sourcePath)!);
-        string[] files = sourcePath switch
+        foreach (string path in DirectiveFixturePaths(sourcePath, testsRoot))
         {
-            "directives/discontiguous_1/tests.lgt" => ["file.pl"],
-            "directives/ensure_loaded_1/tests.lgt" => ["main.pl"],
-            "directives/include_1/tests.lgt" => ["main.pl"],
-            "directives/initialization_1/tests.lgt" => ["main.pl"],
-            "directives/multifile_1/tests.lgt" => ["file_1.pl", "file_2.pl"],
-            "directives/op_3/tests.lgt" => ["file.pl"],
-            _ => [],
-        };
-
-        foreach (string file in files)
-        {
-            string path = Path.Combine(directory, file);
             LoadResult loaded = engine.ConsultFile(path);
             if (!loaded.Success)
             {
-                failure = $"directive fixture {file} did not compile: {string.Join("; ", loaded.Diagnostics)}";
+                failure = $"directive fixture {Path.GetFileName(path)} did not compile: {string.Join("; ", loaded.Diagnostics)}";
                 return false;
             }
         }
@@ -640,7 +709,23 @@ public sealed class LogtalkConformanceTests
         return true;
     }
 
-    private static PrologEngine CreateAdapterEngine(string filesRoot)
+    private static string[] DirectiveFixturePaths(string sourcePath, string testsRoot)
+    {
+        string directory = Path.Combine(testsRoot, Path.GetDirectoryName(sourcePath)!);
+        string[] files = sourcePath switch
+        {
+            "directives/discontiguous_1/tests.lgt" => ["file.pl"],
+            "directives/ensure_loaded_1/tests.lgt" => ["main.pl"],
+            "directives/include_1/tests.lgt" => ["main.pl"],
+            "directives/initialization_1/tests.lgt" => ["main.pl"],
+            "directives/multifile_1/tests.lgt" => ["file_1.pl", "file_2.pl"],
+            "directives/op_3/tests.lgt" => ["file.pl"],
+            _ => [],
+        };
+        return [.. files.Select(file => Path.Combine(directory, file))];
+    }
+
+    internal static PrologEngine CreateAdapterEngine(string filesRoot)
     {
         var engine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
         var namedInputPaths = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -1114,6 +1199,140 @@ public sealed class LogtalkConformanceTests
         await writer.FlushAsync(cancellationToken);
     }
 
+    private static async Task RunGeneratedMatrixAsync(
+        LogtalkTestDeclaration[] directCases,
+        Dictionary<string, string> supportByPath,
+        string testsRoot,
+        string checkout,
+        bool nativeAot,
+        CancellationToken cancellationToken
+    )
+    {
+        List<CompiledConformanceSourceGenerator.SourceGroup> groups = [];
+        foreach (
+            IGrouping<string, LogtalkTestDeclaration> sourceCases in directCases.GroupBy(
+                test => test.SourcePath,
+                StringComparer.Ordinal
+            )
+        )
+        {
+            string cases = BuildCompiledCases([.. sourceCases], out IReadOnlyList<(string Name, bool Deterministic)> names);
+            IReadOnlyList<(string Name, string Text)> compiledSupport =
+                LogtalkTestAdapter.IsIsoDirectiveFixture(sourceCases.Key)
+                    ? [.. DirectiveFixturePaths(sourceCases.Key, testsRoot).Select(path => (path, File.ReadAllText(path)))]
+                : supportByPath[sourceCases.Key].Length == 0 ? []
+                : [(sourceCases.Key, supportByPath[sourceCases.Key])];
+
+            groups.Add(
+                new CompiledConformanceSourceGenerator.SourceGroup(
+                    sourceCases.Key,
+                    supportByPath[sourceCases.Key],
+                    compiledSupport,
+                    cases,
+                    names
+                )
+            );
+        }
+
+        string generatedPath = Path.Combine(checkout, "CompiledConformance.g.cs");
+        await File.WriteAllTextAsync(
+            generatedPath,
+            CompiledConformanceSourceGenerator.Generate(groups, testsRoot),
+            cancellationToken
+        );
+        string project = Path.Combine(RepositoryLayout.Root, "tests", "Integration", "Integration.Tests.csproj");
+        if (!nativeAot)
+        {
+            (int exitCode, string log) = await ChildProcess.RunAsync(
+                "dotnet",
+                [
+                    "run",
+                    "--project",
+                    project,
+                    "--configuration",
+                    "Release",
+                    $"-p:CompiledConformanceSource={generatedPath}",
+                    "-p:CompiledConformanceRunner=true",
+                ],
+                RepositoryLayout.Root
+            );
+            Require(exitCode == 0, $"Generated-C# conformance matrix failed:\n{log}");
+            Require(log.Contains("compiled-conformance: 2304/2304, failed=0", StringComparison.Ordinal), log);
+            return;
+        }
+
+        string publish = Path.Combine(checkout, "publish");
+        (int publishExit, string publishLog) = await ChildProcess.RunAsync(
+            "dotnet",
+            [
+                "publish",
+                "-nodereuse:false",
+                project,
+                "--configuration",
+                "Release",
+                "--runtime",
+                RuntimeInformation.RuntimeIdentifier,
+                "-p:NativeConformanceRunner=true",
+                "-p:CompiledConformanceRunner=true",
+                $"-p:CompiledConformanceSource={generatedPath}",
+                "--output",
+                publish,
+                "--nologo",
+            ],
+            RepositoryLayout.Root
+        );
+        Require(publishExit == 0, $"Generated-C# NativeAOT publish failed:\n{publishLog}");
+        Require(!publishLog.Contains("warning IL", StringComparison.Ordinal), publishLog);
+        string executable = Path.Combine(publish, OperatingSystem.IsWindows() ? "Integration.Tests.exe" : "Integration.Tests");
+        (int runExit, string runLog) = await ChildProcess.RunAsync(executable, [], RepositoryLayout.Root);
+        Require(runExit == 0, $"Generated-C# NativeAOT matrix failed:\n{runLog}");
+        Require(runLog.Contains("compiled-conformance: 2304/2304, failed=0", StringComparison.Ordinal), runLog);
+    }
+
+    private static string BuildCompiledCases(
+        LogtalkTestDeclaration[] tests,
+        out IReadOnlyList<(string Name, bool Deterministic)> names
+    )
+    {
+        var source = new StringBuilder();
+        List<(string Name, bool Deterministic)> predicates = [];
+
+        for (int index = 0; index < tests.Length; index++)
+        {
+            LogtalkTestDeclaration test = tests[index];
+            string name = $"$dotprolog_iso_case_{index.ToString(CultureInfo.InvariantCulture)}";
+            string sourceName = $"'{name}'";
+            predicates.Add((name, test.OutcomeKind == "deterministic"));
+
+            if (test.OutcomeKind != "quick_check")
+            {
+                source.Append(sourceName).Append(" :- ").Append(BuildAssertion(test)).AppendLine(".");
+                continue;
+            }
+
+            (string property, IReadOnlyList<string> inputs) = QuickCheckInputs(test);
+            List<string> trials = [];
+            for (int trial = 0; trial < inputs.Count; trial++)
+            {
+                string trialName = $"{name}_trial_{trial.ToString(CultureInfo.InvariantCulture)}";
+                trials.Add($"'{trialName}'");
+                source
+                    .Append('\'')
+                    .Append(trialName)
+                    .Append("' :- ")
+                    .Append(property)
+                    .Append('(')
+                    .Append(inputs[trial])
+                    .AppendLine(").");
+            }
+
+            source.Append(sourceName).Append(" :- ").Append(string.Join(", ", trials)).AppendLine(".");
+        }
+
+        names = predicates;
+        return source.ToString();
+    }
+
     private static bool Execute(LogtalkTestDeclaration test, PrologEngine engine, out string failure)
     {
         if (test.OutcomeKind == "quick_check")
@@ -1121,27 +1340,7 @@ public sealed class LogtalkConformanceTests
             return ExecuteQuickCheck(test, engine, out failure);
         }
 
-        if (!LogtalkTestAdapter.TryUnwrapBackendGoal(test, out string goal))
-        {
-            failure = "adapter did not find one backend goal";
-            return false;
-        }
-
-        string assertion = test.OutcomeKind switch
-        {
-            "true" when test.Outcome == "true" => $"({goal})",
-            "true" => $"(({goal}), ({LogtalkTestAdapter.TranslateAssertion(ArgumentOf(test.Outcome, "true"))}))",
-            "exists" => $"(({goal}), ({LogtalkTestAdapter.TranslateAssertion(ArgumentOf(test.Outcome, "exists"))}))",
-            "false" or "fail" => $"\\+ ({goal})",
-            "error" => $"catch((({goal}), fail), error(ExternalError, _), ExternalError = ({ArgumentOf(test.Outcome, "error")}))",
-            "errors" => $"catch((({goal}), fail), ExternalBall, "
-                + $"member(ExternalBall, {LogtalkTestAdapter.TranslateErrorAlternatives(ArgumentOf(test.Outcome, "errors"))}))",
-            "ball" => $"catch((({goal}), fail), ExternalBall, ExternalBall = ({ArgumentOf(test.Outcome, "ball")}))",
-            "subsumes" => SubsumesAssertion(goal, test.Outcome),
-            "variant" => VariantAssertion(goal, test.Outcome),
-            "deterministic" when test.Outcome == "deterministic" => $"({goal})",
-            _ => throw new InvalidOperationException($"Unsupported direct expectation: {test.Outcome}"),
-        };
+        string assertion = BuildAssertion(test);
 
         try
         {
@@ -1174,18 +1373,33 @@ public sealed class LogtalkConformanceTests
         return true;
     }
 
+    private static string BuildAssertion(LogtalkTestDeclaration test)
+    {
+        if (!LogtalkTestAdapter.TryUnwrapBackendGoal(test, out string goal))
+        {
+            throw new InvalidOperationException($"{test.Id}: adapter did not find one backend goal");
+        }
+
+        return test.OutcomeKind switch
+        {
+            "true" when test.Outcome == "true" => $"({goal})",
+            "true" => $"(({goal}), ({LogtalkTestAdapter.TranslateAssertion(ArgumentOf(test.Outcome, "true"))}))",
+            "exists" => $"(({goal}), ({LogtalkTestAdapter.TranslateAssertion(ArgumentOf(test.Outcome, "exists"))}))",
+            "false" or "fail" => $"\\+ ({goal})",
+            "error" => $"catch((({goal}), fail), error(ExternalError, _), ExternalError = ({ArgumentOf(test.Outcome, "error")}))",
+            "errors" => $"catch((({goal}), fail), ExternalBall, "
+                + $"member(ExternalBall, {LogtalkTestAdapter.TranslateErrorAlternatives(ArgumentOf(test.Outcome, "errors"))}))",
+            "ball" => $"catch((({goal}), fail), ExternalBall, ExternalBall = ({ArgumentOf(test.Outcome, "ball")}))",
+            "subsumes" => SubsumesAssertion(goal, test.Outcome),
+            "variant" => VariantAssertion(goal, test.Outcome),
+            "deterministic" when test.Outcome == "deterministic" => $"({goal})",
+            _ => throw new InvalidOperationException($"Unsupported direct expectation: {test.Outcome}"),
+        };
+    }
+
     private static bool ExecuteQuickCheck(LogtalkTestDeclaration test, PrologEngine engine, out string failure)
     {
-        (string property, IReadOnlyList<string> inputs) = test.Id switch
-        {
-            "iso_term_variables_2_01" or "iso_quick_fixture" => ("twice", GenerateTermInputs(seed: 13211)),
-            "iso_term_variables_2_02" => ("chain", GenerateTermInputs(seed: 13212)),
-            "iso_number_chars_2_14" => ("round_trip", GenerateIntegerInputs(seed: 16714)),
-            "iso_number_chars_2_15" => ("round_trip", GenerateFloatInputs(seed: 16715)),
-            "iso_number_codes_2_12" => ("round_trip", GenerateIntegerInputs(seed: 16812)),
-            "iso_number_codes_2_13" => ("round_trip", GenerateFloatInputs(seed: 16813)),
-            _ => throw new InvalidOperationException($"Unsupported QuickCheck declaration: {test.Id}"),
-        };
+        (string property, IReadOnlyList<string> inputs) = QuickCheckInputs(test);
 
         for (int trial = 0; trial < inputs.Count; trial++)
         {
@@ -1215,6 +1429,18 @@ public sealed class LogtalkConformanceTests
         failure = string.Empty;
         return true;
     }
+
+    private static (string Property, IReadOnlyList<string> Inputs) QuickCheckInputs(LogtalkTestDeclaration test) =>
+        test.Id switch
+        {
+            "iso_term_variables_2_01" or "iso_quick_fixture" => ("twice", GenerateTermInputs(seed: 13211)),
+            "iso_term_variables_2_02" => ("chain", GenerateTermInputs(seed: 13212)),
+            "iso_number_chars_2_14" => ("round_trip", GenerateIntegerInputs(seed: 16714)),
+            "iso_number_chars_2_15" => ("round_trip", GenerateFloatInputs(seed: 16715)),
+            "iso_number_codes_2_12" => ("round_trip", GenerateIntegerInputs(seed: 16812)),
+            "iso_number_codes_2_13" => ("round_trip", GenerateFloatInputs(seed: 16813)),
+            _ => throw new InvalidOperationException($"Unsupported QuickCheck declaration: {test.Id}"),
+        };
 
     private static IReadOnlyList<string> GenerateIntegerInputs(int seed)
     {
