@@ -101,6 +101,15 @@ public sealed class TermReader
             reader.Advance();
         }
 
+        if (term is not null && reader._current.Kind != TokenKind.Eof)
+        {
+            reader.Report(
+                DiagnosticIds.UnexpectedToken,
+                $"Expected end of input after the term but found {Describe(reader._current)}.",
+                reader._current.Span
+            );
+        }
+
         return new ParseResult(term is null ? [] : [term], diagnostics);
     }
 

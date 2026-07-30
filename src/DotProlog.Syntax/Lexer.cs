@@ -351,7 +351,7 @@ internal sealed class Lexer
             }
         }
 
-        if (_position < _text.Length && (InputAt(_position) is 'e' or 'E'))
+        if (isFloat && _position < _text.Length && (InputAt(_position) is 'e' or 'E'))
         {
             int exponentOffset = Peek(1) is '+' or '-' ? 2 : 1;
             if (char.IsAsciiDigit(Peek(exponentOffset)))

@@ -159,9 +159,19 @@ public sealed class LexerTests
     }
 
     [Fact]
+    public void ExponentWithoutFractionIsNotAFloatToken()
+    {
+        List<Token> tokens = Tokenize("1e2", out List<Diagnostic> diagnostics);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal([TokenKind.Integer, TokenKind.Atom, TokenKind.Eof], tokens.Select(token => token.Kind));
+        Assert.Equal(["1", "e2", string.Empty], tokens.Select(token => token.Text));
+    }
+
+    [Fact]
     public void RetainsFloatOverflowForReaderDiagnostics()
     {
-        List<Token> tokens = Tokenize("1e9999", out List<Diagnostic> diagnostics);
+        List<Token> tokens = Tokenize("1.0e9999", out List<Diagnostic> diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(TokenKind.Float, tokens[0].Kind);

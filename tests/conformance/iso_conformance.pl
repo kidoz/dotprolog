@@ -436,6 +436,14 @@ iso_case('7.1.2', reads_as('0b101', 5), success).
 iso_case('7.1.2', reads_as('1.0', 1.0), success).
 iso_case('7.1.2', reads_as('1.0e2', 100.0), success).
 iso_case(
+    '6.4.4',
+    (
+        catch(read_term_from_atom('1e2', _, []), error(syntax_error(_), _), ExponentWithoutPointCaught = true),
+        ExponentWithoutPointCaught == true
+    ),
+    success
+).
+iso_case(
     '6.4.2',
     (atom_codes(HexQuotedSource, [39, 92, 120, 52, 49, 92, 39]), reads_as(HexQuotedSource, 'A')),
     success
@@ -781,6 +789,8 @@ iso_case('8.16.5', (atom_codes(A9, [0'a]), A9 == a), success).
 iso_case('8.16.6', char_code(_, -1), error(representation_error(character_code))).
 iso_case('8.16.7', (number_chars(N2, [' ', '3']), N2 == 3), success).
 iso_case('8.16.7', number_chars(_, ['3', 'a']), error(syntax_error(illegal_number))).
+iso_case('8.16.7', number_chars(_, ['1', e, '2']), error(syntax_error(illegal_number))).
+iso_case('8.16.8', number_codes(_, [49, 101, 50]), error(syntax_error(illegal_number))).
 
 % --- Sorting: not in clause 8, but standard in every system --------------------
 iso_case('sort/2', sort([b, a, b], [a, b]), success).

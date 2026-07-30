@@ -531,7 +531,7 @@ internal static class TextBuiltins
             }
         }
 
-        bool real = span.Contains('.') || span.Contains('e') || span.Contains('E');
+        bool real = span.Contains('.');
 
         if (!real)
         {

@@ -148,6 +148,17 @@ public sealed class TermReaderTests
     }
 
     [Theory]
+    [InlineData("a b")]
+    [InlineData("1e2")]
+    public void ReadTermRejectsTrailingTokens(string source)
+    {
+        ParseResult result = TermReader.ReadTerm(source);
+
+        Assert.False(result.Success);
+        Assert.Equal(DiagnosticIds.UnexpectedToken, Assert.Single(result.Diagnostics).Id);
+    }
+
+    [Theory]
     [InlineData("999999999999999999999999999999", DiagnosticIds.MaxIntegerExceeded)]
     [InlineData("+999999999999999999999999999999", DiagnosticIds.MaxIntegerExceeded)]
     [InlineData("-999999999999999999999999999999", DiagnosticIds.MinIntegerExceeded)]
@@ -166,10 +177,10 @@ public sealed class TermReaderTests
     }
 
     [Theory]
-    [InlineData("1e9999", 0, 6)]
-    [InlineData("+1e9999", 0, 7)]
-    [InlineData("-1e9999", 0, 7)]
-    [InlineData("f(1e9999)", 2, 6)]
+    [InlineData("1.0e9999", 0, 8)]
+    [InlineData("+1.0e9999", 0, 9)]
+    [InlineData("-1.0e9999", 0, 9)]
+    [InlineData("f(1.0e9999)", 2, 8)]
     public void ReportsFloatOverflowWithItsSourceSpan(string source, int start, int length)
     {
         ArgumentNullException.ThrowIfNull(source);
