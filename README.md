@@ -385,8 +385,10 @@ same control-construct compiler used for source clauses. Its cut is transparent 
 meta-called goal and opaque to the caller, as ISO specifies.
 A non-callable term in a compiled clause body remains a runtime error: it is catchable if execution
 reaches it, while normal control flow can leave it unevaluated.
+`call/2..8` checks the arity of the resulting goal; arity 255 is supported and 256 raises the
+catchable `representation_error(max_arity)`.
 
-DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 476 conformance cases encoded
+DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 486 conformance cases encoded
 from ISO/IEC 13211-1, all passing, but those are its own reading of the standard rather than an
 independent suite — see [COMPATIBILITY.md](COMPATIBILITY.md), which also lists the known
 differences.

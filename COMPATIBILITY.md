@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**476 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**486 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -142,8 +142,11 @@ Writing them was worth it immediately: they found these real defects.
 - A literal non-callable clause body is now accepted as a Prolog term and raises its catchable
   `type_error(callable, Culprit)` if execution reaches it. It no longer becomes a consultation
   diagnostic, and an unreachable body after `fail` does not raise.
+- The control audit now covers goal modes for `once/1`, `call/1..8`, and `catch/3`, including
+  recovery-goal validation and errors caught by the active catcher itself. A `call/8` result at
+  arity 255 executes, while arity 256 raises `representation_error(max_arity)`.
 
-Beyond the conformance cases, the engine and toolchain are covered by 1024 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 1033 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
