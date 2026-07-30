@@ -360,7 +360,7 @@ iso_case('7.8.9', catch(fail, _, true), failure).
 iso_case('8.11.5', open(_, read, _), error(instantiation_error)).
 iso_case('8.11.5', open(f, _, _), error(instantiation_error)).
 iso_case('8.11.5', open(f, sideways, _), error(domain_error(io_mode, sideways))).
-iso_case('8.11.5', open(1, read, _), error(type_error(atom, 1))).
+iso_case('8.11.5', open(1, read, _), error(domain_error(source_sink, 1))).
 iso_case('8.11.5', open(f, read, bound), error(uninstantiation_error(bound))).
 iso_case('8.11.5', open(f, write, _, [type(other)]), error(domain_error(stream_option, type(other)))).
 iso_case('8.11.5', open(f, write, _, [type(1)]), error(domain_error(stream_option, type(1)))).

@@ -328,6 +328,7 @@ public sealed class StreamTests : IDisposable
     [Theory]
     [InlineData("open('/no/such/place/file.pl', read, _)", "existence_error(source_sink,/no/such/place/file.pl)")]
     [InlineData("open(_, read, _)", "instantiation_error")]
+    [InlineData("open(1, read, _)", "domain_error(source_sink,1)")]
     [InlineData("open(f, sideways, _)", "domain_error(io_mode,sideways)")]
     [InlineData("close(nowhere)", "existence_error(stream,nowhere)")]
     [InlineData("read(nowhere, _)", "existence_error(stream,nowhere)")]

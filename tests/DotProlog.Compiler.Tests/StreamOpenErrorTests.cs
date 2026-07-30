@@ -10,6 +10,19 @@ public sealed class StreamOpenErrorTests : IDisposable
     private string Path(string name) => System.IO.Path.Combine(_directory, name).Replace("\\", "/", StringComparison.Ordinal);
 
     [Theory]
+    [InlineData("1", "1")]
+    [InlineData("source(file)", "source(file)")]
+    [InlineData("[file]", "[file]")]
+    public void NonSourceSinkRaisesItsIsoDomainError(string sourceSink, string culprit)
+    {
+        Assert.Equal(
+            $"domain_error(source_sink,{culprit})",
+            PrologTestHost.RunGoal($"catch(open({sourceSink}, read, _), error(E, _), write(E))")
+        );
+        Assert.Empty(Directory.EnumerateFileSystemEntries(_directory));
+    }
+
+    [Theory]
     [InlineData("bound")]
     [InlineData("f(bound)")]
     [InlineData("1")]

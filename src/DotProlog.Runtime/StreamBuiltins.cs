@@ -175,7 +175,7 @@ internal static class StreamBuiltins
 
         if (file.Tag != CellTag.Atom)
         {
-            throw PrologErrors.Type(machine, "atom", file);
+            throw PrologErrors.Domain(machine, "source_sink", file);
         }
 
         if (mode.Tag != CellTag.Atom)
