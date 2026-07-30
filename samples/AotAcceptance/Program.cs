@@ -148,6 +148,19 @@ internal static class Program
 
                 % ISO flags own runtime state explicitly and continue to work after trimming.
                 current_prolog_flag(bounded, true),
+                findall(FlagName, current_prolog_flag(FlagName, _), FlagNames),
+                length(FlagNames, 9),
+                current_prolog_flag(max_integer, NativeMaxInteger),
+                catch(
+                    set_prolog_flag(max_integer, NativeMaxInteger),
+                    error(permission_error(modify, flag, max_integer), _),
+                    MaxIntegerFlagCaught = true),
+                MaxIntegerFlagCaught == true,
+                catch(
+                    set_prolog_flag(max_arity, 255),
+                    error(permission_error(modify, flag, max_arity), _),
+                    MaxArityFlagCaught = true),
+                MaxArityFlagCaught == true,
                 set_prolog_flag(unknown, fail), \+ native_missing_predicate,
                 set_prolog_flag(unknown, error),
                 set_prolog_flag(double_quotes, atom),
