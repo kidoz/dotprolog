@@ -181,6 +181,16 @@ internal static class Program
                 CompareDomainCaught == true,
                 write(compare_order_errors), nl,
 
+                % current_op/3 validates bound ISO filter domains before enumeration.
+                catch(
+                    current_op(a, _, _),
+                    error(domain_error(operator_priority, a), _),
+                    CurrentOpPriorityCaught = true),
+                CurrentOpPriorityCaught == true,
+                catch(current_op(_, _, 1), error(type_error(atom, 1), _), CurrentOpNameCaught = true),
+                CurrentOpNameCaught == true,
+                write(current_op_filter_errors), nl,
+
                 % Open streams and their ISO metadata are explicit runtime state, not reflection.
                 current_input(NativeInput), current_stream(NativeInput),
                 stream_property(NativeInput, mode(read)),

@@ -88,6 +88,7 @@ public sealed class NativeAotAcceptanceTests
                     "float_read_limits",
                     "halt_status_errors",
                     "compare_order_errors",
+                    "current_op_filter_errors",
                     "stream_properties",
                     "current_stream_domains",
                     "code_io",
