@@ -695,6 +695,40 @@ iso_case(
     ),
     success
 ).
+iso_case(
+    '8.14.12',
+    (
+        char_code(SingleQuote, 39),
+        char_code(DoubleQuote, 34),
+        char_conversion(z, x),
+        char_conversion(SingleQuote, x),
+        char_conversion(DoubleQuote, x),
+        set_prolog_flag(char_conversion, on),
+        atom_codes(SingleQuoted, [39, 122, 39]),
+        read_term_from_atom(SingleQuoted, z, []),
+        set_prolog_flag(double_quotes, atom),
+        atom_codes(DoubleQuoted, [34, 122, 34]),
+        read_term_from_atom(DoubleQuoted, z, []),
+        set_prolog_flag(double_quotes, codes),
+        set_prolog_flag(char_conversion, off),
+        char_conversion(z, z),
+        char_conversion(SingleQuote, SingleQuote),
+        char_conversion(DoubleQuote, DoubleQuote)
+    ),
+    success
+).
+iso_case(
+    '8.14.12',
+    (
+        char_conversion(a, x),
+        set_prolog_flag(char_conversion, on),
+        atom_codes(CharacterCodeLiteral, [48, 39, 97]),
+        read_term_from_atom(CharacterCodeLiteral, 97, []),
+        set_prolog_flag(char_conversion, off),
+        char_conversion(a, a)
+    ),
+    success
+).
 
 % --- 8.16 Atomic term processing, remaining modes ------------------------------
 iso_case('8.16.2', (atom_concat(A6, B6, ab), A6 == '', B6 == ab), success).

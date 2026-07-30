@@ -55,13 +55,29 @@ public sealed class CharacterConversionTests
         Assert.Equal(
             "yes\n",
             PrologTestHost.RunGoal(
-                "char_conversion(z, x), set_prolog_flag(char_conversion, on), "
+                "char_code(SingleQuote, 39), char_code(DoubleQuote, 34), "
+                    + "char_conversion(z, x), char_conversion(SingleQuote, x), char_conversion(DoubleQuote, x), "
+                    + "set_prolog_flag(char_conversion, on), "
                     + "atom_codes(SingleQuoted, [39,122,39]), "
                     + "read_term_from_atom(SingleQuoted, z, []), "
                     + "set_prolog_flag(double_quotes, atom), "
                     + "atom_codes(DoubleQuoted, [34,122,34]), "
                     + "read_term_from_atom(DoubleQuoted, z, []), "
                     + "write(yes), nl"
+            )
+        );
+    }
+
+    [Fact]
+    public void CharacterCodeLiteralPayloadRemainsUnconverted()
+    {
+        Assert.Equal(
+            "yes\n",
+            PrologTestHost.RunGoal(
+                "char_conversion(a, x), set_prolog_flag(char_conversion, on), "
+                    + "atom_codes(Literal, [48,39,97]), "
+                    + "read_term_from_atom(Literal, Code, []), "
+                    + "Code =:= 97, write(yes), nl"
             )
         );
     }

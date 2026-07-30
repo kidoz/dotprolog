@@ -167,6 +167,11 @@ internal sealed class Lexer
         }
 
         char input = _text[position];
+        if (input is '\'' or '"')
+        {
+            return input;
+        }
+
         return _flags?.CharConversion == true && _conversions is not null ? _conversions.Convert(input) : input;
     }
 
