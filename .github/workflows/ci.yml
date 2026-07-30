@@ -38,6 +38,9 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - uses: microsoft/setup-msbuild@v2
+        if: matrix.os == 'windows-latest'
+
       # NativeAOT links with the platform toolchain. Windows and macOS runners already carry one.
       - name: Install NativeAOT prerequisites
         if: matrix.os == 'ubuntu-latest'
@@ -67,6 +70,7 @@ jobs:
         run: dotnet test --solution DotProlog.slnx -c Release --no-build --no-ansi
         env:
           DOTPROLOG_RUN_AOT_TESTS: '1'
+          DOTPROLOG_RUN_FULL_MSBUILD_TESTS: '1'
 
       # One platform inventories every independently maintained ISO case at its pinned revision and
       # executes the mechanically supported wrapper slice. Exact counts prevent upstream drift or

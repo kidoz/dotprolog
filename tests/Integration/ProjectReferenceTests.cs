@@ -14,6 +14,7 @@ namespace Integration.Tests;
 public sealed class ProjectReferenceTests
 {
     private const string OptInVariable = "DOTPROLOG_RUN_AOT_TESTS";
+    private const string FullMsBuildOptInVariable = "DOTPROLOG_RUN_FULL_MSBUILD_TESTS";
 
     [Fact]
     public async Task CSharpProjectCallsAPrologProjectThroughAProjectReference()
@@ -66,6 +67,49 @@ public sealed class ProjectReferenceTests
             ],
             lines
         );
+    }
+
+    [Fact]
+    public async Task VisualStudioMsBuildHostsTheNetFacadeGenerator()
+    {
+        Assert.SkipUnless(
+            OperatingSystem.IsWindows() && Environment.GetEnvironmentVariable(FullMsBuildOptInVariable) == "1",
+            $"Run on Windows with {FullMsBuildOptInVariable}=1 to test full MSBuild task hosting."
+        );
+
+        string console = Path.Combine(RepositoryLayout.Root, "samples", "PricingConsole", "PricingConsole.csproj");
+
+        (int buildExit, string buildLog) = await Run(
+            "msbuild",
+            [
+                console,
+                "-restore",
+                "-target:Rebuild",
+                "-property:Configuration=Release",
+                "-nodeReuse:false",
+                "-verbosity:minimal",
+                "-nologo",
+            ]
+        );
+
+        Assert.True(buildExit == 0, $"Full MSBuild could not host the .NET facade generator:\n{buildLog}");
+
+        string generated = Path.Combine(
+            RepositoryLayout.Root,
+            "samples",
+            "PricingRules",
+            "obj",
+            "prolog",
+            "PricingModule.g.cs"
+        );
+        Assert.True(File.Exists(generated), $"No generated facade at {generated}.");
+
+        (int runExit, string output) = await Run(
+            "dotnet",
+            ["run", "--project", console, "-c", "Release", "--no-build"]
+        );
+        Assert.True(runExit == 0, $"Running the full-MSBuild output failed:\n{output}");
+        Assert.Contains("100 less 15% = 85", output, StringComparison.Ordinal);
     }
 
     [Theory]

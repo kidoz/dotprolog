@@ -51,7 +51,23 @@
             >$(MSBuildThisFileDirectory)..\tasks\net10.0\DotProlog.Build.Tasks.dll</DotPrologTasksAssembly>
     </PropertyGroup>
 
-    <UsingTask TaskName="DotProlog.Build.Tasks.GeneratePrologFacade" AssemblyFile="$(DotPrologTasksAssembly)" />
+    <!--
+      Visual Studio and msbuild.exe host .NET tasks out of process. The dotnet CLI can load the same
+      task in process, avoiding IPC overhead for ordinary command-line builds.
+    -->
+    <UsingTask
+        TaskName="DotProlog.Build.Tasks.GeneratePrologFacade"
+        AssemblyFile="$(DotPrologTasksAssembly)"
+        Runtime="NET"
+        TaskFactory="TaskHostFactory"
+        Condition="'$(MSBuildRuntimeType)' == 'Full'"
+    />
+    <UsingTask
+        TaskName="DotProlog.Build.Tasks.GeneratePrologFacade"
+        AssemblyFile="$(DotPrologTasksAssembly)"
+        Runtime="NET"
+        Condition="'$(MSBuildRuntimeType)' == 'Core'"
+    />
 
     <!--
       The facade has to exist before the C# compiler runs, which is why this is hooked ahead of

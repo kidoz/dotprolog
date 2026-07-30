@@ -32,6 +32,9 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - uses: microsoft/setup-msbuild@v2
+        if: matrix.os == 'windows-latest'
+
       - name: Install NativeAOT prerequisites
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install --yes clang zlib1g-dev
@@ -53,6 +56,7 @@ jobs:
         run: dotnet test --solution DotProlog.slnx -c Release --no-build --no-ansi
         env:
           DOTPROLOG_RUN_AOT_TESTS: '1'
+          DOTPROLOG_RUN_FULL_MSBUILD_TESTS: '1'
 
       # The tag has to agree with what the projects say they are, or the packages would carry a
       # version nobody chose.
