@@ -450,6 +450,9 @@ iso_case('8.13.3', put_byte(user_output, 0), error(permission_error(output, text
 % --- 8.14 Term input and output -----------------------------------------------
 iso_case('8.14.1', read_term(no_such_stream, _, []), error(existence_error(stream, no_such_stream))).
 iso_case('8.14.1', read_term(user_output, _, []), error(permission_error(input, stream, user_output))).
+iso_case('8.14.1', read_term(_, [nonsense(x)]), error(domain_error(read_option, nonsense(x)))).
+iso_case('8.14.1', read_term(_, [_]), error(instantiation_error)).
+iso_case('8.14.1', read_term(_, atom), error(type_error(list, atom))).
 iso_case('8.14.1', (read_term_from_atom('f(A,B,A)', _, [singletons(S7)]), S7 = ['B'=_]), success).
 iso_case('8.14.1', (read_term_from_atom('f(A,_,A)', _, [variables(V7)]), V7 = [_, _]), success).
 iso_case('8.14.1', read_term_from_atom('f(A,A)', _, [singletons([])]), success).

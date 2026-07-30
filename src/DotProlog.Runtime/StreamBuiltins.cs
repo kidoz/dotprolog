@@ -654,6 +654,7 @@ internal static class StreamBuiltins
     {
         PrologStream source = Resolve(machine, stream, input: true);
         PrepareInput(machine, source, stream);
+        List<ReadOption> readOptions = options < 0 ? [] : ReadReadOptions(machine, options);
         IRuntimeCompiler compiler =
             machine.Program.RuntimeCompiler ?? throw new PrologException("Reading a term needs a compiler to parse it.");
 
@@ -690,15 +691,14 @@ internal static class StreamBuiltins
         }
 
         return machine.Unify(machine.Argument(term), value)
-            && (options < 0 || ApplyReadOptions(machine, options, names, variables, singletons));
+            && ApplyReadOptions(machine, readOptions, names, variables, singletons);
     }
 
-    /// <summary>
-    /// Applies the ISO <c>read_term/2</c> options. Anything else is a <c>domain_error</c> rather
-    /// than something quietly ignored.
-    /// </summary>
-    private static bool ApplyReadOptions(Machine machine, int options, Cell names, Cell variables, Cell singletons)
+    /// <summary>Validates ISO read options before any input operation can consume a term.</summary>
+    private static List<ReadOption> ReadReadOptions(Machine machine, int options)
     {
+        List<ReadOption> result = [];
+
         foreach (Cell element in TermList.ReadProper(machine, machine.Argument(options)))
         {
             Cell option = machine.Dereference(element);
@@ -714,14 +714,30 @@ internal static class StreamBuiltins
             }
 
             Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(option.Index).Index);
-            Cell target = machine.HeapAt(option.Index + 1);
-
-            bool applied = machine.Symbols.AtomName(functor.NameAtom) switch
+            ReadOptionKind kind = machine.Symbols.AtomName(functor.NameAtom) switch
             {
-                "variable_names" => machine.Unify(target, names),
-                "variables" => machine.Unify(target, variables),
-                "singletons" => machine.Unify(target, singletons),
+                "variable_names" => ReadOptionKind.VariableNames,
+                "variables" => ReadOptionKind.Variables,
+                "singletons" => ReadOptionKind.Singletons,
                 _ => throw PrologErrors.Domain(machine, "read_option", option),
+            };
+
+            result.Add(new ReadOption(kind, machine.HeapAt(option.Index + 1)));
+        }
+
+        return result;
+    }
+
+    private static bool ApplyReadOptions(Machine machine, List<ReadOption> options, Cell names, Cell variables, Cell singletons)
+    {
+        foreach (ReadOption option in options)
+        {
+            bool applied = option.Kind switch
+            {
+                ReadOptionKind.VariableNames => machine.Unify(option.Target, names),
+                ReadOptionKind.Variables => machine.Unify(option.Target, variables),
+                ReadOptionKind.Singletons => machine.Unify(option.Target, singletons),
+                _ => false,
             };
 
             if (!applied)
@@ -731,6 +747,15 @@ internal static class StreamBuiltins
         }
 
         return true;
+    }
+
+    private readonly record struct ReadOption(ReadOptionKind Kind, Cell Target);
+
+    private enum ReadOptionKind
+    {
+        VariableNames,
+        Variables,
+        Singletons,
     }
 
     private static bool GetChar(Machine machine, int stream, int target, bool consume)
@@ -1167,6 +1192,7 @@ internal static class StreamBuiltins
             throw PrologErrors.Type(machine, "atom", text);
         }
 
+        List<ReadOption> readOptions = ReadReadOptions(machine, options: 2);
         IRuntimeCompiler compiler =
             machine.Program.RuntimeCompiler ?? throw new PrologException("Reading a term needs a compiler to parse it.");
 
@@ -1190,7 +1216,7 @@ internal static class StreamBuiltins
             singletons = Cell.Atom(machine.Symbols.EmptyList);
         }
 
-        return machine.Unify(machine.Argument(1), value) && ApplyReadOptions(machine, 2, names, variables, singletons);
+        return machine.Unify(machine.Argument(1), value) && ApplyReadOptions(machine, readOptions, names, variables, singletons);
     }
 
     private static bool CaptureBegin(Machine machine)

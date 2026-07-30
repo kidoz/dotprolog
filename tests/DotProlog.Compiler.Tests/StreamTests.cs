@@ -131,6 +131,25 @@ public sealed class StreamTests : IDisposable
             RunWithInput(":- initialization(catch(read_term(_, [nonsense(x)]), error(E, _), (writeq(E), nl))).", "a.\n")
         );
 
+    [Theory]
+    [InlineData("[nonsense(x)]", "domain_error(read_option, nonsense(x))")]
+    [InlineData("[_]", "instantiation_error")]
+    [InlineData("[variables(_)|tail]", "type_error(list, [variables(_)|tail])")]
+    public void InvalidReadOptionsDoNotConsumeTheNextTerm(string options, string formal)
+    {
+        string path = Path("read-options.pl");
+        File.WriteAllText(path, "first. second.");
+
+        Assert.Equal(
+            "first\n",
+            PrologTestHost.RunGoal(
+                $"open('{path}', read, S), "
+                    + $"catch(read_term(S, _, {options}), error({formal}, _), true), "
+                    + "read(S, First), close(S), write(First), nl"
+            )
+        );
+    }
+
     [Fact]
     public void WritesAndReadsBackAFile()
     {
