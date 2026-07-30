@@ -196,7 +196,7 @@ public sealed class LogtalkConformanceTests
 
         const string unrelatedDispatchSource = """
             test(iso_dispatch, true) :-
-                ^^file_path(output, Path),
+                ^^unsupported_helper(output),
                 {write(a)}.
             """;
         LogtalkTestDeclaration unrelatedDispatch = Assert.Single(
@@ -204,7 +204,7 @@ public sealed class LogtalkConformanceTests
         );
         Assert.False(LogtalkTestAdapter.TryUnwrapBackendGoal(unrelatedDispatch, out _));
 
-        var textInputEngine = CreateAdapterEngine();
+        var textInputEngine = CreateAdapterEngine(Path.GetTempPath());
         Assert.Equal(
             RunResult.Success,
             textInputEngine.RunGoal(
@@ -277,6 +277,8 @@ public sealed class LogtalkConformanceTests
         );
 
         string checkout = Path.Combine(Path.GetTempPath(), $"dotprolog-logtalk-{Environment.ProcessId}");
+        string adapterFilesRoot = Path.Combine(checkout, ".dotprolog-adapter");
+        var engines = new Dictionary<string, PrologEngine>(StringComparer.Ordinal);
         Directory.CreateDirectory(checkout);
 
         try
@@ -405,11 +407,11 @@ public sealed class LogtalkConformanceTests
                 ),
             ];
 
-            Assert.Equal(736, directCases.Length);
-            Assert.Equal(435, directCases.Count(test => test.OutcomeKind == "true"));
+            Assert.Equal(741, directCases.Length);
+            Assert.Equal(437, directCases.Count(test => test.OutcomeKind == "true"));
             Assert.Equal(73, directCases.Count(test => test.OutcomeKind == "false"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "fail"));
-            Assert.Equal(149, directCases.Count(test => test.OutcomeKind == "error"));
+            Assert.Equal(152, directCases.Count(test => test.OutcomeKind == "error"));
             Assert.Equal(13, directCases.Count(test => test.OutcomeKind == "variant"));
             Assert.Equal(41, directCases.Count(test => test.OutcomeKind == "exists"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "subsumes"));
@@ -422,11 +424,17 @@ public sealed class LogtalkConformanceTests
 
             var failures = new List<string>();
             var executionResults = new Dictionary<LogtalkTestDeclaration, string>();
-            var engines = new Dictionary<string, PrologEngine>(StringComparer.Ordinal);
             foreach (LogtalkTestDeclaration test in casesToExecute)
             {
                 if (
-                    !TryGetSourceEngine(test, supportByPath[test.SourcePath], engines, out PrologEngine engine, out string failure)
+                    !TryGetSourceEngine(
+                        test,
+                        supportByPath[test.SourcePath],
+                        adapterFilesRoot,
+                        engines,
+                        out PrologEngine engine,
+                        out string failure
+                    )
                     || !Execute(test, engine, out failure)
                 )
                 {
@@ -456,6 +464,11 @@ public sealed class LogtalkConformanceTests
         }
         finally
         {
+            foreach (PrologEngine engine in engines.Values)
+            {
+                engine.Machine.Streams.CloseAll();
+            }
+
             Directory.Delete(checkout, recursive: true);
         }
     }
@@ -533,6 +546,7 @@ public sealed class LogtalkConformanceTests
     private static bool TryGetSourceEngine(
         LogtalkTestDeclaration test,
         string supportProgram,
+        string adapterFilesRoot,
         Dictionary<string, PrologEngine> engines,
         out PrologEngine engine,
         out string failure
@@ -544,7 +558,7 @@ public sealed class LogtalkConformanceTests
             return true;
         }
 
-        engine = CreateAdapterEngine();
+        engine = CreateAdapterEngine(adapterFilesRoot);
         if (supportProgram.Length > 0)
         {
             LoadResult loaded = engine.ConsultText(supportProgram, test.SourcePath);
@@ -562,10 +576,11 @@ public sealed class LogtalkConformanceTests
         return true;
     }
 
-    private static PrologEngine CreateAdapterEngine()
+    private static PrologEngine CreateAdapterEngine(string filesRoot)
     {
         var engine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
         var namedInputPaths = new Dictionary<string, string>(StringComparer.Ordinal);
+        var fixturePaths = new Dictionary<string, string>(StringComparer.Ordinal);
         engine.Program.Builtins.Register("$logtalk_set_text_input", 1, SetTextInput);
         engine.Program.Builtins.Register(
             "$logtalk_set_text_input",
@@ -584,6 +599,23 @@ public sealed class LogtalkConformanceTests
         engine.Program.Builtins.Register("$logtalk_text_output_contents", 1, TextOutputContents);
         engine.Program.Builtins.Register("$logtalk_text_output_contents", 2, NamedTextOutputContents);
         engine.Program.Builtins.Register("$logtalk_check_text_output", 2, CheckNamedTextOutput);
+        engine.Program.Builtins.Register(
+            "$logtalk_file_path",
+            2,
+            machine => FilePath(machine, filesRoot, fixturePaths)
+        );
+        engine.Program.Builtins.Register("$logtalk_create_text_file", 2, CreateTextFile);
+        engine.Program.Builtins.Register("$logtalk_create_binary_file", 2, CreateBinaryFile);
+        engine.Program.Builtins.Register(
+            "$logtalk_closed_input_stream",
+            2,
+            static machine => ClosedStream(machine, input: true)
+        );
+        engine.Program.Builtins.Register(
+            "$logtalk_closed_output_stream",
+            2,
+            static machine => ClosedStream(machine, input: false)
+        );
         engine.Program.Builtins.Register(
             "$logtalk_suppress_text_output",
             0,
@@ -731,6 +763,117 @@ public sealed class LogtalkConformanceTests
         }
 
         return output == expected;
+    }
+
+    private static bool FilePath(
+        Machine machine,
+        string filesRoot,
+        Dictionary<string, string> fixturePaths
+    )
+    {
+        Cell name = machine.Argument(0);
+        if (name.Tag != CellTag.Atom)
+        {
+            return false;
+        }
+
+        string fixture = machine.Symbols.AtomName(name.Index);
+        if (!fixturePaths.TryGetValue(fixture, out string? path))
+        {
+            Directory.CreateDirectory(filesRoot);
+            path = Path.Combine(filesRoot, $"{Guid.NewGuid():N}.tmp");
+            fixturePaths.Add(fixture, path);
+        }
+
+        return machine.Unify(
+            machine.Argument(1),
+            Cell.Atom(machine.Symbols.InternAtom(path.Replace('\\', '/')))
+        );
+    }
+
+    private static bool CreateTextFile(Machine machine)
+    {
+        Cell path = machine.Argument(0);
+        if (
+            path.Tag != CellTag.Atom
+            || !TryReadTextContents(machine, machine.Argument(1), out string contents)
+        )
+        {
+            return false;
+        }
+
+        File.WriteAllText(machine.Symbols.AtomName(path.Index), contents);
+        return true;
+    }
+
+    private static bool CreateBinaryFile(Machine machine)
+    {
+        Cell path = machine.Argument(0);
+        if (
+            path.Tag != CellTag.Atom
+            || !TryReadBytes(machine, machine.Argument(1), out byte[] contents)
+        )
+        {
+            return false;
+        }
+
+        File.WriteAllBytes(machine.Symbols.AtomName(path.Index), contents);
+        return true;
+    }
+
+    private static bool ClosedStream(Machine machine, bool input)
+    {
+        Cell options = machine.Argument(1);
+        if (options.Tag != CellTag.Atom || options.Index != machine.Symbols.EmptyList)
+        {
+            return false;
+        }
+
+        string path = Path.GetTempFileName();
+        PrologStream stream = machine.Streams.Open(
+            path,
+            input ? "read" : "write",
+            alias: null,
+            "text",
+            reposition: false
+        );
+        Cell handle = machine.CreateStructure(
+            machine.Symbols.InternFunctor("$stream", 1),
+            [Cell.Integer60(stream.Id)]
+        );
+        machine.Streams.Close(stream);
+        File.Delete(path);
+        return machine.Unify(machine.Argument(0), handle);
+    }
+
+    private static bool TryReadBytes(Machine machine, Cell item, out byte[] contents)
+    {
+        var bytes = new List<byte>();
+
+        while (
+            item.Tag == CellTag.Structure
+            && machine.HeapAt(item.Index).Index == machine.Symbols.ListFunctor
+        )
+        {
+            Cell head = machine.Dereference(machine.HeapAt(item.Index + 1));
+            if (head.Tag != CellTag.Integer || head.Integer is < byte.MinValue or > byte.MaxValue)
+            {
+                contents = [];
+                return false;
+            }
+
+            bytes.Add((byte)head.Integer);
+            item = machine.Dereference(machine.HeapAt(item.Index + 2));
+        }
+
+        if (item.Tag != CellTag.Atom || item.Index != machine.Symbols.EmptyList)
+        {
+            contents = [];
+            return false;
+        }
+
+        contents = [.. bytes];
+        return true;
     }
 
     private static bool TryTakeNamedTextOutput(Machine machine, Cell alias, out string output)

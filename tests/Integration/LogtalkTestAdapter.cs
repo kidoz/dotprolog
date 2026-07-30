@@ -487,6 +487,21 @@ internal static class LogtalkTestAdapter
             bool dispatchedCheckTextOutput = source
                 .AsSpan(current)
                 .StartsWith("^^check_text_output(", StringComparison.Ordinal);
+            bool dispatchedFilePath = source
+                .AsSpan(current)
+                .StartsWith("^^file_path(", StringComparison.Ordinal);
+            bool dispatchedCreateTextFile = source
+                .AsSpan(current)
+                .StartsWith("^^create_text_file(", StringComparison.Ordinal);
+            bool dispatchedCreateBinaryFile = source
+                .AsSpan(current)
+                .StartsWith("^^create_binary_file(", StringComparison.Ordinal);
+            bool dispatchedClosedInputStream = source
+                .AsSpan(current)
+                .StartsWith("^^closed_input_stream(", StringComparison.Ordinal);
+            bool dispatchedClosedOutputStream = source
+                .AsSpan(current)
+                .StartsWith("^^closed_output_stream(", StringComparison.Ordinal);
             if (
                 source.AsSpan(current).StartsWith("^^", StringComparison.Ordinal)
                 && !dispatchedAssertion
@@ -496,6 +511,11 @@ internal static class LogtalkTestAdapter
                 && !dispatchedTextOutputContents
                 && !dispatchedTextInputAssertion
                 && !dispatchedCheckTextOutput
+                && !dispatchedFilePath
+                && !dispatchedCreateTextFile
+                && !dispatchedCreateBinaryFile
+                && !dispatchedClosedInputStream
+                && !dispatchedClosedOutputStream
             )
             {
                 translated = string.Empty;
@@ -510,6 +530,11 @@ internal static class LogtalkTestAdapter
                 || dispatchedTextOutputContents
                 || dispatchedTextInputAssertion
                 || dispatchedCheckTextOutput
+                || dispatchedFilePath
+                || dispatchedCreateTextFile
+                || dispatchedCreateBinaryFile
+                || dispatchedClosedInputStream
+                || dispatchedClosedOutputStream
             )
             {
                 functorStart += 2;
@@ -524,6 +549,11 @@ internal static class LogtalkTestAdapter
                 : IsFunctorCallAt(source, functorStart, "text_output_contents") ? "text_output_contents"
                 : IsFunctorCallAt(source, functorStart, "text_input_assertion") ? "text_input_assertion"
                 : IsFunctorCallAt(source, functorStart, "check_text_output") ? "check_text_output"
+                : IsFunctorCallAt(source, functorStart, "file_path") ? "file_path"
+                : IsFunctorCallAt(source, functorStart, "create_text_file") ? "create_text_file"
+                : IsFunctorCallAt(source, functorStart, "create_binary_file") ? "create_binary_file"
+                : IsFunctorCallAt(source, functorStart, "closed_input_stream") ? "closed_input_stream"
+                : IsFunctorCallAt(source, functorStart, "closed_output_stream") ? "closed_output_stream"
                 : null;
             if (functor is null)
             {
@@ -588,7 +618,12 @@ internal static class LogtalkTestAdapter
                     "text_output_assertion" => "$logtalk_text_output_assertion",
                     "text_output_contents" => "$logtalk_text_output_contents",
                     "text_input_assertion" => "$logtalk_text_input_assertion",
-                    _ => "$logtalk_check_text_output",
+                    "check_text_output" => "$logtalk_check_text_output",
+                    "file_path" => "$logtalk_file_path",
+                    "create_text_file" => "$logtalk_create_text_file",
+                    "create_binary_file" => "$logtalk_create_binary_file",
+                    "closed_input_stream" => "$logtalk_closed_input_stream",
+                    _ => "$logtalk_closed_output_stream",
                 };
                 replacement = $"'{hostFunctor}'({arguments})";
             }
