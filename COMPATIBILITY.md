@@ -90,6 +90,9 @@ Writing them was worth it immediately: they found these real defects.
 - Character, code, and byte I/O now apply ISO error priority when more than one argument is invalid:
   explicit stream variables win first, value type checks precede stream lookup, and character-code
   representation checks follow stream permissions.
+- `open/4`, `close/2`, `read_term/3`, `write_term/3`, and `set_stream_position/2` now separate
+  option-list shape, argument domains, option semantics, stream lookup, and permissions so
+  simultaneous errors are raised in ISO priority order without performing I/O.
 - Host reader and writer failures now become catchable ISO `system_error` terms throughout stream
   input, output, EOF inspection, positioning, formatting, flushing, and closing. Implicit-current
   output predicates also enforce the same text/binary permissions as explicit-stream calls.

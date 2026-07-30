@@ -311,10 +311,12 @@ collisions before it touches the requested source/sink, and rejects non-source/s
 `domain_error(source_sink, Culprit)`. Stream permission errors preserve that alias or handle as the
 culprit, and malformed handles cannot wrap to another live stream. Bound character-input targets
 are validated before any character is consumed. Character, code, and byte predicates apply ISO
-error priority when their stream and value arguments are both invalid. Host reader and writer
-failures remain recoverable through `catch/3` as `system_error`. `write_term/2,3` supports the ISO
-`quoted`, `ignore_ops`, and `numbervars` options with exact boolean validation. `read_term/2,3`
-rejects malformed options before consuming the next term.
+error priority when their stream and value arguments are both invalid. Open, close, stream
+positioning, and term I/O likewise validate option shape, domains, and option semantics before
+stream lookup in the standard order. Host reader and writer failures remain recoverable through
+`catch/3` as `system_error`. `write_term/2,3` supports the ISO `quoted`, `ignore_ops`, and
+`numbervars` options with exact boolean validation. `read_term/2,3` rejects malformed options
+before consuming the next term.
 
 ```prolog
 main :-
