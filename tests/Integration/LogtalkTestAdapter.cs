@@ -54,6 +54,52 @@ internal static class LogtalkTestAdapter
                 continue;
             }
 
+            bool quickCheckDisabled = text.StartsWith("- quick_check(iso", StringComparison.Ordinal);
+            int quickCheckStart =
+                quickCheckDisabled ? 2
+                : text.StartsWith("quick_check(iso", StringComparison.Ordinal) ? 0
+                : -1;
+            if (quickCheckStart >= 0)
+            {
+                string quickCheckHead = text[quickCheckStart..].Trim();
+                if (!quickCheckHead.EndsWith('.'))
+                {
+                    throw new InvalidDataException(
+                        $"{relativePath}: quick-check declaration has no full stop: {quickCheckHead}"
+                    );
+                }
+
+                quickCheckHead = quickCheckHead[..^1].Trim();
+                if (!quickCheckHead.StartsWith("quick_check(", StringComparison.Ordinal) || !quickCheckHead.EndsWith(')'))
+                {
+                    throw new InvalidDataException($"{relativePath}: malformed quick-check declaration: {quickCheckHead}");
+                }
+
+                List<string> quickCheckArguments = SplitTopLevel(quickCheckHead[12..^1], ',');
+                if (
+                    quickCheckArguments.Count != 2
+                    || !quickCheckArguments[0].StartsWith("iso_", StringComparison.Ordinal)
+                )
+                {
+                    throw new InvalidDataException(
+                        $"{relativePath}: malformed ISO quick-check declaration: {quickCheckHead}"
+                    );
+                }
+
+                declarations.Add(
+                    new LogtalkTestDeclaration(
+                        relativePath,
+                        quickCheckArguments[0],
+                        $"quick_check({quickCheckArguments[1]})",
+                        null,
+                        null,
+                        quickCheckDisabled,
+                        ConditionalGoal(conditionals)
+                    )
+                );
+                continue;
+            }
+
             bool disabled = text.StartsWith("- test(iso", StringComparison.Ordinal);
             int testStart =
                 disabled ? 2
@@ -145,6 +191,8 @@ internal static class LogtalkTestAdapter
             if (
                 text.StartsWith("test(", StringComparison.Ordinal)
                 || text.StartsWith("- test(", StringComparison.Ordinal)
+                || text.StartsWith("quick_check(", StringComparison.Ordinal)
+                || text.StartsWith("- quick_check(", StringComparison.Ordinal)
                 || text.StartsWith(":- object", StringComparison.Ordinal)
                 || text.StartsWith(":- info", StringComparison.Ordinal)
                 || text.StartsWith(":- end_object", StringComparison.Ordinal)
@@ -230,8 +278,17 @@ internal static class LogtalkTestAdapter
     /// <summary>
     /// Unwraps one or more conjoined Logtalk backend escapes, leaving each Prolog goal unchanged.
     /// </summary>
-    internal static bool TryUnwrapBackendGoal(LogtalkTestDeclaration declaration, out string goal) =>
-        TryUnwrapBackendBody(declaration.Body, out goal) || TryUnwrapFindallBackendGoal(declaration.Body, out goal);
+    internal static bool TryUnwrapBackendGoal(LogtalkTestDeclaration declaration, out string goal)
+    {
+        if (declaration.Body is null)
+        {
+            goal = string.Empty;
+            return false;
+        }
+
+        return TryUnwrapBackendBody(declaration.Body, out goal)
+            || TryUnwrapFindallBackendGoal(declaration.Body, out goal);
+    }
 
     private static bool TryUnwrapFindallBackendGoal(string source, out string goal)
     {

@@ -1,12 +1,12 @@
 namespace Integration.Tests;
 
-/// <summary>One ISO-prefixed test declaration read without changing its upstream expectation.</summary>
+/// <summary>One ISO-prefixed test or quick-check declaration with its upstream expectation intact.</summary>
 internal sealed record LogtalkTestDeclaration(
     string SourcePath,
     string Id,
     string Outcome,
     string? Options,
-    string Body,
+    string? Body,
     bool Disabled,
     string? ConditionalGoal
 )

@@ -38,6 +38,8 @@ public sealed class LogtalkConformanceTests
 
             - test(iso_fixture_03, false, [note('upstream disabled')]) :-
                 {fail}.
+
+            quick_check(iso_fixture_04, round_trip(+integer)).
             """;
 
         IReadOnlyList<LogtalkTestDeclaration> declarations = LogtalkTestAdapter.ReadDeclarations(source, "fixture.lgt");
@@ -68,6 +70,14 @@ public sealed class LogtalkConformanceTests
                 Assert.Equal("false", third.Outcome);
                 Assert.Equal("[note('upstream disabled')]", third.Options);
                 Assert.True(third.Disabled);
+            },
+            fourth =>
+            {
+                Assert.Equal("iso_fixture_04", fourth.Id);
+                Assert.Equal("quick_check(round_trip(+integer))", fourth.Outcome);
+                Assert.Equal("quick_check", fourth.OutcomeKind);
+                Assert.Null(fourth.Body);
+                Assert.False(fourth.Disabled);
             }
         );
 
@@ -170,8 +180,8 @@ public sealed class LogtalkConformanceTests
                 }),
             ];
 
-            Assert.Equal(782, declarations.Length);
-            Assert.Equal(753, declarations.Count(test => !test.Disabled));
+            Assert.Equal(788, declarations.Length);
+            Assert.Equal(759, declarations.Count(test => !test.Disabled));
             Assert.Equal(29, declarations.Count(test => test.Disabled));
 
             Dictionary<string, int> outcomeKinds = declarations
@@ -189,6 +199,7 @@ public sealed class LogtalkConformanceTests
                     ["exists"] = 41,
                     ["fail"] = 3,
                     ["false"] = 73,
+                    ["quick_check"] = 6,
                     ["subsumes"] = 3,
                     ["true"] = 447,
                     ["variant"] = 13,
