@@ -65,7 +65,7 @@ internal static class ChildProcess
             // The whole tree, because dotnet leaves MSBuild worker processes behind it.
             process.Kill(entireProcessTree: true);
 
-            string partial = await standardOutput + await standardError;
+            string partial = await DrainAsync(standardOutput, standardError);
             throw new TimeoutException(
                 $"{fileName} {string.Join(' ', arguments)} did not finish within "
                     + $"{Limit.TotalMinutes.ToString("F0", System.Globalization.CultureInfo.InvariantCulture)} minutes. "
@@ -73,6 +73,33 @@ internal static class ChildProcess
             );
         }
 
-        return (process.ExitCode, await standardOutput + await standardError);
+        // The same deadline bounds the output reads: a child that exited can still have handed its
+        // output pipe to a detached grandchild, and an unbounded read would then hang until the CI
+        // job's own limit.
+        try
+        {
+            return (process.ExitCode, await standardOutput.WaitAsync(expiry.Token) + await standardError.WaitAsync(expiry.Token));
+        }
+        catch (OperationCanceledException)
+        {
+            throw new TimeoutException(
+                $"{fileName} {string.Join(' ', arguments)} exited, but its standard output or error "
+                    + "pipe stayed open past the limit — a process it started still holds it."
+            );
+        }
+    }
+
+    /// <summary>Collects whatever output is ready, without waiting on a pipe a survivor may hold.</summary>
+    private static async Task<string> DrainAsync(Task<string> standardOutput, Task<string> standardError)
+    {
+        try
+        {
+            return await standardOutput.WaitAsync(TimeSpan.FromSeconds(5))
+                + await standardError.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        catch (TimeoutException)
+        {
+            return "(unavailable: a surviving process still holds the output pipe)";
+        }
     }
 }
