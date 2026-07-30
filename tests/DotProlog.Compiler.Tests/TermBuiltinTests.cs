@@ -67,7 +67,11 @@ public sealed class TermBuiltinTests
     [InlineData("f(a) @< g(a,b)")]
     [InlineData("1 @< 2")]
     [InlineData("1.0 @< 1")]
-    [InlineData("8.0 @< 1")]
+    // Numbers compare by value across kinds, so a large float follows a small integer.
+    [InlineData("1 @< 8.0")]
+    [InlineData("1 @< 2.5")]
+    [InlineData("2.5 @< 3")]
+    [InlineData("\\+ 8.0 @< 1")]
     [InlineData("a @=< a")]
     [InlineData("b @> a")]
     public void StandardOrderComparisonsHold(string goal)
@@ -85,6 +89,11 @@ public sealed class TermBuiltinTests
     [InlineData("compare(R, a, b)", "<")]
     [InlineData("compare(R, b, a)", ">")]
     [InlineData("compare(R, a, a)", "=")]
+    [InlineData("compare(R, 1, 2.5)", "<")]
+    [InlineData("compare(R, 1.0, 1)", "<")]
+    // Near 2^59 a double no longer holds every integer, so the comparison must stay exact
+    // rather than widening the integer to a double that would collapse the two.
+    [InlineData("compare(R, 576460752303423233, 576460752303423232.0)", ">")]
     public void CompareReportsTheOrder(string goal, string expected)
     {
         Assert.Equal(expected, PrologTestHost.RunGoal($"{goal}, write(R)"));

@@ -1,9 +1,9 @@
 namespace DotProlog.Runtime;
 
 /// <summary>
-/// The ISO standard order of terms: <c>Variable @&lt; Float @&lt; Integer @&lt; Atom @&lt; Compound</c>.
-/// Numbers of the same type compare by value. Compound terms compare by arity, then by functor name,
-/// then argument by argument.
+/// The ISO standard order of terms: <c>Variable @&lt; Number @&lt; Atom @&lt; Compound</c>.
+/// Numbers compare by value across kinds, and a float precedes an integer it equals. Compound terms
+/// compare by arity, then by functor name, then argument by argument.
 /// </summary>
 /// <remarks>
 /// Traversal is iterative over an explicit work list, so comparing deeply nested terms cannot
@@ -124,21 +124,62 @@ public static class TermOrder
 
     private static int CompareNumbers(Machine machine, Cell a, Cell b)
     {
-        if (a.Tag == CellTag.Integer)
+        if (a.Tag == b.Tag)
         {
-            return a.Integer.CompareTo(b.Integer);
+            return a.Tag == CellTag.Integer
+                ? a.Integer.CompareTo(b.Integer)
+                : machine.Symbols.GetFloat(a.Index).CompareTo(machine.Symbols.GetFloat(b.Index));
         }
 
-        return machine.Symbols.GetFloat(a.Index).CompareTo(machine.Symbols.GetFloat(b.Index));
+        // Mixed kinds compare by value; when the two are arithmetically equal the float precedes.
+        if (a.Tag == CellTag.Integer)
+        {
+            int order = CompareIntegerToFloat(a.Integer, machine.Symbols.GetFloat(b.Index));
+            return order != 0 ? order : 1;
+        }
+
+        int reversed = CompareIntegerToFloat(b.Integer, machine.Symbols.GetFloat(a.Index));
+        return reversed != 0 ? -reversed : -1;
+    }
+
+    /// <summary>
+    /// Compares exactly: a double above 2^53 does not represent every tagged integer, so the float's
+    /// integral part is brought to a long rather than the integer being widened to a double.
+    /// </summary>
+    private static int CompareIntegerToFloat(long integer, double value)
+    {
+        if (double.IsNaN(value))
+        {
+            return 1;
+        }
+
+        // 2^63 and beyond exceed every long; an integral double inside the range converts exactly.
+        if (value >= 9223372036854775808.0)
+        {
+            return -1;
+        }
+
+        if (value < -9223372036854775808.0)
+        {
+            return 1;
+        }
+
+        double floor = Math.Floor(value);
+        long floorInteger = (long)floor;
+        if (integer != floorInteger)
+        {
+            return integer < floorInteger ? -1 : 1;
+        }
+
+        return value > floor ? -1 : 0;
     }
 
     private static int RankOf(Cell cell) =>
         cell.Tag switch
         {
             CellTag.Reference => 0,
-            CellTag.Float => 1,
-            CellTag.Integer => 2,
-            CellTag.Atom => 3,
-            _ => 4,
+            CellTag.Float or CellTag.Integer => 1,
+            CellTag.Atom => 2,
+            _ => 3,
         };
 }
