@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**486 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**496 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -145,8 +145,11 @@ Writing them was worth it immediately: they found these real defects.
 - The control audit now covers goal modes for `once/1`, `call/1..8`, and `catch/3`, including
   recovery-goal validation and errors caught by the active catcher itself. A `call/8` result at
   arity 255 executes, while arity 256 raises `representation_error(max_arity)`.
+- The flag audit covers all nine ISO flags, each fixed flag's modification permission, and every
+  mutable value domain. Modules enumerate the same core set without exposing extension-specific
+  flags, and NativeAOT retains the same values and permissions.
 
-Beyond the conformance cases, the engine and toolchain are covered by 1033 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 1038 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
