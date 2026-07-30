@@ -89,7 +89,15 @@ public sealed class GeneratedFacadeTests
     private static object CreateModule(out Type moduleType)
     {
         string source = FacadeGenerator.Generate(ReadContract(), PrologSource, "pricing.pl");
+        Assembly assembly = CompileGenerated(source);
+        moduleType = assembly.GetType("Generated.Pricing.PricingModule")!;
+        Assert.NotNull(moduleType);
 
+        return moduleType.GetMethod("Create", BindingFlags.Public | BindingFlags.Static, Type.EmptyTypes)!.Invoke(null, null)!;
+    }
+
+    private static Assembly CompileGenerated(string source)
+    {
         CSharpCompilation compilation = CSharpCompilation.Create(
             $"GeneratedFacade_{Guid.NewGuid():N}",
             [CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Latest))],
@@ -111,11 +119,7 @@ public sealed class GeneratedFacadeTests
                 + source
         );
 
-        Assembly assembly = Assembly.Load(image.ToArray());
-        moduleType = assembly.GetType("Generated.Pricing.PricingModule")!;
-        Assert.NotNull(moduleType);
-
-        return moduleType.GetMethod("Create", BindingFlags.Public | BindingFlags.Static, Type.EmptyTypes)!.Invoke(null, null)!;
+        return Assembly.Load(image.ToArray());
     }
 
     private static MetadataReference[] ReferenceAssemblies()
@@ -350,5 +354,63 @@ public sealed class GeneratedFacadeTests
 
         Assert.Contains("bool InStock(string item)", source, StringComparison.Ordinal);
         Assert.Contains("_host.Bind(\"in_stock\", 1)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StrictFacadeCompilesRunsAndRequiresAStrictEngine()
+    {
+        ContractReadResult contract = ContractReader.Read(
+            """
+            :- clr_module('Strict').
+            :- clr_namespace('Generated.Strict').
+            :- clr_export(answer/1, semidet, [in(value, integer)]).
+            """,
+            "Generated.Strict",
+            "strict.dpli"
+        );
+        Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
+
+        string source = FacadeGenerator.Generate(
+            contract.Contract!,
+            "answer(42).",
+            "strict.pl",
+            Runtime.PrologLanguageMode.StrictIso
+        );
+        Assembly assembly = CompileGenerated(source);
+        Type type = assembly.GetType("Generated.Strict.StrictModule")!;
+        object module = type.GetMethod("Create", BindingFlags.Public | BindingFlags.Static, Type.EmptyTypes)!.Invoke(null, null)!;
+
+        Assert.Equal(true, Call(module, type, "Answer", 42L));
+
+        TargetInvocationException mismatch = Assert.Throws<TargetInvocationException>(() =>
+            type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [new Compiler.PrologEngine()])
+        );
+        Assert.Contains("requires StrictIso language mode", mismatch.InnerException!.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StrictFacadeRejectsAnExtensionAtBuildTime()
+    {
+        ContractReadResult contract = ContractReader.Read(
+            """
+            :- clr_module('Strict').
+            :- clr_namespace('Generated.Strict').
+            :- clr_export(answer/0, semidet, []).
+            """,
+            "Generated.Strict",
+            "strict.dpli"
+        );
+        Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
+
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
+            FacadeGenerator.Generate(
+                contract.Contract!,
+                "answer :- member(a, [a]).",
+                "strict.pl",
+                Runtime.PrologLanguageMode.StrictIso
+            )
+        );
+
+        Assert.Contains(Compiler.CompilerDiagnosticIds.StrictIsoViolation, exception.Message, StringComparison.Ordinal);
     }
 }

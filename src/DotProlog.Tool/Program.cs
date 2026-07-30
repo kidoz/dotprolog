@@ -30,9 +30,16 @@ internal static class Program
 
     private static int Run(ReadOnlySpan<string> args)
     {
+        bool strictIso = false;
+        if (args.Length > 0 && args[0] == "--strict-iso")
+        {
+            strictIso = true;
+            args = args[1..];
+        }
+
         if (args.Length != 1)
         {
-            Console.Error.WriteLine("Usage: dotnet prolog run <file.pl>");
+            Console.Error.WriteLine("Usage: dotnet prolog run [--strict-iso] <file.pl>");
             return ExitUsage;
         }
 
@@ -43,7 +50,7 @@ internal static class Program
             return ExitUsage;
         }
 
-        var engine = new PrologEngine();
+        var engine = new PrologEngine(strictIso ? PrologLanguageMode.StrictIso : PrologLanguageMode.Extended);
 
         LoadResult loaded = engine.ConsultFile(path);
         foreach (Diagnostic diagnostic in loaded.Diagnostics)
@@ -88,6 +95,6 @@ internal static class Program
         output.WriteLine("dotnet prolog — run Prolog on .NET");
         output.WriteLine();
         output.WriteLine("Usage:");
-        output.WriteLine("  dotnet prolog run <file.pl>   consult a file and run its goals");
+        output.WriteLine("  dotnet prolog run [--strict-iso] <file.pl>   consult a file and run its goals");
     }
 }

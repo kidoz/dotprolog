@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using DotProlog.Runtime;
 
 namespace DotProlog.CodeGen.CSharp;
 
@@ -23,7 +24,15 @@ public static class EntryPointGenerator
     /// </summary>
     /// <param name="namespace">Namespace to generate into.</param>
     /// <param name="sources">Each source file's name and contents.</param>
-    public static string GenerateTestHost(string @namespace, IReadOnlyList<(string Name, string Text)> sources)
+    public static string GenerateTestHost(string @namespace, IReadOnlyList<(string Name, string Text)> sources) =>
+        GenerateTestHost(@namespace, sources, PrologLanguageMode.Extended);
+
+    /// <summary>Generates a test host using <paramref name="languageMode"/>.</summary>
+    public static string GenerateTestHost(
+        string @namespace,
+        IReadOnlyList<(string Name, string Text)> sources,
+        PrologLanguageMode languageMode
+    )
     {
         ArgumentNullException.ThrowIfNull(@namespace);
         ArgumentNullException.ThrowIfNull(sources);
@@ -31,6 +40,8 @@ public static class EntryPointGenerator
         string compiledProgram = CompiledProgramEmitter.Generate(
             sources,
             "__CompiledTests",
+            [],
+            languageMode,
             out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics
         );
         if (diagnostics.Any(diagnostic => diagnostic.Severity == DotProlog.Syntax.DiagnosticSeverity.Error))
@@ -51,7 +62,10 @@ public static class EntryPointGenerator
         text.AppendLine("    {");
         text.AppendLine("        // Muted while loading: directive output belongs to no single test, and during");
         text.AppendLine("        // discovery it would repeat once per scan. The runner attaches per-test writers.");
-        text.AppendLine("        var engine = new global::DotProlog.Compiler.PrologEngine");
+        text.AppendLine(
+            CultureInfo.InvariantCulture,
+            $"        var engine = new global::DotProlog.Compiler.PrologEngine(global::DotProlog.Runtime.PrologLanguageMode.{languageMode})"
+        );
         text.AppendLine("        {");
         text.AppendLine("            Output = global::System.IO.TextWriter.Null,");
         text.AppendLine("            Error = global::System.IO.TextWriter.Null,");
@@ -85,7 +99,15 @@ public static class EntryPointGenerator
     /// <summary>Generates the entry point for <paramref name="sources"/>.</summary>
     /// <param name="namespace">Namespace to generate into.</param>
     /// <param name="sources">Each source file's name and contents, consulted in order.</param>
-    public static string Generate(string @namespace, IReadOnlyList<(string Name, string Text)> sources)
+    public static string Generate(string @namespace, IReadOnlyList<(string Name, string Text)> sources) =>
+        Generate(@namespace, sources, PrologLanguageMode.Extended);
+
+    /// <summary>Generates an application entry point using <paramref name="languageMode"/>.</summary>
+    public static string Generate(
+        string @namespace,
+        IReadOnlyList<(string Name, string Text)> sources,
+        PrologLanguageMode languageMode
+    )
     {
         ArgumentNullException.ThrowIfNull(@namespace);
         ArgumentNullException.ThrowIfNull(sources);
@@ -93,6 +115,8 @@ public static class EntryPointGenerator
         string compiledProgram = CompiledProgramEmitter.Generate(
             sources,
             "__CompiledProgram",
+            [],
+            languageMode,
             out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics
         );
         if (diagnostics.Any(diagnostic => diagnostic.Severity == DotProlog.Syntax.DiagnosticSeverity.Error))
@@ -114,7 +138,10 @@ public static class EntryPointGenerator
 
         text.AppendLine("    private static int Main()");
         text.AppendLine("    {");
-        text.AppendLine("        var engine = new global::DotProlog.Compiler.PrologEngine();");
+        text.AppendLine(
+            CultureInfo.InvariantCulture,
+            $"        var engine = new global::DotProlog.Compiler.PrologEngine(global::DotProlog.Runtime.PrologLanguageMode.{languageMode});"
+        );
         text.AppendLine("        int[] initialization = __CompiledProgram.Install(engine);");
         text.AppendLine("        try");
         text.AppendLine("        {");

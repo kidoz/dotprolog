@@ -24,5 +24,7 @@
     <PropertyGroup>
         <!-- Prolog sources and contracts are picked up automatically, like .cs files are. -->
         <EnableDefaultPrologItems Condition="'$(EnableDefaultPrologItems)' == ''">true</EnableDefaultPrologItems>
+        <!-- Opt in to the processor mode that rejects implementation-specific language features. -->
+        <DotPrologStrictIso Condition="'$(DotPrologStrictIso)' == ''">false</DotPrologStrictIso>
     </PropertyGroup>
 </Project>

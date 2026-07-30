@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using DotProlog.Runtime;
 
 namespace DotProlog.CodeGen.CSharp;
 
@@ -25,7 +26,16 @@ public static class FacadeGenerator
     /// <param name="contract">The module surface to generate.</param>
     /// <param name="prologSource">The module's Prolog source, compiled into generated C# blocks.</param>
     /// <param name="sourceName">Name reported in build-time diagnostics.</param>
-    public static string Generate(ModuleContract contract, string prologSource, string sourceName)
+    public static string Generate(ModuleContract contract, string prologSource, string sourceName) =>
+        Generate(contract, prologSource, sourceName, PrologLanguageMode.Extended);
+
+    /// <summary>Generates a facade whose build-time and runtime behavior use <paramref name="languageMode"/>.</summary>
+    public static string Generate(
+        ModuleContract contract,
+        string prologSource,
+        string sourceName,
+        PrologLanguageMode languageMode
+    )
     {
         ArgumentNullException.ThrowIfNull(contract);
         ArgumentNullException.ThrowIfNull(prologSource);
@@ -45,6 +55,8 @@ public static class FacadeGenerator
         string compiledProgram = CompiledProgramEmitter.Generate(
             [(sourceName, prologSource)],
             "__CompiledModule",
+            [],
+            languageMode,
             out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics
         );
         if (diagnostics.Any(diagnostic => diagnostic.Severity == DotProlog.Syntax.DiagnosticSeverity.Error))
@@ -52,7 +64,7 @@ public static class FacadeGenerator
             throw new ArgumentException($"{sourceName} did not compile: {string.Join("; ", diagnostics)}", nameof(prologSource));
         }
 
-        AppendImplementation(text, contract, compiledProgram);
+        AppendImplementation(text, contract, compiledProgram, languageMode);
 
         return text.ToString();
     }
@@ -99,7 +111,12 @@ public static class FacadeGenerator
         text.AppendLine();
     }
 
-    private static void AppendImplementation(StringBuilder text, ModuleContract contract, string compiledProgram)
+    private static void AppendImplementation(
+        StringBuilder text,
+        ModuleContract contract,
+        string compiledProgram,
+        PrologLanguageMode languageMode
+    )
     {
         string type = $"{contract.ClrTypeName}Module";
 
@@ -140,7 +157,10 @@ public static class FacadeGenerator
         text.AppendLine("    /// <summary>Loads the module into a fresh engine.</summary>");
         text.AppendLine(CultureInfo.InvariantCulture, $"    public static I{type} Create()");
         text.AppendLine("    {");
-        text.AppendLine("        var engine = new global::DotProlog.Compiler.PrologEngine();");
+        text.AppendLine(
+            CultureInfo.InvariantCulture,
+            $"        var engine = new global::DotProlog.Compiler.PrologEngine(global::DotProlog.Runtime.PrologLanguageMode.{languageMode});"
+        );
         text.AppendLine("        return Create(engine);");
         text.AppendLine("    }");
         text.AppendLine();

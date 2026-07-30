@@ -1,4 +1,5 @@
 using DotProlog.CodeGen.CSharp;
+using DotProlog.Runtime;
 using DotProlog.Syntax;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
@@ -38,6 +39,9 @@ public sealed class GeneratePrologFacade : Task
     /// <summary>Whether that entry point should host the test platform rather than run the program.</summary>
     public bool GenerateTestHost { get; set; }
 
+    /// <summary>Whether generated source must use the strict ISO language profile.</summary>
+    public bool StrictIso { get; set; }
+
     /// <summary>The generated C# files, to be added to <c>Compile</c>.</summary>
     [Output]
     public ITaskItem[] GeneratedFiles { get; private set; } = [];
@@ -57,6 +61,7 @@ public sealed class GeneratePrologFacade : Task
 
         Directory.CreateDirectory(OutputPath);
         List<ITaskItem> generated = [];
+        PrologLanguageMode languageMode = StrictIso ? PrologLanguageMode.StrictIso : PrologLanguageMode.Extended;
 
         if (GenerateEntryPoint)
         {
@@ -71,8 +76,8 @@ public sealed class GeneratePrologFacade : Task
             WriteIfChanged(
                 entryPoint,
                 GenerateTestHost
-                    ? EntryPointGenerator.GenerateTestHost(RootNamespace, sources)
-                    : EntryPointGenerator.Generate(RootNamespace, sources)
+                    ? EntryPointGenerator.GenerateTestHost(RootNamespace, sources, languageMode)
+                    : EntryPointGenerator.Generate(RootNamespace, sources, languageMode)
             );
             generated.Add(new TaskItem(entryPoint));
         }
@@ -110,7 +115,8 @@ public sealed class GeneratePrologFacade : Task
             string facade = FacadeGenerator.Generate(
                 result.Contract!,
                 File.ReadAllText(sourcePath),
-                Path.GetFileName(sourcePath)
+                Path.GetFileName(sourcePath),
+                languageMode
             );
 
             string target = Path.Combine(OutputPath, $"{result.Contract!.ClrTypeName}Module.g.cs");

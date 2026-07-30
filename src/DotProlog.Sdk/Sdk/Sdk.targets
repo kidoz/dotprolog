@@ -80,7 +80,7 @@
 
         <WriteLinesToFile
             File="$(DotPrologGeneratedPath).inputs"
-            Lines="@(PrologCompile->'%(FullPath)');@(PrologContract->'%(FullPath)')"
+            Lines="strict-iso=$(DotPrologStrictIso);@(PrologCompile->'%(FullPath)');@(PrologContract->'%(FullPath)')"
             Overwrite="true"
             WriteOnlyWhenDifferent="true"
         />
@@ -111,6 +111,7 @@
             RootNamespace="$(RootNamespace)"
             GenerateEntryPoint="$(_DotPrologGenerateEntryPoint)"
             GenerateTestHost="$(DotPrologTestProject)"
+            StrictIso="$(DotPrologStrictIso)"
         >
             <Output TaskParameter="GeneratedFiles" ItemName="DotPrologGeneratedCompile" />
         </GeneratePrologFacade>

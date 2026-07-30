@@ -98,6 +98,31 @@ public sealed class IncrementalBuildTests : IDisposable
         Assert.True(fifthExit == 0, $"The build after the deletion failed:\n{fifthLog}");
         Assert.False(File.Exists(extraFacade), $"The stale facade {extraFacade} survived the deletion.");
 
+        // The language mode is an incremental input even when no project file or Prolog source
+        // timestamp changes. Strict generation rejects extensions and records the mode in the
+        // generated installer and engine construction.
+        await File.WriteAllTextAsync(
+            Path.Combine(_project, "pricing.pl"),
+            "value(one) :- member(one, [one]).\n",
+            TestContext.Current.CancellationToken
+        );
+        (int rejectedExit, string rejectedLog) = await Build("-p:DotPrologStrictIso=true");
+        Assert.True(rejectedExit != 0, "Strict generation accepted a bundled extension.");
+        Assert.Contains("DPL1018", rejectedLog, StringComparison.Ordinal);
+
+        await File.WriteAllTextAsync(
+            Path.Combine(_project, "pricing.pl"),
+            "value(one).\n",
+            TestContext.Current.CancellationToken
+        );
+        (int strictExit, string strictLog) = await Build("-p:DotPrologStrictIso=true");
+        Assert.True(strictExit == 0, $"The strict build failed:\n{strictLog}");
+        Assert.Contains(
+            "PrologLanguageMode.StrictIso",
+            await File.ReadAllTextAsync(Path.Combine(generatedPath, "PricingModule.g.cs"), TestContext.Current.CancellationToken),
+            StringComparison.Ordinal
+        );
+
         // The generated files live outside IntermediateOutputPath, so Clean needs its own proof.
         (int cleanExit, string cleanLog) = await Run(
             "dotnet",
@@ -142,8 +167,8 @@ public sealed class IncrementalBuildTests : IDisposable
         );
     }
 
-    private Task<(int ExitCode, string Log)> Build() =>
-        Run("dotnet", ["build", "-nodereuse:false", Path.Combine(_project, "Incremental.dplproj"), "--nologo"]);
+    private Task<(int ExitCode, string Log)> Build(params string[] properties) =>
+        Run("dotnet", ["build", "-nodereuse:false", Path.Combine(_project, "Incremental.dplproj"), "--nologo", .. properties]);
 
     private static Task<(int ExitCode, string Log)> Run(string fileName, string[] arguments) =>
         ChildProcess.RunAsync(fileName, arguments, RepositoryLayout.Root);

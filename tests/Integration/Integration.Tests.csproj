@@ -22,6 +22,16 @@
         <StartupObject>Integration.Tests.NativeConformanceProgram</StartupObject>
     </PropertyGroup>
 
+    <PropertyGroup Condition="'$(StrictIsoRunner)' == 'true'">
+        <DefineConstants>$(DefineConstants);STRICT_ISO_RUNNER</DefineConstants>
+        <StartupObject>Integration.Tests.StrictIsoNativeProgram</StartupObject>
+        <PublishAot>true</PublishAot>
+        <TrimMode>full</TrimMode>
+        <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+        <EnableAotAnalyzer>true</EnableAotAnalyzer>
+        <NoWarn>$(NoWarn);IL2104;IL3000;IL3053</NoWarn>
+    </PropertyGroup>
+
     <ItemGroup Condition="'$(CompiledConformanceSource)' != ''">
         <Compile Include="$(CompiledConformanceSource)" Link="CompiledConformance.g.cs" />
     </ItemGroup>

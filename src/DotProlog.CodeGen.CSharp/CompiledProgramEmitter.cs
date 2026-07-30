@@ -13,16 +13,24 @@ internal static class CompiledProgramEmitter
         IReadOnlyList<(string Name, string Text)> sources,
         string typeName,
         out IReadOnlyList<Diagnostic> diagnostics
-    ) => Generate(sources, typeName, [], out diagnostics);
+    ) => Generate(sources, typeName, [], PrologLanguageMode.Extended, out diagnostics);
 
     internal static string Generate(
         IReadOnlyList<(string Name, string Text)> sources,
         string typeName,
         IReadOnlyList<(string Name, int Arity)> hostBuiltins,
         out IReadOnlyList<Diagnostic> diagnostics
+    ) => Generate(sources, typeName, hostBuiltins, PrologLanguageMode.Extended, out diagnostics);
+
+    internal static string Generate(
+        IReadOnlyList<(string Name, string Text)> sources,
+        string typeName,
+        IReadOnlyList<(string Name, int Arity)> hostBuiltins,
+        PrologLanguageMode languageMode,
+        out IReadOnlyList<Diagnostic> diagnostics
     )
     {
-        var engine = new PrologEngine
+        var engine = new PrologEngine(languageMode)
         {
             Output = TextWriter.Null,
             Error = TextWriter.Null,
@@ -56,7 +64,7 @@ internal static class CompiledProgramEmitter
         }
 
         var model = CompiledModel.Create(engine.Program, codeStart, initialization, preparation);
-        return Emit(model, typeName);
+        return Emit(model, typeName, languageMode);
     }
 
     private static List<(int Functor, int Entry)> SnapshotPredicates(BytecodeProgram program, int codeStart)
@@ -74,7 +82,7 @@ internal static class CompiledProgramEmitter
         return predicates;
     }
 
-    private static string Emit(CompiledModel model, string typeName)
+    private static string Emit(CompiledModel model, string typeName, PrologLanguageMode languageMode)
     {
         var text = new StringBuilder();
         text.AppendLine(CultureInfo.InvariantCulture, $"private static class {typeName}");
@@ -82,6 +90,17 @@ internal static class CompiledProgramEmitter
         text.AppendLine("    internal static int[] Install(global::DotProlog.Compiler.PrologEngine engine)");
         text.AppendLine("    {");
         text.AppendLine("        global::DotProlog.Runtime.BytecodeProgram runtime = engine.Program;");
+        text.AppendLine(
+            CultureInfo.InvariantCulture,
+            $"        if (runtime.LanguageMode != global::DotProlog.Runtime.PrologLanguageMode.{languageMode})"
+        );
+        text.AppendLine("        {");
+        text.AppendLine(
+            CultureInfo.InvariantCulture,
+            $"            throw new global::DotProlog.Runtime.PrologException(\"Generated program requires {languageMode} language mode.\");"
+        );
+        text.AppendLine("        }");
+        text.AppendLine();
         text.AppendLine("        global::DotProlog.Runtime.SymbolTable symbols = runtime.Symbols;");
         AppendFunctors(text, model);
         AppendBuiltins(text, model);
