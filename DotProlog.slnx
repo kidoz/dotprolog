@@ -20,6 +20,7 @@
     </Folder>
     <Folder Name="/samples/">
         <Project Path="samples/AotAcceptance/AotAcceptance.csproj" />
+        <Project Path="samples/GreymereAdventure/GreymereAdventure.dplproj" Type="C#" />
         <Project Path="samples/GreetingApp/GreetingApp.dplproj" Type="C#" />
         <Project Path="samples/PricingConsole/PricingConsole.csproj" />
         <Project Path="samples/PricingFSharp/PricingFSharp.fsproj" />

@@ -146,6 +146,7 @@ bundles of [widget, gadget]:
 | `samples/PricingRules` | A `.dplproj`: Prolog rules plus their `.dpli` contract |
 | `samples/PricingConsole`, `samples/PricingFSharp`, `samples/PricingVisualBasic` | C#, F#, and VB apps referencing it |
 | `samples/GreetingApp` | A Prolog application built from a `.dplproj` |
+| `samples/GreymereAdventure` | A complete fantasy text adventure written in Prolog |
 | `samples/PricingTests` | Prolog tests in a `.dplproj`, run by `DotProlog.Testing` |
 | `samples/AotAcceptance` | The NativeAOT acceptance sample |
 
