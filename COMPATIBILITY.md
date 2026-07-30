@@ -196,7 +196,7 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 
 | Feature | Current state |
 |---|---|
-| Complete standard clause audit | Remaining modes and non-stream errors still require a clause-by-clause audit |
+| Complete standard clause audit | Repository mappings and direct tests cover lexical, operator, stream, and non-stream clauses |
 | Independent ISO verification | The repository corpus is not a substitute for a published independent suite |
 
 ## Non-ISO features absent deliberately
