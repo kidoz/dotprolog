@@ -192,7 +192,7 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 | Area | Predicates |
 |---|---|
 | Terms | atoms, variables, integers, floats, double-quoted code lists, lists, structures |
-| Control | `,/2`, `;/2`, `->/2`, `*->/2`, `\+/1`, `!/0`, `call/1..8`, `once/1`, `ignore/1`, `not/1`, `true/0`, `fail/0` |
+| Control | `,/2`, `;/2`, `->/2`, `*->/2`, `\+/1`, `!/0`, `call/1..8`, `once/1`, `repeat/0`, `ignore/1`, `not/1`, `true/0`, `fail/0` |
 | Exceptions | `throw/1`, `catch/3`, with catchable ISO `error/2` terms |
 | All solutions | `findall/3`, `bagof/3`, `setof/3`, `forall/2`, `aggregate_all/3` (`count`, `bag`, `set`, `sum`, `max`, `min`) |
 | Database | `assertz/1`, `asserta/1`, `retract/1`, `clause/2`, `retractall/1`, `abolish/1`, `:- dynamic` |
@@ -384,7 +384,7 @@ A control term assembled at run time and passed to `call/1` is lowered to VM byt
 same control-construct compiler used for source clauses. Its cut is transparent within that
 meta-called goal and opaque to the caller, as ISO specifies.
 
-DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 472 conformance cases encoded
+DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 474 conformance cases encoded
 from ISO/IEC 13211-1, all passing, but those are its own reading of the standard rather than an
 independent suite — see [COMPATIBILITY.md](COMPATIBILITY.md), which also lists the known
 differences.
