@@ -31,6 +31,19 @@ public sealed class AtomicTermProcessingTests
     [InlineData("number_codes(_, [51,32])", "syntax_error(illegal_number)")]
     [InlineData("char_code(ab, _)", "type_error(character,ab)")]
     [InlineData("char_code(_, a)", "type_error(integer,a)")]
+    [InlineData(
+        "number_chars(_, ['1','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0'])",
+        "representation_error(max_integer)"
+    )]
+    [InlineData(
+        "number_codes(_, [45,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57])",
+        "representation_error(min_integer)"
+    )]
+    [InlineData("atom_number('1000000000000000000', _)", "representation_error(max_integer)")]
+    [InlineData("atom_number('0x10000000000000000', _)", "representation_error(max_integer)")]
+    [InlineData("atom_number('-0x10000000000000000', _)", "representation_error(min_integer)")]
+    [InlineData("atom_number('1.0e400', _)", "syntax_error(float_overflow)")]
+    [InlineData("number_chars(_, ['1','.','0','e','4','0','0'])", "syntax_error(float_overflow)")]
     public void ReportsIsoAtomicProcessingErrors(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
 
@@ -39,8 +52,18 @@ public sealed class AtomicTermProcessingTests
     [InlineData("atom_concat(a, b, ac)")]
     [InlineData("sub_atom(ab, 0, 3, _, _)")]
     [InlineData("atom_chars(ab, [a,c])")]
+    [InlineData("atom_chars(ab, [_,_,_])")]
+    [InlineData("number_codes(33, [0'3])")]
     public void ValidButNonMatchingModesFail(string goal) =>
         Assert.Equal("no", PrologTestHost.RunGoal($"( {goal} -> write(yes) ; write(no) )"));
+
+    [Theory]
+    [InlineData("atom_chars(abc, [X, Y, Z]), atom_chars(A, [X, Y, Z]), write(A)", "abc")]
+    [InlineData("atom_codes(abc, [X | _]), write(X)", "97")]
+    [InlineData("number_chars(33, [X, _]), write(X)", "3")]
+    [InlineData("number_codes(33, L), write(L)", "[51,51]")]
+    public void ABoundFirstArgumentConvertsAndUnifiesWithTheList(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal(goal));
 
     [Theory]
     [InlineData("number_chars")]

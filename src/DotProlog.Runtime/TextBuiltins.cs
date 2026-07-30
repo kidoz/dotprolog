@@ -165,7 +165,7 @@ internal static class TextBuiltins
         if (atom.Tag == CellTag.Atom)
         {
             string text = machine.Symbols.AtomName(atom.Index);
-            return TryParseNumber(text, out PrologNumber number)
+            return TryParseNumber(machine, text, out PrologNumber number)
                 && machine.Unify(machine.Argument(1), ArithmeticEvaluator.ToCell(machine, number));
         }
 
@@ -206,41 +206,34 @@ internal static class TextBuiltins
             {
                 throw PrologErrors.Type(machine, "atom", source);
             }
+
+            // ISO 8.16.4-8.16.8: a bound first argument decides the direction. It is converted and
+            // the result unified with the list, whatever the list holds — a list of unbound
+            // elements is filled in, and a list of the wrong length fails.
+            string written =
+                source.Tag == CellTag.Atom ? machine.Symbols.AtomName(source.Index)
+                : TryText(machine, source, out string value) ? value
+                : throw new InvalidOperationException("Validated text source has no textual representation.");
+            return machine.Unify(list, BuildText(machine, written, chars));
         }
 
-        // A proper list decides the direction, even when the first argument is bound: that is what
-        // lets number_codes/2 check a parse rather than only produce one.
-        if (TermList.IsProper(machine, list))
-        {
-            string text = ReadText(machine, list, chars);
-
-            if (!numeric)
-            {
-                // With the first argument already bound, the question is whether those are its
-                // characters — so its text is compared. Interning an atom and unifying instead
-                // keeps a bound atom comparison allocation-free.
-                return source.Tag == CellTag.Reference
-                    ? machine.Unify(source, Cell.Atom(machine.Symbols.InternAtom(text)))
-                    : string.Equals(machine.Symbols.AtomName(source.Index), text, StringComparison.Ordinal);
-            }
-
-            return TryParseNumber(text, out PrologNumber parsed)
-                ? machine.Unify(source, ArithmeticEvaluator.ToCell(machine, parsed))
-                : throw machine.CreateBall(SyntaxErrorTerm(machine, "illegal_number"), "syntax_error(illegal_number)");
-        }
-
-        if (source.Tag == CellTag.Reference)
+        if (!TermList.IsProper(machine, list))
         {
             List<Cell> elements = [];
             Cell tail = TermList.Read(machine, list, elements);
             throw tail.Tag == CellTag.Reference ? PrologErrors.Instantiation(machine) : PrologErrors.Type(machine, "list", list);
         }
 
-        string written =
-            source.Tag == CellTag.Atom ? machine.Symbols.AtomName(source.Index)
-            : TryText(machine, source, out string value) ? value
-            : throw new InvalidOperationException("Validated text source has no textual representation.");
-        return machine.Unify(list, BuildText(machine, written, chars));
+        string text = ReadText(machine, list, chars);
+
+        if (!numeric)
+        {
+            return machine.Unify(source, Cell.Atom(machine.Symbols.InternAtom(text)));
+        }
+
+        return TryParseNumber(machine, text, out PrologNumber parsed)
+            ? machine.Unify(source, ArithmeticEvaluator.ToCell(machine, parsed))
+            : throw machine.CreateBall(SyntaxErrorTerm(machine, "illegal_number"), "syntax_error(illegal_number)");
     }
 
     /// <summary>Reads a proper list of characters or codes as text.</summary>
@@ -562,9 +555,12 @@ internal static class TextBuiltins
     /// <remarks>
     /// This is a second, smaller number reader than the one in the syntax layer, because the runtime
     /// deliberately does not depend on it. The two must agree on what a number looks like; the tests
-    /// for <c>atom_number/2</c> are what hold them together.
+    /// for <c>atom_number/2</c> are what hold them together. Text that spells a number the term
+    /// representation cannot hold raises the reader's error rather than returning false —
+    /// <c>representation_error(max_integer|min_integer)</c> for an oversized integer literal and
+    /// <c>syntax_error(float_overflow)</c> for a float outside binary64.
     /// </remarks>
-    internal static bool TryParseNumber(string text, out PrologNumber number)
+    internal static bool TryParseNumber(Machine machine, string text, out PrologNumber number)
     {
         number = default;
         ReadOnlySpan<char> span = text.AsSpan().TrimStart();
@@ -585,8 +581,13 @@ internal static class TextBuiltins
             return false;
         }
 
-        if (TryParseRadix(span, out long radixValue))
+        if (TryParseRadix(span, out long radixValue, out bool radixOverflow))
         {
+            if (radixOverflow || !Cell.FitsInteger(negative ? -radixValue : radixValue))
+            {
+                throw PrologErrors.Representation(machine, negative ? "min_integer" : "max_integer");
+            }
+
             number = PrologNumber.FromInteger(negative ? -radixValue : radixValue);
             return true;
         }
@@ -603,9 +604,20 @@ internal static class TextBuiltins
 
         if (!real)
         {
-            if (!long.TryParse(span, NumberStyles.None, CultureInfo.InvariantCulture, out long integer))
+            foreach (char c in span)
             {
-                return false;
+                if (!char.IsAsciiDigit(c))
+                {
+                    return false;
+                }
+            }
+
+            if (
+                !long.TryParse(span, NumberStyles.None, CultureInfo.InvariantCulture, out long integer)
+                || !Cell.FitsInteger(negative ? -integer : integer)
+            )
+            {
+                throw PrologErrors.Representation(machine, negative ? "min_integer" : "max_integer");
             }
 
             number = PrologNumber.FromInteger(negative ? -integer : integer);
@@ -624,13 +636,21 @@ internal static class TextBuiltins
             return false;
         }
 
+        if (double.IsInfinity(value))
+        {
+            // double.TryParse rounds an oversized literal to infinity; runtime-read floats stay
+            // finite, so this raises the same error as the reader path.
+            throw machine.CreateBall(SyntaxErrorTerm(machine, "float_overflow"), "syntax_error(float_overflow)");
+        }
+
         number = PrologNumber.FromReal(negative ? -value : value);
         return true;
     }
 
-    private static bool TryParseRadix(ReadOnlySpan<char> span, out long value)
+    private static bool TryParseRadix(ReadOnlySpan<char> span, out long value, out bool overflow)
     {
         value = 0;
+        overflow = false;
 
         if (span.Length < 3 || span[0] != '0')
         {
@@ -672,6 +692,12 @@ internal static class TextBuiltins
             if (digit < 0 || digit >= radix)
             {
                 return false;
+            }
+
+            if (value > (long.MaxValue - digit) / radix)
+            {
+                overflow = true;
+                continue;
             }
 
             value = (value * radix) + digit;
