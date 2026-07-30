@@ -224,6 +224,19 @@ internal static class Program
                 get_char(CharacterMode, 'A'),
                 close(CharacterMode),
                 write(character_input_modes), nl,
+
+                % ISO value checks precede stream lookup, while an explicit stream variable wins first.
+                catch(
+                    (get_char(no_such_stream, bad), CharacterPriorityCaught = false),
+                    error(type_error(in_character, bad), _),
+                    CharacterPriorityCaught = true),
+                CharacterPriorityCaught == true,
+                catch(
+                    (put_byte(_, 256), BytePriorityCaught = false),
+                    error(instantiation_error, _),
+                    BytePriorityCaught = true),
+                BytePriorityCaught == true,
+                write(primitive_io_error_priority), nl,
                 write(stream_system_errors), nl,
 
                 % ISO write_term/3 and numbervars options stay explicitly registered after trimming.

@@ -91,6 +91,7 @@ public sealed class NativeAotAcceptanceTests
                     "source_sink_domains",
                     "stream_error_terms",
                     "character_input_modes",
+                    "primitive_io_error_priority",
                     "stream_system_errors",
                     "term_write_options",
                     "byte_io",
