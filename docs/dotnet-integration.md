@@ -9,8 +9,9 @@ Create a `PrologEngine`, consult source, and pull solutions from a query:
 
 ```csharp
 using DotProlog.Compiler;
+using DotProlog.Runtime;
 
-var engine = new PrologEngine();
+var engine = new PrologEngine(PrologLanguageMode.StrictIso);
 engine.ConsultText("colour(red). colour(green). colour(blue).");
 
 foreach (PrologSolution solution in engine.Query("colour(C)").Solutions())
@@ -27,6 +28,10 @@ unbounded goal.
 
 One engine runs one goal at a time and is not thread-safe. Use separate engine instances when
 independent callers need to execute concurrently.
+
+The parameterless constructor selects `PrologLanguageMode.Extended`. Pass
+`PrologLanguageMode.StrictIso` before consulting any source to restrict predefined features to the
+ISO Parts 1–3 inventory. The selection is immutable for the lifetime of the engine.
 
 ## Bind a predicate
 
@@ -93,6 +98,19 @@ A normal project reference is enough:
 
 The generated facade is ordinary .NET code, so C#, F#, and Visual Basic consume the same assembly.
 The repository exercises all three languages against `samples/PricingRules`.
+
+Set the following property in a `.dplproj` to validate and generate the whole project in strict ISO
+mode:
+
+```xml
+<PropertyGroup>
+  <DotPrologStrictIso>true</DotPrologStrictIso>
+</PropertyGroup>
+```
+
+Generated code records its language mode and refuses to install into an engine created in a
+different mode. This keeps build-time validation and runtime consultation under the same language
+contract.
 
 ## NativeAOT behavior
 

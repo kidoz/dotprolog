@@ -4,6 +4,18 @@ This page records DotProlog’s processor-defined choices for the ISO-oriented c
 characteristics declaration, not a claim that every requirement of ISO/IEC 13211-1 has been
 certified.
 
+## Strict ISO mode
+
+`PrologLanguageMode.StrictIso` is an immutable, program-owned processor mode. It admits the
+explicitly inventoried predefined surface from ISO/IEC 13211 Parts 1, 2, and 3 and rejects known
+predefined DotProlog extensions. Source preparation reports `DPL1018`; a runtime-constructed
+meta-goal or host binding raises the catchable term
+`permission_error(access, implementation_specific_feature, Name/Arity)`.
+
+The bundled implementation library is trusted below this boundary so it may use private helpers
+to implement standardized predicates. User-defined predicate names are unrestricted. Extended mode
+is the default for backward compatibility.
+
 ## Representation limits
 
 | Characteristic | DotProlog choice |
@@ -75,8 +87,9 @@ extensions rather than claims about the Part 2 filesystem model.
 
 Grammar alternative `|` is predefined as `xfy` at priority 1105. DotProlog supports terminal
 semicontexts, `Name//Arity` in `dynamic/1`, `multifile/1`, and `discontiguous/1`, and the standard
-grammar control constructs. The additional soft-cut grammar forms follow the corresponding
-DotProlog control semantics.
+grammar control constructs. In extended mode, the additional soft-cut grammar forms follow the
+corresponding DotProlog control semantics. In strict mode, soft cut is translated as an ordinary
+nonterminal rather than an additional grammar control construct.
 
 If an ordinary `Name/(Arity+2)` clause and `Name//Arity` grammar rule coexist, DotProlog combines
 their expanded clauses into one procedure in source order. Grammar-rule heads that are themselves

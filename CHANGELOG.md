@@ -12,6 +12,9 @@ All notable changes to DotProlog are recorded here. The format follows
   compiled-to-bytecode, bytecode-to-compiled, and NativeAOT paths in CI.
 - Part 3 DCG semicontexts and `Name//Arity` declarations for `dynamic/1`, `multifile/1`, and
   `discontiguous/1`.
+- An opt-in strict ISO language mode for embedding, `dotnet prolog`, generated code, and
+  `.dplproj` builds. It rejects known predefined extensions during source preparation and at
+  runtime meta-call and host-binding boundaries.
 
 ### Changed
 
@@ -19,6 +22,8 @@ All notable changes to DotProlog are recorded here. The format follows
   unexported, or conflicting selected imports.
 - DCG processing uses the Part 3 `|` operator priority, rejects reserved and predefined grammar
   heads, and applies the specified `phrase/2` and terminal-sequence validation.
+- Extended DCGs lower soft cut consistently in static and runtime-loaded source; strict mode treats
+  the additional control as an ordinary nonterminal.
 
 ## [0.1.1] — 2026-07-30
 

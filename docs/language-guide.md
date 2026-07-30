@@ -4,6 +4,21 @@ DotProlog implements an ISO-oriented Prolog core. It does **not** claim full ISO
 compatibility; the repository's conformance cases are useful evidence, but not independent
 verification.
 
+## Language modes
+
+The default `Extended` mode accepts the ISO Parts 1–3 surface plus documented DotProlog
+extensions such as soft cut, `format/1,2,3`, `member/2`, and higher-order list predicates.
+
+The opt-in `StrictIso` mode restricts predefined language features to the explicit ISO Parts 1–3
+inventory. A source call to a known predefined extension is rejected with diagnostic `DPL1018`.
+Runtime-constructed meta-goals and host bindings reject the same extensions with a catchable
+`permission_error(access, implementation_specific_feature, Name/Arity)`. Arbitrarily named
+predicates defined by the program remain valid, including a user definition whose name matches an
+extended library predicate.
+
+Strict mode is an enforcement boundary, not a certification claim. The licensed-text
+requirement-by-requirement review described in the compatibility record remains separate.
+
 ## Terms and clauses
 
 The reader supports variables, atoms, bounded integers, finite floats, lists, structures, and
@@ -25,8 +40,9 @@ does not add the SWI-Prolog string type or alias string predicates to atoms.
 
 ## Control and errors
 
-The supported control surface includes conjunction, disjunction, if-then-else, soft cut, negation
-as failure, cut, `call/1..8`, `once/1`, `repeat/0`, and `ignore/1`.
+The extended control surface includes conjunction, disjunction, if-then-else, soft cut, negation
+as failure, cut, `call/1..8`, `once/1`, `repeat/0`, and `ignore/1`. Strict mode excludes soft cut
+and `ignore/1`.
 
 Engine errors are catchable `error(Formal, Context)` terms:
 
@@ -95,6 +111,9 @@ look_ahead(X), [X] --> [X].
 cannot define grammar control constructs or expand over predefined procedures. `phrase/2` checks
 that its input can be a list; `phrase/3` deliberately leaves its sequence arguments unchecked, the
 implementation-defined lower-overhead choice permitted by the grammar specification.
+
+In extended mode, soft cut is also recognized as a grammar control extension. In strict mode it is
+an ordinary nonterminal, as required for additional grammar controls by Part 3.
 
 `op/3` changes the program-owned operator table used by both reading and writing terms.
 

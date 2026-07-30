@@ -49,6 +49,15 @@ just hello
 The `run` command consults the file, reports reader or compiler diagnostics, and then executes its
 directives and initialization goal.
 
+To reject known implementation-specific language features, run the file in strict ISO mode:
+
+```console
+dotnet run --project src/DotProlog.Tool -- run --strict-iso path/to/program.pl
+```
+
+Strict mode reports `DPL1018` when source calls a predefined DotProlog extension. The default mode
+remains extended for backward compatibility.
+
 ## Run your own program
 
 Create a UTF-8 `.pl` file:

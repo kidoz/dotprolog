@@ -2,7 +2,7 @@
     <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
 
     <PropertyGroup>
-        <!-- Every shipped component must stay trim- and AOT-clean; see .agents/contexts/conventions/STYLE_PROFILE.md. -->
+        <!-- Every shipped component must stay trim- and AOT-clean. -->
         <IsAotCompatible>true</IsAotCompatible>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>

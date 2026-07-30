@@ -4,8 +4,10 @@
 
 DotProlog **does not yet claim complete ISO or SWI-Prolog compatibility**. The applicable
 independent Part 1 corpus passes on every execution path, but licensed-text traceability and the
-separate Part 2 module and Part 3 grammar completion gates remain open. What follows is evidence
-and known variation, not a certification.
+remaining Part 2 module and Part 3 grammar completion gates remain open. An opt-in strict mode now
+rejects known implementation-specific predefined features across all execution paths, but that
+enforcement boundary is not a substitute for certification. What follows is evidence and known
+variation.
 
 ## What has been measured
 
@@ -203,7 +205,7 @@ Writing them was worth it immediately: they found these real defects.
   the reader rejects. The named ISO escapes `\a \b \f \n \r \t \v` and delimited `\x...\` hex
   escapes for the rest now round-trip every control character.
 
-Beyond the conformance cases, the engine and toolchain are covered by 1308 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 1343 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
@@ -224,14 +226,15 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 | Modules, `use_module/1,2`, `meta_predicate/1` | Implemented |
 | ISO Prolog flags and state-dependent reading/calls | Implemented |
 | Character conversion and state-dependent lexical reading | Implemented |
+| Opt-in strict ISO predefined-feature boundary | Implemented across source, generated code, runtime meta-call, host binding, SDK, CLI, and NativeAOT |
 
 ## Known ISO gaps
 
 | Feature | Current state |
 |---|---|
 | Complete standard clause audit | The private maps still require a licensed-text, one-row-per-normative-requirement review |
-| Part 2 modules | Core behavior is implemented; strict-mode and licensed-text completion remain |
-| Part 3 grammars | Common semantics, semicontexts, declarations, errors, and all execution paths are tested; a whole-processor strict mode and final-text traceability remain |
+| Part 2 modules | Core behavior and the strict feature boundary are implemented; licensed-text built-in, error, and complete execution-matrix review remains |
+| Part 3 grammars | Common semantics, semicontexts, declarations, errors, strict additional-control handling, and all execution paths are tested; formal-expansion comparison and final-text traceability remain |
 
 ## Non-ISO features absent deliberately
 
@@ -248,7 +251,7 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 | A character is a UTF-16 code unit | A character outside the Basic Multilingual Plane is two codes, and `atom_length/2` counts it as two | SWI counts code points |
 | Two modules exporting the same name | The first loaded gets the unqualified name | SWI reports a conflict |
 | Clause selection | Linear scan; no first-argument indexing | Indexed |
-| Arithmetic extensions | `div/2`, evaluable `integer/1`, `e/0`, `inf/0`, `nan/0`, and several utility functions remain available | Not part of the ISO core |
+| Arithmetic extensions | Evaluable `integer/1`, `e/0`, `inf/0`, `nan/0`, and several utility functions remain available in extended mode and are rejected in strict mode | Not part of the ISO core |
 
 ## Platforms
 
