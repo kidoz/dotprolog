@@ -87,6 +87,36 @@ public sealed class LogtalkConformanceTests
             LogtalkTestAdapter.TranslateAssertion("X =~= 3.1415927")
         );
         Assert.Equal("(current_predicate(foo/1))", LogtalkTestAdapter.TranslateAssertion("{current_predicate(foo/1)}"));
+
+        const string conditionalSource = """
+            :- if(catch({1^true}, _, fail)).
+                test(iso_conditional, true) :-
+                    {true}.
+            :- else.
+                test(iso_conditional, false) :-
+                    {fail}.
+            :- endif.
+            """;
+        IReadOnlyList<LogtalkTestDeclaration> conditional = LogtalkTestAdapter.ReadDeclarations(
+            conditionalSource,
+            "conditional.lgt"
+        );
+        Assert.Equal("catch({1^true}, _, fail)", conditional[0].ConditionalGoal);
+        Assert.Equal("\\+ (catch({1^true}, _, fail))", conditional[1].ConditionalGoal);
+        Assert.Equal(
+            "catch((1^true), _, fail)",
+            LogtalkTestAdapter.TranslateConditionalGoal(conditional[0].ConditionalGoal!)
+        );
+
+        const string findallSource = """
+            test(iso_findall_escape, variant(L, [1, 2])) :-
+                findall(X, {between(1, 2, X)}, L).
+            """;
+        LogtalkTestDeclaration findall = Assert.Single(
+            LogtalkTestAdapter.ReadDeclarations(findallSource, "findall.lgt")
+        );
+        Assert.True(LogtalkTestAdapter.TryUnwrapBackendGoal(findall, out string findallGoal));
+        Assert.Equal("findall(X, ((between(1, 2, X))), L)", findallGoal);
     }
 
     [Fact]
@@ -175,6 +205,14 @@ public sealed class LogtalkConformanceTests
                 }
             }
 
+            HashSet<(string SourcePath, string Id)> conditionalAlternates =
+            [
+                .. declarations
+                    .Where(test => !test.Disabled)
+                    .GroupBy(test => (test.SourcePath, test.Id))
+                    .Where(group => group.Count() > 1)
+                    .Select(group => group.Key),
+            ];
             LogtalkTestDeclaration[] directCases =
             [
                 .. declarations.Where(test =>
@@ -182,30 +220,32 @@ public sealed class LogtalkConformanceTests
                     && test.OutcomeKind is "true" or "false" or "fail" or "error" or "variant"
                     && supportByPath.ContainsKey(test.SourcePath)
                     && LogtalkTestAdapter.TryUnwrapBackendGoal(test, out _)
+                    && (
+                        !conditionalAlternates.Contains((test.SourcePath, test.Id))
+                        || IsApplicableConditionalBranch(test)
+                    )
                 ),
             ];
 
-            Assert.Equal(330, directCases.Length);
-            Assert.Equal(227, directCases.Count(test => test.OutcomeKind == "true"));
-            Assert.Equal(63, directCases.Count(test => test.OutcomeKind == "false"));
-            Assert.Single(directCases, test => test.OutcomeKind == "fail");
-            Assert.Equal(38, directCases.Count(test => test.OutcomeKind == "error"));
-            Assert.Single(directCases, test => test.OutcomeKind == "variant");
+            Assert.Equal(417, directCases.Length);
+            Assert.Equal(279, directCases.Count(test => test.OutcomeKind == "true"));
+            Assert.Equal(72, directCases.Count(test => test.OutcomeKind == "false"));
+            Assert.Equal(2, directCases.Count(test => test.OutcomeKind == "fail"));
+            Assert.Equal(53, directCases.Count(test => test.OutcomeKind == "error"));
+            Assert.Equal(11, directCases.Count(test => test.OutcomeKind == "variant"));
 
             string? selectedId = Environment.GetEnvironmentVariable(CaseVariable);
-            LogtalkTestDeclaration[] casesToExecute = selectedId is null
-                ? directCases
-                : directCases.Where(test => test.Id == selectedId).ToArray();
-            Assert.True(
-                selectedId is null || casesToExecute.Length > 0,
-                $"{CaseVariable} did not select a directly executable case: {selectedId}"
-            );
+            LogtalkTestDeclaration[] casesToExecute = SelectCasesToExecute(directCases, selectedId);
 
             var failures = new List<string>();
             var executionResults = new Dictionary<LogtalkTestDeclaration, string>();
+            var engines = new Dictionary<string, PrologEngine>(StringComparer.Ordinal);
             foreach (LogtalkTestDeclaration test in casesToExecute)
             {
-                if (!Execute(test, supportByPath[test.SourcePath], out string failure))
+                if (
+                    !TryGetSourceEngine(test, supportByPath[test.SourcePath], engines, out PrologEngine engine, out string failure)
+                    || !Execute(test, engine, out failure)
+                )
                 {
                     failures.Add($"{test.SourcePath} | {test.Id} | {failure}");
                     executionResults.Add(test, $"failed: {failure}");
@@ -229,6 +269,80 @@ public sealed class LogtalkConformanceTests
         {
             Directory.Delete(checkout, recursive: true);
         }
+    }
+
+    private static bool IsApplicableConditionalBranch(LogtalkTestDeclaration declaration)
+    {
+        if (declaration.ConditionalGoal is null)
+        {
+            throw new InvalidDataException(
+                $"{declaration.SourcePath}: duplicate declaration {declaration.Id} is not conditional."
+            );
+        }
+
+        var engine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
+        string condition = LogtalkTestAdapter.TranslateConditionalGoal(declaration.ConditionalGoal);
+        RunResult result = engine.RunGoal(condition, out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics);
+        if (diagnostics.Count > 0)
+        {
+            throw new InvalidDataException(
+                $"{declaration.SourcePath}: conditional for {declaration.Id} did not compile: "
+                    + string.Join("; ", diagnostics)
+            );
+        }
+
+        return result == RunResult.Success;
+    }
+
+    private static LogtalkTestDeclaration[] SelectCasesToExecute(
+        LogtalkTestDeclaration[] directCases,
+        string? selectedId
+    )
+    {
+        if (selectedId is null)
+        {
+            return directCases;
+        }
+
+        LogtalkTestDeclaration[] selected = [.. directCases.Where(test => test.Id == selectedId)];
+        Assert.Single(selected);
+
+        LogtalkTestDeclaration target = selected[0];
+        LogtalkTestDeclaration[] sourceCases = [.. directCases.Where(test => test.SourcePath == target.SourcePath)];
+        int targetIndex = Array.IndexOf(sourceCases, target);
+        return sourceCases[..(targetIndex + 1)];
+    }
+
+    private static bool TryGetSourceEngine(
+        LogtalkTestDeclaration test,
+        string supportProgram,
+        Dictionary<string, PrologEngine> engines,
+        out PrologEngine engine,
+        out string failure
+    )
+    {
+        if (engines.TryGetValue(test.SourcePath, out engine!))
+        {
+            failure = string.Empty;
+            return true;
+        }
+
+        engine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
+        if (supportProgram.Length > 0)
+        {
+            LoadResult loaded = engine.ConsultText(supportProgram, test.SourcePath);
+            if (!loaded.Success)
+            {
+                failure = $"support program did not compile: {string.Join("; ", loaded.Diagnostics)}";
+                return false;
+            }
+
+            engine.RunPendingGoals();
+        }
+
+        engines.Add(test.SourcePath, engine);
+        failure = string.Empty;
+        return true;
     }
 
     private static async Task WriteReportAsync(
@@ -273,7 +387,7 @@ public sealed class LogtalkConformanceTests
         await File.WriteAllTextAsync(path, json, TestContext.Current.CancellationToken);
     }
 
-    private static bool Execute(LogtalkTestDeclaration test, string supportProgram, out string failure)
+    private static bool Execute(LogtalkTestDeclaration test, PrologEngine engine, out string failure)
     {
         if (!LogtalkTestAdapter.TryUnwrapBackendGoal(test, out string goal))
         {
@@ -291,22 +405,8 @@ public sealed class LogtalkConformanceTests
             _ => throw new InvalidOperationException($"Unsupported direct expectation: {test.Outcome}"),
         };
 
-        var engine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
-
         try
         {
-            if (supportProgram.Length > 0)
-            {
-                LoadResult loaded = engine.ConsultText(supportProgram, test.SourcePath);
-                if (!loaded.Success)
-                {
-                    failure = $"support program did not compile: {string.Join("; ", loaded.Diagnostics)}";
-                    return false;
-                }
-
-                engine.RunPendingGoals();
-            }
-
             RunResult result = engine.RunGoal(assertion, out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics);
             if (diagnostics.Count > 0)
             {

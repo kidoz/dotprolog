@@ -10,10 +10,50 @@ internal static class LogtalkTestAdapter
     internal static IReadOnlyList<LogtalkTestDeclaration> ReadDeclarations(string source, string relativePath)
     {
         var declarations = new List<LogtalkTestDeclaration>();
+        var conditionals = new List<ConditionalFrame>();
 
         foreach (string clause in SplitClauses(source))
         {
             string text = TrimLeadingTrivia(clause);
+            if (TryReadDirectiveArgument(text, "if", out string condition))
+            {
+                conditionals.Add(new ConditionalFrame(condition));
+                continue;
+            }
+
+            if (TryReadDirectiveArgument(text, "elif", out condition))
+            {
+                if (conditionals.Count == 0)
+                {
+                    throw new InvalidDataException($"{relativePath}: elif directive has no matching if directive.");
+                }
+
+                conditionals[^1].BeginAlternative(condition);
+                continue;
+            }
+
+            if (text == ":- else.")
+            {
+                if (conditionals.Count == 0)
+                {
+                    throw new InvalidDataException($"{relativePath}: else directive has no matching if directive.");
+                }
+
+                conditionals[^1].BeginElse();
+                continue;
+            }
+
+            if (text == ":- endif.")
+            {
+                if (conditionals.Count == 0)
+                {
+                    throw new InvalidDataException($"{relativePath}: endif directive has no matching if directive.");
+                }
+
+                conditionals.RemoveAt(conditionals.Count - 1);
+                continue;
+            }
+
             bool disabled = text.StartsWith("- test(iso", StringComparison.Ordinal);
             int testStart =
                 disabled ? 2
@@ -71,9 +111,15 @@ internal static class LogtalkTestAdapter
                     arguments.Count >= 2 ? arguments[1] : "true",
                     arguments.Count == 3 ? arguments[2] : null,
                     body,
-                    disabled
+                    disabled,
+                    ConditionalGoal(conditionals)
                 )
             );
+        }
+
+        if (conditionals.Count != 0)
+        {
+            throw new InvalidDataException($"{relativePath}: conditional directive has no matching endif directive.");
         }
 
         return declarations;
@@ -86,7 +132,7 @@ internal static class LogtalkTestAdapter
     internal static bool TryReadSupportProgram(string source, out string program)
     {
         var support = new List<string>();
-        bool conditional = false;
+        int conditionalDepth = 0;
 
         foreach (string clause in SplitClauses(source))
         {
@@ -112,14 +158,26 @@ internal static class LogtalkTestAdapter
                 continue;
             }
 
-            if (
-                text.StartsWith(":- if", StringComparison.Ordinal)
-                || text.StartsWith(":- elif", StringComparison.Ordinal)
-                || text.StartsWith(":- else", StringComparison.Ordinal)
-                || text.StartsWith(":- endif", StringComparison.Ordinal)
-            )
+            if (text.StartsWith(":- if", StringComparison.Ordinal))
             {
-                conditional = true;
+                conditionalDepth++;
+                continue;
+            }
+
+            if (text.StartsWith(":- elif", StringComparison.Ordinal) || text.StartsWith(":- else", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (text.StartsWith(":- endif", StringComparison.Ordinal))
+            {
+                conditionalDepth--;
+                if (conditionalDepth < 0)
+                {
+                    program = string.Empty;
+                    return false;
+                }
+
                 continue;
             }
 
@@ -134,12 +192,19 @@ internal static class LogtalkTestAdapter
 
             if (text.StartsWith(":- dynamic", StringComparison.Ordinal))
             {
+                if (conditionalDepth > 0)
+                {
+                    program = string.Empty;
+                    return false;
+                }
+
                 support.Add(text);
                 continue;
             }
 
             if (
-                text.StartsWith(":-", StringComparison.Ordinal)
+                conditionalDepth > 0
+                || text.StartsWith(":-", StringComparison.Ordinal)
                 || text.Contains("^^", StringComparison.Ordinal)
                 || text.Contains("::", StringComparison.Ordinal)
                 || !TryTranslateSupportClause(text, out string translated)
@@ -152,9 +217,7 @@ internal static class LogtalkTestAdapter
             support.Add(translated);
         }
 
-        // Selecting a backend branch requires evaluating Logtalk flags. Files without helper
-        // clauses remain safe because their enabled test declaration is already explicit.
-        if (conditional && support.Count > 0)
+        if (conditionalDepth != 0)
         {
             program = string.Empty;
             return false;
@@ -168,7 +231,48 @@ internal static class LogtalkTestAdapter
     /// Unwraps one or more conjoined Logtalk backend escapes, leaving each Prolog goal unchanged.
     /// </summary>
     internal static bool TryUnwrapBackendGoal(LogtalkTestDeclaration declaration, out string goal) =>
-        TryUnwrapBackendBody(declaration.Body, out goal);
+        TryUnwrapBackendBody(declaration.Body, out goal) || TryUnwrapFindallBackendGoal(declaration.Body, out goal);
+
+    private static bool TryUnwrapFindallBackendGoal(string source, out string goal)
+    {
+        string body = source.Trim();
+        const string prefix = "findall(";
+        if (
+            !body.StartsWith(prefix, StringComparison.Ordinal)
+            || !body.EndsWith(')')
+            || !OuterParenthesesEndAt(body, prefix.Length - 1)
+        )
+        {
+            goal = string.Empty;
+            return false;
+        }
+
+        List<string> arguments = SplitTopLevel(body[prefix.Length..^1], ',');
+        if (arguments.Count != 3 || !TryUnwrapBackendBody(arguments[1], out string generator))
+        {
+            goal = string.Empty;
+            return false;
+        }
+
+        goal = $"findall({arguments[0]}, ({generator}), {arguments[2]})";
+        return true;
+    }
+
+    private static bool OuterParenthesesEndAt(string source, int opening)
+    {
+        var state = new ScanState();
+
+        for (int index = opening; index < source.Length; index++)
+        {
+            Advance(source, ref index, state);
+            if (index > opening && state.Parentheses == 0)
+            {
+                return index == source.Length - 1;
+            }
+        }
+
+        return false;
+    }
 
     private static bool TryTranslateSupportClause(string clause, out string translated)
     {
@@ -266,6 +370,13 @@ internal static class LogtalkTestAdapter
         return $"(({difference} < 0.0000000001) -> true ; ({difference} < (0.00001 * max(abs({left}), abs({right})))))";
     }
 
+    /// <summary>
+    /// Translates Logtalk's backend escape braces inside a conditional directive to ordinary Prolog
+    /// grouping. The pinned corpus uses these braces only to ask the backend about a capability.
+    /// </summary>
+    internal static string TranslateConditionalGoal(string condition) =>
+        condition.Replace('{', '(').Replace('}', ')');
+
     /// <summary>Finds the comma separating two opaque expectation arguments.</summary>
     internal static int FindArgumentSeparator(string arguments) => FindTopLevel(arguments, ",");
 
@@ -290,6 +401,31 @@ internal static class LogtalkTestAdapter
         }
 
         return clauses;
+    }
+
+    private static bool TryReadDirectiveArgument(string directive, string name, out string argument)
+    {
+        string prefix = $":- {name}(";
+        if (!directive.StartsWith(prefix, StringComparison.Ordinal) || !directive.EndsWith(").", StringComparison.Ordinal))
+        {
+            argument = string.Empty;
+            return false;
+        }
+
+        argument = directive[prefix.Length..^2].Trim();
+        return argument.Length > 0;
+    }
+
+    private static string? ConditionalGoal(List<ConditionalFrame> conditionals)
+    {
+        if (conditionals.Count == 0)
+        {
+            return null;
+        }
+
+        return conditionals.Count == 1
+            ? conditionals[0].Goal
+            : string.Join(", ", conditionals.Select(frame => $"({frame.Goal})"));
     }
 
     private static int FindTopLevel(string source, string token)
@@ -527,5 +663,48 @@ internal static class LogtalkTestAdapter
         internal bool BlockComment { get; set; }
 
         internal bool IsTopLevel => Parentheses == 0 && Brackets == 0 && Braces == 0;
+    }
+
+    private sealed class ConditionalFrame(string firstCondition)
+    {
+        private readonly List<string> _previous = [];
+        private string? _current = firstCondition;
+
+        internal string Goal
+        {
+            get
+            {
+                if (_current is null)
+                {
+                    return $"\\+ ({string.Join(" ; ", _previous)})";
+                }
+
+                return _previous.Count == 0
+                    ? _current
+                    : $"\\+ ({string.Join(" ; ", _previous)}), ({_current})";
+            }
+        }
+
+        internal void BeginAlternative(string condition)
+        {
+            if (_current is null)
+            {
+                throw new InvalidDataException("An elif directive cannot follow an else directive.");
+            }
+
+            _previous.Add(_current);
+            _current = condition;
+        }
+
+        internal void BeginElse()
+        {
+            if (_current is null)
+            {
+                throw new InvalidDataException("A conditional directive cannot contain more than one else branch.");
+            }
+
+            _previous.Add(_current);
+            _current = null;
+        }
     }
 }

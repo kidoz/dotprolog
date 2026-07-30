@@ -7,7 +7,8 @@ internal sealed record LogtalkTestDeclaration(
     string Outcome,
     string? Options,
     string Body,
-    bool Disabled
+    bool Disabled,
+    string? ConditionalGoal
 )
 {
     /// <summary>The lgtunit expectation functor, or <c>true</c> for a one-argument declaration.</summary>
