@@ -402,13 +402,20 @@ internal static class LogtalkTestAdapter
 
             int functorStart = current;
             bool dispatchedAssertion = source.AsSpan(current).StartsWith("^^assertion(", StringComparison.Ordinal);
-            if (source.AsSpan(current).StartsWith("^^", StringComparison.Ordinal) && !dispatchedAssertion)
+            bool dispatchedTextInput = source
+                .AsSpan(current)
+                .StartsWith("^^set_text_input(", StringComparison.Ordinal);
+            if (
+                source.AsSpan(current).StartsWith("^^", StringComparison.Ordinal)
+                && !dispatchedAssertion
+                && !dispatchedTextInput
+            )
             {
                 translated = string.Empty;
                 return false;
             }
 
-            if (dispatchedAssertion)
+            if (dispatchedAssertion || dispatchedTextInput)
             {
                 functorStart += 2;
             }
@@ -416,6 +423,7 @@ internal static class LogtalkTestAdapter
             string? functor =
                 IsFunctorCallAt(source, functorStart, "assertion") ? "assertion"
                 : IsFunctorCallAt(source, functorStart, "variant") ? "variant"
+                : IsFunctorCallAt(source, functorStart, "set_text_input") ? "set_text_input"
                 : null;
             if (functor is null)
             {
@@ -442,7 +450,7 @@ internal static class LogtalkTestAdapter
 
                 replacement = $"({assertion})";
             }
-            else
+            else if (functor == "variant")
             {
                 List<string> variantArguments = SplitTopLevel(arguments, ',');
                 if (variantArguments.Count != 2)
@@ -455,6 +463,10 @@ internal static class LogtalkTestAdapter
                 string right = variantArguments[1];
                 replacement =
                     $"(subsumes_term(({left}), ({right})), subsumes_term(({right}), ({left})))";
+            }
+            else
+            {
+                replacement = $"'$logtalk_set_text_input'({arguments})";
             }
 
             result.Append(source, copyStart, current - copyStart);

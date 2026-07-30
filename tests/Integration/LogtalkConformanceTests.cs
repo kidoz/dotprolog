@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using DotProlog.Compiler;
 using DotProlog.Runtime;
@@ -186,6 +187,16 @@ public sealed class LogtalkConformanceTests
         );
         Assert.False(LogtalkTestAdapter.TryUnwrapBackendGoal(unrelatedDispatch, out _));
 
+        var textInputEngine = CreateAdapterEngine();
+        Assert.Equal(
+            RunResult.Success,
+            textInputEngine.RunGoal(
+                "'$logtalk_set_text_input'(['a. ', 'b.']), read(A), read(B), A == a, B == b",
+                out IReadOnlyList<DotProlog.Syntax.Diagnostic> textInputDiagnostics
+            )
+        );
+        Assert.Empty(textInputDiagnostics);
+
         var adapterEngine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
         var errors = new LogtalkTestDeclaration(
             "fixture.lgt",
@@ -329,11 +340,11 @@ public sealed class LogtalkConformanceTests
                 ),
             ];
 
-            Assert.Equal(626, directCases.Length);
-            Assert.Equal(343, directCases.Count(test => test.OutcomeKind == "true"));
+            Assert.Equal(681, directCases.Length);
+            Assert.Equal(393, directCases.Count(test => test.OutcomeKind == "true"));
             Assert.Equal(73, directCases.Count(test => test.OutcomeKind == "false"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "fail"));
-            Assert.Equal(134, directCases.Count(test => test.OutcomeKind == "error"));
+            Assert.Equal(139, directCases.Count(test => test.OutcomeKind == "error"));
             Assert.Equal(13, directCases.Count(test => test.OutcomeKind == "variant"));
             Assert.Equal(41, directCases.Count(test => test.OutcomeKind == "exists"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "subsumes"));
@@ -439,7 +450,7 @@ public sealed class LogtalkConformanceTests
             return true;
         }
 
-        engine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
+        engine = CreateAdapterEngine();
         if (supportProgram.Length > 0)
         {
             LoadResult loaded = engine.ConsultText(supportProgram, test.SourcePath);
@@ -454,6 +465,49 @@ public sealed class LogtalkConformanceTests
 
         engines.Add(test.SourcePath, engine);
         failure = string.Empty;
+        return true;
+    }
+
+    private static PrologEngine CreateAdapterEngine()
+    {
+        var engine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
+        engine.Program.Builtins.Register("$logtalk_set_text_input", 1, SetTextInput);
+        return engine;
+    }
+
+    private static bool SetTextInput(Machine machine)
+    {
+        var input = new StringBuilder();
+        Cell item = machine.Argument(0);
+
+        if (item.Tag == CellTag.Atom)
+        {
+            input.Append(machine.Symbols.AtomName(item.Index));
+        }
+        else
+        {
+            while (
+                item.Tag == CellTag.Structure
+                && machine.HeapAt(item.Index).Index == machine.Symbols.ListFunctor
+            )
+            {
+                Cell head = machine.Dereference(machine.HeapAt(item.Index + 1));
+                if (head.Tag != CellTag.Atom)
+                {
+                    return false;
+                }
+
+                input.Append(machine.Symbols.AtomName(head.Index));
+                item = machine.Dereference(machine.HeapAt(item.Index + 2));
+            }
+
+            if (item.Tag != CellTag.Atom || item.Index != machine.Symbols.EmptyList)
+            {
+                return false;
+            }
+        }
+
+        machine.Input = new StringReader(input.ToString());
         return true;
     }
 
