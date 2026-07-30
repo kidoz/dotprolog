@@ -34,7 +34,49 @@ All notable changes to DotProlog are recorded here. The format follows
 - Arithmetic now enforces ISO operand signatures, float division result types, bounded-overflow
   errors, and the distinct exceptional cases for zero division, undefined results, and float
   overflow.
-- The repository's ISO-derived conformance corpus now contains 549 passing cases.
+- The repository's ISO-derived conformance corpus now contains 563 passing cases.
+- Integration tests no longer tolerate the zero-tests-ran exit code, child-process output reads
+  share the process deadline instead of waiting on a held pipe forever, and a failing release
+  verify platform no longer cancels its siblings.
+
+### Fixed
+
+- The machine protected new environment frames only against the newest choice point, so a frame
+  deallocated by last-call optimisation could be overwritten while an older choice point still
+  referenced it. Solutions were silently dropped — `forall/2` with a compound action and
+  `findall/3` over goals with in-clause disjunction or negation were the visible cases — and an
+  uncaught exception could vanish while backtracking through `catch/3`. The protection watermark
+  is now monotone up the choice-point stack.
+- `retract/1` and `clause/2` re-read the database generation on every redo, letting clauses
+  asserted after the goal started appear mid-enumeration. Both now keep the generation captured at
+  the first solution and resume from a stable clause cursor, so `asserta/1` between solutions can
+  no longer shift or repeat answers.
+- Copying a cyclic term — through `copy_term/2`, `findall/3`, `assertz/1`, or `throw/1` — looped
+  forever. It now raises catchable `representation_error(cyclic_term)`, and the term writer prints
+  cycles as `...` instead of hanging.
+- Every meta-call of a control term compiled a fresh clause into the append-only program. Compiled
+  control goals are now cached by shape, so long-running loops no longer grow memory without bound.
+- Integer division by zero always raises `evaluation_error(zero_divisor)`; only float `0.0/0.0`
+  remains `undefined`.
+- `atom_chars/2`, `atom_codes/2`, `number_chars/2`, and `number_codes/2` with a bound first
+  argument now convert it and unify with the list instead of raising `instantiation_error`.
+- Number conversion no longer lets oversized float literals become IEEE infinities or wraps
+  oversized radix literals; out-of-range input raises the reader's `syntax_error(float_overflow)`
+  and `representation_error(max_integer|min_integer)`.
+- `format/3` accepts real stream handles and aliases, and `format(user_error, ...)` writes to the
+  error stream instead of the current output.
+- `phrase/2,3` treated a run-time if-then-else as a plain disjunction and offered the else branch
+  as an extra solution.
+- `writeq/1` emits the named ISO escapes and delimited hex escapes for control characters, so its
+  output always reads back.
+- The build task deletes generated facades whose contract was removed or renamed, `dotnet clean`
+  removes the generated directory, and facade generation reruns when the project file or the set
+  of source files changes — not only when a surviving file's timestamp moves.
+- Contract mistakes that previously escaped into raw C# compiler errors — or crashed the build
+  task — are reported as `DPL2011`–`DPL2014` diagnostics, and a `nondet` export with no outputs
+  streams one unit value per solution as ADR 0006 promises.
+- Prolog test projects honour run filters, capture `user_error` into failure reports, and fail a
+  looping test after a configurable per-test timeout instead of hanging `dotnet test`.
 
 ## [0.1.0] — 2026-07-27
 
