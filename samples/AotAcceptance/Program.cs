@@ -51,6 +51,9 @@ internal static class Program
         string script = $$"""
             :- initialization(main).
 
+            native_noncallable_body :- 4.
+            native_unreached_noncallable_body :- fail, 4.
+
             main :-
                 greeting(G), write(G), nl,
 
@@ -102,6 +105,15 @@ internal static class Program
                 !,
                 retractall(native_repeat_count(_)),
                 write(repeat_control), nl,
+
+                % Compiled non-callable bodies raise at execution and remain catchable.
+                catch(
+                    native_noncallable_body,
+                    error(type_error(callable, 4), _),
+                    NonCallableCaught = true),
+                NonCallableCaught == true,
+                \+ native_unreached_noncallable_body,
+                write(compiled_goal_errors), nl,
 
                 % Predicate enumeration uses explicit program metadata, never reflection.
                 assertz(inspected(value)),
