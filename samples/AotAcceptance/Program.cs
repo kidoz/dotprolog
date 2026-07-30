@@ -56,6 +56,7 @@ internal static class Program
             native_unreached_noncallable_body :- fail, 4.
             native_quoted_fact(left 'native_quoted' right).
             native_escape('\x41\').
+            native_backquoted(`native`).
 
             main :-
                 greeting(G), write(G), nl,
@@ -177,13 +178,16 @@ internal static class Program
                 set_prolog_flag(char_conversion, on),
                 atom_codes(ConvertedSource, [102, 105, 122, 122]),
                 read_term_from_atom(ConvertedSource, fixx, []),
-                char_code(SingleQuote, 39), char_code(DoubleQuote, 34),
+                char_code(SingleQuote, 39), char_code(DoubleQuote, 34), char_code(Backquote, 96),
                 char_conversion(SingleQuote, x), char_conversion(DoubleQuote, x),
+                char_conversion(Backquote, x),
                 atom_codes(QuotedSource, [39, 122, 39]),
                 read_term_from_atom(QuotedSource, z, []),
                 set_prolog_flag(double_quotes, atom),
                 atom_codes(DoubleQuotedSource, [34, 122, 34]),
                 read_term_from_atom(DoubleQuotedSource, z, []),
+                atom_codes(BackquotedSource, [96, 122, 96]),
+                read_term_from_atom(BackquotedSource, z, []),
                 set_prolog_flag(double_quotes, codes),
                 char_conversion(a, x),
                 atom_codes(CharacterCodeSource, [48, 39, 97]),
@@ -192,6 +196,7 @@ internal static class Program
                 char_conversion(z, z), \+ current_char_conversion(z, _),
                 char_conversion(SingleQuote, SingleQuote),
                 char_conversion(DoubleQuote, DoubleQuote),
+                char_conversion(Backquote, Backquote),
                 char_conversion(a, a),
                 write(character_conversion), nl,
 
@@ -202,6 +207,19 @@ internal static class Program
                 atom_codes(NativeEscapedSource, [39, 92, 120, 52, 49, 92, 39]),
                 read_term_from_atom(NativeEscapedSource, 'A', []),
                 write(numeric_escape_syntax), nl,
+
+                % ISO backquoted names and quoted control-character rules remain catchable.
+                native_backquoted(native),
+                atom_codes(BackquotedDeleteSource, [96, 92, 100, 96]),
+                read_term_from_atom(BackquotedDeleteSource, DeleteAtom, []),
+                atom_codes(DeleteAtom, [127]),
+                atom_codes(RawQuotedLayoutSource, [96, 114, 97, 119, 9, 108, 97, 121, 111, 117, 116, 96]),
+                catch(
+                    read_term_from_atom(RawQuotedLayoutSource, _, []),
+                    error(syntax_error('DPL0011'), _),
+                    RawQuotedLayoutCaught = true),
+                RawQuotedLayoutCaught == true,
+                write(quoted_token_syntax), nl,
 
                 % ISO read options retain source order, sharing, and named-singleton identity.
                 read_term_from_atom('f(A,B,A,_C,_)', ReadOptionsTerm,
