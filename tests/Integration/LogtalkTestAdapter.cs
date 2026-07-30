@@ -753,7 +753,14 @@ internal static class LogtalkTestAdapter
     /// grouping. The pinned corpus uses these braces only to ask the backend about a capability.
     /// </summary>
     internal static string TranslateConditionalGoal(string condition) =>
-        condition.Replace('{', '(').Replace('}', ')');
+        condition
+            .Replace('{', '(')
+            .Replace('}', ')')
+            .Replace(
+                "os::operating_system_type(windows)",
+                "'$logtalk_is_windows'",
+                StringComparison.Ordinal
+            );
 
     /// <summary>Wraps each accepted lgtunit error term in the ISO <c>error/2</c> ball shape.</summary>
     internal static string TranslateErrorAlternatives(string errors)

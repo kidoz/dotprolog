@@ -133,6 +133,12 @@ public sealed class LogtalkConformanceTests
             LogtalkTestAdapter.TranslateConditionalGoal(conditional[0].ConditionalGoal!)
         );
         Assert.Equal(
+            "(current_logtalk_flag(prolog_dialect, Dialect), '$logtalk_is_windows')",
+            LogtalkTestAdapter.TranslateConditionalGoal(
+                "(current_logtalk_flag(prolog_dialect, Dialect), os::operating_system_type(windows))"
+            )
+        );
+        Assert.Equal(
             "[error((type_error(callable, 1)), _), error((type_error(callable, ':'(user, 1))), _)]",
             LogtalkTestAdapter.TranslateErrorAlternatives(
                 "[type_error(callable, 1), type_error(callable, ':'(user, 1))]"
@@ -357,6 +363,24 @@ public sealed class LogtalkConformanceTests
                     .Where(group => group.Count() > 1)
                     .Select(group => group.Key),
             ];
+            HashSet<LogtalkTestDeclaration> applicableConditionalCases =
+            [
+                .. declarations.Where(test =>
+                    !test.Disabled
+                    && conditionalAlternates.Contains((test.SourcePath, test.Id))
+                    && IsApplicableConditionalBranch(test)
+                ),
+            ];
+            HashSet<LogtalkTestDeclaration> nonApplicableCases =
+            [
+                .. declarations.Where(test =>
+                    !test.Disabled
+                    && conditionalAlternates.Contains((test.SourcePath, test.Id))
+                    && !applicableConditionalCases.Contains(test)
+                ),
+            ];
+            Assert.Equal(5, nonApplicableCases.Count);
+
             LogtalkTestDeclaration[] directCases =
             [
                 .. declarations.Where(test =>
@@ -376,16 +400,16 @@ public sealed class LogtalkConformanceTests
                     && LogtalkTestAdapter.TryUnwrapBackendGoal(test, out _)
                     && (
                         !conditionalAlternates.Contains((test.SourcePath, test.Id))
-                        || IsApplicableConditionalBranch(test)
+                        || applicableConditionalCases.Contains(test)
                     )
                 ),
             ];
 
-            Assert.Equal(734, directCases.Length);
-            Assert.Equal(434, directCases.Count(test => test.OutcomeKind == "true"));
+            Assert.Equal(736, directCases.Length);
+            Assert.Equal(435, directCases.Count(test => test.OutcomeKind == "true"));
             Assert.Equal(73, directCases.Count(test => test.OutcomeKind == "false"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "fail"));
-            Assert.Equal(148, directCases.Count(test => test.OutcomeKind == "error"));
+            Assert.Equal(149, directCases.Count(test => test.OutcomeKind == "error"));
             Assert.Equal(13, directCases.Count(test => test.OutcomeKind == "variant"));
             Assert.Equal(41, directCases.Count(test => test.OutcomeKind == "exists"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "subsumes"));
@@ -419,7 +443,13 @@ public sealed class LogtalkConformanceTests
             if (reportPath is not null)
             {
                 Assert.Null(selectedId);
-                await WriteReportAsync(reportPath, declarations, directCases, executionResults);
+                await WriteReportAsync(
+                    reportPath,
+                    declarations,
+                    directCases,
+                    nonApplicableCases,
+                    executionResults
+                );
             }
 
             Assert.True(failures.Count == 0, $"Independent ISO cases failed:\n{string.Join('\n', failures)}");
@@ -440,6 +470,12 @@ public sealed class LogtalkConformanceTests
         }
 
         var engine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
+        engine.Program.Builtins.Register("current_logtalk_flag", 2, CurrentLogtalkFlag);
+        engine.Program.Builtins.Register(
+            "$logtalk_is_windows",
+            0,
+            static _ => OperatingSystem.IsWindows()
+        );
         string condition = LogtalkTestAdapter.TranslateConditionalGoal(declaration.ConditionalGoal);
         try
         {
@@ -456,6 +492,23 @@ public sealed class LogtalkConformanceTests
             // A Logtalk flag or other wrapper-only condition cannot select a backend branch.
             return false;
         }
+    }
+
+    private static bool CurrentLogtalkFlag(Machine machine)
+    {
+        Cell flag = machine.Argument(0);
+        if (
+            flag.Tag != CellTag.Atom
+            || machine.Symbols.AtomName(flag.Index) != "prolog_dialect"
+        )
+        {
+            return false;
+        }
+
+        return machine.Unify(
+            machine.Argument(1),
+            Cell.Atom(machine.Symbols.InternAtom("dotprolog"))
+        );
     }
 
     private static LogtalkTestDeclaration[] SelectCasesToExecute(
@@ -758,6 +811,7 @@ public sealed class LogtalkConformanceTests
         string path,
         LogtalkTestDeclaration[] declarations,
         LogtalkTestDeclaration[] directCases,
+        HashSet<LogtalkTestDeclaration> nonApplicableCases,
         Dictionary<LogtalkTestDeclaration, string> executionResults
     )
     {
@@ -776,10 +830,16 @@ public sealed class LogtalkConformanceTests
             {
                 total = declarations.Length,
                 enabled = declarations.Count(test => !test.Disabled),
+                applicable = declarations.Count(test => !test.Disabled && !nonApplicableCases.Contains(test)),
                 disabled = declarations.Count(test => test.Disabled),
+                not_applicable = nonApplicableCases.Count,
                 passed = executionResults.Count(result => result.Value == "passed"),
                 failed = executionResults.Count(result => result.Value.StartsWith("failed:", StringComparison.Ordinal)),
-                unsupported = declarations.Count(test => !test.Disabled && !directCases.Contains(test)),
+                unsupported = declarations.Count(test =>
+                    !test.Disabled
+                    && !nonApplicableCases.Contains(test)
+                    && !directCases.Contains(test)
+                ),
             },
             cases = declarations.Select(test => new
             {
@@ -787,6 +847,7 @@ public sealed class LogtalkConformanceTests
                 id = test.Id,
                 expectation = test.Outcome,
                 status = test.Disabled ? "upstream-disabled"
+                : nonApplicableCases.Contains(test) ? "not-applicable"
                 : executionResults.TryGetValue(test, out string? result) ? result
                 : "unsupported",
             }),
