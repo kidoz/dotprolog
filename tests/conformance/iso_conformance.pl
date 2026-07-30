@@ -424,6 +424,26 @@ iso_case('7.1.2', reads_as('0o17', 15), success).
 iso_case('7.1.2', reads_as('0b101', 5), success).
 iso_case('7.1.2', reads_as('1.0', 1.0), success).
 iso_case('7.1.2', reads_as('1.0e2', 100.0), success).
+iso_case(
+    '6.4.2',
+    (atom_codes(HexQuotedSource, [39, 92, 120, 52, 49, 92, 39]), reads_as(HexQuotedSource, 'A')),
+    success
+).
+iso_case(
+    '6.4.2',
+    (atom_codes(OctalStringSource, [34, 92, 111, 49, 48, 49, 92, 34]), reads_as(OctalStringSource, [65])),
+    success
+).
+iso_case(
+    '6.4.4',
+    (atom_codes(HexCharacterCodeSource, [48, 39, 92, 120, 52, 49, 92]), reads_as(HexCharacterCodeSource, 65)),
+    success
+).
+iso_case(
+    '6.4.4',
+    (atom_codes(OctalCharacterCodeSource, [48, 39, 92, 111, 49, 48, 49, 92]), reads_as(OctalCharacterCodeSource, 65)),
+    success
+).
 iso_case('7.1.4', reads_as('f(a, b)', f(a, b)), success).
 iso_case('7.1.6', reads_as('[a, b]', [a, b]), success).
 iso_case('7.1.6', reads_as('[a|b]', [a|b]), success).

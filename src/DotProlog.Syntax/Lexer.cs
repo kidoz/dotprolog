@@ -478,33 +478,63 @@ internal sealed class Lexer
             case '\n':
                 return;
             case 'x':
-            {
-                int digitsStart = _position;
-                while (_position < _text.Length && char.IsAsciiHexDigit(_text[_position]))
-                {
-                    Advance();
-                }
-
-                if (_position == digitsStart)
-                {
-                    Report(DiagnosticIds.InvalidEscape, "Expected hexadecimal digits after '\\x'.", SpanFrom(start));
-                    return;
-                }
-
-                builder.Append((char)Convert.ToInt32(_text[digitsStart.._position], 16));
-                if (_position < _text.Length && _text[_position] == '\\')
-                {
-                    Advance();
-                }
-
+                ReadNumericEscape(builder, start, radix: 16, "hexadecimal");
                 return;
-            }
+            case 'o':
+                ReadNumericEscape(builder, start, radix: 8, "octal");
+                return;
 
             default:
                 Report(DiagnosticIds.InvalidEscape, $"Unrecognised escape sequence '\\{c}'.", SpanFrom(start));
                 return;
         }
     }
+
+    private void ReadNumericEscape(StringBuilder builder, int start, int radix, string description)
+    {
+        int digitsStart = _position;
+        int value = 0;
+        bool overflow = false;
+        while (_position < _text.Length && IsEscapeDigit(_text[_position], radix))
+        {
+            int digit = EscapeDigitValue(_text[_position]);
+            if (value > (char.MaxValue - digit) / radix)
+            {
+                overflow = true;
+            }
+            else if (!overflow)
+            {
+                value = (value * radix) + digit;
+            }
+
+            Advance();
+        }
+
+        if (_position == digitsStart)
+        {
+            Report(DiagnosticIds.InvalidEscape, $"Expected {description} digits in numeric escape.", SpanFrom(start));
+            return;
+        }
+
+        if (_position >= _text.Length || _text[_position] != '\\')
+        {
+            Report(DiagnosticIds.InvalidEscape, "Expected '\\' to terminate numeric escape.", SpanFrom(start));
+            return;
+        }
+
+        Advance();
+        if (overflow)
+        {
+            Report(DiagnosticIds.InvalidEscape, "Numeric escape exceeds the supported character range.", SpanFrom(start));
+            return;
+        }
+
+        builder.Append((char)value);
+    }
+
+    private static bool IsEscapeDigit(char c, int radix) => radix == 16 ? char.IsAsciiHexDigit(c) : c is >= '0' and <= '7';
+
+    private static int EscapeDigitValue(char c) => char.IsAsciiDigit(c) ? c - '0' : char.ToLowerInvariant(c) - 'a' + 10;
 
     private SourceSpan SpanFrom(int start) => new(start, Math.Max(1, _position - start), _line, start - _lineStart + 1);
 

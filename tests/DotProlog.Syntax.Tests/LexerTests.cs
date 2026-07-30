@@ -63,6 +63,41 @@ public sealed class LexerTests
     }
 
     [Theory]
+    [InlineData(@"'\x41\'", false)]
+    [InlineData(@"""\o101\""", true)]
+    public void ReadsIsoNumericEscapes(string text, bool stringToken)
+    {
+        List<Token> tokens = Tokenize(text, out List<Diagnostic> diagnostics);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(stringToken ? TokenKind.String : TokenKind.Atom, tokens[0].Kind);
+        Assert.Equal("A", tokens[0].Text);
+    }
+
+    [Theory]
+    [InlineData(@"0'\x41\")]
+    [InlineData(@"0'\o101\")]
+    public void ReadsIsoNumericEscapesInCharacterCodeLiterals(string text)
+    {
+        List<Token> tokens = Tokenize(text, out List<Diagnostic> diagnostics);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(TokenKind.Integer, tokens[0].Kind);
+        Assert.Equal(65, tokens[0].Integer);
+    }
+
+    [Theory]
+    [InlineData(@"'\x41'")]
+    [InlineData(@"'\o101'")]
+    [InlineData(@"'\x10000\'")]
+    public void RejectsMalformedIsoNumericEscapes(string text)
+    {
+        Tokenize(text, out List<Diagnostic> diagnostics);
+
+        Assert.Equal(DiagnosticIds.InvalidEscape, Assert.Single(diagnostics).Id);
+    }
+
+    [Theory]
     [InlineData("42", 42L)]
     [InlineData("0xff", 255L)]
     [InlineData("0o17", 15L)]
