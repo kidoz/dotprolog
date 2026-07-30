@@ -21,7 +21,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
-      fail-fast: true
+      # One platform's flake must not cancel its siblings mid-run; a cancelled hung job is what
+      # left the 0.1.0 release without native binaries.
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
