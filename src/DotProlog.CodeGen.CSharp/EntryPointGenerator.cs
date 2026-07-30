@@ -49,7 +49,14 @@ public static class EntryPointGenerator
         text.AppendLine();
         text.AppendLine("    private static global::DotProlog.Compiler.PrologEngine CreateEngine()");
         text.AppendLine("    {");
-        text.AppendLine("        var engine = new global::DotProlog.Compiler.PrologEngine();");
+        text.AppendLine("        // Muted while loading: directive output belongs to no single test, and during");
+        text.AppendLine("        // discovery it would repeat once per scan. The runner attaches per-test writers.");
+        text.AppendLine("        var engine = new global::DotProlog.Compiler.PrologEngine");
+        text.AppendLine("        {");
+        text.AppendLine("            Output = global::System.IO.TextWriter.Null,");
+        text.AppendLine("            Error = global::System.IO.TextWriter.Null,");
+        text.AppendLine("            Input = global::System.IO.TextReader.Null,");
+        text.AppendLine("        };");
         text.AppendLine("        int[] initialization = __CompiledTests.Install(engine);");
         text.AppendLine("        foreach (int target in initialization)");
         text.AppendLine("        {");
@@ -142,7 +149,4 @@ public static class EntryPointGenerator
 
         return text.ToString();
     }
-
-    private static string Literal(string value) =>
-        $"\"{value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal).Replace("\r", "\\r", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal)}\"";
 }

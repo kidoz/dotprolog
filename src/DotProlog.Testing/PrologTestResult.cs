@@ -4,11 +4,12 @@ namespace DotProlog.Testing;
 /// <param name="Succeeded">Whether the predicate was proved.</param>
 /// <param name="Message">Why it failed, or <see langword="null"/> when it passed.</param>
 /// <param name="Output">Anything the test wrote, which is reported alongside a failure.</param>
-public sealed record PrologTestResult(bool Succeeded, string? Message, string Output)
+/// <param name="Error">Anything the test wrote to <c>user_error</c>, reported the same way.</param>
+public sealed record PrologTestResult(bool Succeeded, string? Message, string Output, string Error)
 {
     /// <summary>The test was proved.</summary>
-    public static PrologTestResult Passed(string output) => new(true, null, output);
+    public static PrologTestResult Passed(string output) => new(true, null, output, string.Empty);
 
-    /// <summary>The test failed, threw, or halted.</summary>
-    public static PrologTestResult Failed(string message, string output) => new(false, message, output);
+    /// <summary>The test failed, threw, halted, or timed out.</summary>
+    public static PrologTestResult Failed(string message, string output, string error) => new(false, message, output, error);
 }

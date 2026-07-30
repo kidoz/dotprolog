@@ -1,3 +1,4 @@
+using System.Text;
 using DotProlog.Runtime;
 using Microsoft.Testing.Platform.Extensions.Messages;
 using Microsoft.Testing.Platform.Extensions.TestFramework;
@@ -63,7 +64,7 @@ public sealed class PrologTestFramework : ITestFramework, IDataProducer
                 break;
 
             case RunTestExecutionRequest run:
-                await PublishAsync(context, run.Session.SessionUid, run: true).ConfigureAwait(false);
+                await PublishAsync(context, run.Session.SessionUid, run: true, run.Filter).ConfigureAwait(false);
                 break;
 
             default:
@@ -76,11 +77,17 @@ public sealed class PrologTestFramework : ITestFramework, IDataProducer
     private async Task PublishAsync(
         ExecuteRequestContext context,
         Microsoft.Testing.Platform.TestHost.SessionUid session,
-        bool run
+        bool run,
+        ITestExecutionFilter? filter = null
     )
     {
         foreach (PrologTest test in _runner.Discover())
         {
+            if (run && !ShouldRun(filter, test.Uid))
+            {
+                continue;
+            }
+
             var node = new TestNode { Uid = new TestNodeUid(test.Uid), DisplayName = test.Name };
 
             if (!run)
@@ -101,7 +108,25 @@ public sealed class PrologTestFramework : ITestFramework, IDataProducer
         }
     }
 
+    /// <summary>Whether the platform's filter selects this test; no recognised filter selects everything.</summary>
+    internal static bool ShouldRun(ITestExecutionFilter? filter, string uid) =>
+        filter is not TestNodeUidListFilter uids || uids.TestNodeUids.Any(candidate => candidate.Value == uid);
+
     /// <summary>Puts whatever the test wrote next to the reason it failed; output is often the clue.</summary>
-    private static string Describe(PrologTestResult result) =>
-        string.IsNullOrEmpty(result.Output) ? result.Message! : $"{result.Message}\n{result.Output}";
+    private static string Describe(PrologTestResult result)
+    {
+        var text = new StringBuilder(result.Message);
+
+        if (!string.IsNullOrEmpty(result.Output))
+        {
+            text.Append('\n').Append(result.Output);
+        }
+
+        if (!string.IsNullOrEmpty(result.Error))
+        {
+            text.Append('\n').Append(result.Error);
+        }
+
+        return text.ToString();
+    }
 }

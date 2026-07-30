@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <RootNamespace>DotProlog.Testing.Tests</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\DotProlog.Testing\DotProlog.Testing.csproj" />
+    </ItemGroup>
+</Project>
