@@ -20,6 +20,7 @@ public static class TermOrder
         ArgumentNullException.ThrowIfNull(machine);
 
         List<(Cell Left, Cell Right)> work = [(left, right)];
+        var visitedStructures = new HashSet<ulong>();
 
         while (work.Count > 0)
         {
@@ -70,6 +71,12 @@ public static class TermOrder
 
                 default:
                 {
+                    ulong pair = ((ulong)(uint)a.Index << 32) | (uint)b.Index;
+                    if (!visitedStructures.Add(pair))
+                    {
+                        continue;
+                    }
+
                     int structures = CompareStructures(machine, a, b, work);
                     if (structures != 0)
                     {

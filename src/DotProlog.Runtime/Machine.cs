@@ -43,6 +43,7 @@ public sealed class Machine
 
     private Cell[] _unificationStack = new Cell[256];
     private int _unificationTop;
+    private readonly HashSet<ulong> _unificationVisited = [];
 
     private Cell[] _occursCheckStack = new Cell[256];
     private int _occursCheckTop;
@@ -1066,6 +1067,7 @@ public sealed class Machine
     private bool UnifyCore(Cell left, Cell right, bool occursCheck)
     {
         _unificationTop = 0;
+        _unificationVisited.Clear();
         PushUnification(left, right);
 
         while (_unificationTop > 0)
@@ -1130,6 +1132,17 @@ public sealed class Machine
             {
                 _unificationTop = 0;
                 return false;
+            }
+
+            // Rational trees can lead back to the same pair of structures. Their arguments were
+            // already scheduled on the first visit, so revisiting the pair adds no constraint and
+            // would otherwise make ordinary unification loop forever.
+            uint lower = (uint)Math.Min(a.Index, b.Index);
+            uint upper = (uint)Math.Max(a.Index, b.Index);
+            ulong pair = ((ulong)lower << 32) | upper;
+            if (!_unificationVisited.Add(pair))
+            {
+                continue;
             }
 
             int arity = _symbols.ArityOf(functorId);

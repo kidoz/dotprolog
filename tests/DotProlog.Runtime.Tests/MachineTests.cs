@@ -201,6 +201,43 @@ public sealed class MachineTests
     }
 
     [Fact]
+    public void OrdinaryUnificationTerminatesWhenCyclicIntermediateBindingsPrecedeAMismatch()
+    {
+        BytecodeProgram program = NewProgram();
+        var machine = new Machine(program);
+        int a = program.Symbols.InternFunctor("a", 1);
+        int f = program.Symbols.InternFunctor("f", 4);
+        Cell x = machine.CreateVariable();
+        Cell y = machine.CreateVariable();
+        Cell left = machine.CreateStructure(f, [x, y, x, Cell.Integer60(1)]);
+        Cell right = machine.CreateStructure(
+            f,
+            [machine.CreateStructure(a, [x]), machine.CreateStructure(a, [y]), y, Cell.Integer60(2)]
+        );
+
+        Assert.False(machine.Unify(left, right));
+    }
+
+    [Fact]
+    public void TermIdentityTerminatesForEquivalentRationalTreesWithDifferentPeriods()
+    {
+        BytecodeProgram program = NewProgram();
+        var machine = new Machine(program);
+        Cell shortTail = machine.CreateVariable();
+        Cell shortCycle = machine.CreateList([Cell.Integer60(1), Cell.Integer60(2), Cell.Integer60(3)], shortTail);
+        Assert.True(machine.Unify(shortTail, shortCycle));
+
+        Cell longTail = machine.CreateVariable();
+        Cell longCycle = machine.CreateList(
+            [Cell.Integer60(1), Cell.Integer60(2), Cell.Integer60(3), Cell.Integer60(1), Cell.Integer60(2), Cell.Integer60(3)],
+            longTail
+        );
+        Assert.True(machine.Unify(longTail, longCycle));
+
+        Assert.True(TermOrder.AreIdentical(machine, shortCycle, longCycle));
+    }
+
+    [Fact]
     public void ProgramDistinguishesUserPredicatesFromBuiltinsAndInternalBytecode()
     {
         BytecodeProgram program = NewProgram();
