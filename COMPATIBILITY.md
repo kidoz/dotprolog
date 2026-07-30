@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**443 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**445 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -115,8 +115,11 @@ Writing them was worth it immediately: they found these real defects.
   Because the ISO core does not assign oversized float input a representation flag, it raises the
   catchable `syntax_error(float_overflow)`; underflow follows the ISO-compatible choice of rounding
   to signed zero. Rejected stream input still leaves the following term available.
+- `halt/1` now validates its input mode before requesting process termination. A variable raises
+  `instantiation_error`, and any non-integer status raises `type_error(integer, Culprit)` instead of
+  silently terminating with status zero.
 
-Beyond the conformance cases, the engine and toolchain are covered by 991 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 994 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
