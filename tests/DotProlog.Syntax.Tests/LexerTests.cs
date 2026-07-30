@@ -42,6 +42,25 @@ public sealed class LexerTests
     }
 
     [Fact]
+    public void TreatsExtendedTitlecaseLettersAsAtomStarts()
+    {
+        List<Token> tokens = Tokenize("ǅelta.", out List<Diagnostic> diagnostics);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(TokenKind.Atom, tokens[0].Kind);
+        Assert.Equal("ǅelta", tokens[0].Text);
+    }
+
+    [Fact]
+    public void RejectsNonAsciiDigitsAsNumericStartsWithoutThrowing()
+    {
+        List<Token> tokens = Tokenize("١ next.", out List<Diagnostic> diagnostics);
+
+        Assert.Equal(DiagnosticIds.UnexpectedCharacter, Assert.Single(diagnostics).Id);
+        Assert.Equal(["next", ".", string.Empty], tokens.Select(token => token.Text));
+    }
+
+    [Fact]
     public void MarksLayoutBeforeOpeningParenthesis()
     {
         List<Token> attached = Tokenize("foo(a)", out _);

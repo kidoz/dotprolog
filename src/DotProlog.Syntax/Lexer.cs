@@ -59,7 +59,8 @@ internal sealed class Lexer
             c = InputAt(_position);
             if (
                 c is '_' or '\'' or '"' or '`'
-                || char.IsLetterOrDigit(c)
+                || char.IsLetter(c)
+                || char.IsAsciiDigit(c)
                 || IsStructural(c)
                 || SymbolCharacters.Contains(c, StringComparison.Ordinal)
             )
@@ -105,7 +106,7 @@ internal sealed class Lexer
             return new Token(TokenKind.Variable, ConvertedText(start, _position - start), SpanFrom(start), layout);
         }
 
-        if (char.IsLower(c))
+        if (char.IsLetter(c))
         {
             while (_position < _text.Length && IsAlphanumeric(InputAt(_position)))
             {
