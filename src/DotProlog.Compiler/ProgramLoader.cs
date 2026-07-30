@@ -653,7 +653,8 @@ public sealed class ProgramLoader
             Cell bodyCell = body is null ? Cell.Atom(machine.Symbols.True) : TermReifier.ToHeap(machine, body, variables);
 
             var term = new TermBuffer();
-            int root = term.Copy(machine, machine.CreateStructure(rule, [headCell, bodyCell]));
+            Cell clause = machine.CreateStructure(rule, [headCell, bodyCell]);
+            int root = term.Copy(machine, DatabaseBuiltins.NormalizeClause(machine, clause));
 
             predicate.Append(
                 new DynamicClause

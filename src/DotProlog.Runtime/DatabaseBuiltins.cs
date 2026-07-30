@@ -62,7 +62,7 @@ internal static class DatabaseBuiltins
         DynamicPredicate predicate = machine.Program.DeclareDynamic(functorId);
 
         var term = new TermBuffer();
-        int root = term.Copy(machine, Normalize(machine, clause));
+        int root = term.Copy(machine, NormalizeClause(machine, clause));
 
         var entry = new DynamicClause
         {
@@ -96,7 +96,7 @@ internal static class DatabaseBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        Cell normalized = Normalize(machine, pattern);
+        Cell normalized = NormalizeClausePattern(machine, pattern);
         int functorId = FunctorOf(machine, normalized);
         RequireModifiable(machine, functorId);
         DynamicPredicate? predicate = FindPredicate(machine, normalized, declareIfMissing: false);
@@ -349,8 +349,27 @@ internal static class DatabaseBuiltins
         machine.Program.RuntimeCompiler
         ?? throw new PrologException("permission_error(modify, database, no_runtime_compiler_installed)");
 
-    /// <summary>Rewrites a bare head into the <c>Head :- true</c> form clauses are stored in.</summary>
-    private static Cell Normalize(Machine machine, Cell clause)
+    /// <summary>
+    /// Rewrites a clause into its ISO database form: facts acquire a <c>true</c> body and variables
+    /// used directly as goals become <c>call(Variable)</c>.
+    /// </summary>
+    internal static Cell NormalizeClause(Machine machine, Cell clause)
+    {
+        if (clause.Tag != CellTag.Structure || machine.HeapAt(clause.Index).Index != RuleFunctor(machine))
+        {
+            return machine.CreateStructure(RuleFunctor(machine), [clause, Cell.Atom(machine.Symbols.True)]);
+        }
+
+        Cell head = machine.HeapAt(clause.Index + 1);
+        Cell body = CanonicalizeGoal(machine, machine.HeapAt(clause.Index + 2));
+        return machine.CreateStructure(RuleFunctor(machine), [head, body]);
+    }
+
+    /// <summary>
+    /// Gives a fact pattern its implicit <c>true</c> body while preserving variables in an explicit
+    /// rule body so they can match and receive the canonical stored goal.
+    /// </summary>
+    private static Cell NormalizeClausePattern(Machine machine, Cell clause)
     {
         if (clause.Tag == CellTag.Structure && machine.HeapAt(clause.Index).Index == RuleFunctor(machine))
         {
@@ -361,6 +380,102 @@ internal static class DatabaseBuiltins
     }
 
     private static int RuleFunctor(Machine machine) => machine.Symbols.InternFunctor(":-", 2);
+
+    /// <summary>
+    /// Canonicalizes variable goals without CLR recursion. Only arguments that are themselves goal
+    /// positions in an ISO control construct are traversed; a variable passed to an ordinary
+    /// predicate remains an ordinary argument.
+    /// </summary>
+    private static Cell CanonicalizeGoal(Machine machine, Cell goal)
+    {
+        goal = machine.Dereference(goal);
+        int call = machine.Symbols.InternFunctor("call", 1);
+        if (goal.Tag == CellTag.Reference)
+        {
+            return machine.CreateStructure(call, [goal]);
+        }
+
+        if (goal.Tag != CellTag.Structure || !IsControlConstruct(machine, goal))
+        {
+            return goal;
+        }
+
+        var rewritten = new Dictionary<int, Cell>();
+        var active = new HashSet<int>();
+        var complete = new HashSet<int>();
+        List<(Cell Goal, bool Leaving)> work = [(goal, false)];
+
+        while (work.Count > 0)
+        {
+            (Cell current, bool leaving) = work[^1];
+            work.RemoveAt(work.Count - 1);
+            current = machine.Dereference(current);
+
+            if (current.Tag != CellTag.Structure || !IsControlConstruct(machine, current))
+            {
+                continue;
+            }
+
+            if (leaving)
+            {
+                active.Remove(current.Index);
+                if (!complete.Add(current.Index))
+                {
+                    continue;
+                }
+
+                int functor = machine.HeapAt(current.Index).Index;
+                int arity = machine.Symbols.ArityOf(functor);
+                var arguments = new Cell[arity];
+                for (int i = 0; i < arity; i++)
+                {
+                    Cell argument = machine.Dereference(machine.HeapAt(current.Index + i + 1));
+                    arguments[i] =
+                        argument.Tag == CellTag.Reference ? machine.CreateStructure(call, [argument])
+                        : argument.Tag == CellTag.Structure && rewritten.TryGetValue(argument.Index, out Cell replacement)
+                            ? replacement
+                            : argument;
+                }
+
+                rewritten.Add(current.Index, machine.CreateStructure(functor, arguments));
+                continue;
+            }
+
+            if (complete.Contains(current.Index))
+            {
+                continue;
+            }
+
+            // Rational control terms are outside ISO's finite source-term model. Preserve one
+            // already-seen edge rather than recursing forever or manufacturing a different cycle.
+            if (!active.Add(current.Index))
+            {
+                continue;
+            }
+
+            work.Add((current, true));
+            int childCount = machine.Symbols.ArityOf(machine.HeapAt(current.Index).Index);
+            for (int i = childCount; i >= 1; i--)
+            {
+                Cell child = machine.Dereference(machine.HeapAt(current.Index + i));
+                if (child.Tag == CellTag.Structure && IsControlConstruct(machine, child))
+                {
+                    work.Add((child, false));
+                }
+            }
+        }
+
+        return rewritten.TryGetValue(goal.Index, out Cell canonical) ? canonical : goal;
+    }
+
+    private static bool IsControlConstruct(Machine machine, Cell goal)
+    {
+        int functorId = machine.HeapAt(goal.Index).Index;
+        Functor functor = machine.Symbols.GetFunctor(functorId);
+        string name = machine.Symbols.AtomName(functor.NameAtom);
+        return (functor.Arity == 2 && name is "," or ";" or "->" or "*->")
+            || (functor.Arity == 1 && name == "\\+");
+    }
 
     private static int FunctorOf(Machine machine, Cell clauseOrHead)
     {

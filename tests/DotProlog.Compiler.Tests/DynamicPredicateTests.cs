@@ -49,6 +49,45 @@ public sealed class DynamicPredicateTests
     }
 
     [Fact]
+    public void ConsultedVariableGoalsHaveTheIsoClauseRepresentation()
+    {
+        string output = PrologTestHost.Run(
+            """
+            :- dynamic legs/2.
+
+            legs(A, 7) :- A, call(A).
+
+            :- initialization((clause(legs(C, 7), Body), Body == (call(C), call(C)), write(yes), nl)).
+            """
+        );
+
+        Assert.Equal("yes\n", output);
+    }
+
+    [Fact]
+    public void AssertedVariableGoalsHaveTheIsoClauseRepresentation()
+    {
+        Assert.Equal(
+            "yes\n",
+            PrologTestHost.RunGoal(
+                "assertz((p(X) :- X, call(X))), clause(p(Y), Body), Body == (call(Y), call(Y)), write(yes), nl"
+            )
+        );
+    }
+
+    [Fact]
+    public void RetractMatchesTheIsoVariableGoalRepresentation()
+    {
+        Assert.Equal(
+            "gone\n",
+            PrologTestHost.RunGoal(
+                "assertz((variable_goal(X) :- X)), retract((variable_goal(Y) :- Body)), "
+                    + "Body == call(Y), \\+ clause(variable_goal(_), _), write(gone), nl"
+            )
+        );
+    }
+
+    [Fact]
     public void RetractRemovesTheFirstMatchingClause()
     {
         Assert.Equal(
