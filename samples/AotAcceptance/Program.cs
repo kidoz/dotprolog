@@ -158,6 +158,15 @@ internal static class Program
                 MaxArityCaught == true,
                 write(max_arity_representation_error), nl,
 
+                % Oversized float literals remain finite-only runtime input after trimming.
+                catch(
+                    read_term_from_atom('1e9999', _, []),
+                    error(syntax_error(float_overflow), _),
+                    FloatOverflowCaught = true),
+                FloatOverflowCaught == true,
+                read_term_from_atom('1e-9999', Underflow, []), Underflow =:= 0.0,
+                write(float_read_limits), nl,
+
                 % Open streams and their ISO metadata are explicit runtime state, not reflection.
                 current_input(NativeInput), current_stream(NativeInput),
                 stream_property(NativeInput, mode(read)),
