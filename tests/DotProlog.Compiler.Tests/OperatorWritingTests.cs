@@ -87,7 +87,7 @@ public sealed class OperatorWritingTests
 
     [Theory]
     [InlineData("write_canonical(1+2*3)", "+(1,*(2,3))")]
-    [InlineData("write_canonical([a, b])", "[a,b]")]
+    [InlineData("write_canonical([a, b])", "'.'(a,'.'(b,[]))")]
     [InlineData("write_canonical('a b')", "'a b'")]
     [InlineData("write_term(1+2, [ignore_ops(true)])", "+(1,2)")]
     [InlineData("write_term('a b', [quoted(true)])", "'a b'")]

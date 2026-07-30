@@ -119,6 +119,7 @@ public sealed class NativeAotAcceptanceTests
                     "stream_position",
                     "alice likes bob",
                     "+(1,*(2,3))",
+                    "'.'(1,'.'(2,'.'(3,[])))",
                     "427",
                     "captured(1+2)",
                     "done",

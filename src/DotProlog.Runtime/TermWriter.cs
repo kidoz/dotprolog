@@ -146,7 +146,7 @@ public static class TermWriter
             return;
         }
 
-        if (functorId == machine.Symbols.ListFunctor)
+        if (!ignoreOperators && functorId == machine.Symbols.ListFunctor)
         {
             output.Write("[");
             work.Add(Item.OfListTail(machine.HeapAt(cell.Index + 2)));
@@ -365,6 +365,11 @@ public static class TermWriter
     private static bool NeedsQuotes(string name)
     {
         if (name.Length == 0)
+        {
+            return true;
+        }
+
+        if (name == ".")
         {
             return true;
         }

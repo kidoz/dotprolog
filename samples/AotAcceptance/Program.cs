@@ -612,6 +612,7 @@ internal static class Program
                 op(700, xfx, likes),
                 write(likes(alice, bob)), nl,
                 write_canonical(1 + 2 * 3), nl,
+                write_canonical([1,2,3]), nl,
 
                 % A grammar consulted from the external file, translated inside the native image.
                 phrase(number(N), "427"), write(N), nl,
