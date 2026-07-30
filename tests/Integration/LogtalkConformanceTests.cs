@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using DotProlog.Compiler;
@@ -275,6 +276,24 @@ public sealed class LogtalkConformanceTests
             null
         );
         Assert.True(Execute(ball, adapterEngine, out string ballFailure), ballFailure);
+
+        const string quickCheckSource = """
+            twice(T) :-
+                {term_variables(T, Vs1), term_variables(T, Vs2), Vs1 == Vs2}.
+            quick_check(iso_quick_fixture, twice(+term)).
+            """;
+        Assert.True(
+            LogtalkTestAdapter.TryReadSupportProgram(quickCheckSource, out string quickCheckSupport)
+        );
+        var quickCheckEngine = CreateAdapterEngine(Path.GetTempPath());
+        quickCheckEngine.ConsultOrThrow(quickCheckSupport, "quick-check-fixture.lgt");
+        LogtalkTestDeclaration quickCheck = Assert.Single(
+            LogtalkTestAdapter.ReadDeclarations(quickCheckSource, "quick-check-fixture.lgt")
+        );
+        Assert.True(
+            ExecuteQuickCheck(quickCheck, quickCheckEngine, out string quickCheckFailure),
+            quickCheckFailure
+        );
     }
 
     [Fact]
@@ -407,8 +426,12 @@ public sealed class LogtalkConformanceTests
                             or "subsumes"
                             or "variant"
                             or "deterministic"
+                            or "quick_check"
                     && supportByPath.ContainsKey(test.SourcePath)
-                    && LogtalkTestAdapter.TryUnwrapBackendGoal(test, out _)
+                    && (
+                        test.OutcomeKind == "quick_check"
+                        || LogtalkTestAdapter.TryUnwrapBackendGoal(test, out _)
+                    )
                     && (
                         !conditionalAlternates.Contains((test.SourcePath, test.Id))
                         || applicableConditionalCases.Contains(test)
@@ -416,7 +439,7 @@ public sealed class LogtalkConformanceTests
                 ),
             ];
 
-            Assert.Equal(748, directCases.Length);
+            Assert.Equal(754, directCases.Length);
             Assert.Equal(442, directCases.Count(test => test.OutcomeKind == "true"));
             Assert.Equal(73, directCases.Count(test => test.OutcomeKind == "false"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "fail"));
@@ -427,6 +450,7 @@ public sealed class LogtalkConformanceTests
             Assert.Single(directCases, test => test.OutcomeKind == "deterministic");
             Assert.Equal(17, directCases.Count(test => test.OutcomeKind == "errors"));
             Assert.Single(directCases, test => test.OutcomeKind == "ball");
+            Assert.Equal(6, directCases.Count(test => test.OutcomeKind == "quick_check"));
 
             string? selectedId = Environment.GetEnvironmentVariable(CaseVariable);
             LogtalkTestDeclaration[] casesToExecute = SelectCasesToExecute(directCases, selectedId);
@@ -1139,6 +1163,11 @@ public sealed class LogtalkConformanceTests
 
     private static bool Execute(LogtalkTestDeclaration test, PrologEngine engine, out string failure)
     {
+        if (test.OutcomeKind == "quick_check")
+        {
+            return ExecuteQuickCheck(test, engine, out failure);
+        }
+
         if (!LogtalkTestAdapter.TryUnwrapBackendGoal(test, out string goal))
         {
             failure = "adapter did not find one backend goal";
@@ -1191,6 +1220,177 @@ public sealed class LogtalkConformanceTests
 
         failure = string.Empty;
         return true;
+    }
+
+    private static bool ExecuteQuickCheck(
+        LogtalkTestDeclaration test,
+        PrologEngine engine,
+        out string failure
+    )
+    {
+        (string property, IReadOnlyList<string> inputs) = test.Id switch
+        {
+            "iso_term_variables_2_01" or "iso_quick_fixture" => (
+                "twice",
+                GenerateTermInputs(seed: 13211)
+            ),
+            "iso_term_variables_2_02" => ("chain", GenerateTermInputs(seed: 13212)),
+            "iso_number_chars_2_14" => (
+                "round_trip",
+                GenerateIntegerInputs(seed: 16714)
+            ),
+            "iso_number_chars_2_15" => ("round_trip", GenerateFloatInputs(seed: 16715)),
+            "iso_number_codes_2_12" => (
+                "round_trip",
+                GenerateIntegerInputs(seed: 16812)
+            ),
+            "iso_number_codes_2_13" => ("round_trip", GenerateFloatInputs(seed: 16813)),
+            _ => throw new InvalidOperationException($"Unsupported QuickCheck declaration: {test.Id}"),
+        };
+
+        for (int trial = 0; trial < inputs.Count; trial++)
+        {
+            string goal = $"{property}({inputs[trial]})";
+            try
+            {
+                RunResult result = engine.RunGoal(
+                    goal,
+                    out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics
+                );
+                if (diagnostics.Count > 0)
+                {
+                    failure =
+                        $"QuickCheck trial {trial + 1} did not compile: "
+                        + $"{string.Join("; ", diagnostics)} | {goal}";
+                    return false;
+                }
+
+                if (result != RunResult.Success)
+                {
+                    failure = $"QuickCheck trial {trial + 1} failed | {goal}";
+                    return false;
+                }
+            }
+            catch (PrologException exception)
+            {
+                failure = $"QuickCheck trial {trial + 1} raised {exception.Message} | {goal}";
+                return false;
+            }
+        }
+
+        failure = string.Empty;
+        return true;
+    }
+
+    private static IReadOnlyList<string> GenerateIntegerInputs(int seed)
+    {
+        string[] edgeCases =
+        [
+            "0",
+            "1",
+            "-1",
+            Cell.MinInteger.ToString(CultureInfo.InvariantCulture),
+            Cell.MaxInteger.ToString(CultureInfo.InvariantCulture),
+        ];
+        var random = new DeterministicRandom(seed);
+        return
+        [
+            .. edgeCases,
+            .. Enumerable
+                .Range(0, 100 - edgeCases.Length)
+                .Select(_ => random.Next(-1000, 1001).ToString(CultureInfo.InvariantCulture)),
+        ];
+    }
+
+    private static IReadOnlyList<string> GenerateFloatInputs(int seed)
+    {
+        string[] edgeCases = ["0.0", "1.0", "-1.0", "0.000000000001"];
+        var random = new DeterministicRandom(seed);
+        return
+        [
+            .. edgeCases,
+            .. Enumerable
+                .Range(0, 100 - edgeCases.Length)
+                .Select(_ => FloatLiteral(random.Next(-1000, 1001) * random.NextDouble())),
+        ];
+    }
+
+    private static IReadOnlyList<string> GenerateTermInputs(int seed)
+    {
+        var random = new DeterministicRandom(seed);
+        return [.. Enumerable.Range(0, 100).Select(_ => GenerateTerm(random, depth: 3))];
+    }
+
+    private static string GenerateTerm(DeterministicRandom random, int depth)
+    {
+        string[] variables = ["A", "B", "C", "_"];
+        string[] atoms = ["a", "z", "[]", "{}", "'a b'", "'\\\\'"];
+
+        int shape = depth == 0 ? random.Next(4) : random.Next(9);
+        return shape switch
+        {
+            0 => variables[random.Next(variables.Length)],
+            1 => atoms[random.Next(atoms.Length)],
+            2 => random.Next(-1000, 1001).ToString(CultureInfo.InvariantCulture),
+            3 => FloatLiteral(random.Next(-1000, 1001) * random.NextDouble()),
+            4 => $"f({GenerateTerm(random, depth - 1)})",
+            5 =>
+                $"pair({GenerateTerm(random, depth - 1)},{GenerateTerm(random, depth - 1)})",
+            6 =>
+                $"[{GenerateTerm(random, depth - 1)},{GenerateTerm(random, depth - 1)}]",
+            7 =>
+                $"[{GenerateTerm(random, depth - 1)}|{GenerateTerm(random, depth - 1)}]",
+            _ =>
+                $"node({GenerateTerm(random, depth - 1)},"
+                    + $"{GenerateTerm(random, depth - 1)},"
+                    + $"{GenerateTerm(random, depth - 1)})",
+        };
+    }
+
+    private static string FloatLiteral(double value)
+    {
+        string text = value.ToString("R", CultureInfo.InvariantCulture);
+        if (text.Contains('.'))
+        {
+            return text;
+        }
+
+        int exponent = text.IndexOf('E', StringComparison.Ordinal);
+        if (exponent < 0)
+        {
+            exponent = text.IndexOf('e', StringComparison.Ordinal);
+        }
+
+        return exponent >= 0 ? text.Insert(exponent, ".0") : $"{text}.0";
+    }
+
+    private sealed class DeterministicRandom(int seed)
+    {
+        private uint state = unchecked((uint)seed);
+
+        public int Next(int maximum)
+        {
+            return Next(0, maximum);
+        }
+
+        public int Next(int minimum, int maximum)
+        {
+            uint range = checked((uint)(maximum - minimum));
+            return minimum + (int)(NextUInt32() % range);
+        }
+
+        public double NextDouble()
+        {
+            return NextUInt32() / ((double)uint.MaxValue + 1.0);
+        }
+
+        private uint NextUInt32()
+        {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            return state;
+        }
     }
 
     private static string VariantAssertion(string goal, string outcome)
