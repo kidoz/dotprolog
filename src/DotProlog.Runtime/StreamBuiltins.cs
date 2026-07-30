@@ -1208,6 +1208,13 @@ internal static class StreamBuiltins
         GuardIo(machine, () => target.Writer!.Write(text));
     }
 
+    /// <summary>Writes text to the output stream or alias named by argument <paramref name="index"/>.</summary>
+    internal static void WriteStreamText(Machine machine, int index, string text)
+    {
+        PrologStream target = Resolve(machine, index, input: false);
+        GuardIo(machine, () => target.Writer!.Write(text));
+    }
+
     private static bool Flush(Machine machine, int stream)
     {
         PrologStream target = Resolve(machine, stream, input: false, expectedType: null);

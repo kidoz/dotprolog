@@ -55,7 +55,23 @@ public sealed class FormatTests
     [InlineData("format(codes(C), \"hi\", []), write(C)", "[104,105]")]
     [InlineData("format(chars(C), \"hi\", []), write(C)", "[h,i]")]
     [InlineData("format(user_output, \"out\", [])", "out")]
+    [InlineData("current_output(S), format(S, \"handle\", [])", "handle")]
     public void WritesToASink(string goal, string expected) => Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Fact]
+    public void UserErrorTargetsTheErrorStream()
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var engine = new PrologEngine { Output = output, Error = error };
+
+        Assert.True(engine.ConsultText(":- initialization(with_output_to(atom(A), format(user_error, \"oops\", []))).").Success);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+
+        // The error text bypasses the capture instead of being folded into the current output.
+        Assert.Equal("oops", error.ToString());
+        Assert.Equal("", output.ToString());
+    }
 
     [Fact]
     public void TheFormatStringMayBeAnAtom() => Assert.Equal("hi", PrologTestHost.RunGoal("format('~w', [hi])"));
@@ -75,16 +91,30 @@ public sealed class FormatTests
         );
 
     [Fact]
+    public void LeftoverArgumentsAreReported() =>
+        Assert.Equal(
+            "domain_error(format_arguments,[a,b])",
+            PrologTestHost.RunGoal("catch(format(\"~w\", [a, b]), error(E, _), write(E))")
+        );
+
+    [Fact]
     public void TabWritesSpaces() => Assert.Equal("a  b", PrologTestHost.RunGoal("write(a), tab(1 + 1), write(b)"));
 
     [Fact]
-    public void FormatToAnUnknownStreamIsReported()
+    public void TabRejectsAFloatCount() =>
+        Assert.Equal("type_error(integer,1.5)", PrologTestHost.RunGoal("catch(tab(1.5), error(E, _), write(E))"));
+
+    [Theory]
+    [InlineData("format(nowhere, \"x\", [])", "existence_error(stream,nowhere)")]
+    [InlineData("format(7, \"x\", [])", "domain_error(stream_or_alias,7)")]
+    [InlineData("format(user_input, \"x\", [])", "permission_error(output,stream,user_input)")]
+    public void FormatToABadStreamIsReported(string goal, string expected)
     {
         (RunResult result, string output, _) = PrologTestHost.Execute(
-            ":- initialization(catch(format(nowhere, \"x\", []), error(E, _), write(E)))."
+            $":- initialization(catch({goal}, error(E, _), write(E)))."
         );
 
         Assert.Equal(RunResult.Success, result);
-        Assert.Equal("domain_error(stream_or_alias,nowhere)", output);
+        Assert.Equal(expected, output);
     }
 }

@@ -55,6 +55,11 @@ internal static class FormatBuiltins
             static machine =>
             {
                 PrologNumber count = ArithmeticEvaluator.Evaluate(machine, machine.Argument(0));
+                if (count.IsFloat)
+                {
+                    throw PrologErrors.Type(machine, "integer", ArithmeticEvaluator.ToCell(machine, count));
+                }
+
                 StreamBuiltins.WriteCurrentText(machine, new string(' ', (int)Math.Max(count.Integer, 0)));
                 return true;
             }
@@ -63,47 +68,32 @@ internal static class FormatBuiltins
 
     /// <summary>
     /// <c>format(+Sink, +Format, +Arguments)</c>. The sink is <c>atom(A)</c>, <c>codes(C)</c>, or
-    /// <c>chars(C)</c> to capture the text, or a stream alias to write it.
+    /// <c>chars(C)</c> to capture the text, or a stream or alias to write it — resolved exactly as
+    /// <c>write/2</c> resolves its stream, so <c>user_error</c> reaches the error stream.
     /// </summary>
-    /// <remarks>
-    /// <c>user_error</c> writes to the machine's output like <c>user_output</c> does. There is no
-    /// stream system yet, and an embedding host that captures output would not expect a builtin to
-    /// reach past it to the process's stderr.
-    /// </remarks>
     private static bool Format3(Machine machine)
     {
         Cell sink = machine.Argument(0);
         string text = Render(machine, machine.Argument(1), machine.Argument(2));
 
-        if (sink.Tag == CellTag.Atom)
+        if (sink.Tag == CellTag.Structure && machine.Symbols.ArityOf(machine.HeapAt(sink.Index).Index) == 1)
         {
-            string alias = machine.Symbols.AtomName(sink.Index);
-            if (alias is "user_output" or "user_error")
+            Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(sink.Index).Index);
+            Cell target = machine.HeapAt(sink.Index + 1);
+
+            switch (machine.Symbols.AtomName(functor.NameAtom))
             {
-                StreamBuiltins.WriteCurrentText(machine, text);
-                return true;
+                case "atom":
+                    return machine.Unify(target, Cell.Atom(machine.Symbols.InternAtom(text)));
+                case "codes":
+                    return machine.Unify(target, TextBuiltins.BuildText(machine, text, chars: false));
+                case "chars":
+                    return machine.Unify(target, TextBuiltins.BuildText(machine, text, chars: true));
             }
-
-            throw PrologErrors.Domain(machine, "stream_or_alias", sink);
         }
 
-        if (sink.Tag != CellTag.Structure || machine.Symbols.ArityOf(machine.HeapAt(sink.Index).Index) != 1)
-        {
-            throw sink.Tag == CellTag.Reference
-                ? PrologErrors.Instantiation(machine)
-                : PrologErrors.Domain(machine, "stream_or_alias", sink);
-        }
-
-        Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(sink.Index).Index);
-        Cell target = machine.HeapAt(sink.Index + 1);
-
-        return machine.Symbols.AtomName(functor.NameAtom) switch
-        {
-            "atom" => machine.Unify(target, Cell.Atom(machine.Symbols.InternAtom(text))),
-            "codes" => machine.Unify(target, TextBuiltins.BuildText(machine, text, chars: false)),
-            "chars" => machine.Unify(target, TextBuiltins.BuildText(machine, text, chars: true)),
-            _ => throw PrologErrors.Domain(machine, "stream_or_alias", sink),
-        };
+        StreamBuiltins.WriteStreamText(machine, 0, text);
+        return true;
     }
 
     private static string Render(Machine machine, Cell format, Cell arguments)
@@ -161,6 +151,11 @@ internal static class FormatBuiltins
             }
 
             Directive(machine, output, text[i], count, given, ref next, arguments);
+        }
+
+        if (next < given.Count)
+        {
+            throw PrologErrors.Domain(machine, "format_arguments", machine.Dereference(arguments));
         }
 
         return output.ToString();
