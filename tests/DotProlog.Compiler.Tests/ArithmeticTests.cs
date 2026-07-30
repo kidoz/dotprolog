@@ -36,6 +36,18 @@ public sealed class ArithmeticTests
     }
 
     [Theory]
+    [InlineData("\\ 10", "-11")]
+    [InlineData("-10 \\/ 12", "-2")]
+    [InlineData("-10 /\\ 12", "4")]
+    [InlineData("xor(-10, 12)", "-6")]
+    [InlineData("-16 << 2", "-64")]
+    [InlineData("-16 >> 2", "-4")]
+    public void PinsImplementationDefinedTwoComplementBitwiseResults(string expression, string expected)
+    {
+        Assert.Equal(expected, PrologTestHost.RunGoal($"X is {expression}, write(X)"));
+    }
+
+    [Theory]
     [InlineData("1 < 2")]
     [InlineData("2 >= 2")]
     [InlineData("2 =:= 2")]

@@ -55,6 +55,8 @@ nav:
           - 12. Пролог и .NET: book/ru/12-prolog-meets-dotnet.md
   - .NET integration: dotnet-integration.md
   - Architecture: architecture/index.md
+  - Reference:
+      - ISO processor characteristics: reference/iso-processor-characteristics.md
   - Contributing: contributing.md
 
 markdown_extensions:

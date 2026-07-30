@@ -78,6 +78,7 @@ public sealed class NativeAotAcceptanceTests
                     "row     7",
                     "arithmetic=-1,2.0,0.0",
                     "arithmetic_error",
+                    "bitwise_processor_choices",
                     "occurs_check",
                     "repeat_control",
                     "compiled_goal_errors",

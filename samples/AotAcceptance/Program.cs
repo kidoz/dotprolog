@@ -114,6 +114,13 @@ internal static class Program
                 Rounded is round(-1.5), Quotient is 6 / 3, Sine is sin(0),
                 format("arithmetic=~w,~w,~w~n", [Rounded, Quotient, Sine]),
                 catch(_ is 0.0 / 0.0, error(evaluation_error(undefined), _), write(arithmetic_error)), nl,
+                \ 10 =:= -11,
+                -10 \/ 12 =:= -2,
+                -10 /\ 12 =:= 4,
+                xor(-10, 12) =:= -6,
+                -16 << 2 =:= -64,
+                -16 >> 2 =:= -4,
+                write(bitwise_processor_choices), nl,
 
                 % Occurs-check unification is iterative and must survive NativeAOT trimming.
                 \+ unify_with_occurs_check(Cycle, f(Cycle)), var(Cycle),
