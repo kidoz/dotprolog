@@ -50,4 +50,7 @@ public static class CompilerDiagnosticIds
 
     /// <summary>A <c>multifile/1</c> declaration contains an invalid predicate indicator.</summary>
     public const string InvalidMultifileDeclaration = "DPL1016";
+
+    /// <summary>A module import is not exported by its source module or conflicts with another import.</summary>
+    public const string InvalidModuleImport = "DPL1017";
 }

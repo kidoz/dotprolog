@@ -229,10 +229,13 @@ public sealed class ProgramLoader
     private void Collect(IReadOnlyList<SyntaxTerm> clauses, LoadUnit unit, List<Diagnostic> diagnostics, string? fileName)
     {
         DoubleQuotesMode doubleQuotes = _program.Flags.DoubleQuotes;
+        bool firstTerm = true;
 
         foreach (SyntaxTerm rawClause in clauses)
         {
             SyntaxTerm clause = TermNormalizer.Normalize(rawClause, doubleQuotes);
+            bool isFirstTerm = firstTerm;
+            firstTerm = false;
 
             if (clause is CompoundTerm { Name: ":-", Arity: 1 } directive)
             {
@@ -241,6 +244,19 @@ public sealed class ProgramLoader
                 switch (goal)
                 {
                     case CompoundTerm { Name: "module", Arity: 2 } declaration:
+                        if (!isFirstTerm || unit.HasModuleDeclaration)
+                        {
+                            Report(
+                                diagnostics,
+                                CompilerDiagnosticIds.InvalidModuleDeclaration,
+                                "module/2 must be the first term and may occur only once in a module text.",
+                                declaration.Span,
+                                fileName
+                            );
+                            continue;
+                        }
+
+                        unit.HasModuleDeclaration = true;
                         DeclareModule(declaration, unit, diagnostics, fileName);
                         continue;
 
@@ -305,8 +321,32 @@ public sealed class ProgramLoader
             // rest of the loader and the whole compiler never learn that DCGs exist.
             if (clause is CompoundTerm { Name: "-->", Arity: 2 } grammarRule)
             {
+                if (GrammarHeadIsReserved(grammarRule.Arguments[0], out SyntaxTerm culprit))
+                {
+                    Report(
+                        diagnostics,
+                        CompilerDiagnosticIds.InvalidGrammarRule,
+                        "A grammar rule head may not be a grammar control construct.",
+                        culprit.Span,
+                        fileName
+                    );
+                    continue;
+                }
+
                 if (!DcgTranslator.TryTranslate(grammarRule, diagnostics, fileName, out head, out SyntaxTerm translated))
                 {
+                    continue;
+                }
+
+                if (GrammarHeadCollidesWithPredefinedProcedure(head))
+                {
+                    Report(
+                        diagnostics,
+                        CompilerDiagnosticIds.InvalidGrammarRule,
+                        "A grammar rule may not expand to a predefined procedure.",
+                        grammarRule.Arguments[0].Span,
+                        fileName
+                    );
                     continue;
                 }
 
@@ -341,6 +381,46 @@ public sealed class ProgramLoader
 
             unit.Items.Add(new ClauseItem(head, body));
         }
+    }
+
+    private bool GrammarHeadCollidesWithPredefinedProcedure(SyntaxTerm head)
+    {
+        string name;
+        int arity;
+        switch (head)
+        {
+            case AtomTerm atom:
+                name = atom.Name;
+                arity = 0;
+                break;
+
+            case CompoundTerm compound:
+                name = compound.Name;
+                arity = compound.Arity;
+                break;
+
+            default:
+                return false;
+        }
+
+        int functor = _program.Symbols.InternFunctor(name, arity);
+        return _program.Builtins.TryGetId(functor, out _) || (_program.IsDefined(functor) && !_program.IsUserPredicate(functor));
+    }
+
+    private static bool GrammarHeadIsReserved(SyntaxTerm head, out SyntaxTerm culprit)
+    {
+        culprit = head;
+        SyntaxTerm nonTerminal = head is CompoundTerm { Name: ",", Arity: 2 } semicontext ? semicontext.Arguments[0] : head;
+        culprit = nonTerminal;
+
+        return nonTerminal switch
+        {
+            AtomTerm { Name: "[]" or "!" } => true,
+            CompoundTerm { Name: "," or ";" or "|" or "->" or "*->", Arity: 2 } => true,
+            CompoundTerm { Name: "\\+" or "{}" or "call", Arity: 1 } => true,
+            CompoundTerm { Name: ".", Arity: 2 } => true,
+            _ => false,
+        };
     }
 
     /// <summary>Loads an <c>ensure_loaded/1</c> declaration once, relative to its source unit.</summary>
@@ -514,7 +594,16 @@ public sealed class ProgramLoader
                 if (TryIndicator(item, out PredicateIndicator indicator))
                 {
                     listed.Add(indicator);
+                    continue;
                 }
+
+                Report(
+                    diagnostics,
+                    CompilerDiagnosticIds.InvalidModuleImport,
+                    "A selected import must be a predicate indicator of the form Name/Arity or Name//Arity.",
+                    item.Span,
+                    fileName
+                );
             }
 
             wanted = listed;
@@ -522,7 +611,28 @@ public sealed class ProgramLoader
 
         foreach (PredicateIndicator indicator in wanted)
         {
-            _modules.Import(unit.Module, indicator, loaded);
+            if (!_modules.Exports(loaded, indicator))
+            {
+                Report(
+                    diagnostics,
+                    CompilerDiagnosticIds.InvalidModuleImport,
+                    $"Module {loaded} does not export {indicator}.",
+                    import.Span,
+                    fileName
+                );
+                continue;
+            }
+
+            if (!_modules.TryImport(unit.Module, indicator, loaded, out string? conflictingModule))
+            {
+                Report(
+                    diagnostics,
+                    CompilerDiagnosticIds.InvalidModuleImport,
+                    $"{indicator} is already imported into module {unit.Module} from module {conflictingModule}.",
+                    import.Span,
+                    fileName
+                );
+            }
         }
     }
 
@@ -695,6 +805,8 @@ public sealed class ProgramLoader
     private sealed class LoadUnit
     {
         internal string Module { get; set; } = ModuleTable.UserModule;
+
+        internal bool HasModuleDeclaration { get; set; }
 
         internal HashSet<PredicateIndicator> Defines { get; } = [];
 

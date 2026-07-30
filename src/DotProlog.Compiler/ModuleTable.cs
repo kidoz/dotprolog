@@ -104,8 +104,11 @@ public sealed class ModuleTable
     public IReadOnlyCollection<PredicateIndicator> ExportsOf(string module) =>
         _exports.TryGetValue(module, out HashSet<PredicateIndicator>? set) ? set : [];
 
-    /// <summary>Records that <paramref name="importer"/> takes <paramref name="predicate"/> from <paramref name="from"/>.</summary>
-    public void Import(string importer, PredicateIndicator predicate, string from)
+    /// <summary>
+    /// Records that <paramref name="importer"/> takes <paramref name="predicate"/> from
+    /// <paramref name="from"/>, unless another module already supplies the same visible name.
+    /// </summary>
+    public bool TryImport(string importer, PredicateIndicator predicate, string from, out string? conflictingModule)
     {
         ArgumentNullException.ThrowIfNull(importer);
         ArgumentNullException.ThrowIfNull(from);
@@ -116,7 +119,15 @@ public sealed class ModuleTable
             _imports[importer] = map;
         }
 
+        if (map.TryGetValue(predicate, out string? existing))
+        {
+            conflictingModule = existing;
+            return existing == from;
+        }
+
         map[predicate] = from;
+        conflictingModule = null;
+        return true;
     }
 
     /// <summary>The module <paramref name="importer"/> imported <paramref name="predicate"/> from, if any.</summary>

@@ -31,6 +31,10 @@ public sealed class GrammarTests
 
     private static string Run(string goal) => PrologTestHost.Run($"{Grammar}:- initialization(({goal})).\n");
 
+    [Fact]
+    public void GrammarAlternativeOperatorUsesThePartThreePriority() =>
+        Assert.Equal("yes", Run("( current_op(1105, xfy, '|') -> write(yes) ; write(no) )"));
+
     [Theory]
     [InlineData("phrase(greeting, [hello, world])")]
     [InlineData("phrase(greeting, [hello, prolog])")]
@@ -94,6 +98,56 @@ public sealed class GrammarTests
     }
 
     [Fact]
+    public void ASemicontextCanLookAheadWithoutConsuming()
+    {
+        Assert.Equal(
+            "a-[a,b]",
+            PrologTestHost.Run(
+                """
+                look_ahead(X), [X] --> [X].
+                :- initialization((phrase(look_ahead(X), [a, b], R), write(X-R))).
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void AnEmptyBodyCanConstrainTheRemainderWithASemicontext()
+    {
+        Assert.Equal(
+            "[word,tail]",
+            PrologTestHost.Run(
+                """
+                next_word, [word] --> [].
+                :- initialization((phrase(next_word, [tail], R), write(R))).
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ANonListSemicontextIsReported()
+    {
+        (RunResult result, _, IReadOnlyList<Syntax.Diagnostic> diagnostics) = PrologTestHost.Execute(
+            "invalid, not_a_list --> [].\n"
+        );
+
+        Assert.NotEqual(RunResult.Success, result);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidGrammarRule);
+    }
+
+    [Fact]
+    public void AnImproperSemicontextIsReported()
+    {
+        (RunResult result, _, IReadOnlyList<Syntax.Diagnostic> diagnostics) = PrologTestHost.Execute(
+            "invalid, [a|tail] --> [].\n"
+        );
+
+        Assert.NotEqual(RunResult.Success, result);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidGrammarRule);
+    }
+
+    [Fact]
     public void AVariableBodyGoesThroughPhrase() =>
         Assert.Equal("yes", Run("X = [a], ( phrase(X, [a]) -> write(yes) ; write(no) )"));
 
@@ -128,6 +182,23 @@ public sealed class GrammarTests
     public void PhraseOnAnUnboundBodyIsReported() =>
         Assert.Equal("instantiation_error", PrologTestHost.RunGoal("catch(phrase(_, []), error(E, _), write(E))"));
 
+    [Theory]
+    [InlineData("phrase(1, [])", "type_error(callable,1)")]
+    [InlineData("phrase(1, [], _)", "type_error(callable,1)")]
+    public void PhraseRejectsANonCallableBody(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+
+    [Theory]
+    [InlineData("phrase([a|_], [a])", "instantiation_error")]
+    [InlineData("phrase([a|tail], [a])", "type_error(list,[a|tail])")]
+    [InlineData("phrase([], not_a_list)", "type_error(list,not_a_list)")]
+    public void PhraseReportsGrammarBodyAndPhraseTwoListErrors(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+
+    [Fact]
+    public void PhraseThreeIsSteadfastInItsRemainder() =>
+        Assert.Equal("[[a,tail]]", Run("findall(Input, phrase([a], Input, [tail]), Inputs), write(Inputs)"));
+
     [Fact]
     public void GeneratedVariablesCannotCollideWithTheGrammarsOwn()
     {
@@ -159,6 +230,28 @@ public sealed class GrammarTests
     {
         (_, _, IReadOnlyList<Syntax.Diagnostic> diagnostics) = PrologTestHost.Execute("a --> 1.\n");
 
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidGrammarRule);
+    }
+
+    [Theory]
+    [InlineData("[] --> [].")]
+    [InlineData("! --> [].")]
+    [InlineData("(a, b) --> [].")]
+    [InlineData("call(G) --> [].")]
+    public void AGrammarControlConstructCannotBeDefinedAsARuleHead(string source)
+    {
+        (RunResult result, _, IReadOnlyList<Syntax.Diagnostic> diagnostics) = PrologTestHost.Execute(source);
+
+        Assert.NotEqual(RunResult.Success, result);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidGrammarRule);
+    }
+
+    [Fact]
+    public void AGrammarRuleCannotExpandToAPredefinedProcedure()
+    {
+        (RunResult result, _, IReadOnlyList<Syntax.Diagnostic> diagnostics) = PrologTestHost.Execute("phrase(Body) --> [Body].");
+
+        Assert.NotEqual(RunResult.Success, result);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidGrammarRule);
     }
 }

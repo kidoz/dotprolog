@@ -277,7 +277,7 @@ internal static class StandardLibrary
         % phrase/2,3 only has to supply the two list arguments. It walks the control
         % constructs itself because a body built at run time was never translated.
 
-        phrase(Body, List) :- phrase(Body, List, []).
+        phrase(Body, List) :- '$validate_partial_list'(List), phrase(Body, List, []).
 
         phrase(Body, List, Rest) :- '$phrase'(Body, List, Rest).
 
@@ -296,7 +296,7 @@ internal static class StandardLibrary
         '$phrase'(!, S, S) :- !.
         '$phrase'({Goal}, S, S) :- !, call(Goal).
         '$phrase'([], S, S) :- !.
-        '$phrase'([H|T], S0, S) :- !, append([H|T], S, S0).
+        '$phrase'([H|T], S0, S) :- !, '$validate_proper_list'([H|T]), append([H|T], S, S0).
         '$phrase'(Body, S0, S) :- '$add_args'(Body, [S0, S], Goal), call(Goal).
 
         % --- bagof/3 and setof/3 ---------------------------------------------------

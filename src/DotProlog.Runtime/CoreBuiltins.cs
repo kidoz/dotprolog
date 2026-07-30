@@ -114,6 +114,7 @@ public static class CoreBuiltins
             }
         );
         registry.Register("$validate_partial_list", 1, ValidatePartialList);
+        registry.Register("$validate_proper_list", 1, ValidateProperList);
 
         // Records where a host query's variables live, so each solution can be read back. The engine
         // compiles '$bindings'(v(V1, ..., Vn)) as the first goal of a query it was handed.
@@ -221,6 +222,13 @@ public static class CoreBuiltins
         return TermList.IsEmpty(machine, tail) || tail.Tag == CellTag.Reference
             ? true
             : throw PrologErrors.Type(machine, "list", list);
+    }
+
+    /// <summary>Accepts a proper list and preserves the required partial-list error distinction.</summary>
+    private static bool ValidateProperList(Machine machine)
+    {
+        _ = TermList.ReadProper(machine, machine.Argument(0));
+        return true;
     }
 
     /// <summary>

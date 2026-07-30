@@ -150,7 +150,7 @@ public sealed class OperatorTable
         }
 
         Define(1100, OperatorType.Xfy, ";");
-        Define(1100, OperatorType.Xfy, "|");
+        Define(1105, OperatorType.Xfy, "|");
         Define(1050, OperatorType.Xfy, "->");
         Define(1050, OperatorType.Xfy, "*->");
         Define(1000, OperatorType.Xfy, ",");

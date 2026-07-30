@@ -145,6 +145,97 @@ public sealed class ModuleTests : IDisposable
     }
 
     [Fact]
+    public void ASelectedImportMustBeExported()
+    {
+        Write(
+            "library.pl",
+            """
+            :- module(library, [visible/0]).
+            visible.
+            hidden.
+            """
+        );
+        string main = Write("main.pl", ":- use_module(library, [hidden/0]).\n");
+
+        var engine = new PrologEngine { Output = TextWriter.Null };
+        LoadResult loaded = engine.ConsultFile(main);
+
+        Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidModuleImport);
+    }
+
+    [Fact]
+    public void ASelectedImportMustContainPredicateIndicators()
+    {
+        Write(
+            "library.pl",
+            """
+            :- module(library, [visible/0]).
+            visible.
+            """
+        );
+        string main = Write("main.pl", ":- use_module(library, [visible]).\n");
+
+        var engine = new PrologEngine { Output = TextWriter.Null };
+        LoadResult loaded = engine.ConsultFile(main);
+
+        Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidModuleImport);
+    }
+
+    [Fact]
+    public void ConflictingImportsAreReported()
+    {
+        Write("first.pl", ":- module(first, [item/1]).\nitem(first).\n");
+        Write("second.pl", ":- module(second, [item/1]).\nitem(second).\n");
+        string main = Write(
+            "main.pl",
+            """
+            :- module(main, []).
+            :- use_module(first).
+            :- use_module(second).
+            """
+        );
+
+        var engine = new PrologEngine { Output = TextWriter.Null };
+        LoadResult loaded = engine.ConsultFile(main);
+
+        Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidModuleImport);
+    }
+
+    [Fact]
+    public void AModuleDeclarationMustBeFirst()
+    {
+        string path = Write(
+            "late.pl",
+            """
+            before.
+            :- module(late, [before/0]).
+            """
+        );
+
+        var engine = new PrologEngine { Output = TextWriter.Null };
+        LoadResult loaded = engine.ConsultFile(path);
+
+        Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidModuleDeclaration);
+    }
+
+    [Fact]
+    public void AModuleTextCannotDeclareTwoModules()
+    {
+        string path = Write(
+            "duplicate.pl",
+            """
+            :- module(first, []).
+            :- module(second, []).
+            """
+        );
+
+        var engine = new PrologEngine { Output = TextWriter.Null };
+        LoadResult loaded = engine.ConsultFile(path);
+
+        Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidModuleDeclaration);
+    }
+
+    [Fact]
     public void AModuleSeesTheStandardLibrary()
     {
         string path = Write(
@@ -327,6 +418,40 @@ public sealed class ModuleTests : IDisposable
         );
 
         Assert.Equal("[1,2]\n", RunFile(main));
+    }
+
+    [Theory]
+    [InlineData("dynamic")]
+    [InlineData("multifile")]
+    [InlineData("discontiguous")]
+    public void AGrammarRuleIndicatorIsAcceptedByPredicateDeclarations(string declaration)
+    {
+        string path = Write(
+            $"{declaration}.pl",
+            $$"""
+            :- {{declaration}} token//1.
+
+            token(X) --> [X].
+
+            :- initialization((phrase(token(a), [a]), write(ok), nl)).
+            """
+        );
+
+        Assert.Equal("ok\n", RunFile(path));
+    }
+
+    [Theory]
+    [InlineData("dynamic")]
+    [InlineData("multifile")]
+    [InlineData("discontiguous")]
+    public void AMalformedGrammarRuleIndicatorIsReportedByPredicateDeclarations(string declaration)
+    {
+        string path = Write($"{declaration}-bad.pl", $":- {declaration} token//-1.\n");
+
+        var engine = new PrologEngine { Output = TextWriter.Null };
+        LoadResult loaded = engine.ConsultFile(path);
+
+        Assert.False(loaded.Success);
     }
 
     [Fact]

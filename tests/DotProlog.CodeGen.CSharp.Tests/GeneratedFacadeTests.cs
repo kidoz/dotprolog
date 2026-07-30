@@ -30,6 +30,11 @@ public sealed class GeneratedFacadeTests
 
         runtime_bridge(X) :- runtime_value(X).
 
+        token(X) --> [X].
+        grammar_accepts(X) :- phrase(token(X), [X]).
+        look_ahead(X), [X] --> [X].
+        grammar_looks_ahead(X) :- phrase(look_ahead(X), [X, tail], [X, tail]).
+
         :- dynamic dynamic_value/1.
         dynamic_value(first).
 
@@ -66,6 +71,8 @@ public sealed class GeneratedFacadeTests
         :- clr_export(in_stock/1, semidet, [in(item, atom)]).
         :- clr_export(stock_level/2, semidet, [in(item, atom), out(level, integer)]).
         :- clr_export(runtime_bridge/1, nondet, [out(value, atom)]).
+        :- clr_export(grammar_accepts/1, semidet, [in(value, atom)]).
+        :- clr_export(grammar_looks_ahead/1, semidet, [in(value, atom)]).
         :- clr_export(dynamic_value/1, nondet, [out(value, atom)]).
         :- clr_export(split/3, nondet, [in(items, list(atom)), out(left, list(atom)), out(right, list(atom))]).
         :- clr_export(audited/1, nondet, [out(value, atom)]).
@@ -254,6 +261,15 @@ public sealed class GeneratedFacadeTests
         var values = (IEnumerable<string>)Call(module, type, "RuntimeBridge", CancellationToken.None)!;
 
         Assert.Equal(["alpha", "beta"], values);
+    }
+
+    [Fact]
+    public void CompiledGrammarRulesCrossBothExecutionBoundaries()
+    {
+        object module = CreateModule(out Type type);
+
+        Assert.Equal(true, Call(module, type, "GrammarAccepts", "token"));
+        Assert.Equal(true, Call(module, type, "GrammarLooksAhead", "token"));
     }
 
     [Fact]

@@ -95,13 +95,25 @@ internal sealed class DcgTranslator
             return false;
         }
 
-        if (!TryTranslateBody(pushback, end, middle, out SyntaxTerm pushed))
+        if (!TryTranslateSemicontext(pushback, end, middle, out SyntaxTerm pushed))
         {
             return false;
         }
 
         body = Conjunction(inner, pushed, rule.Span);
         return true;
+    }
+
+    private bool TryTranslateSemicontext(SyntaxTerm semicontext, SyntaxTerm start, SyntaxTerm end, out SyntaxTerm goal)
+    {
+        if (semicontext is not AtomTerm { Name: "[]" } && semicontext is not CompoundTerm { Name: ".", Arity: 2 })
+        {
+            goal = semicontext;
+            Report(semicontext, "A grammar rule semicontext must be a terminal sequence.");
+            return false;
+        }
+
+        return TryTranslateTerminals(semicontext, start, end, out goal);
     }
 
     private bool TryTranslateBody(SyntaxTerm element, SyntaxTerm start, SyntaxTerm end, out SyntaxTerm goal)
