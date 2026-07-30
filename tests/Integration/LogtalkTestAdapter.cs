@@ -294,7 +294,8 @@ internal static class LogtalkTestAdapter
         }
 
         return TryUnwrapBackendBody(declaration.Body, out goal)
-            || TryUnwrapFindallBackendGoal(declaration.Body, out goal);
+            || TryUnwrapFindallBackendGoal(declaration.Body, out goal)
+            || TryTranslateEmbeddedBackendGoal(declaration.Body, out goal);
     }
 
     private static bool TryUnwrapFindallBackendGoal(string source, out string goal)
@@ -336,6 +337,50 @@ internal static class LogtalkTestAdapter
         }
 
         return false;
+    }
+
+    private static bool TryTranslateEmbeddedBackendGoal(string source, out string goal)
+    {
+        if (
+            !source.Contains('{')
+            || source.Contains("^^", StringComparison.Ordinal)
+            || source.Contains("::", StringComparison.Ordinal)
+            || source.Contains("assertion(", StringComparison.Ordinal)
+            || source.Contains("variant(", StringComparison.Ordinal)
+        )
+        {
+            goal = string.Empty;
+            return false;
+        }
+
+        char[] translated = source.ToCharArray();
+        var state = new ScanState();
+        bool found = false;
+
+        for (int index = 0; index < source.Length; index++)
+        {
+            bool shielded = state.LineComment || state.BlockComment || state.Quote != '\0';
+            int current = index;
+            Advance(source, ref index, state);
+
+            if (shielded || current != index)
+            {
+                continue;
+            }
+
+            if (source[current] == '{')
+            {
+                translated[current] = '(';
+                found = true;
+            }
+            else if (source[current] == '}')
+            {
+                translated[current] = ')';
+            }
+        }
+
+        goal = found && state.Braces == 0 ? new string(translated) : string.Empty;
+        return goal.Length > 0;
     }
 
     private static bool TryTranslateSupportClause(string clause, out string translated)

@@ -137,6 +137,24 @@ public sealed class LogtalkConformanceTests
         Assert.True(LogtalkTestAdapter.TryUnwrapBackendGoal(findall, out string findallGoal));
         Assert.Equal("findall(X, ((between(1, 2, X))), L)", findallGoal);
 
+        const string mixedSource = """
+            helper(a).
+            test(iso_mixed_escape, true) :-
+                helper(X),
+                {atom(X)}.
+            """;
+        LogtalkTestDeclaration mixed = Assert.Single(
+            LogtalkTestAdapter.ReadDeclarations(mixedSource, "mixed.lgt")
+        );
+        Assert.True(LogtalkTestAdapter.TryUnwrapBackendGoal(mixed, out string mixedGoal));
+        Assert.Equal(
+            """
+            helper(X),
+                (atom(X))
+            """,
+            mixedGoal
+        );
+
         var adapterEngine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
         var errors = new LogtalkTestDeclaration(
             "fixture.lgt",
@@ -280,15 +298,17 @@ public sealed class LogtalkConformanceTests
                 ),
             ];
 
-            Assert.Equal(505, directCases.Length);
-            Assert.Equal(303, directCases.Count(test => test.OutcomeKind == "true"));
-            Assert.Equal(72, directCases.Count(test => test.OutcomeKind == "false"));
+            Assert.Equal(616, directCases.Length);
+            Assert.Equal(335, directCases.Count(test => test.OutcomeKind == "true"));
+            Assert.Equal(73, directCases.Count(test => test.OutcomeKind == "false"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "fail"));
-            Assert.Equal(71, directCases.Count(test => test.OutcomeKind == "error"));
+            Assert.Equal(134, directCases.Count(test => test.OutcomeKind == "error"));
             Assert.Equal(11, directCases.Count(test => test.OutcomeKind == "variant"));
             Assert.Equal(41, directCases.Count(test => test.OutcomeKind == "exists"));
             Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "subsumes"));
             Assert.Single(directCases, test => test.OutcomeKind == "deterministic");
+            Assert.Equal(14, directCases.Count(test => test.OutcomeKind == "errors"));
+            Assert.Single(directCases, test => test.OutcomeKind == "ball");
 
             string? selectedId = Environment.GetEnvironmentVariable(CaseVariable);
             LogtalkTestDeclaration[] casesToExecute = SelectCasesToExecute(directCases, selectedId);
