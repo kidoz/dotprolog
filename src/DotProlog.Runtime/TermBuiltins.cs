@@ -276,27 +276,33 @@ internal static class TermBuiltins
             return machine.Unify(machine.Argument(1), machine.CreateList([term], Cell.Atom(emptyList)));
         }
 
+        Cell list = machine.Argument(1);
         List<Cell> elements = [];
-        if (!TermList.IsEmpty(machine, TermList.Read(machine, machine.Argument(1), elements)))
+        Cell tail = TermList.Read(machine, list, elements);
+        if (!TermList.IsEmpty(machine, tail))
         {
-            throw PrologErrors.Instantiation(machine);
+            throw tail.Tag == CellTag.Reference ? PrologErrors.Instantiation(machine) : PrologErrors.Type(machine, "list", list);
         }
 
         if (elements.Count == 0)
         {
-            throw PrologErrors.Domain(machine, "non_empty_list", machine.Argument(1));
+            throw PrologErrors.Domain(machine, "non_empty_list", list);
         }
 
         Cell head = machine.Dereference(elements[0]);
-
-        if (elements.Count == 1)
-        {
-            return machine.Unify(term, head);
-        }
-
         if (head.Tag == CellTag.Reference)
         {
             throw PrologErrors.Instantiation(machine);
+        }
+
+        if (elements.Count == 1)
+        {
+            if (head.Tag == CellTag.Structure)
+            {
+                throw PrologErrors.Type(machine, "atomic", head);
+            }
+
+            return machine.Unify(term, head);
         }
 
         if (head.Tag != CellTag.Atom)

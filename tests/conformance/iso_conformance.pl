@@ -100,6 +100,11 @@ iso_case('8.5.1', functor(_, foo, _), error(instantiation_error)).
 iso_case('8.5.1', functor(_, foo, a), error(type_error(integer, a))).
 iso_case('8.5.1', functor(_, _, 1), error(instantiation_error)).
 iso_case('8.5.1', functor(_, foo(a), 1), error(type_error(atomic, foo(a)))).
+iso_case('8.5.1', functor(_, foo(a), 0), error(type_error(atomic, foo(a)))).
+iso_case('8.5.1', functor(_, 1, 1), error(type_error(atom, 1))).
+iso_case('8.5.1', functor(_, f, -1), error(domain_error(not_less_than_zero, -1))).
+iso_case('8.5.1', functor(_, f, 255), success).
+iso_case('8.5.1', functor(_, f, 256), error(representation_error(max_arity))).
 iso_case('8.5.2', arg(1, foo(a, b), a), success).
 iso_case('8.5.2', arg(3, foo(a, b), _), failure).
 iso_case('8.5.2', arg(0, foo(a, b), _), failure).
@@ -116,7 +121,14 @@ iso_case('8.5.3', (_ =.. _), error(instantiation_error)).
 iso_case('8.5.3', (_ =.. [foo, a | _]), error(instantiation_error)).
 iso_case('8.5.3', (_ =.. [_, a]), error(instantiation_error)).
 iso_case('8.5.3', (_ =.. [foo(a), a]), error(type_error(atom, foo(a)))).
+iso_case('8.5.3', (_ =.. [1, a]), error(type_error(atom, 1))).
+iso_case('8.5.3', (_ =.. atom), error(type_error(list, atom))).
+iso_case('8.5.3', (_ =.. [foo | tail]), error(type_error(list, [foo | tail]))).
+iso_case('8.5.3', (_ =.. [_]), error(instantiation_error)).
+iso_case('8.5.3', (_ =.. [foo(a)]), error(type_error(atomic, foo(a)))).
 iso_case('8.5.3', (_ =.. []), error(domain_error(non_empty_list, []))).
+iso_case('8.5.3', (length(As1, 255), L1 = [f | As1], T1 =.. L1, functor(T1, f, 255)), success).
+iso_case('8.5.3', (length(As2, 256), _ =.. [f | As2]), error(representation_error(max_arity))).
 iso_case('8.5.4', copy_term(_, _), success).
 iso_case('8.5.4', copy_term(a, a), success).
 iso_case('8.5.4', copy_term(a, b), failure).

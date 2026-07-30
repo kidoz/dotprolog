@@ -136,6 +136,15 @@ public sealed class TermBuiltinTests
     }
 
     [Theory]
+    [InlineData("functor(_, f, -1)", "domain_error(not_less_than_zero,-1)")]
+    [InlineData("functor(_, 1, 1)", "type_error(atom,1)")]
+    [InlineData("functor(_, f(a), 0)", "type_error(atomic,f(a))")]
+    public void FunctorReportsIsoConstructionErrors(string goal, string expected)
+    {
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+    }
+
+    [Theory]
     [InlineData("arg(1, f(a,b), X)", "a")]
     [InlineData("arg(2, f(a,b), X)", "b")]
     public void ArgSelectsAnArgument(string goal, string expected)
@@ -190,5 +199,42 @@ public sealed class TermBuiltinTests
         PrologException exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
 
         Assert.Contains("domain_error(non_empty_list", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("T =.. atom", "type_error(list,atom)")]
+    [InlineData("T =.. [f|tail]", "type_error(list,[f|tail])")]
+    [InlineData("T =.. [_]", "instantiation_error")]
+    [InlineData("T =.. [f(a)]", "type_error(atomic,f(a))")]
+    public void UnivReportsIsoListAndHeadErrors(string goal, string expected)
+    {
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+    }
+
+    [Fact]
+    public void UnivEnforcesTheMaximumArity()
+    {
+        string maximum = string.Join(",", Enumerable.Repeat("a", Machine.ArgumentRegisterCount - 1));
+        string oversized = $"{maximum},a";
+
+        Assert.Equal(
+            "255 representation_error(max_arity)",
+            PrologTestHost.RunGoal(
+                $"T =.. [f,{maximum}], functor(T, f, A), write(A), write(' '), "
+                    + $"catch((_ =.. [f,{oversized}]), error(E, _), write(E))"
+            )
+        );
+    }
+
+    [Fact]
+    public void FunctorEnforcesTheMaximumArity()
+    {
+        Assert.Equal(
+            "255 representation_error(max_arity)",
+            PrologTestHost.RunGoal(
+                "functor(T, f, 255), functor(T, f, A), write(A), write(' '), "
+                    + "catch(functor(_, f, 256), error(E, _), write(E))"
+            )
+        );
     }
 }
