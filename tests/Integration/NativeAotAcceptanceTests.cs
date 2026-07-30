@@ -122,6 +122,7 @@ public sealed class NativeAotAcceptanceTests
                     "'.'(1,'.'(2,'.'(3,[])))",
                     "427",
                     "captured(1+2)",
+                    "read_boundary",
                     "done",
                 ],
                 runLog.ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)

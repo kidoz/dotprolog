@@ -624,6 +624,12 @@ internal static class Program
                 open('dotprolog-aot.tmp', read, In), read(In, Read), close(In),
                 write(Read), nl,
 
+                open('dotprolog-aot-read-boundary.tmp', write, BoundaryOut),
+                write(BoundaryOut, 'a. tail'), close(BoundaryOut),
+                open('dotprolog-aot-read-boundary.tmp', read, BoundaryIn),
+                read(BoundaryIn, a), get_char(BoundaryIn, ' '), get_char(BoundaryIn, t), close(BoundaryIn),
+                write(read_boundary), nl,
+
                 write(done), nl.
             """;
 

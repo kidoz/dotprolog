@@ -56,6 +56,16 @@ public sealed class StreamTests : IDisposable
         );
 
     [Fact]
+    public void ReadingATermLeavesFollowingCharactersUntouched() =>
+        Assert.Equal(
+            "yes\n",
+            RunWithInput(
+                ":- initialization((read(a), get_char(' '), get_char(t), write(yes), nl)).",
+                "a. tail"
+            )
+        );
+
+    [Fact]
     public void ReadingPastTheEndGivesEndOfFile() =>
         Assert.Equal("end_of_file\n", RunWithInput(":- initialization((read(T), writeq(T), nl)).", ""));
 

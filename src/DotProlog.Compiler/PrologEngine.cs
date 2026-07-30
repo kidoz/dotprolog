@@ -490,8 +490,8 @@ public sealed class PrologEngine : IRuntimeCompiler
         int end = ClauseScanner.FindClauseEnd(buffer, Program.CharacterConversions, Program.Flags);
         while (end < 0)
         {
-            string? line = input.ReadLine();
-            if (line is null)
+            string? chunk = ReadLinePreservingTerminator(input);
+            if (chunk is null)
             {
                 // What is left at end of input is either nothing, which is end_of_file, or a clause
                 // missing its terminator. Reading the incomplete text as if it were whole would
@@ -502,7 +502,7 @@ public sealed class PrologEngine : IRuntimeCompiler
                 return blank ? false : throw SyntaxError(machine, "unexpected_end_of_file");
             }
 
-            buffer += line + "\n";
+            buffer += chunk;
             end = ClauseScanner.FindClauseEnd(buffer, Program.CharacterConversions, Program.Flags);
         }
 
@@ -554,6 +554,27 @@ public sealed class PrologEngine : IRuntimeCompiler
         variables = machine.CreateList(variableOrder.ToArray(), Cell.Atom(machine.Symbols.EmptyList));
         singletons = machine.CreateList(singletonPairs.ToArray(), Cell.Atom(machine.Symbols.EmptyList));
         return true;
+    }
+
+    private static string? ReadLinePreservingTerminator(TextReader input)
+    {
+        var chunk = new System.Text.StringBuilder();
+
+        while (true)
+        {
+            int value = input.Read();
+            if (value < 0)
+            {
+                return chunk.Length == 0 ? null : chunk.ToString();
+            }
+
+            char character = (char)value;
+            chunk.Append(character);
+            if (character is '\r' or '\n')
+            {
+                return chunk.ToString();
+            }
+        }
     }
 
     /// <summary>

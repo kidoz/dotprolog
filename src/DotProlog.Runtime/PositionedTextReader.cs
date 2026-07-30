@@ -3,7 +3,6 @@ namespace DotProlog.Runtime;
 /// <summary>A text-file reader whose next logical character has an explicit restorable position.</summary>
 internal sealed class PositionedTextReader(string text) : TextReader
 {
-    private readonly List<LineSegment> _lines = [];
     private int _position;
 
     internal long Position => _position;
@@ -36,7 +35,6 @@ internal sealed class PositionedTextReader(string text) : TextReader
             _position++;
         }
 
-        _lines.Add(new LineSegment(start, contentEnd - start, _position));
         return text[start..contentEnd];
     }
 
@@ -62,35 +60,8 @@ internal sealed class PositionedTextReader(string text) : TextReader
         }
 
         _position = (int)position;
-        _lines.Clear();
         return true;
     }
 
-    internal long PositionBeforeBuffer(string buffer)
-    {
-        if (buffer.Length == 0)
-        {
-            return _position;
-        }
-
-        long normalizedLength = _lines.Sum(line => (long)line.ContentLength + 1);
-        long consumed = normalizedLength - buffer.Length;
-        long normalizedStart = 0;
-
-        foreach (LineSegment line in _lines)
-        {
-            long normalizedEnd = normalizedStart + line.ContentLength + 1;
-            if (consumed <= normalizedEnd)
-            {
-                long withinLine = consumed - normalizedStart;
-                return withinLine <= line.ContentLength ? line.Start + withinLine : line.End;
-            }
-
-            normalizedStart = normalizedEnd;
-        }
-
-        return _position;
-    }
-
-    private readonly record struct LineSegment(int Start, int ContentLength, int End);
+    internal long PositionBeforeBuffer(string buffer) => _position - buffer.Length;
 }
