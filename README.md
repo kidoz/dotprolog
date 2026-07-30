@@ -237,6 +237,8 @@ errors instead of being converted to exit code zero.
 `compare/3` likewise distinguishes an invalid output type from an atom outside the order domain.
 `arg/3` distinguishes an uninstantiated compound term and a negative index from its ordinary
 zero-or-out-of-range failure cases.
+`=../2` distinguishes partial lists from malformed list terms, requires an atomic one-element
+construction list, and shares the advertised arity-255 limit with `functor/3`.
 `current_op/3` validates bound priority, specifier, and name filters before enumeration.
 Its solutions come from the operator-table snapshot current when the goal starts, even if `op/3`
 changes the live table between solutions.
@@ -382,7 +384,7 @@ A control term assembled at run time and passed to `call/1` is lowered to VM byt
 same control-construct compiler used for source clauses. Its cut is transparent within that
 meta-called goal and opaque to the caller, as ISO specifies.
 
-DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 460 conformance cases encoded
+DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 472 conformance cases encoded
 from ISO/IEC 13211-1, all passing, but those are its own reading of the standard rather than an
 independent suite — see [COMPATIBILITY.md](COMPATIBILITY.md), which also lists the known
 differences.
