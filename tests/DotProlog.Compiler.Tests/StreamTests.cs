@@ -150,6 +150,15 @@ public sealed class StreamTests : IDisposable
         );
     }
 
+    [Theory]
+    [InlineData("read_term(_, _, atom)", "instantiation_error")]
+    [InlineData("read_term(f(1), _, atom)", "domain_error(stream_or_alias,f(1))")]
+    [InlineData("read_term(no_such_stream, _, [_])", "instantiation_error")]
+    [InlineData("read_term(no_such_stream, _, [bad])", "domain_error(read_option,bad)")]
+    [InlineData("read_term(user_output, _, [bad])", "domain_error(read_option,bad)")]
+    public void ReportsIsoReadTermErrorPriority(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+
     [Fact]
     public void WritesAndReadsBackAFile()
     {

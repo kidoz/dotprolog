@@ -170,6 +170,15 @@ public sealed class StreamEofActionTests : IDisposable
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
 
     [Theory]
+    [InlineData("close(_, atom)", "instantiation_error")]
+    [InlineData("close(no_such_stream, [_])", "instantiation_error")]
+    [InlineData("close(no_such_stream, atom)", "type_error(list,atom)")]
+    [InlineData("close(f(1), [bad])", "domain_error(stream_or_alias,f(1))")]
+    [InlineData("close(no_such_stream, [bad])", "domain_error(close_option,bad)")]
+    public void ReportsIsoCloseErrorPriority(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+
+    [Theory]
     [InlineData("false")]
     [InlineData("true")]
     public void StandardOutputAcceptsForceCloseOptions(string force) =>

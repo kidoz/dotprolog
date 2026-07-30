@@ -154,6 +154,51 @@ internal static class StreamBuiltins
         }
     }
 
+    private static void ValidateExplicitStreamDomain(Machine machine, int index)
+    {
+        if (index < 0)
+        {
+            return;
+        }
+
+        Cell stream = machine.Argument(index);
+        if (stream.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        if (stream.Tag != CellTag.Atom && !TryStreamHandle(machine, stream, out _))
+        {
+            throw PrologErrors.Domain(machine, "stream_or_alias", stream);
+        }
+    }
+
+    private static InspectedOptionList InspectOptionList(Machine machine, int index)
+    {
+        Cell original = machine.Argument(index);
+        List<Cell> elements = [];
+        Cell tail = TermList.Read(machine, original, elements);
+
+        if (tail.Tag == CellTag.Reference || elements.Any(element => machine.Dereference(element).Tag == CellTag.Reference))
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        return new InspectedOptionList(original, elements, TermList.IsEmpty(machine, tail));
+    }
+
+    private static List<Cell> RequireProperOptionList(Machine machine, InspectedOptionList options)
+    {
+        if (!options.IsProper)
+        {
+            throw PrologErrors.Type(machine, "list", options.Original);
+        }
+
+        return options.Elements;
+    }
+
+    private readonly record struct InspectedOptionList(Cell Original, List<Cell> Elements, bool IsProper);
+
     private static Cell StreamCulprit(Machine machine, int index, PrologStream stream) =>
         index < 0 ? StreamTerm(machine, stream) : machine.Argument(index);
 
@@ -181,14 +226,23 @@ internal static class StreamBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        if (file.Tag != CellTag.Atom)
-        {
-            throw PrologErrors.Domain(machine, "source_sink", file);
-        }
+        InspectedOptionList? inspectedOptions = options < 0 ? null : InspectOptionList(machine, options);
 
         if (mode.Tag != CellTag.Atom)
         {
             throw PrologErrors.Type(machine, "atom", mode);
+        }
+
+        List<Cell>? optionElements = inspectedOptions is null ? null : RequireProperOptionList(machine, inspectedOptions.Value);
+        Cell target = machine.Argument(2);
+        if (target.Tag != CellTag.Reference)
+        {
+            throw PrologErrors.Uninstantiation(machine, target);
+        }
+
+        if (file.Tag != CellTag.Atom)
+        {
+            throw PrologErrors.Domain(machine, "source_sink", file);
         }
 
         string modeName = machine.Symbols.AtomName(mode.Index);
@@ -197,13 +251,9 @@ internal static class StreamBuiltins
             throw PrologErrors.Domain(machine, "io_mode", mode);
         }
 
-        OpenOptions openOptions =
-            options < 0 ? new OpenOptions(null, "text", true, PrologStream.EofAction.EofCode) : ReadOpenOptions(machine, options);
-        Cell target = machine.Argument(2);
-        if (target.Tag != CellTag.Reference)
-        {
-            throw PrologErrors.Uninstantiation(machine, target);
-        }
+        OpenOptions openOptions = optionElements is null
+            ? new OpenOptions(null, "text", true, PrologStream.EofAction.EofCode)
+            : ReadOpenOptions(machine, optionElements);
 
         if (openOptions.Alias is not null && machine.Streams.ByAlias(openOptions.Alias) is not null)
         {
@@ -241,11 +291,11 @@ internal static class StreamBuiltins
     }
 
     /// <summary>Reads the supported ISO options of <c>open/4</c>; unknown options are rejected.</summary>
-    private static OpenOptions ReadOpenOptions(Machine machine, int options)
+    private static OpenOptions ReadOpenOptions(Machine machine, List<Cell> options)
     {
         var result = new OpenOptions(null, "text", true, PrologStream.EofAction.EofCode);
 
-        foreach (Cell element in TermList.ReadProper(machine, machine.Argument(options)))
+        foreach (Cell element in options)
         {
             Cell option = machine.Dereference(element);
 
@@ -300,8 +350,11 @@ internal static class StreamBuiltins
 
     private static bool Close(Machine machine, int options)
     {
+        ValidateExplicitStreamInstantiation(machine, 0);
+        List<Cell>? optionElements = options < 0 ? null : RequireProperOptionList(machine, InspectOptionList(machine, options));
+        ValidateExplicitStreamDomain(machine, 0);
+        bool force = optionElements is not null && ReadCloseOptions(machine, optionElements);
         PrologStream stream = ResolveEither(machine, 0);
-        bool force = options >= 0 && ReadCloseOptions(machine, options);
 
         try
         {
@@ -315,11 +368,11 @@ internal static class StreamBuiltins
         return true;
     }
 
-    private static bool ReadCloseOptions(Machine machine, int options)
+    private static bool ReadCloseOptions(Machine machine, List<Cell> options)
     {
         bool force = false;
 
-        foreach (Cell element in TermList.ReadProper(machine, machine.Argument(options)))
+        foreach (Cell element in options)
         {
             Cell option = machine.Dereference(element);
             if (option.Tag == CellTag.Reference)
@@ -669,9 +722,14 @@ internal static class StreamBuiltins
 
     private static bool Read(Machine machine, int stream, int term, int options)
     {
+        ValidateExplicitStreamInstantiation(machine, stream);
+        InspectedOptionList? inspectedOptions = options < 0 ? null : InspectOptionList(machine, options);
+        ValidateExplicitStreamDomain(machine, stream);
+        List<ReadOption> readOptions = inspectedOptions is null
+            ? []
+            : ReadReadOptions(machine, RequireProperOptionList(machine, inspectedOptions.Value));
         PrologStream source = Resolve(machine, stream, input: true);
         PrepareInput(machine, source, stream);
-        List<ReadOption> readOptions = options < 0 ? [] : ReadReadOptions(machine, options);
         IRuntimeCompiler compiler =
             machine.Program.RuntimeCompiler ?? throw new PrologException("Reading a term needs a compiler to parse it.");
 
@@ -712,11 +770,11 @@ internal static class StreamBuiltins
     }
 
     /// <summary>Validates ISO read options before any input operation can consume a term.</summary>
-    private static List<ReadOption> ReadReadOptions(Machine machine, int options)
+    private static List<ReadOption> ReadReadOptions(Machine machine, List<Cell> options)
     {
         List<ReadOption> result = [];
 
-        foreach (Cell element in TermList.ReadProper(machine, machine.Argument(options)))
+        foreach (Cell element in options)
         {
             Cell option = machine.Dereference(element);
 
@@ -983,18 +1041,20 @@ internal static class StreamBuiltins
 
     private static bool SetStreamPosition(Machine machine)
     {
+        ValidateExplicitStreamInstantiation(machine, 0);
         Cell positionTerm = machine.Argument(1);
         if (positionTerm.Tag == CellTag.Reference)
         {
             throw PrologErrors.Instantiation(machine);
         }
 
-        PrologStream stream = ResolveEither(machine, 0);
+        ValidateExplicitStreamDomain(machine, 0);
         if (!TryReadPosition(machine, positionTerm, out long position))
         {
             throw PrologErrors.Domain(machine, "stream_position", positionTerm);
         }
 
+        PrologStream stream = ResolveEither(machine, 0);
         if (!stream.Reposition)
         {
             throw PrologErrors.Permission(machine, "reposition", "stream", machine.Argument(0));
@@ -1058,8 +1118,11 @@ internal static class StreamBuiltins
 
     private static bool WriteTermOptions(Machine machine, int stream, int term, int options)
     {
+        ValidateExplicitStreamInstantiation(machine, stream);
+        List<Cell> optionElements = RequireProperOptionList(machine, InspectOptionList(machine, options));
+        ValidateExplicitStreamDomain(machine, stream);
+        WriteOptions selected = ReadWriteOptions(machine, optionElements);
         PrologStream target = Resolve(machine, stream, input: false);
-        WriteOptions selected = ReadWriteOptions(machine, options);
         GuardIo(
             machine,
             () =>
@@ -1075,11 +1138,11 @@ internal static class StreamBuiltins
         return true;
     }
 
-    private static WriteOptions ReadWriteOptions(Machine machine, int options)
+    private static WriteOptions ReadWriteOptions(Machine machine, List<Cell> options)
     {
         var selected = new WriteOptions();
 
-        foreach (Cell element in TermList.ReadProper(machine, machine.Argument(options)))
+        foreach (Cell element in options)
         {
             Cell option = machine.Dereference(element);
             if (option.Tag == CellTag.Reference)
@@ -1212,7 +1275,10 @@ internal static class StreamBuiltins
             throw PrologErrors.Type(machine, "atom", text);
         }
 
-        List<ReadOption> readOptions = ReadReadOptions(machine, options: 2);
+        List<ReadOption> readOptions = ReadReadOptions(
+            machine,
+            RequireProperOptionList(machine, InspectOptionList(machine, index: 2))
+        );
         IRuntimeCompiler compiler =
             machine.Program.RuntimeCompiler ?? throw new PrologException("Reading a term needs a compiler to parse it.");
 

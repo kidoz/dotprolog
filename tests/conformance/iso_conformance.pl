@@ -371,6 +371,13 @@ iso_case('8.11.5', open(f, write, _, [reposition(_)]), error(instantiation_error
 iso_case('8.11.5', open(f, write, _, [eof_action(other)]), error(domain_error(stream_option, eof_action(other)))).
 iso_case('8.11.5', open(f, write, _, [eof_action(1)]), error(domain_error(stream_option, eof_action(1)))).
 iso_case('8.11.5', open(f, write, _, [eof_action(_)]), error(instantiation_error)).
+iso_case('8.11.5', open(file, 1, _, [_]), error(instantiation_error)).
+iso_case('8.11.5', open(1, 2, bound, atom), error(type_error(atom, 2))).
+iso_case('8.11.5', open(1, read, _, atom), error(type_error(list, atom))).
+iso_case('8.11.5', open(1, sideways, bound, []), error(uninstantiation_error(bound))).
+iso_case('8.11.5', open(1, sideways, _, []), error(domain_error(source_sink, 1))).
+iso_case('8.11.5', open(file, sideways, _, [bad]), error(domain_error(io_mode, sideways))).
+iso_case('8.11.5', open(file, write, bound, [bad]), error(uninstantiation_error(bound))).
 iso_case(
     '8.11.5',
     open(f, write, _, [alias(user_output)]),
@@ -385,6 +392,11 @@ iso_case('8.11.6', close(user_output, [force(_)]), error(instantiation_error)).
 iso_case('8.11.6', close(user_output, [force(other)]), error(domain_error(close_option, force(other)))).
 iso_case('8.11.6', close(user_output, [force(1)]), error(domain_error(close_option, force(1)))).
 iso_case('8.11.6', close(user_output, atom), error(type_error(list, atom))).
+iso_case('8.11.6', close(_, atom), error(instantiation_error)).
+iso_case('8.11.6', close(no_such_stream, [_]), error(instantiation_error)).
+iso_case('8.11.6', close(no_such_stream, atom), error(type_error(list, atom))).
+iso_case('8.11.6', close(f(1), [bad]), error(domain_error(stream_or_alias, f(1)))).
+iso_case('8.11.6', close(no_such_stream, [bad]), error(domain_error(close_option, bad))).
 iso_case('8.11.7', (current_output(S4), \+ var(S4)), success).
 iso_case('8.11.7', current_input(foo), error(domain_error(stream, foo))).
 iso_case('8.11.7', current_output(1), error(domain_error(stream, 1))).
@@ -415,6 +427,8 @@ iso_case(
     set_stream_position(user_input, '$stream_position'(0, 0, 0, 0)),
     error(permission_error(reposition, stream, user_input))
 ).
+iso_case('8.11.11', set_stream_position(f(1), foo), error(domain_error(stream_or_alias, f(1)))).
+iso_case('8.11.11', set_stream_position(no_such_stream, foo), error(domain_error(stream_position, foo))).
 
 % --- 8.12 Character input and output ------------------------------------------
 iso_case('8.12.1', get_char(no_such_stream, _), error(existence_error(stream, no_such_stream))).
@@ -466,6 +480,11 @@ iso_case('8.14.1', read_term(user_output, _, []), error(permission_error(input, 
 iso_case('8.14.1', read_term(_, [nonsense(x)]), error(domain_error(read_option, nonsense(x)))).
 iso_case('8.14.1', read_term(_, [_]), error(instantiation_error)).
 iso_case('8.14.1', read_term(_, atom), error(type_error(list, atom))).
+iso_case('8.14.1', read_term(_, _, atom), error(instantiation_error)).
+iso_case('8.14.1', read_term(f(1), _, atom), error(domain_error(stream_or_alias, f(1)))).
+iso_case('8.14.1', read_term(no_such_stream, _, [_]), error(instantiation_error)).
+iso_case('8.14.1', read_term(no_such_stream, _, [bad]), error(domain_error(read_option, bad))).
+iso_case('8.14.1', read_term(user_output, _, [bad]), error(domain_error(read_option, bad))).
 iso_case('8.14.1', (read_term_from_atom('f(A,B,A)', _, [singletons(S7)]), S7 = ['B'=_]), success).
 iso_case('8.14.1', (read_term_from_atom('f(A,_,A)', _, [variables(V7)]), V7 = [_, _]), success).
 iso_case('8.14.1', read_term_from_atom('f(A,A)', _, [singletons([])]), success).
@@ -476,6 +495,11 @@ iso_case('8.14.2', write_term(a, [quoted(on)]), error(domain_error(write_option,
 iso_case('8.14.2', write_term(a, [numbervars(1)]), error(domain_error(write_option, numbervars(1)))).
 iso_case('8.14.2', write_term(user_input, a, []), error(permission_error(output, stream, user_input))).
 iso_case('8.14.2', write_term(_, a, []), error(instantiation_error)).
+iso_case('8.14.2', write_term(_, x, atom), error(instantiation_error)).
+iso_case('8.14.2', write_term(f(1), x, [_]), error(instantiation_error)).
+iso_case('8.14.2', write_term(f(1), x, atom), error(type_error(list, atom))).
+iso_case('8.14.2', write_term(no_such_stream, x, [bad]), error(domain_error(write_option, bad))).
+iso_case('8.14.2', write_term(user_input, x, [bad]), error(domain_error(write_option, bad))).
 iso_case(
     '8.14.2',
     (with_output_to(atom(A6), write_term('$VAR'(27), [numbervars(true)])), A6 == 'B1'),

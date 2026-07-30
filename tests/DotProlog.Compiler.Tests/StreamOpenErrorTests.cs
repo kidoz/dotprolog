@@ -37,6 +37,20 @@ public sealed class StreamOpenErrorTests : IDisposable
         Assert.False(File.Exists(path));
     }
 
+    [Theory]
+    [InlineData("open(file, 1, _, [_])", "instantiation_error")]
+    [InlineData("open(1, 2, bound, atom)", "type_error(atom,2)")]
+    [InlineData("open(1, read, _, atom)", "type_error(list,atom)")]
+    [InlineData("open(1, sideways, bound, [])", "uninstantiation_error(bound)")]
+    [InlineData("open(1, sideways, _, [])", "domain_error(source_sink,1)")]
+    [InlineData("open(file, sideways, _, [bad])", "domain_error(io_mode,sideways)")]
+    [InlineData("open(file, write, bound, [bad])", "uninstantiation_error(bound)")]
+    public void ReportsIsoOpenErrorPriorityBeforeTouchingAFile(string goal, string expected)
+    {
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(_directory));
+    }
+
     [Fact]
     public void DuplicateAliasDoesNotReplaceTheOpenStreamOrTouchTheSecondFile()
     {

@@ -195,6 +195,8 @@ public sealed class StreamPositionTests : IDisposable
     [InlineData("set_stream_position(user_input, '$stream_position'(0,0,0,0))", "permission_error(reposition,stream,user_input)")]
     [InlineData("set_stream_position(no_such_stream, '$stream_position'(0,0,0,0))", "existence_error(stream,no_such_stream)")]
     [InlineData("set_stream_position(f(1), '$stream_position'(0,0,0,0))", "domain_error(stream_or_alias,f(1))")]
+    [InlineData("set_stream_position(f(1), foo)", "domain_error(stream_or_alias,f(1))")]
+    [InlineData("set_stream_position(no_such_stream, foo)", "domain_error(stream_position,foo)")]
     [InlineData(
         "set_stream_position(user_input, '$stream_position'(-1,0,0,0))",
         "domain_error(stream_position,$stream_position(-1,0,0,0))"

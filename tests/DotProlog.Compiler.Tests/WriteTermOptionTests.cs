@@ -63,4 +63,13 @@ public sealed class WriteTermOptionTests : IDisposable
     [InlineData("write_term(_, x, [])", "instantiation_error")]
     public void ReportsIsoWriteOptionAndStreamErrors(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+
+    [Theory]
+    [InlineData("write_term(_, x, atom)", "instantiation_error")]
+    [InlineData("write_term(f(1), x, [_])", "instantiation_error")]
+    [InlineData("write_term(f(1), x, atom)", "type_error(list,atom)")]
+    [InlineData("write_term(no_such_stream, x, [bad])", "domain_error(write_option,bad)")]
+    [InlineData("write_term(user_input, x, [bad])", "domain_error(write_option,bad)")]
+    public void ReportsIsoWriteTermErrorPriority(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
 }
