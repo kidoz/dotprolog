@@ -343,6 +343,28 @@ internal static class Program
                 UnivArityCaught == true,
                 write(term_construction_errors), nl,
 
+                % Atomic processing preserves ISO modes, domains, and exception terms in native code.
+                catch(atom_length(1, _), error(type_error(atom, 1), _), AtomLengthCaught = true),
+                AtomLengthCaught == true,
+                catch(
+                    atom_concat(_, native, _),
+                    error(instantiation_error, _),
+                    AtomConcatCaught = true),
+                AtomConcatCaught == true,
+                catch(
+                    sub_atom(native, -1, _, _, _),
+                    error(domain_error(not_less_than_zero, -1), _),
+                    SubAtomCaught = true),
+                SubAtomCaught == true,
+                catch(atom_chars(1.0, _), error(type_error(atom, 1.0), _), AtomCharsCaught = true),
+                AtomCharsCaught == true,
+                catch(
+                    number_codes(_, [51, 32]),
+                    error(syntax_error(illegal_number), _),
+                    NumberCodesCaught = true),
+                NumberCodesCaught == true,
+                write(atomic_processing_errors), nl,
+
                 % current_op/3 validates bound ISO filter domains before enumeration.
                 catch(
                     current_op(a, _, _),

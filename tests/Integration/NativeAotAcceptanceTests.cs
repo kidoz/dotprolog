@@ -96,6 +96,7 @@ public sealed class NativeAotAcceptanceTests
                     "compare_order_errors",
                     "arg_errors",
                     "term_construction_errors",
+                    "atomic_processing_errors",
                     "current_op_filter_errors",
                     "current_op_snapshot",
                     "quoted_operator_syntax",
