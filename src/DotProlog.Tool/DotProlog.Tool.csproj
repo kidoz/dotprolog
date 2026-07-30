@@ -18,6 +18,8 @@
         <PublishAot Condition="'$(RuntimeIdentifier)' != 'any'">true</PublishAot>
         <PublishAot Condition="'$(RuntimeIdentifier)' == 'any'">false</PublishAot>
         <SelfContained Condition="'$(RuntimeIdentifier)' == 'any'">false</SelfContained>
+        <!-- Override this when running the AOT LINQ comparison; release packages favor size. -->
+        <UseSizeOptimizedLinq Condition="'$(UseSizeOptimizedLinq)' == ''">true</UseSizeOptimizedLinq>
         <!--
           The pointer has no implementation, and NativeAOT packages contain native executables
           rather than managed assemblies. The portable fallback retains its managed symbol package.
