@@ -309,7 +309,8 @@ stream's `eof_action(error|eof_code|reset)` controls reads after its first EOF m
 `close/2` supports forced best-effort cleanup. `open/3,4` rejects bound output arguments and alias
 collisions before it touches the requested source/sink. Stream permission errors preserve that
 alias or handle as the culprit, and malformed handles cannot wrap to another live stream. Bound
-character-input targets are validated before any character is consumed.
+character-input targets are validated before any character is consumed. Host reader and writer
+failures remain recoverable through `catch/3` as `system_error`.
 
 ```prolog
 main :-

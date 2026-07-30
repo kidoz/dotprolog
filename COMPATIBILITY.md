@@ -82,8 +82,11 @@ Writing them was worth it immediately: they found these real defects.
 - `get_char/1,2` and `peek_char/1,2` now validate bound inputs as the ISO `in_character` type before
   consuming anything. One-character atoms and `end_of_file` are accepted; other terms raise the
   exact `type_error(in_character, Culprit)`.
+- Host reader and writer failures now become catchable ISO `system_error` terms throughout stream
+  input, output, EOF inspection, positioning, formatting, flushing, and closing. Implicit-current
+  output predicates also enforce the same text/binary permissions as explicit-stream calls.
 
-Beyond the conformance cases, the engine and toolchain are covered by 864 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 887 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
@@ -109,7 +112,7 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 
 | Feature | Current state |
 |---|---|
-| Complete stream surface | The remaining term/stream I/O mode and error clauses still require a systematic audit |
+| Complete stream surface | Term I/O option modes and the remaining I/O error clauses still require a systematic audit |
 
 ## Non-ISO features absent deliberately
 
