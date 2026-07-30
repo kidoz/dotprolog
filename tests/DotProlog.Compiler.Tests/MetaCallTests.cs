@@ -180,6 +180,32 @@ public sealed class MetaCallTests
         Assert.Contains("type_error(callable, 42)", exception.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("once(_)", "instantiation_error")]
+    [InlineData("once(4)", "type_error(callable,4)")]
+    [InlineData("call(_, a)", "instantiation_error")]
+    [InlineData("call(4, a)", "type_error(callable,4)")]
+    public void ControlMetaCallsReportIsoGoalErrors(string goal, string expected)
+    {
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+    }
+
+    [Fact]
+    public void CallEightEnforcesTheResultingMaximumArity()
+    {
+        Assert.Equal(
+            "yes representation_error(max_arity)",
+            PrologTestHost.RunGoal(
+                "functor(Fact, call_limit, 255), assertz(Fact), "
+                    + "functor(Allowed, call_limit, 248), "
+                    + "call(Allowed, a, b, c, d, e, f, g), write(yes), "
+                    + "abolish(call_limit/255), write(' '), "
+                    + "functor(Oversized, call_limit, 249), "
+                    + "catch(call(Oversized, a, b, c, d, e, f, g), error(E, _), write(E))"
+            )
+        );
+    }
+
     [Fact]
     public void CallingAnUndefinedGoalIsAnExistenceError()
     {

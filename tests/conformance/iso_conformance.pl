@@ -273,6 +273,8 @@ iso_case('8.15.1', \+ _, error(instantiation_error)).
 iso_case('8.15.1', \+ 4, error(type_error(callable, 4))).
 iso_case('8.15.2', once(!), success).
 iso_case('8.15.2', once(fail), failure).
+iso_case('8.15.2', once(_), error(instantiation_error)).
+iso_case('8.15.2', once(4), error(type_error(callable, 4))).
 iso_case('8.15.3', (repeat, !), success).
 iso_case(
     '8.15.3',
@@ -294,6 +296,24 @@ iso_case('8.15.3', call(fail), failure).
 iso_case('8.15.3', call(_), error(instantiation_error)).
 iso_case('8.15.3', call(4), error(type_error(callable, 4))).
 iso_case('8.15.3', call((fail, 4)), error(type_error(callable, (fail, 4)))).
+iso_case('8.15.3', call(_, a), error(instantiation_error)).
+iso_case('8.15.3', call(4, a), error(type_error(callable, 4))).
+iso_case(
+    '8.15.3',
+    (
+        functor(Fact1, iso_call_limit, 255),
+        assertz(Fact1),
+        functor(Allowed1, iso_call_limit, 248),
+        call(Allowed1, a, b, c, d, e, f, g),
+        abolish(iso_call_limit/255)
+    ),
+    success
+).
+iso_case(
+    '8.15.3',
+    (functor(Oversized1, iso_call_limit, 249), call(Oversized1, a, b, c, d, e, f, g)),
+    error(representation_error(max_arity))
+).
 iso_case('8.15.3', iso_noncallable_body, error(type_error(callable, 4))).
 iso_case('8.15.3', iso_unreached_noncallable_body, failure).
 
@@ -328,6 +348,10 @@ iso_case('8.16.8', number_codes(_, [0'a]), error(syntax_error(illegal_number))).
 % --- 8.17 Implementation defined hooks ---------------------------------------
 iso_case('8.17.1', (catch(throw(ball), Ball, true), Ball == ball), success).
 iso_case('8.17.1', catch(true, _, fail), success).
+iso_case('8.17.1', catch(_, never, true), error(instantiation_error)).
+iso_case('8.17.1', catch(4, never, true), error(type_error(callable, 4))).
+iso_case('8.17.1', catch(throw(ball), ball, 4), error(type_error(callable, 4))).
+iso_case('8.17.1', catch(true, _, 4), success).
 iso_case('8.17.1', throw(_), error(instantiation_error)).
 iso_case('8.17.2', current_prolog_flag(bounded, true), success).
 iso_case('8.17.2', current_prolog_flag(integer_rounding_function, toward_zero), success).

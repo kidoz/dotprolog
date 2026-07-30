@@ -109,6 +109,19 @@ public sealed class ExceptionTests
         Assert.Equal("yes", PrologTestHost.RunGoal("catch(throw(_), error(instantiation_error, _), write(yes))"));
     }
 
+    [Theory]
+    [InlineData("catch(_, never, true)", "instantiation_error")]
+    [InlineData("catch(4, never, true)", "type_error(callable,4)")]
+    [InlineData("catch(throw(ball), ball, 4)", "type_error(callable,4)")]
+    [InlineData("catch(true, _, 4)", "success")]
+    public void CatchValidatesOnlyTheGoalItExecutes(string goal, string expected)
+    {
+        Assert.Equal(
+            expected,
+            PrologTestHost.RunGoal($"catch(({goal}, Result = success), error(E, _), Result = E), write(Result)")
+        );
+    }
+
     // write/1 is canonical until the writer learns the operator table, so a predicate indicator
     // comes out as '/(nowhere,1)' rather than 'nowhere/1'.
     [Theory]
