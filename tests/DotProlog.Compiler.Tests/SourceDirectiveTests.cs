@@ -95,6 +95,48 @@ public sealed class SourceDirectiveTests : IDisposable
         Assert.Equal(CompilerDiagnosticIds.IncludeCycle, Assert.Single(loaded.Diagnostics).Id);
     }
 
+    [Fact]
+    public void EnsureLoadedDirectiveLoadsOnceRelativeToItsSource()
+    {
+        Write("nested/dependency.pl", ":- initialization(write(dependency)).");
+        string main = Write(
+            "nested/main.pl",
+            """
+            :- ensure_loaded(dependency).
+            :- ensure_loaded('./dependency.pl').
+            :- initialization(write(main)).
+            """
+        );
+
+        Assert.Equal("dependencymain", RunFile(main));
+    }
+
+    [Fact]
+    public void RuntimeEnsureLoadedRemembersAPreviouslyConsultedFile()
+    {
+        string dependency = Write("dependency.pl", ":- initialization(write(dependency)).");
+        var output = new StringWriter();
+        var engine = new PrologEngine { Output = output, Input = TextReader.Null };
+
+        Assert.Empty(engine.ConsultFile(dependency).Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal(RunResult.Success, engine.RunGoal($"ensure_loaded('{dependency}')", out _));
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+
+        Assert.Equal("dependency", output.ToString());
+    }
+
+    [Fact]
+    public void MissingEnsureLoadedProducesAStableDiagnostic()
+    {
+        var engine = new PrologEngine();
+        string main = Write("main.pl", ":- ensure_loaded(missing).");
+
+        LoadResult loaded = engine.ConsultFile(main);
+
+        Assert.Equal(CompilerDiagnosticIds.EnsureLoadedNotFound, Assert.Single(loaded.Diagnostics).Id);
+    }
+
     private string Write(string name, string source)
     {
         string path = Path.Combine(_directory, name);

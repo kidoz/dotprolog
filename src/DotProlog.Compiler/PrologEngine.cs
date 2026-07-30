@@ -17,6 +17,8 @@ public sealed class PrologEngine : IRuntimeCompiler
     private readonly ModuleTable _modules = new();
     private readonly List<int> _pendingDirectives = [];
     private readonly List<int> _pendingInitialization = [];
+    private readonly HashSet<string> _loadedSourceFiles = new(PathComparer);
+    private readonly HashSet<string> _loadingSourceFiles = new(PathComparer);
 
     /// <summary>Creates an engine with the core builtins registered and an empty program.</summary>
     public PrologEngine()
@@ -100,7 +102,14 @@ public sealed class PrologEngine : IRuntimeCompiler
     public LoadResult ConsultFile(string path)
     {
         ArgumentNullException.ThrowIfNull(path);
-        return ConsultText(File.ReadAllText(path), path);
+        string absolute = Path.GetFullPath(path);
+        LoadResult loaded = ConsultText(File.ReadAllText(absolute), absolute);
+        if (loaded.Success)
+        {
+            _loadedSourceFiles.Add(absolute);
+        }
+
+        return loaded;
     }
 
     /// <summary>Reads and compiles <paramref name="text"/> as a Prolog source unit.</summary>
@@ -121,9 +130,11 @@ public sealed class PrologEngine : IRuntimeCompiler
         List<Diagnostic> diagnostics = [.. parsed.Diagnostics, .. loaded.Diagnostics];
 
         // Which module a file declared is what use_module/1 needs to know when it is imported later.
-        if (fileName is not null && File.Exists(fileName))
+        if (loaded.Success && fileName is not null && File.Exists(fileName))
         {
-            _modules.RecordLoad(Path.GetFullPath(fileName), loader.Module);
+            string absolute = Path.GetFullPath(fileName);
+            _modules.RecordLoad(absolute, loader.Module);
+            _loadedSourceFiles.Add(absolute);
         }
 
         if (loaded.Success)
@@ -558,15 +569,47 @@ public sealed class PrologEngine : IRuntimeCompiler
         ArgumentNullException.ThrowIfNull(machine);
         ArgumentNullException.ThrowIfNull(path);
 
-        if (!File.Exists(path))
+        string? resolved = ResolveSourcePath(path, null);
+        if (resolved is null)
         {
             throw ExistenceError(machine, "source_sink", Cell.Atom(machine.Symbols.InternAtom(path)));
         }
 
-        LoadResult loaded = ConsultText(File.ReadAllText(path), path);
+        LoadResult loaded = ConsultFile(resolved);
         if (!loaded.Success)
         {
-            throw SyntaxError(machine, $"{path}: {string.Join("; ", loaded.Diagnostics)}");
+            throw SyntaxError(machine, $"{resolved}: {string.Join("; ", loaded.Diagnostics)}");
+        }
+    }
+
+    /// <inheritdoc />
+    public void EnsureLoadedFile(Machine machine, string path)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+        ArgumentNullException.ThrowIfNull(path);
+
+        string? resolved = ResolveSourcePath(path, null);
+        if (resolved is null)
+        {
+            throw ExistenceError(machine, "source_sink", Cell.Atom(machine.Symbols.InternAtom(path)));
+        }
+
+        if (_loadedSourceFiles.Contains(resolved) || !_loadingSourceFiles.Add(resolved))
+        {
+            return;
+        }
+
+        try
+        {
+            LoadResult loaded = ConsultFile(resolved);
+            if (!loaded.Success)
+            {
+                throw SyntaxError(machine, $"{resolved}: {string.Join("; ", loaded.Diagnostics)}");
+            }
+        }
+        finally
+        {
+            _loadingSourceFiles.Remove(resolved);
         }
     }
 

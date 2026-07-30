@@ -39,6 +39,15 @@ public interface IRuntimeCompiler
     void ConsultFile(Machine machine, string path);
 
     /// <summary>
+    /// Reads and loads a Prolog source file unless the same canonical file is already loaded or is
+    /// currently being loaded.
+    /// </summary>
+    /// <param name="machine">The machine to load into.</param>
+    /// <param name="path">Path of the file to load once.</param>
+    /// <exception cref="PrologException">The file cannot be read, or does not compile.</exception>
+    void EnsureLoadedFile(Machine machine, string path);
+
+    /// <summary>
     /// Reads one term from <paramref name="input"/> and builds it on the heap.
     /// </summary>
     /// <param name="machine">Machine owning the heap the term is built on.</param>

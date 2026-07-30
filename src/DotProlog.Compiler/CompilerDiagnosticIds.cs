@@ -38,4 +38,10 @@ public static class CompilerDiagnosticIds
 
     /// <summary>An <c>include/1</c> declaration recursively includes a source already being read.</summary>
     public const string IncludeCycle = "DPL1012";
+
+    /// <summary>An <c>ensure_loaded/1</c> declaration does not name a source file with an atom.</summary>
+    public const string InvalidEnsureLoadedDeclaration = "DPL1013";
+
+    /// <summary>An <c>ensure_loaded/1</c> declaration names a source file that cannot be found or loaded.</summary>
+    public const string EnsureLoadedNotFound = "DPL1014";
 }

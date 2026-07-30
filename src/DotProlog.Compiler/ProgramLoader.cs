@@ -179,6 +179,10 @@ public sealed class ProgramLoader
                         DeclareMeta(meta.Arguments[0], diagnostics, fileName);
                         continue;
 
+                    case CompoundTerm { Name: "ensure_loaded", Arity: 1 } ensureLoaded:
+                        EnsureLoaded(ensureLoaded, diagnostics, fileName);
+                        continue;
+
                     // A dynamic declaration changes how later clauses are stored, so it is collected
                     // here and acted on once the module is known.
                     case CompoundTerm { Name: "dynamic", Arity: 1 } dynamic:
@@ -257,6 +261,50 @@ public sealed class ProgramLoader
             }
 
             unit.Clauses.Add((head, body));
+        }
+    }
+
+    /// <summary>Loads an <c>ensure_loaded/1</c> declaration once, relative to its source unit.</summary>
+    private void EnsureLoaded(CompoundTerm declaration, List<Diagnostic> diagnostics, string? fileName)
+    {
+        if (declaration.Arguments[0] is not AtomTerm file)
+        {
+            Report(
+                diagnostics,
+                CompilerDiagnosticIds.InvalidEnsureLoadedDeclaration,
+                "ensure_loaded/1 needs an atom naming a source file.",
+                declaration.Arguments[0].Span,
+                fileName
+            );
+            return;
+        }
+
+        string? path = ResolvePath(file.Name, fileName);
+        if (path is null || _program.RuntimeCompiler is null || _machine is null)
+        {
+            Report(
+                diagnostics,
+                CompilerDiagnosticIds.EnsureLoadedNotFound,
+                $"No file for ensure_loaded({file.Name}).",
+                file.Span,
+                fileName
+            );
+            return;
+        }
+
+        try
+        {
+            _program.RuntimeCompiler.EnsureLoadedFile(_machine, path);
+        }
+        catch (PrologException exception)
+        {
+            Report(
+                diagnostics,
+                CompilerDiagnosticIds.EnsureLoadedNotFound,
+                exception.Message,
+                file.Span,
+                fileName
+            );
         }
     }
 

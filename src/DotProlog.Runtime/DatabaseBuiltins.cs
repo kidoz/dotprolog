@@ -42,7 +42,7 @@ internal static class DatabaseBuiltins
             1,
             static machine =>
             {
-                Consult(machine, machine.Argument(0));
+                EnsureLoaded(machine, machine.Argument(0));
                 return true;
             }
         );
@@ -337,12 +337,22 @@ internal static class DatabaseBuiltins
 
     private static void Consult(Machine machine, Cell path)
     {
+        CompilerOf(machine).ConsultFile(machine, SourcePath(machine, path));
+    }
+
+    private static void EnsureLoaded(Machine machine, Cell path) =>
+        CompilerOf(machine).EnsureLoadedFile(machine, SourcePath(machine, path));
+
+    private static string SourcePath(Machine machine, Cell path)
+    {
         if (path.Tag != CellTag.Atom)
         {
-            throw path.Tag == CellTag.Reference ? PrologErrors.Instantiation(machine) : PrologErrors.Type(machine, "atom", path);
+            throw path.Tag == CellTag.Reference
+                ? PrologErrors.Instantiation(machine)
+                : PrologErrors.Type(machine, "atom", path);
         }
 
-        CompilerOf(machine).ConsultFile(machine, machine.Symbols.AtomName(path.Index));
+        return machine.Symbols.AtomName(path.Index);
     }
 
     private static IRuntimeCompiler CompilerOf(Machine machine) =>
