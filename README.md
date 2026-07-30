@@ -238,6 +238,8 @@ errors instead of being converted to exit code zero.
 `current_op/3` validates bound priority, specifier, and name filters before enumeration.
 Its solutions come from the operator-table snapshot current when the goal starts, even if `op/3`
 changes the live table between solutions.
+`clause/2` rejects static and built-in predicates as private procedures and validates a bound body
+as callable. Attempts to retract a static procedure raise a catchable modification permission error.
 
 ```prolog
 report(Rows) :-
@@ -378,7 +380,7 @@ A control term assembled at run time and passed to `call/1` is lowered to VM byt
 same control-construct compiler used for source clauses. Its cut is transparent within that
 meta-called goal and opaque to the caller, as ISO specifies.
 
-DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 453 conformance cases encoded
+DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 458 conformance cases encoded
 from ISO/IEC 13211-1, all passing, but those are its own reading of the standard rather than an
 independent suite — see [COMPATIBILITY.md](COMPATIBILITY.md), which also lists the known
 differences.

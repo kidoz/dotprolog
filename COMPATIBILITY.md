@@ -8,7 +8,7 @@ where behaviour is known to differ. It is a description, not a conformance state
 
 ## What has been measured
 
-**453 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
+**458 conformance cases encoded from ISO/IEC 13211-1 and its published corrigenda, all passing.**
 They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
 a goal, and what the standard says that goal does — and run as part of the test suite.
@@ -127,8 +127,11 @@ Writing them was worth it immediately: they found these real defects.
 - `current_op/3` now captures an immutable operator-table version when enumeration begins. Later
   `op/3` calls neither remove old definitions from that goal nor add new definitions to it, and
   bound filters scan the entire captured version rather than stopping at the first non-match.
+- `clause/2` now protects static and built-in predicates as private procedures and validates a
+  bound body as callable. `retract/1` and `retractall/1` consistently reject static procedures
+  with a modification permission error instead of silently failing.
 
-Beyond the conformance cases, the engine and toolchain are covered by 1004 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 1010 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
