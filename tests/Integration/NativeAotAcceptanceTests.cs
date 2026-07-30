@@ -86,6 +86,7 @@ public sealed class NativeAotAcceptanceTests
                     "character_conversion",
                     "numeric_escape_syntax",
                     "quoted_token_syntax",
+                    "extended_character_syntax",
                     "read_options",
                     "read_option_validation",
                     "integer_representation_errors",

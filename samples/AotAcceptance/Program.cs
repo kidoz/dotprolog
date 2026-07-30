@@ -57,6 +57,7 @@ internal static class Program
             native_quoted_fact(left 'native_quoted' right).
             native_escape('\x41\').
             native_backquoted(`native`).
+            native_extended_atom(ǅelta).
 
             main :-
                 greeting(G), write(G), nl,
@@ -220,6 +221,16 @@ internal static class Program
                     RawQuotedLayoutCaught = true),
                 RawQuotedLayoutCaught == true,
                 write(quoted_token_syntax), nl,
+
+                % Extended source classes are explicit and never leak host lexer exceptions.
+                native_extended_atom(ǅelta),
+                atom_codes(NonAsciiDigitSource, [1633]),
+                catch(
+                    read_term_from_atom(NonAsciiDigitSource, _, []),
+                    error(syntax_error('DPL0001'), _),
+                    NonAsciiDigitCaught = true),
+                NonAsciiDigitCaught == true,
+                write(extended_character_syntax), nl,
 
                 % ISO read options retain source order, sharing, and named-singleton identity.
                 read_term_from_atom('f(A,B,A,_C,_)', ReadOptionsTerm,
