@@ -38,6 +38,7 @@ internal static class TermBuiltins
     {
         registry.Register("==", 2, static machine => Order(machine) == 0);
         registry.Register("\\==", 2, static machine => Order(machine) != 0);
+        registry.Register("subsumes_term", 2, SubsumesTerm);
         registry.Register("@<", 2, static machine => Order(machine) < 0);
         registry.Register("@>", 2, static machine => Order(machine) > 0);
         registry.Register("@=<", 2, static machine => Order(machine) <= 0);
@@ -124,6 +125,111 @@ internal static class TermBuiltins
     }
 
     private static int Order(Machine machine) => TermOrder.Compare(machine, machine.Argument(0), machine.Argument(1));
+
+    /// <summary>
+    /// Tests whether the first term can be instantiated to the second without binding either term.
+    /// Variables reachable from the specific term are rigid, including variables shared by both
+    /// arguments; variables found only in the general term may acquire temporary conceptual
+    /// substitutions.
+    /// </summary>
+    private static bool SubsumesTerm(Machine machine)
+    {
+        Cell general = machine.Argument(0);
+        Cell specific = machine.Argument(1);
+        HashSet<int> rigidVariables = CollectVariables(machine, specific);
+        var substitutions = new Dictionary<int, Cell>();
+        var visitedStructures = new HashSet<ulong>();
+        List<(Cell General, Cell Specific)> work = [(general, specific)];
+
+        while (work.Count > 0)
+        {
+            (Cell candidate, Cell instance) = work[^1];
+            work.RemoveAt(work.Count - 1);
+            candidate = machine.Dereference(candidate);
+            instance = machine.Dereference(instance);
+
+            if (candidate == instance)
+            {
+                continue;
+            }
+
+            if (candidate.Tag == CellTag.Reference)
+            {
+                if (rigidVariables.Contains(candidate.Index))
+                {
+                    return false;
+                }
+
+                if (substitutions.TryGetValue(candidate.Index, out Cell substitution))
+                {
+                    work.Add((substitution, instance));
+                }
+                else
+                {
+                    substitutions.Add(candidate.Index, instance);
+                }
+
+                continue;
+            }
+
+            if (candidate.Tag != CellTag.Structure || instance.Tag != CellTag.Structure)
+            {
+                return false;
+            }
+
+            int candidateFunctor = machine.HeapAt(candidate.Index).Index;
+            if (candidateFunctor != machine.HeapAt(instance.Index).Index)
+            {
+                return false;
+            }
+
+            ulong pair = ((ulong)(uint)candidate.Index << 32) | (uint)instance.Index;
+            if (!visitedStructures.Add(pair))
+            {
+                continue;
+            }
+
+            int arity = machine.Symbols.ArityOf(candidateFunctor);
+            for (int i = arity; i >= 1; i--)
+            {
+                work.Add((machine.HeapAt(candidate.Index + i), machine.HeapAt(instance.Index + i)));
+            }
+        }
+
+        return true;
+    }
+
+    private static HashSet<int> CollectVariables(Machine machine, Cell term)
+    {
+        var variables = new HashSet<int>();
+        var visitedStructures = new HashSet<int>();
+        List<Cell> work = [term];
+
+        while (work.Count > 0)
+        {
+            Cell cell = machine.Dereference(work[^1]);
+            work.RemoveAt(work.Count - 1);
+
+            if (cell.Tag == CellTag.Reference)
+            {
+                variables.Add(cell.Index);
+                continue;
+            }
+
+            if (cell.Tag != CellTag.Structure || !visitedStructures.Add(cell.Index))
+            {
+                continue;
+            }
+
+            int arity = machine.Symbols.ArityOf(machine.HeapAt(cell.Index).Index);
+            for (int i = arity; i >= 1; i--)
+            {
+                work.Add(machine.HeapAt(cell.Index + i));
+            }
+        }
+
+        return variables;
+    }
 
     private static bool Compare(Machine machine, int less, int equal, int greater)
     {

@@ -102,6 +102,19 @@ public sealed class TermBuiltinTests
     }
 
     [Theory]
+    [InlineData("subsumes_term(a, a)")]
+    [InlineData("subsumes_term(f(_X,_Y), f(Z,Z))")]
+    [InlineData("\\+ subsumes_term(f(Z,Z), f(_X,_Y))")]
+    [InlineData("\\+ subsumes_term(g(X), g(f(X)))")]
+    [InlineData("\\+ subsumes_term(X, f(X))")]
+    [InlineData("subsumes_term(X, Y), subsumes_term(Y, f(X))")]
+    [InlineData("subsumes_term(f(X), f(a)), var(X)")]
+    public void SubsumesTermHasIsoNonBindingSemantics(string goal)
+    {
+        Assert.Equal("yes", PrologTestHost.RunGoal($"{goal}, write(yes)"));
+    }
+
+    [Theory]
     [InlineData("unify_with_occurs_check(X, f(a)), X == f(a)")]
     [InlineData("unify_with_occurs_check(X, Y), X == Y")]
     [InlineData("\\+ unify_with_occurs_check(X, f(X)), var(X)")]
