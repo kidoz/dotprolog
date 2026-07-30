@@ -76,6 +76,9 @@ Writing them was worth it immediately: they found these real defects.
 - `open/3,4` now raises `uninstantiation_error/1` for a bound stream output and rejects an alias
   already owned by an open stream. Both checks happen before opening or truncating the source/sink,
   so error handling cannot leak a stream or replace an alias.
+- A non-variable value outside the ISO `source_sink` domain now raises
+  `domain_error(source_sink, Culprit)` from `open/3,4` instead of treating every source/sink as an
+  atom-typed argument.
 - Stream permission errors now retain the caller's actual alias or handle as their culprit instead
   of manufacturing a predicate indicator. Malformed negative and oversized stream handles are
   rejected as domain errors rather than wrapping to another live identifier.
@@ -92,7 +95,7 @@ Writing them was worth it immediately: they found these real defects.
   Unknown options, variable elements, and partial lists therefore raise their ISO errors without
   consuming the next term.
 
-Beyond the conformance cases, the engine and toolchain are covered by 910 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 914 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 
@@ -118,7 +121,7 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 
 | Feature | Current state |
 |---|---|
-| Complete stream surface | Source/sink domains and the final term/stream I/O error clauses still require an audit |
+| Complete stream surface | The final term/stream I/O error clauses still require an audit |
 
 ## Non-ISO features absent deliberately
 
