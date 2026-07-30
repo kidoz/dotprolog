@@ -77,17 +77,22 @@ application therefore needs no separate standard-library files.
 
 ## SDK and generated facades
 
-`DotProlog.Sdk` is additive to the .NET SDK. A `.dplproj` build embeds Prolog source and reads a
-`.dpli` contract to generate a typed C# facade. The result is an ordinary assembly consumable by
-C#, F#, and Visual Basic.
+`DotProlog.Sdk` is additive to the .NET SDK. A `.dplproj` build parses and lowers Prolog source,
+then reads a `.dpli` contract to generate a typed C# facade. The result is an ordinary assembly
+consumable by C#, F#, and Visual Basic.
 
-Predicate bodies still execute as DotProlog bytecode. The planned build-time path that generates C#
-for predicate bodies is not implemented:
+Build-time predicates become direct-threaded generated C# blocks and then CLR IL. Runtime-loaded
+source continues to become DotProlog bytecode. Both target the same explicit heap, trail,
+environment, choice-point, and continuation state, so either path can call the other:
 
 ```text
-Planned build time : parser -> semantic IR -> generated C# -> Roslyn -> IL
-Implemented runtime: parser -> semantic IR -> bytecode -> DotProlog VM
+Build time : parser -> semantic IR -> generated C# -> Roslyn -> IL
+Runtime    : parser -> semantic IR -> bytecode -> DotProlog VM
 ```
+
+Generated applications, facades, and Prolog test hosts do not embed or consult their build-time
+source. Runtime `consult/1`, `ensure_loaded/1`, and database updates remain available and are never
+converted into new CLR IL inside the process.
 
 ## NativeAOT constraints
 
