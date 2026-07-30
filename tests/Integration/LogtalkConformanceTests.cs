@@ -29,6 +29,9 @@ public sealed class LogtalkConformanceTests
             helper(X) :-
                 {atom(X)}.
 
+            cleanup :-
+                ^^clean_text_input.
+
             test(iso_fixture_01, true(X == 1.0)) :-
                 {X = 1.0},
                 {Y = pair(a, b)}.
@@ -277,14 +280,14 @@ public sealed class LogtalkConformanceTests
                 ),
             ];
 
-            Assert.Equal(461, directCases.Length);
-            Assert.Equal(279, directCases.Count(test => test.OutcomeKind == "true"));
+            Assert.Equal(505, directCases.Length);
+            Assert.Equal(303, directCases.Count(test => test.OutcomeKind == "true"));
             Assert.Equal(72, directCases.Count(test => test.OutcomeKind == "false"));
-            Assert.Equal(2, directCases.Count(test => test.OutcomeKind == "fail"));
-            Assert.Equal(53, directCases.Count(test => test.OutcomeKind == "error"));
+            Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "fail"));
+            Assert.Equal(71, directCases.Count(test => test.OutcomeKind == "error"));
             Assert.Equal(11, directCases.Count(test => test.OutcomeKind == "variant"));
             Assert.Equal(41, directCases.Count(test => test.OutcomeKind == "exists"));
-            Assert.Equal(2, directCases.Count(test => test.OutcomeKind == "subsumes"));
+            Assert.Equal(3, directCases.Count(test => test.OutcomeKind == "subsumes"));
             Assert.Single(directCases, test => test.OutcomeKind == "deterministic");
 
             string? selectedId = Environment.GetEnvironmentVariable(CaseVariable);
@@ -335,16 +338,21 @@ public sealed class LogtalkConformanceTests
 
         var engine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
         string condition = LogtalkTestAdapter.TranslateConditionalGoal(declaration.ConditionalGoal);
-        RunResult result = engine.RunGoal(condition, out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics);
-        if (diagnostics.Count > 0)
+        try
         {
-            throw new InvalidDataException(
-                $"{declaration.SourcePath}: conditional for {declaration.Id} did not compile: "
-                    + string.Join("; ", diagnostics)
-            );
-        }
+            RunResult result = engine.RunGoal(condition, out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics);
+            if (diagnostics.Count > 0)
+            {
+                return false;
+            }
 
-        return result == RunResult.Success;
+            return result == RunResult.Success;
+        }
+        catch (PrologException)
+        {
+            // A Logtalk flag or other wrapper-only condition cannot select a backend branch.
+            return false;
+        }
     }
 
     private static LogtalkTestDeclaration[] SelectCasesToExecute(

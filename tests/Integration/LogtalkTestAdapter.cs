@@ -206,6 +206,13 @@ internal static class LogtalkTestAdapter
                 continue;
             }
 
+            // lgtunit invokes these object hooks around tests. A hook implemented through Logtalk
+            // message dispatch is wrapper infrastructure, not a source-local Prolog helper.
+            if (IsDispatchedLifecycleHook(text))
+            {
+                continue;
+            }
+
             if (text.StartsWith(":- if", StringComparison.Ordinal))
             {
                 conditionalDepth++;
@@ -368,6 +375,22 @@ internal static class LogtalkTestAdapter
 
         translated = $"{clause[..(neck + 2)]}{Environment.NewLine}    {backendGoal}.";
         return true;
+    }
+
+    private static bool IsDispatchedLifecycleHook(string clause)
+    {
+        int neck = FindTopLevel(clause, ":-");
+        if (neck < 0)
+        {
+            return false;
+        }
+
+        string head = clause[..neck].Trim();
+        return head is "setup" or "cleanup"
+            && (
+                clause.Contains("^^", StringComparison.Ordinal)
+                || clause.Contains("::", StringComparison.Ordinal)
+            );
     }
 
     private static bool TryUnwrapBackendBody(string source, out string goal)
