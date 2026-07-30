@@ -89,6 +89,7 @@ public sealed class NativeAotAcceptanceTests
                     "stream_eof_actions",
                     "stream_open_errors",
                     "source_sink_domains",
+                    "invalid_source_sink_paths",
                     "stream_option_error_priority",
                     "stream_error_terms",
                     "character_input_modes",

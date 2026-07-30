@@ -201,6 +201,15 @@ internal static class Program
                 SourceSinkDomainCaught == true,
                 write(source_sink_domains), nl,
 
+                % OS-invalid path atoms stay inside the ISO source/sink error boundary.
+                atom_codes(InvalidSourceSink, [0]),
+                catch(
+                    (open(InvalidSourceSink, read, _), InvalidSourceSinkCaught = false),
+                    error(domain_error(source_sink, InvalidSourceSink), _),
+                    InvalidSourceSinkCaught = true),
+                InvalidSourceSinkCaught == true,
+                write(invalid_source_sink_paths), nl,
+
                 % Option shape, stream domains, and option semantics follow ISO error priority.
                 catch(
                     (open(1, sideways, bound, []), OpenPriorityCaught = false),
