@@ -15,7 +15,7 @@ internal static class OperatorBuiltins
     internal static void Register(BuiltinRegistry registry)
     {
         registry.Register("op", 3, Define);
-        registry.RegisterNondeterministic("current_op", 3, static machine => Current(machine, 0), Current);
+        registry.RegisterNondeterministic("current_op", 3, CurrentFirst, CurrentRetry);
     }
 
     /// <summary>
@@ -98,34 +98,44 @@ internal static class OperatorBuiltins
     /// <c>current_op(?Priority, ?Type, ?Name)</c>: every definition in turn, in a fixed order.
     /// </summary>
     /// <param name="machine">The machine.</param>
-    /// <param name="state">Index into the ordered snapshot of the table.</param>
-    /// <remarks>
-    /// The snapshot is rebuilt on each solution rather than held across them. It costs a sort of
-    /// about sixty entries and means an <c>op/3</c> executed while enumerating cannot leave the retry
-    /// pointing at a definition that no longer exists.
-    /// </remarks>
-    private static bool Current(Machine machine, long state)
+    private static bool CurrentFirst(Machine machine)
     {
         ValidateCurrentArguments(machine);
+        return Current(machine, machine.Operators.Version, 0);
+    }
 
-        PrologOperator[] all = machine.Operators.All();
-        int index = (int)state;
+    private static bool CurrentRetry(Machine machine, long state) => Current(machine, (int)(state >> 32), (int)state);
 
-        if (index >= all.Length)
+    private static bool Current(Machine machine, int version, int start)
+    {
+        ReadOnlySpan<PrologOperator> entries = machine.Operators.Entries(version);
+        for (int index = start; index < entries.Length; index++)
         {
-            return false;
+            PrologOperator entry = entries[index];
+            Cell priority = Cell.Integer60(entry.Priority);
+            Cell specifier = Cell.Atom(machine.Symbols.InternAtom(NameOf(entry.Type)));
+            Cell name = Cell.Atom(machine.Symbols.InternAtom(entry.Name));
+
+            if (
+                !machine.CanUnify(machine.Argument(0), priority)
+                || !machine.CanUnify(machine.Argument(1), specifier)
+                || !machine.CanUnify(machine.Argument(2), name)
+            )
+            {
+                continue;
+            }
+
+            if (index + 1 < entries.Length)
+            {
+                machine.PushRetry(((long)version << 32) | (uint)(index + 1));
+            }
+
+            return machine.Unify(machine.Argument(0), priority)
+                && machine.Unify(machine.Argument(1), specifier)
+                && machine.Unify(machine.Argument(2), name);
         }
 
-        if (index + 1 < all.Length)
-        {
-            machine.PushRetry(index + 1);
-        }
-
-        PrologOperator entry = all[index];
-
-        return machine.Unify(machine.Argument(0), Cell.Integer60(entry.Priority))
-            && machine.Unify(machine.Argument(1), Cell.Atom(machine.Symbols.InternAtom(NameOf(entry.Type))))
-            && machine.Unify(machine.Argument(2), Cell.Atom(machine.Symbols.InternAtom(entry.Name)));
+        return false;
     }
 
     private static string NameOf(OperatorType type) =>

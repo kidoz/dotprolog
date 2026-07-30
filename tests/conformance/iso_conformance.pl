@@ -559,6 +559,25 @@ iso_case('8.14.4', (current_op(P1, xfx, ':-'), P1 =:= 1200), success).
 iso_case('8.14.4', current_op(a, _, _), error(domain_error(operator_priority, a))).
 iso_case('8.14.4', current_op(_, nonsense, _), error(domain_error(operator_specifier, nonsense))).
 iso_case('8.14.4', current_op(_, _, 1), error(type_error(atom, 1))).
+iso_case('8.14.4', current_op(1200, xfx, '-->'), success).
+iso_case(
+    '8.14.4',
+    (
+        op(333, xfx, snapshot_old),
+        findall(N8, (current_op(_, _, N8), op(0, xfx, snapshot_old)), OldNames),
+        member(snapshot_old, OldNames)
+    ),
+    success
+).
+iso_case(
+    '8.14.4',
+    (
+        findall(N9, (current_op(_, _, N9), op(333, xfx, snapshot_new)), NewNames),
+        \+ member(snapshot_new, NewNames),
+        op(0, xfx, snapshot_new)
+    ),
+    success
+).
 iso_case('8.14.12', (char_conversion(q, r), current_char_conversion(q, r)), success).
 iso_case('8.14.12', char_conversion(_, a), error(instantiation_error)).
 iso_case('8.14.12', char_conversion(a, _), error(instantiation_error)).

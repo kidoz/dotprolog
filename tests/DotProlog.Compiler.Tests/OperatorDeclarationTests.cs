@@ -66,6 +66,10 @@ public sealed class OperatorDeclarationTests
         Assert.Equal("500-yfx", PrologTestHost.RunGoal("current_op(P, T, +), P =:= 500, write(P-T)"));
 
     [Fact]
+    public void CurrentOpScansPastNonMatchingDefinitions() =>
+        Assert.Equal("yes", PrologTestHost.RunGoal("current_op(1200, xfx, '-->'), write(yes)"));
+
+    [Fact]
     public void CurrentOpEnumeratesEveryDefinition()
     {
         // The ISO table this engine starts with; the count is asserted so that adding an operator to
@@ -85,6 +89,27 @@ public sealed class OperatorDeclarationTests
     [Fact]
     public void CurrentOpSeesWhatOpDeclared() =>
         Assert.Equal("yes", PrologTestHost.RunGoal("op(333, xfx, zzz), current_op(333, xfx, zzz), write(yes)"));
+
+    [Fact]
+    public void CurrentOpKeepsRemovedDefinitionsInItsSnapshot() =>
+        Assert.Equal(
+            "yes",
+            PrologTestHost.RunGoal(
+                "op(333, xfx, snapshot_old), "
+                    + "findall(N, (current_op(_, _, N), op(0, xfx, snapshot_old)), Names), "
+                    + "member(snapshot_old, Names), write(yes)"
+            )
+        );
+
+    [Fact]
+    public void CurrentOpDoesNotAddNewDefinitionsToItsSnapshot() =>
+        Assert.Equal(
+            "yes",
+            PrologTestHost.RunGoal(
+                "findall(N, (current_op(_, _, N), op(333, xfx, snapshot_new)), Names), "
+                    + "\\+ member(snapshot_new, Names), write(yes)"
+            )
+        );
 
     [Fact]
     public void OperatorsDeclaredInOneEngineDoNotLeakIntoAnother()

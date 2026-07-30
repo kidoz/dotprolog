@@ -8,12 +8,19 @@ public sealed class OperatorTable
 {
     private readonly Dictionary<string, PrologOperator> _prefix = [];
     private readonly Dictionary<string, PrologOperator> _infixOrPostfix = [];
+    private readonly List<PrologOperator[]> _versions =
+    [
+        [],
+    ];
 
     /// <summary>Creates a table containing the ISO default operators.</summary>
     public OperatorTable()
     {
         DefineDefaults();
     }
+
+    /// <summary>The immutable operator-table version current when this property is read.</summary>
+    internal int Version => _versions.Count - 1;
 
     /// <summary>
     /// Installs an operator. A priority of zero removes the definition in the matching class
@@ -28,11 +35,23 @@ public sealed class OperatorTable
         Dictionary<string, PrologOperator> target = type is OperatorType.Fx or OperatorType.Fy ? _prefix : _infixOrPostfix;
         if (priority == 0)
         {
-            target.Remove(name);
+            if (!target.Remove(name))
+            {
+                return;
+            }
+
+            AddVersion();
             return;
         }
 
-        target[name] = new PrologOperator(priority, type, name);
+        var definition = new PrologOperator(priority, type, name);
+        if (target.TryGetValue(name, out PrologOperator previous) && previous == definition)
+        {
+            return;
+        }
+
+        target[name] = definition;
+        AddVersion();
     }
 
     /// <summary>Looks up a prefix definition for <paramref name="name"/>.</summary>
@@ -48,13 +67,10 @@ public sealed class OperatorTable
     /// Every definition, ordered by name and then by specifier. The order is fixed rather than
     /// insertion-dependent so that <c>current_op/3</c> enumerates the same way every run.
     /// </summary>
-    public PrologOperator[] All() =>
-        [
-            .. _prefix
-                .Values.Concat(_infixOrPostfix.Values)
-                .OrderBy(entry => entry.Name, StringComparer.Ordinal)
-                .ThenBy(entry => entry.Type),
-        ];
+    public PrologOperator[] All() => _versions[^1];
+
+    /// <summary>Returns the immutable definitions held by a prior table version.</summary>
+    internal ReadOnlySpan<PrologOperator> Entries(int version) => _versions[version];
 
     /// <summary>The highest priority of any definition for <paramref name="name"/>, or zero if it is not an operator.</summary>
     public int MaxPriority(string name)
@@ -121,4 +137,12 @@ public sealed class OperatorTable
         Define(100, OperatorType.Yfx, ".");
         Define(1, OperatorType.Fx, "$");
     }
+
+    private void AddVersion() =>
+        _versions.Add([
+            .. _prefix
+                .Values.Concat(_infixOrPostfix.Values)
+                .OrderBy(entry => entry.Name, StringComparer.Ordinal)
+                .ThenBy(entry => entry.Type),
+        ]);
 }
