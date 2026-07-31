@@ -542,6 +542,10 @@ public sealed class LogtalkConformanceTests
                 {
                     executionResults.Add(test, "passed");
                 }
+
+                // A case that leaks an open stream must not hold a file lock into the next case;
+                // Windows enforces sharing, so leaked writers make later opens fail.
+                engine?.Machine.Streams.CloseAll();
             }
 
             if (reportPath is not null)
@@ -604,7 +608,10 @@ public sealed class LogtalkConformanceTests
 
         var engine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
         engine.Program.Builtins.Register("current_logtalk_flag", 2, CurrentLogtalkFlag);
-        engine.Program.Builtins.Register("$logtalk_is_windows", 0, static _ => OperatingSystem.IsWindows());
+        // The corpus's operating-system conditionals select newline expectations. DotProlog's text
+        // convention is '\n' on every platform — nl/0 writes a bare line feed — so the unix branch
+        // is the applicable one everywhere, including Windows hosts.
+        engine.Program.Builtins.Register("$logtalk_is_windows", 0, static _ => false);
         string condition = LogtalkTestAdapter.TranslateConditionalGoal(declaration.ConditionalGoal);
         try
         {

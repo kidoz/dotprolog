@@ -219,6 +219,10 @@ internal static class CompiledConformanceSourceGenerator
                 $"                    global::System.Console.Error.WriteLine($\"{{mode}} | {Escape(group.SourcePath)} | {Escape(name)} | {{error.Message}}\");"
             );
             text.AppendLine("                }");
+
+            // A case that leaks an open stream must not hold a file lock into the next case;
+            // Windows enforces sharing, so leaked writers make later opens fail.
+            text.AppendLine("                engine.Machine.Streams.CloseAll();");
         }
 
         text.AppendLine("            }");
