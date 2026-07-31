@@ -551,8 +551,31 @@ public sealed class LogtalkConformanceTests
                 engine.Machine.Streams.CloseAll();
             }
 
-            Directory.Delete(checkout, recursive: true);
+            DeleteCheckout(checkout);
         }
+    }
+
+    /// <summary>
+    /// Deletes the cloned checkout. Git pack files are read-only, which Windows refuses to delete
+    /// until the attribute is cleared.
+    /// </summary>
+    private static void DeleteCheckout(string checkout)
+    {
+        var root = new DirectoryInfo(checkout);
+        if (!root.Exists)
+        {
+            return;
+        }
+
+        foreach (FileSystemInfo entry in root.EnumerateFileSystemInfos("*", SearchOption.AllDirectories))
+        {
+            if ((entry.Attributes & FileAttributes.ReadOnly) != 0)
+            {
+                entry.Attributes &= ~FileAttributes.ReadOnly;
+            }
+        }
+
+        root.Delete(recursive: true);
     }
 
     private static bool IsApplicableConditionalBranch(LogtalkTestDeclaration declaration)
