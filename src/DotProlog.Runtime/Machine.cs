@@ -398,6 +398,32 @@ public sealed class Machine
                     proved = EnterDynamic(code[_pc++]);
                     break;
 
+                case OpCode.EnterStatic:
+                    proved = EnterStatic(code[_pc++]);
+                    break;
+
+                case OpCode.NextStaticClause:
+                {
+                    // Reached through a choice point's alternative, so that choice point is still on top.
+                    ChoicePoint point = _choicePoints[_b - 1];
+                    BytecodeProgram.StaticClauseIndex table = _program.StaticIndex(point.IndexTable);
+                    int current = point.IndexNext;
+                    int following = ClauseIndexing.NextMatch(table.Keys, current + 1, point.IndexKey);
+
+                    if (following < 0)
+                    {
+                        _b--;
+                        _savedTop = _choicePoints[_b].ArgumentBase;
+                    }
+                    else
+                    {
+                        _choicePoints[_b - 1].IndexNext = following;
+                    }
+
+                    _pc = table.Addresses[current];
+                    break;
+                }
+
                 case OpCode.RedoBuiltin:
                 {
                     // The choice point is still on top; pop it, then let the builtin offer another
@@ -422,7 +448,11 @@ public sealed class Machine
                     // Reached through a choice point's alternative, so that choice point is still on top.
                     ChoicePoint point = _choicePoints[_b - 1];
                     DynamicClause clause = point.NextClause!;
-                    DynamicClause? following = DynamicPredicate.FirstVisible(clause.Next, point.ClauseGeneration);
+                    DynamicClause? following = DynamicPredicate.FirstVisibleMatching(
+                        clause.Next,
+                        point.ClauseGeneration,
+                        point.IndexKey
+                    );
 
                     if (following is null)
                     {
@@ -1207,22 +1237,53 @@ public sealed class Machine
         DynamicPredicate predicate = _program.FindDynamic(functorId) ?? throw PrologErrors.UndefinedProcedure(this, functorId);
 
         int generation = _program.Generation;
-        DynamicClause? clause = DynamicPredicate.FirstVisible(predicate.First, generation);
+        Cell callKey = predicate.Arity >= 1 ? ClauseIndexing.CallKey(this, _x[0]) : ClauseIndexing.AnyKey;
+        DynamicClause? clause = DynamicPredicate.FirstVisibleMatching(predicate.First, generation, callKey);
         if (clause is null)
         {
             return false;
         }
 
-        DynamicClause? following = DynamicPredicate.FirstVisible(clause.Next, generation);
+        DynamicClause? following = DynamicPredicate.FirstVisibleMatching(clause.Next, generation, callKey);
         if (following is not null)
         {
             PushChoicePoint(BytecodeProgram.NextClauseAddress);
             ref ChoicePoint point = ref _choicePoints[_b - 1];
             point.NextClause = following;
             point.ClauseGeneration = generation;
+            point.IndexKey = callKey;
         }
 
         _pc = clause.CodeAddress;
+        return true;
+    }
+
+    /// <summary>
+    /// Dispatches an indexed static predicate: jump to the first clause whose first-argument key
+    /// can match the call, pushing a choice point only if a later clause could match too.
+    /// </summary>
+    private bool EnterStatic(int tableId)
+    {
+        BytecodeProgram.StaticClauseIndex table = _program.StaticIndex(tableId);
+        Cell callKey = ClauseIndexing.CallKey(this, _x[0]);
+
+        int first = ClauseIndexing.NextMatch(table.Keys, 0, callKey);
+        if (first < 0)
+        {
+            return false;
+        }
+
+        int following = ClauseIndexing.NextMatch(table.Keys, first + 1, callKey);
+        if (following >= 0)
+        {
+            PushChoicePoint(BytecodeProgram.NextStaticClauseAddress);
+            ref ChoicePoint point = ref _choicePoints[_b - 1];
+            point.IndexTable = tableId;
+            point.IndexNext = following;
+            point.IndexKey = callKey;
+        }
+
+        _pc = table.Addresses[first];
         return true;
     }
 

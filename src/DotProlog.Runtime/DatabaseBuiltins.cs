@@ -70,8 +70,9 @@ internal static class DatabaseBuiltins
 
         // Copied before compiling, so a cyclic clause is rejected here rather than looping the
         // compiler's term traversal.
+        Cell normalized = NormalizeClause(machine, clause);
         var term = new TermBuffer();
-        int root = term.Copy(machine, NormalizeClause(machine, clause));
+        int root = term.Copy(machine, normalized);
 
         IRuntimeCompiler compiler = CompilerOf(machine);
         int address = compiler.CompileClause(machine, clause, out int functorId);
@@ -84,6 +85,7 @@ internal static class DatabaseBuiltins
             Term = term,
             TermRoot = root,
             Birth = machine.Program.NextGeneration(),
+            IndexKey = ClauseIndexing.ClauseKeyFromHeap(machine, normalized, machine.Symbols.InternFunctor(":-", 2), functorId),
         };
 
         if (atEnd)

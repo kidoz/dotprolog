@@ -26,6 +26,9 @@ public sealed class BytecodeProgram
     /// <summary>The address a nondeterministic builtin's choice point resumes at.</summary>
     public const int RedoBuiltinAddress = 4;
 
+    /// <summary>The address an indexed static predicate's choice point resumes at.</summary>
+    public const int NextStaticClauseAddress = 5;
+
     private const int Undefined = -1;
 
     private int[] _code = new int[1024];
@@ -37,6 +40,7 @@ public sealed class BytecodeProgram
     private readonly Dictionary<int, HashSet<int>> _staticAliases = [];
     private readonly Dictionary<int, int> _staticAliasTargets = [];
     private readonly List<(CompiledPredicateBlock Block, CompiledProgram Program)> _compiledBlocks = [];
+    private readonly List<StaticClauseIndex> _staticIndexes = [];
 
     /// <summary>Creates an empty extended-mode program with its own symbol table and builtin registry.</summary>
     public BytecodeProgram()
@@ -59,11 +63,19 @@ public sealed class BytecodeProgram
         _code[PopAndFailAddress + 1] = (int)OpCode.Fail;
         _code[NextClauseAddress] = (int)OpCode.NextClause;
         _code[RedoBuiltinAddress] = (int)OpCode.RedoBuiltin;
-        CodeLength = 5;
+        _code[NextStaticClauseAddress] = (int)OpCode.NextStaticClause;
+        CodeLength = 6;
     }
 
     /// <summary>The immutable language profile selected before source preparation.</summary>
     public PrologLanguageMode LanguageMode { get; }
+
+    /// <summary>
+    /// Whether the loader dispatches multi-clause static predicates through a first-argument
+    /// clause index. The generated-C# emitter turns this off, because its instruction translator
+    /// consumes the loader's try/retry/trust form; the bytecode VM path leaves it on.
+    /// </summary>
+    internal bool EmitFirstArgumentIndexing { get; set; } = true;
 
     /// <summary>The atoms, functors, and floats this program refers to.</summary>
     public SymbolTable Symbols { get; }
@@ -212,7 +224,12 @@ public sealed class BytecodeProgram
         int trampoline = CodeLength;
         Emit(OpCode.EnterDynamic, functorId);
 
-        var predicate = new DynamicPredicate { FunctorId = functorId, TrampolineAddress = trampoline };
+        var predicate = new DynamicPredicate
+        {
+            FunctorId = functorId,
+            TrampolineAddress = trampoline,
+            Arity = Symbols.GetFunctor(functorId).Arity,
+        };
         _dynamicPredicates[functorId] = predicate;
         DefinePredicate(functorId, trampoline, userDefined);
         return predicate;
@@ -235,6 +252,7 @@ public sealed class BytecodeProgram
                 Term = TermBuffer.FromCells(termCells),
                 TermRoot = termRoot,
                 Birth = Generation,
+                IndexKey = ClauseIndexing.ClauseKeyFromBuffer(termCells, termRoot, Symbols.InternFunctor(":-", 2), functorId),
             }
         );
     }
@@ -312,6 +330,36 @@ public sealed class BytecodeProgram
 
         return true;
     }
+
+    /// <summary>The clause addresses and first-argument keys of one indexed static predicate.</summary>
+    internal readonly struct StaticClauseIndex(int[] addresses, Cell[] keys)
+    {
+        /// <summary>Entry address of each clause, in source order.</summary>
+        internal int[] Addresses { get; } = addresses;
+
+        /// <summary>First-argument key of each clause, parallel to <see cref="Addresses"/>.</summary>
+        internal Cell[] Keys { get; } = keys;
+    }
+
+    /// <summary>
+    /// Registers the clause table of an indexed static predicate and returns its identifier, the
+    /// operand of <see cref="OpCode.EnterStatic"/>.
+    /// </summary>
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    public int AddStaticIndex(int[] clauseAddresses, Cell[] firstArgumentKeys)
+    {
+        ArgumentNullException.ThrowIfNull(clauseAddresses);
+        ArgumentNullException.ThrowIfNull(firstArgumentKeys);
+        if (clauseAddresses.Length != firstArgumentKeys.Length)
+        {
+            throw new ArgumentException("Clause addresses and keys must be parallel arrays.", nameof(firstArgumentKeys));
+        }
+
+        _staticIndexes.Add(new StaticClauseIndex(clauseAddresses, firstArgumentKeys));
+        return _staticIndexes.Count - 1;
+    }
+
+    internal StaticClauseIndex StaticIndex(int id) => _staticIndexes[id];
 
     /// <summary>Appends an instruction with no operands and returns its address.</summary>
     public int Emit(OpCode opCode) => EmitWord((int)opCode);

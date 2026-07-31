@@ -12,6 +12,11 @@ the next release is versioned 0.2.0 because features have been added since `v0.1
 
 ### Added
 
+- First-argument clause indexing in the bytecode VM. Static multi-clause predicates dispatch
+  through a clause table keyed on the first argument, and dynamic predicates skip clauses whose
+  first argument could never unify — under the unchanged logical update view. A call with a bound
+  first argument that can only reach one clause creates no choice point. Solutions and their order
+  are unchanged; build-time generated C# keeps its existing in-order clause chains.
 - The pinned 768-case independent ISO corpus now runs exhaustively through generated C#,
   compiled-to-bytecode, bytecode-to-compiled, and NativeAOT paths in CI.
 - Part 3 DCG semicontexts and `Name//Arity` declarations for `dynamic/1`, `multifile/1`, and

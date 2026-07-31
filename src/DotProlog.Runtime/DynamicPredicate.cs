@@ -17,6 +17,9 @@ internal sealed class DynamicPredicate
     /// <summary>Address of the trampoline that callers jump to.</summary>
     internal int TrampolineAddress { get; init; }
 
+    /// <summary>The predicate's arity, cached so dispatch need not consult the symbol table.</summary>
+    internal int Arity { get; init; }
+
     /// <summary>First clause in declaration order.</summary>
     internal DynamicClause? First { get; private set; }
 
@@ -65,6 +68,24 @@ internal sealed class DynamicPredicate
         for (DynamicClause? clause = from; clause is not null; clause = clause.Next)
         {
             if (clause.IsVisibleAt(generation))
+            {
+                return clause;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the first clause at or after <paramref name="from"/> that a goal started at
+    /// <paramref name="generation"/> can see and whose first-argument key can match
+    /// <paramref name="callKey"/>.
+    /// </summary>
+    internal static DynamicClause? FirstVisibleMatching(DynamicClause? from, int generation, Cell callKey)
+    {
+        for (DynamicClause? clause = from; clause is not null; clause = clause.Next)
+        {
+            if (clause.IsVisibleAt(generation) && ClauseIndexing.Matches(clause.IndexKey, callKey))
             {
                 return clause;
             }

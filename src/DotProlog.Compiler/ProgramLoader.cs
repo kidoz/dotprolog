@@ -963,6 +963,7 @@ public sealed class ProgramLoader
                     Term = term,
                     TermRoot = root,
                     Birth = _program.Generation,
+                    IndexKey = FirstArgumentSyntaxKey(head),
                 }
             );
         }
@@ -1001,6 +1002,12 @@ public sealed class ProgramLoader
         IReadOnlySet<int> unitDefinitions
     )
     {
+        if (clauses.Count > 1 && _program.EmitFirstArgumentIndexing && _program.Symbols.GetFunctor(functorId).Arity >= 1)
+        {
+            EmitIndexedPredicate(functorId, clauses, diagnostics, fileName, unitDefinitions);
+            return;
+        }
+
         int entry = _program.CodeLength;
         int pendingAlternative = -1;
 
@@ -1036,6 +1043,68 @@ public sealed class ProgramLoader
         }
 
         _program.DefinePredicate(functorId, entry, _userPredicates);
+    }
+
+    /// <summary>
+    /// Emits a multi-clause predicate behind a first-argument clause index: an
+    /// <see cref="OpCode.EnterStatic"/> stub, then the clause bodies without try/retry/trust
+    /// headers, dispatched through the registered clause table.
+    /// </summary>
+    private void EmitIndexedPredicate(
+        int functorId,
+        IReadOnlyList<(SyntaxTerm Head, SyntaxTerm? Body)> clauses,
+        List<Diagnostic> diagnostics,
+        string? fileName,
+        IReadOnlySet<int> unitDefinitions
+    )
+    {
+        int stub = _program.Emit(OpCode.EnterStatic, 0);
+        List<int> addresses = new(clauses.Count);
+        List<Cell> keys = new(clauses.Count);
+
+        foreach ((SyntaxTerm head, SyntaxTerm? body) in clauses)
+        {
+            var compiler = new ClauseCompiler(
+                _program,
+                _constants,
+                diagnostics,
+                fileName,
+                unitDefinitions,
+                trustedImplementation: !_userPredicates
+            );
+            int address = compiler.Compile(head, body);
+            if (address < 0)
+            {
+                continue;
+            }
+
+            addresses.Add(address);
+            keys.Add(FirstArgumentSyntaxKey(head));
+        }
+
+        _program.Patch(stub + 1, _program.AddStaticIndex([.. addresses], [.. keys]));
+        _program.DefinePredicate(functorId, stub, _userPredicates);
+    }
+
+    /// <summary>
+    /// Derives the first-argument index key of a clause head. Anything the mapping does not
+    /// recognise keys as matching every call, which is always correct.
+    /// </summary>
+    private Cell FirstArgumentSyntaxKey(SyntaxTerm head)
+    {
+        if (TermNormalizer.Normalize(head, _program.Flags.DoubleQuotes) is not CompoundTerm compound || compound.Arity == 0)
+        {
+            return ClauseIndexing.AnyKey;
+        }
+
+        return TermNormalizer.Normalize(compound.Arguments[0], _program.Flags.DoubleQuotes) switch
+        {
+            AtomTerm atom => Cell.Atom(_program.Symbols.InternAtom(atom.Name)),
+            IntegerTerm integer when Cell.FitsInteger(integer.Value) => Cell.Integer60(integer.Value),
+            FloatTerm floating => Cell.Float(_program.Symbols.InternFloat(floating.Value)),
+            CompoundTerm structure => Cell.Functor(_program.Symbols.InternFunctor(structure.Name, structure.Arity)),
+            _ => ClauseIndexing.AnyKey,
+        };
     }
 
     private bool TryGetHeadFunctor(SyntaxTerm head, out int functorId)

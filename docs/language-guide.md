@@ -128,7 +128,9 @@ number conversion, term inspection, arithmetic, formatting, and standard-order c
 
 ## Known limits
 
-- Clause selection is currently a linear scan; first-argument indexing is not implemented.
+- Clause selection uses first-argument indexing in the bytecode VM: a call with a bound first
+  argument skips clauses whose first argument could never unify, and creates no choice point when
+  only one clause can match. Build-time generated C# still tries clauses in order.
 - Runtime-loaded source compiles to DotProlog bytecode, not new CLR IL.
 - Build-time source compiles to direct-threaded generated C# blocks sharing the same explicit
   machine state as runtime bytecode.

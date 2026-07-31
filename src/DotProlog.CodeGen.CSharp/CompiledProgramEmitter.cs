@@ -36,6 +36,11 @@ internal static class CompiledProgramEmitter
             Error = TextWriter.Null,
             Input = TextReader.Null,
         };
+
+        // This translator consumes the loader's try/retry/trust clause form; first-argument
+        // indexing stays a bytecode-VM dispatch strategy.
+        engine.Program.EmitFirstArgumentIndexing = false;
+
         foreach ((string name, int arity) in hostBuiltins)
         {
             engine.Program.Builtins.Register(name, arity, static _ => false);

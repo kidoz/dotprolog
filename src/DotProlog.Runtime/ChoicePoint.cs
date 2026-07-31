@@ -62,6 +62,18 @@ internal struct ChoicePoint
     /// <summary>Clause generation the call started at, which fixes the clauses it can see.</summary>
     public int ClauseGeneration;
 
+    /// <summary>Static clause-index identifier, for an indexed static predicate's choice point.</summary>
+    public int IndexTable;
+
+    /// <summary>Ordinal of the next clause to try within that static clause index.</summary>
+    public int IndexNext;
+
+    /// <summary>
+    /// First-argument key the call was dispatched with, so redo keeps skipping clauses that could
+    /// never unify. Shared by indexed static predicates and dynamic predicates.
+    /// </summary>
+    public Cell IndexKey;
+
     /// <summary>Identifier of the builtin to resume, for a nondeterministic native predicate.</summary>
     public int BuiltinId;
 

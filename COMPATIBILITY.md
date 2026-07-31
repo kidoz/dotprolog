@@ -250,7 +250,7 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 | `\+ 4` | `type_error(callable, 4)` — the inner goal | Same |
 | A character is a UTF-16 code unit | A character outside the Basic Multilingual Plane is two codes, and `atom_length/2` counts it as two | SWI counts code points |
 | Two modules exporting the same name | The first loaded gets the unqualified name | SWI reports a conflict |
-| Clause selection | Linear scan; no first-argument indexing | Indexed |
+| Clause selection | First-argument indexed in the bytecode VM; linear in build-time generated C# | Indexed |
 | Arithmetic extensions | Evaluable `integer/1`, `e/0`, `inf/0`, `nan/0`, and several utility functions remain available in extended mode and are rejected in strict mode | Not part of the ISO core |
 
 ## Platforms

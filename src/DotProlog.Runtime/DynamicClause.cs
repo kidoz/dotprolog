@@ -23,6 +23,12 @@ internal sealed class DynamicClause
     /// <summary>Generation at which the clause became visible.</summary>
     internal int Birth { get; init; }
 
+    /// <summary>
+    /// First-argument index key, derived when the clause is stored. Defaults to the key that
+    /// matches every call, which is always correct and merely unoptimised.
+    /// </summary>
+    internal Cell IndexKey { get; init; } = ClauseIndexing.AnyKey;
+
     /// <summary>Generation at which the clause stopped being visible; <see cref="int.MaxValue"/> while alive.</summary>
     internal int Death { get; set; } = int.MaxValue;
 

@@ -156,4 +156,17 @@ public enum OpCode
 
     /// <summary>Fail unconditionally, forcing backtracking.</summary>
     Fail,
+
+    /// <summary>
+    /// Operand: static clause-index identifier. Dispatch a multi-clause static predicate through
+    /// first-argument indexing: jump to the first clause whose key can match the call's first
+    /// argument, and push a choice point only if a later clause could match too.
+    /// </summary>
+    EnterStatic,
+
+    /// <summary>
+    /// Resume an indexed static predicate at the clause its choice point recorded. Reached only
+    /// through that choice point's alternative.
+    /// </summary>
+    NextStaticClause,
 }
