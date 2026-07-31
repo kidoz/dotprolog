@@ -1247,12 +1247,14 @@ public sealed class LogtalkConformanceTests
                 "dotnet",
                 [
                     "run",
+                    "-nodereuse:false",
                     "--project",
                     project,
                     "--configuration",
                     "Release",
                     $"-p:CompiledConformanceSource={generatedPath}",
                     "-p:CompiledConformanceRunner=true",
+                    $"-p:RunnerIsolationRoot={Path.Combine(checkout, "out-managed")}{Path.DirectorySeparatorChar}",
                 ],
                 RepositoryLayout.Root
             );
@@ -1275,6 +1277,7 @@ public sealed class LogtalkConformanceTests
                 "-p:NativeConformanceRunner=true",
                 "-p:CompiledConformanceRunner=true",
                 $"-p:CompiledConformanceSource={generatedPath}",
+                $"-p:RunnerIsolationRoot={Path.Combine(checkout, "out-native")}{Path.DirectorySeparatorChar}",
                 "--output",
                 publish,
                 "--nologo",

@@ -29,7 +29,7 @@ mkdir -p "$DOTNET_CLI_HOME" "$NUGET_PACKAGES" "$work"
 
 cd "$work"
 dotnet new nugetconfig --force
-dotnet nuget add source "$package_feed" --name dotprolog-local --configfile NuGet.Config
+dotnet nuget add source "$package_feed" --name dotprolog-local --configfile nuget.config
 dotnet new install "$package_feed/DotProlog.Templates.$version.nupkg"
 
 dotnet new prolog-console -n HelloProlog --DotPrologVersion "$version"

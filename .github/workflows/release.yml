@@ -13,6 +13,9 @@ env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  # Reused MSBuild worker nodes outlive their build step and keep task assemblies such as
+  # DotProlog.Build.Tasks loaded, which blocks later copies to those outputs on Windows.
+  MSBUILDDISABLENODEREUSE: '1'
 
 jobs:
   # The same gates CI applies, re-run against the tagged commit rather than trusted from a branch.

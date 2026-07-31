@@ -120,7 +120,7 @@ public sealed class SourceDirectiveTests : IDisposable
 
         Assert.Empty(engine.ConsultFile(dependency).Diagnostics);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
-        Assert.Equal(RunResult.Success, engine.RunGoal($"ensure_loaded('{dependency}')", out _));
+        Assert.Equal(RunResult.Success, engine.RunGoal($"ensure_loaded('{QuotedAtomText(dependency)}')", out _));
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
 
         Assert.Equal("dependency", output.ToString());
@@ -263,7 +263,7 @@ public sealed class SourceDirectiveTests : IDisposable
         var output = new StringWriter();
         var engine = new PrologEngine { Output = output, Input = TextReader.Null };
 
-        Assert.Equal(RunResult.Success, engine.RunGoal($"consult('{dependency}')", out _));
+        Assert.Equal(RunResult.Success, engine.RunGoal($"consult('{QuotedAtomText(dependency)}')", out _));
         Assert.Equal("", output.ToString());
         Assert.Equal(RunResult.Success, engine.RunGoal("loaded", out _));
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
@@ -283,6 +283,9 @@ public sealed class SourceDirectiveTests : IDisposable
 
         Assert.Equal(diagnosticId, Assert.Single(loaded.Diagnostics).Id);
     }
+
+    /// <summary>Escapes a host path for use inside a single-quoted atom, where `\` starts an escape.</summary>
+    private static string QuotedAtomText(string path) => path.Replace("\\", "\\\\", StringComparison.Ordinal);
 
     private string Write(string name, string source)
     {

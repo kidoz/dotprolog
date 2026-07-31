@@ -359,7 +359,7 @@ internal static class LogtalkTestAdapter
             support.Add(BinaryOutputSupport);
         }
 
-        program = string.Join(Environment.NewLine, support);
+        program = string.Join('\n', support);
         return true;
     }
 
@@ -742,7 +742,7 @@ internal static class LogtalkTestAdapter
             return false;
         }
 
-        translated = $"{clause[..(neck + 2)]}{Environment.NewLine}    {backendGoal}.";
+        translated = $"{clause[..(neck + 2)]}\n    {backendGoal}.";
         return true;
     }
 

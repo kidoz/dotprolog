@@ -1,0 +1,17 @@
+<Project>
+    <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)..'))" />
+
+    <!--
+      Conformance and strict-ISO runner rebuilds recompile this project with a different entry
+      point. Redirecting their outputs keeps the shared bin/obj pristine, so a test host or a
+      later no-build test step never executes a runner-flavoured assembly.
+    -->
+    <PropertyGroup Condition="'$(RunnerIsolationRoot)' != ''">
+        <RunnerIsolationRoot>$([MSBuild]::EnsureTrailingSlash('$(RunnerIsolationRoot)'))</RunnerIsolationRoot>
+        <BaseIntermediateOutputPath>$(RunnerIsolationRoot)obj/</BaseIntermediateOutputPath>
+        <BaseOutputPath>$(RunnerIsolationRoot)bin/</BaseOutputPath>
+        <!-- The SDK only excludes the redirected output paths from source globs, so the
+             project-local bin/obj of ordinary builds must be excluded explicitly. -->
+        <DefaultItemExcludes>$(DefaultItemExcludes);bin/**;obj/**</DefaultItemExcludes>
+    </PropertyGroup>
+</Project>
