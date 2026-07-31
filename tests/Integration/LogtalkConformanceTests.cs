@@ -348,9 +348,24 @@ public sealed class LogtalkConformanceTests
 
         try
         {
+            // The corpus must be byte-identical on every platform: Windows git defaults to
+            // autocrlf, and a CRLF working tree breaks ISO '\'-newline continuations in quoted
+            // atoms.
             (int cloneExit, string cloneLog) = await ChildProcess.RunAsync(
                 "git",
-                ["clone", "--depth", "1", "--branch", Tag, "--filter=blob:none", "--sparse", Repository, checkout],
+                [
+                    "clone",
+                    "--config",
+                    "core.autocrlf=false",
+                    "--depth",
+                    "1",
+                    "--branch",
+                    Tag,
+                    "--filter=blob:none",
+                    "--sparse",
+                    Repository,
+                    checkout,
+                ],
                 RepositoryLayout.Root
             );
             Require(cloneExit == 0, $"Could not clone the pinned Logtalk suite:\n{cloneLog}");
