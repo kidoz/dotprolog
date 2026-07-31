@@ -888,7 +888,7 @@ public sealed class LogtalkConformanceTests
             return false;
         }
 
-        Cell assertion = EqualityAssertion(machine, machine.Argument(0), output.ToString());
+        Cell assertion = EqualityAssertion(machine, machine.Argument(0), output.ToString().ReplaceLineEndings("\n"));
         machine.Output = TextWriter.Null;
         return machine.Unify(machine.Argument(1), assertion);
     }
@@ -911,7 +911,7 @@ public sealed class LogtalkConformanceTests
             return false;
         }
 
-        Cell contents = CharacterList(machine, output.ToString());
+        Cell contents = CharacterList(machine, output.ToString().ReplaceLineEndings("\n"));
         machine.Output = TextWriter.Null;
         return machine.Unify(machine.Argument(0), contents);
     }
@@ -1127,7 +1127,10 @@ public sealed class LogtalkConformanceTests
 
         string path = stream.Name;
         machine.Streams.Close(stream);
-        output = File.ReadAllText(path);
+
+        // The corpus states its expectations with '\n'; the platform newline the writer produced
+        // is not what these cases measure.
+        output = File.ReadAllText(path).ReplaceLineEndings("\n");
         File.Delete(path);
         return true;
     }
