@@ -502,7 +502,7 @@ changelog section for that version, and only then pushes to NuGet — from a sep
 # 1. Move the version's changelog heading from "unreleased" to today's date.
 # 2. Set VersionPrefix in Directory.Build.props if the version is changing.
 # 3. Commit, then:
-git tag v0.1.1 && git push origin v0.1.1
+git tag v0.2.0 && git push origin v0.2.0
 ```
 
 Nothing is published to NuGet yet, and the publication job fails unless `NUGET_API_KEY` is set.

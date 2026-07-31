@@ -6,6 +6,10 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ## [Unreleased]
 
+A changelog section previously dated as 0.1.1 (2026-07-30) was never shipped: no tag was pushed,
+no GitHub release was produced, and nothing reached NuGet.org. Its content is folded in here, and
+the next release is versioned 0.2.0 because features have been added since `v0.1.0`.
+
 ### Added
 
 - The pinned 768-case independent ISO corpus now runs exhaustively through generated C#,
@@ -15,20 +19,6 @@ All notable changes to DotProlog are recorded here. The format follows
 - An opt-in strict ISO language mode for embedding, `dotnet prolog`, generated code, and
   `.dplproj` builds. It rejects known predefined extensions during source preparation and at
   runtime meta-call and host-binding boundaries.
-
-### Changed
-
-- Module preparation now requires one leading `module/2` declaration and rejects malformed,
-  unexported, or conflicting selected imports.
-- DCG processing uses the Part 3 `|` operator priority, rejects reserved and predefined grammar
-  heads, and applies the specified `phrase/2` and terminal-sequence validation.
-- Extended DCGs lower soft cut consistently in static and runtime-loaded source; strict mode treats
-  the additional control as an ordinary nonterminal.
-
-## [0.1.1] — 2026-07-30
-
-### Added
-
 - A `prolog-test` template whose `test_*` predicates are discovered and run by `dotnet test`.
 - A clean local-feed consumer gate that installs the packed templates and .NET tool, then builds,
   runs, NativeAOT-publishes, and tests generated projects from a path containing spaces.
@@ -43,6 +33,12 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Changed
 
+- Module preparation now requires one leading `module/2` declaration and rejects malformed,
+  unexported, or conflicting selected imports.
+- DCG processing uses the Part 3 `|` operator priority, rejects reserved and predefined grammar
+  heads, and applies the specified `phrase/2` and terminal-sequence validation.
+- Extended DCGs lower soft cut consistently in static and runtime-loaded source; strict mode treats
+  the additional control as an ordinary nonterminal.
 - The repository test suite now uses Microsoft.Testing.Platform v2 through the .NET 10
   `global.json` test-runner contract, so xUnit and Prolog test projects run together.
 - Release checksums now cover packages, symbols, the SBOM, and all native binaries; the CycloneDX
@@ -60,6 +56,12 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Fixed
 
+- The repository gates pass again on Windows and Linux: conformance and strict-ISO runner
+  rebuilds now use isolated build outputs instead of overwriting the shared test assembly that a
+  later no-build step executes, MSBuild worker nodes no longer outlive their step holding task
+  assemblies locked, host paths interpolated into quoted atoms escape their backslashes, the
+  Logtalk adapter emits the same line endings on every platform, and the packed-package consumer
+  gate finds `nuget.config` on case-sensitive filesystems.
 - The machine protected new environment frames only against the newest choice point, so a frame
   deallocated by last-call optimisation could be overwritten while an older choice point still
   referenced it. Solutions were silently dropped — `forall/2` with a compound action and
@@ -152,6 +154,5 @@ binary: a published executable can consult a `.pl` file it has never seen and ru
 
 **Full Changelog**: https://github.com/kidoz/dotprolog/commits/v0.1.0
 
-[Unreleased]: https://github.com/kidoz/dotprolog/compare/v0.1.1...HEAD
-[0.1.1]: https://github.com/kidoz/dotprolog/releases/tag/v0.1.1
+[Unreleased]: https://github.com/kidoz/dotprolog/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.1.0
