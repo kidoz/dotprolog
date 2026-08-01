@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- A published SDK would be `<Sdk Name="DotProlog.Sdk" />`; imported by path inside this repo. -->
+    <Import Project="..\..\src\DotProlog.Sdk\Sdk\Sdk.props" />
+
+    <PropertyGroup>
+        <!-- Exe is what makes the SDK generate an entry point that runs the program's goals. -->
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <RootNamespace>TextGrammar</RootNamespace>
+        <IsPackable>false</IsPackable>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
+        <DotPrologTasksAssembly>$(MSBuildThisFileDirectory)..\..\src\DotProlog.Build.Tasks\bin\$(Configuration)\net10.0\DotProlog.Build.Tasks.dll</DotPrologTasksAssembly>
+
+        <!--
+          The point of this sample: double_quotes starts at chars, so the grammar in text_grammar.pl
+          is written against characters. The generated entry point records the mode and constructs
+          its engine in it, so the build-time and run-time readers agree.
+        -->
+        <DotPrologLanguageMode>modern</DotPrologLanguageMode>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\DotProlog.Compiler\DotProlog.Compiler.csproj" />
+        <ProjectReference Include="..\..\src\DotProlog.Build.Tasks\DotProlog.Build.Tasks.csproj" ReferenceOutputAssembly="false" />
+    </ItemGroup>
+
+    <Import Project="..\..\src\DotProlog.Sdk\Sdk\Sdk.targets" />
+
+</Project>
