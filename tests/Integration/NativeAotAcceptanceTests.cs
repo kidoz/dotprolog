@@ -76,6 +76,64 @@ public sealed class NativeAotAcceptanceTests
     }
 
     [Fact]
+    public async Task PublishedExecutableRunsModernModeGeneratedAndConsultedCode()
+    {
+        Assert.SkipUnless(
+            Environment.GetEnvironmentVariable(OptInVariable) == "1",
+            $"Set {OptInVariable}=1 to run the NativeAOT Modern mode test."
+        );
+
+        string root = Path.Combine(Path.GetTempPath(), $"dotprolog-aot-modern-{Environment.ProcessId}");
+        string output = Path.Combine(root, "publish");
+        Directory.CreateDirectory(output);
+
+        try
+        {
+            string generated = Path.Combine(root, "ModernMode.g.cs");
+            await File.WriteAllTextAsync(
+                generated,
+                CompiledConformanceSourceGenerator.GenerateModernModeSmoke(),
+                TestContext.Current.CancellationToken
+            );
+
+            (int exitCode, string log) = await RunAsync(
+                "dotnet",
+                [
+                    "publish",
+                    "-nodereuse:false",
+                    Path.Combine(RepositoryLayout.Root, "tests", "Integration", "Integration.Tests.csproj"),
+                    "-c",
+                    "Release",
+                    "-r",
+                    RuntimeInformation.RuntimeIdentifier,
+                    "-p:ModernModeRunner=true",
+                    $"-p:CompiledConformanceSource={generated}",
+                    $"-p:RunnerIsolationRoot={Path.Combine(root, "out")}{Path.DirectorySeparatorChar}",
+                    "-o",
+                    output,
+                    "--nologo",
+                ],
+                RepositoryLayout.Root
+            );
+
+            Assert.True(exitCode == 0, $"Modern mode publish failed:\n{log}");
+            Assert.DoesNotContain("warning IL", log, StringComparison.Ordinal);
+
+            string executable = Path.Combine(output, OperatingSystem.IsWindows() ? "Integration.Tests.exe" : "Integration.Tests");
+            Assert.True(File.Exists(executable), $"No published executable at {executable}.");
+            Assert.Empty(Directory.GetFiles(output, "*.dll"));
+
+            (int runExit, string runLog) = await RunAsync(executable, [], RepositoryLayout.Root);
+            Assert.True(runExit == 0, $"Modern mode executable failed:\n{runLog}");
+            Assert.Contains("modern-native: passed", runLog, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task PublishedExecutableConsultsAndUpdatesAtRunTime()
     {
         Assert.SkipUnless(

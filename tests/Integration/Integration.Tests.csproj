@@ -32,6 +32,16 @@
         <NoWarn>$(NoWarn);IL2104;IL3000;IL3053</NoWarn>
     </PropertyGroup>
 
+    <PropertyGroup Condition="'$(ModernModeRunner)' == 'true'">
+        <DefineConstants>$(DefineConstants);MODERN_MODE_RUNNER</DefineConstants>
+        <StartupObject>Integration.Tests.ModernModeNativeProgram</StartupObject>
+        <PublishAot>true</PublishAot>
+        <TrimMode>full</TrimMode>
+        <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+        <EnableAotAnalyzer>true</EnableAotAnalyzer>
+        <NoWarn>$(NoWarn);IL2104;IL3000;IL3053</NoWarn>
+    </PropertyGroup>
+
     <ItemGroup Condition="'$(CompiledConformanceSource)' != ''">
         <Compile Include="$(CompiledConformanceSource)" Link="CompiledConformance.g.cs" />
     </ItemGroup>
