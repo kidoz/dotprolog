@@ -9,8 +9,8 @@ the same first-class SDK experience that C# and F# provide: `.dplproj` projects,
     DotProlog is early but usable. The SDK, templates, `dotnet prolog`, Prolog tests through
     `dotnet test`, typed .NET facades, and NativeAOT runtime consultation work in the repository.
     `.dplproj` predicate bodies compile to generated C# and ordinary CLR IL; runtime-loaded source
-    compiles to internal bytecode. The standalone `plc` command is not implemented yet, and
-    packages are not currently published to NuGet.org.
+    compiles to internal bytecode. The standalone `plc` command is not implemented yet. The
+    packages are published on NuGet.org from 0.2.0 onwards.
 
 ## Try it from the repository
 

@@ -14,8 +14,8 @@ Russian whose examples all run on DotProlog.
 **Status: early, but usable.** `dotnet new prolog-console` through `dotnet publish -p:PublishAot=true`
 works today, and `dotnet test` discovers Prolog tests under Microsoft.Testing.Platform. What is
 missing: the `plc` compiler and generating IL for predicate bodies — a `.dplproj` currently embeds
-its Prolog source and compiles it to bytecode at startup. Nothing is published to NuGet yet, though
-the packages build: see [CHANGELOG.md](CHANGELOG.md) and [COMPATIBILITY.md](COMPATIBILITY.md).
+its Prolog source and compiles it to bytecode at startup. The packages are on NuGet.org from 0.2.0:
+see [CHANGELOG.md](CHANGELOG.md) and [COMPATIBILITY.md](COMPATIBILITY.md).
 
 ## Hello, world
 
@@ -438,8 +438,8 @@ A `.dplproj` publishes with NativeAOT like any other project:
 $ dotnet publish HelloProlog -c Release -r osx-arm64 -p:PublishAot=true
 ```
 
-**Nothing is published to NuGet yet.** Package identity is settled as `DotProlog.*`, and the commands
-above are verified against a local feed built by `dotnet pack`.
+The packages are published on NuGet.org as `DotProlog.*`, starting at 0.2.0. The commands above are
+also verified against a local feed built by `dotnet pack`, so they work before a version ships.
 
 ## Testing Prolog
 
@@ -505,7 +505,7 @@ changelog section for that version, and only then pushes to NuGet — from a sep
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
-Nothing is published to NuGet yet. The publication job authenticates by trusted publishing: it
+The publication job authenticates by trusted publishing: it
 exchanges the workflow's OIDC token for a short-lived nuget.org key, so no API key is stored, and
 the `NUGET_USER` secret names the account whose policy authorises the push.
 
