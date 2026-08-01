@@ -52,11 +52,14 @@ directives and initialization goal.
 To reject known implementation-specific language features, run the file in strict ISO mode:
 
 ```console
-dotnet run --project src/DotProlog.Tool -- run --strict-iso path/to/program.pl
+dotnet run --project src/DotProlog.Tool -- run --mode strict-iso path/to/program.pl
 ```
 
 Strict mode reports `DPL1018` when source calls a predefined DotProlog extension. The default mode
 remains extended for backward compatibility.
+
+`--mode modern` keeps the extended surface but starts `double_quotes` at `chars`, so `"abc"` reads
+as `[a,b,c]`.
 
 ## Run your own program
 

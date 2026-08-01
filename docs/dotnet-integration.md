@@ -99,14 +99,17 @@ A normal project reference is enough:
 The generated facade is ordinary .NET code, so C#, F#, and Visual Basic consume the same assembly.
 The repository exercises all three languages against `samples/PricingRules`.
 
-Set the following property in a `.dplproj` to validate and generate the whole project in strict ISO
-mode:
+Set the following property in a `.dplproj` to validate and generate the whole project in a
+particular language mode:
 
 ```xml
 <PropertyGroup>
-  <DotPrologStrictIso>true</DotPrologStrictIso>
+  <DotPrologLanguageMode>strict-iso</DotPrologLanguageMode>
 </PropertyGroup>
 ```
+
+The accepted values are `extended` (the default), `strict-iso`, and `modern`. See
+[the language guide](language-guide.md#language-modes) for what each one selects.
 
 Generated code records its language mode and refuses to install into an engine created in a
 different mode. This keeps build-time validation and runtime consultation under the same language

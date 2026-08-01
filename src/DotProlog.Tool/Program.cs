@@ -7,6 +7,7 @@ namespace DotProlog.Tool;
 /// <summary>Command line entry point for the <c>dotnet prolog</c> tool.</summary>
 internal static class Program
 {
+    private const string LanguageModeNames = PrologLanguageModes.Names;
     private const int ExitSuccess = 0;
     private const int ExitUsage = 64;
     private const int ExitCompileError = 65;
@@ -30,16 +31,22 @@ internal static class Program
 
     private static int Run(ReadOnlySpan<string> args)
     {
-        bool strictIso = false;
-        if (args.Length > 0 && args[0] == "--strict-iso")
+        PrologLanguageMode languageMode = PrologLanguageMode.Extended;
+        if (args.Length > 1 && args[0] == "--mode")
         {
-            strictIso = true;
-            args = args[1..];
+            if (!PrologLanguageModes.TryParse(args[1], out languageMode))
+            {
+                Console.Error.WriteLine($"error: unknown language mode: {args[1]}");
+                Console.Error.WriteLine($"       expected one of: {LanguageModeNames}");
+                return ExitUsage;
+            }
+
+            args = args[2..];
         }
 
         if (args.Length != 1)
         {
-            Console.Error.WriteLine("Usage: dotnet prolog run [--strict-iso] <file.pl>");
+            Console.Error.WriteLine($"Usage: dotnet prolog run [--mode {LanguageModeNames}] <file.pl>");
             return ExitUsage;
         }
 
@@ -50,7 +57,7 @@ internal static class Program
             return ExitUsage;
         }
 
-        var engine = new PrologEngine(strictIso ? PrologLanguageMode.StrictIso : PrologLanguageMode.Extended);
+        var engine = new PrologEngine(languageMode);
 
         LoadResult loaded = engine.ConsultFile(path);
         foreach (Diagnostic diagnostic in loaded.Diagnostics)
@@ -95,6 +102,12 @@ internal static class Program
         output.WriteLine("dotnet prolog — run Prolog on .NET");
         output.WriteLine();
         output.WriteLine("Usage:");
-        output.WriteLine("  dotnet prolog run [--strict-iso] <file.pl>   consult a file and run its goals");
+        output.WriteLine($"  dotnet prolog run [--mode {LanguageModeNames}] <file.pl>");
+        output.WriteLine("      consult a file and run its goals");
+        output.WriteLine();
+        output.WriteLine("Language modes:");
+        output.WriteLine("  extended     ISO plus the DotProlog extensions (default)");
+        output.WriteLine("  strict-iso   only the standardized ISO/IEC 13211 surface");
+        output.WriteLine("  modern       extended, with double_quotes starting at chars");
     }
 }

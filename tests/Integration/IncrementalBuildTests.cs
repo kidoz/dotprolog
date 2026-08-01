@@ -106,7 +106,7 @@ public sealed class IncrementalBuildTests : IDisposable
             "value(one) :- member(one, [one]).\n",
             TestContext.Current.CancellationToken
         );
-        (int rejectedExit, string rejectedLog) = await Build("-p:DotPrologStrictIso=true");
+        (int rejectedExit, string rejectedLog) = await Build("-p:DotPrologLanguageMode=strict-iso");
         Assert.True(rejectedExit != 0, "Strict generation accepted a bundled extension.");
         Assert.Contains("DPL1018", rejectedLog, StringComparison.Ordinal);
 
@@ -115,7 +115,7 @@ public sealed class IncrementalBuildTests : IDisposable
             "value(one).\n",
             TestContext.Current.CancellationToken
         );
-        (int strictExit, string strictLog) = await Build("-p:DotPrologStrictIso=true");
+        (int strictExit, string strictLog) = await Build("-p:DotPrologLanguageMode=strict-iso");
         Assert.True(strictExit == 0, $"The strict build failed:\n{strictLog}");
         Assert.Contains(
             "PrologLanguageMode.StrictIso",

@@ -24,7 +24,12 @@
     <PropertyGroup>
         <!-- Prolog sources and contracts are picked up automatically, like .cs files are. -->
         <EnableDefaultPrologItems Condition="'$(EnableDefaultPrologItems)' == ''">true</EnableDefaultPrologItems>
-        <!-- Opt in to the processor mode that rejects implementation-specific language features. -->
-        <DotPrologStrictIso Condition="'$(DotPrologStrictIso)' == ''">false</DotPrologStrictIso>
+        <!--
+          Which language surface and initial flag values this project builds against:
+            extended     ISO plus the DotProlog extensions (default)
+            strict-iso   only the standardized ISO/IEC 13211 surface
+            modern       extended, with double_quotes starting at chars
+        -->
+        <DotPrologLanguageMode Condition="'$(DotPrologLanguageMode)' == ''">extended</DotPrologLanguageMode>
     </PropertyGroup>
 </Project>

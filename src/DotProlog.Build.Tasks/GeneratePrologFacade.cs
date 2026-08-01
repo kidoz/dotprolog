@@ -39,8 +39,8 @@ public sealed class GeneratePrologFacade : Task
     /// <summary>Whether that entry point should host the test platform rather than run the program.</summary>
     public bool GenerateTestHost { get; set; }
 
-    /// <summary>Whether generated source must use the strict ISO language profile.</summary>
-    public bool StrictIso { get; set; }
+    /// <summary>The language mode generated source is built against; see <c>DotPrologLanguageMode</c>.</summary>
+    public string LanguageMode { get; set; } = "extended";
 
     /// <summary>The generated C# files, to be added to <c>Compile</c>.</summary>
     [Output]
@@ -59,9 +59,18 @@ public sealed class GeneratePrologFacade : Task
             return false;
         }
 
+        if (!PrologLanguageModes.TryParse(LanguageMode, out PrologLanguageMode languageMode))
+        {
+            Log.LogError(
+                $"DotPrologLanguageMode '{LanguageMode}' is not a known Prolog language mode. "
+                    + $"Expected one of: {PrologLanguageModes.Names}."
+            );
+
+            return false;
+        }
+
         Directory.CreateDirectory(OutputPath);
         List<ITaskItem> generated = [];
-        PrologLanguageMode languageMode = StrictIso ? PrologLanguageMode.StrictIso : PrologLanguageMode.Extended;
 
         if (GenerateEntryPoint)
         {
