@@ -62,3 +62,14 @@ fi
 # isolated feed without leaving a global or local tool installation behind.
 dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" run HelloProlog/main.pl |
     grep -Fx "Hello from Prolog on .NET!"
+
+# The packaged command must preserve its documented warning exit code without consulting source.
+printf 'value(X).\n' >HelloProlog/lint-warning.pl
+if dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --warnings-as-errors HelloProlog/lint-warning.pl; then
+    echo "lint unexpectedly accepted a singleton variable" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1

@@ -38,6 +38,7 @@ Hello! World!
 ## What you can build
 
 - Run `.pl` files with the repository tool.
+- Lint `.pl` files without consulting them or executing directives.
 - Embed a Prolog engine in C#, F#, or Visual Basic and enumerate solutions lazily.
 - Build `.dplproj` applications, libraries, and tests.
 - Generate typed .NET facades from `.dpli` contracts.
@@ -50,6 +51,7 @@ Hello! World!
 - [A Gentle Introduction to Prolog](book/index.md) — a free beginner book, in English and Russian,
   that teaches Prolog from zero using DotProlog.
 - [Language guide](language-guide.md) — learn the supported Prolog surface and current limits.
+- [Source linting](linting.md) — analyze source locally or fail CI on warnings.
 - [.NET integration](dotnet-integration.md) — embed the engine or consume a `.dplproj`.
 - [Architecture](architecture/index.md) — understand the bytecode VM and NativeAOT design.
 - [Contributing](contributing.md) — run the project and documentation checks.

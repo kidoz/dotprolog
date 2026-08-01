@@ -42,6 +42,15 @@ Or, with [just](https://just.systems):
 $ just hello
 ```
 
+Analyze source without consulting it or executing directives:
+
+```console
+$ dotnet run --project src/DotProlog.Tool -- lint --warnings-as-errors path/to/program.pl
+```
+
+The first stable linter diagnostics cover singleton variables and repeated underscore-prefixed
+singleton markers. See [Source linting](docs/linting.md) for rules and exit codes.
+
 ## Calling Prolog from C#
 
 ```csharp
@@ -132,7 +141,7 @@ bundles of [widget, gadget]:
 |---|---|
 | `src/DotProlog.Syntax` | Lexer, ISO operator table, operator-precedence reader, diagnostics |
 | `src/DotProlog.Runtime` | Tagged terms, heap, trail, choice points, bytecode VM, builtins |
-| `src/DotProlog.Compiler` | Clause and directive lowering to bytecode, consult and embedding API |
+| `src/DotProlog.Compiler` | Clause analysis, source linting, bytecode lowering, consult and embedding API |
 | `src/DotProlog.CodeGen.CSharp` | `.dpli` contract reader and C# facade generator |
 | `src/DotProlog.Build.Tasks` | MSBuild task that runs the generator |
 | `src/DotProlog.Sdk` | The `DotProlog.Sdk` MSBuild SDK package |

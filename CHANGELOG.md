@@ -6,6 +6,14 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A non-executing `dotnet prolog lint` command with stable `DPL3xxx` diagnostics for singleton
+  variables and repeated underscore-prefixed singleton markers. It accepts multiple files and the
+  shared language modes; warnings remain advisory unless `--warnings-as-errors` is selected.
+- A reusable `PrologLinter` API in `DotProlog.Compiler`, package-consumer coverage for the installed
+  tool, and source-linting documentation.
+
 ## [0.3.0] — 2026-08-01
 
 A language-mode release. A mode now carries the initial ISO flag values that go with its predefined

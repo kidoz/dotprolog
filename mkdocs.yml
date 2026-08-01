@@ -25,6 +25,7 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - Language guide: language-guide.md
+  - Source linting: linting.md
   - Book:
       - Introduction: book/index.md
       - 1. Getting ready: book/01-getting-ready.md

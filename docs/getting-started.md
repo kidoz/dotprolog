@@ -61,6 +61,22 @@ remains extended for backward compatibility.
 `--mode modern` keeps the extended surface but starts `double_quotes` at `chars`, so `"abc"` reads
 as `[a,b,c]`.
 
+## Lint source without running it
+
+The linter reports source warnings without consulting the program or executing directives:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint path/to/program.pl
+```
+
+Warnings do not fail the command unless CI opts in:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint --warnings-as-errors path/to/program.pl
+```
+
+See [Source linting](linting.md) for the diagnostic and exit-code contract.
+
 ## Run your own program
 
 Create a UTF-8 `.pl` file:
