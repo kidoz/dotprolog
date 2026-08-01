@@ -205,7 +205,7 @@ Writing them was worth it immediately: they found these real defects.
   the reader rejects. The named ISO escapes `\a \b \f \n \r \t \v` and delimited `\x...\` hex
   escapes for the rest now round-trip every control character.
 
-Beyond the conformance cases, the engine and toolchain are covered by 1343 xUnit cases and seven
+Beyond the conformance cases, the engine and toolchain are covered by 1357 xUnit cases and seven
 Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
 C#, F#, and Visual Basic samples and exercises NativeAOT.
 

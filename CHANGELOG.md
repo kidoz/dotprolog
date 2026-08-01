@@ -6,9 +6,16 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ## [Unreleased]
 
-A changelog section previously dated as 0.1.1 (2026-07-30) was never shipped: no tag was pushed,
-no GitHub release was produced, and nothing reached NuGet.org. Its content is folded in here, and
-the next release is versioned 0.2.0 because features have been added since `v0.1.0`.
+## [0.2.0] — 2026-08-01
+
+The second release of **DotProlog**, and the first with independent conformance evidence: all 768
+applicable declarations of the pinned Logtalk 3.101.0 ISO Prolog corpus pass — as consulted
+bytecode, as generated C#, across both compiled↔bytecode boundaries, and from a published
+NativeAOT executable. The engine gained first-argument clause indexing, the language gained an
+opt-in strict ISO mode, and `dotnet test` now drives Prolog test projects directly.
+
+A changelog section dated 0.1.1 (2026-07-30) was never shipped — no tag, no GitHub release, and
+nothing on NuGet.org — so its content is folded in here and this release is 0.2.0.
 
 ### Added
 
@@ -104,6 +111,29 @@ the next release is versioned 0.2.0 because features have been added since `v0.1
 - Prolog test projects honour run filters, capture `user_error` into failure reports, and fail a
   looping test after a configurable per-test timeout instead of hanging `dotnet test`.
 
+### Compatibility
+
+- Requires **.NET 10**. Packages are platform-neutral; NativeAOT publishing is exercised on Linux,
+  Windows, and macOS in CI.
+- **Independent evidence, but still no full ISO claim.** The 768 applicable declarations of the
+  pinned Logtalk 3.101.0 corpus pass on every execution path, and the repository's own 563 cases
+  encoded from ISO/IEC 13211-1 pass as well. Licensed-text traceability and the Part 2 module and
+  Part 3 grammar completion gates remain open. See [COMPATIBILITY.md](COMPATIBILITY.md).
+- The strict ISO mode is **opt-in**; the default profile is unchanged, so existing programs that
+  use predefined extensions keep working.
+- There is still no string type: an atom is the only text term, and the SWI-Prolog string
+  predicates are absent rather than aliased to atoms.
+
+### Known limitations
+
+- `plc` and the foreign-predicate source generator are designed but not implemented.
+- First-argument indexing applies to the bytecode VM; build-time generated C# still tries a
+  predicate's clauses in order.
+- A character is a UTF-16 code unit, so `atom_length/2` counts a character outside the Basic
+  Multilingual Plane as two.
+
+**Full Changelog**: https://github.com/kidoz/dotprolog/compare/v0.1.0...v0.2.0
+
 ## [0.1.0] — 2026-07-27
 
 The first release of **DotProlog** — a Prolog implementation for .NET 10, built as a first-class
@@ -159,5 +189,6 @@ binary: a published executable can consult a `.pl` file it has never seen and ru
 
 **Full Changelog**: https://github.com/kidoz/dotprolog/commits/v0.1.0
 
-[Unreleased]: https://github.com/kidoz/dotprolog/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/kidoz/dotprolog/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.2.0
 [0.1.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.1.0
