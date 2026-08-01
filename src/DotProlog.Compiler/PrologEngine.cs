@@ -36,8 +36,12 @@ public sealed class PrologEngine : IRuntimeCompiler
         Machine = new Machine(Program);
         Program.RuntimeCompiler = this;
 
+        // The bundled libraries are processor implementation, not user source, so they are read under
+        // the ISO initial value whatever mode the host chose. Modern mode cannot reinterpret them.
+        Program.Flags.DoubleQuotes = DoubleQuotesMode.Codes;
         LoadLibrary(BootstrapLibrary.Source, "bootstrap");
         LoadLibrary(StandardLibrary.Source, "library");
+        Program.Flags.DoubleQuotes = Program.InitialDoubleQuotes;
     }
 
     /// <summary>Compiles one of the built-in libraries, which must not fail.</summary>

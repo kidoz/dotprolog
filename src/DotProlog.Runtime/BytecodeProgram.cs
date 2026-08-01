@@ -42,6 +42,18 @@ public sealed class BytecodeProgram
     private readonly List<(CompiledPredicateBlock Block, CompiledProgram Program)> _compiledBlocks = [];
     private readonly List<StaticClauseIndex> _staticIndexes = [];
 
+    /// <summary>
+    /// The modes a program may be built in. This is an allowlist rather than an
+    /// <see cref="Enum.IsDefined{TEnum}(TEnum)"/> check on purpose: adding a mode has to be a
+    /// deliberate act here, because a mode also has to be given its initial flag values below.
+    /// </summary>
+    private static readonly PrologLanguageMode[] SupportedLanguageModes =
+    [
+        PrologLanguageMode.Extended,
+        PrologLanguageMode.StrictIso,
+        PrologLanguageMode.Modern,
+    ];
+
     /// <summary>Creates an empty extended-mode program with its own symbol table and builtin registry.</summary>
     public BytecodeProgram()
         : this(PrologLanguageMode.Extended) { }
@@ -49,12 +61,14 @@ public sealed class BytecodeProgram
     /// <summary>Creates an empty program in <paramref name="languageMode"/>.</summary>
     public BytecodeProgram(PrologLanguageMode languageMode)
     {
-        if (languageMode is not PrologLanguageMode.Extended and not PrologLanguageMode.StrictIso)
+        if (Array.IndexOf(SupportedLanguageModes, languageMode) < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(languageMode), languageMode, "Unknown Prolog language mode.");
         }
 
         LanguageMode = languageMode;
+        InitialDoubleQuotes = InitialDoubleQuotesOf(languageMode);
+        Flags.DoubleQuotes = InitialDoubleQuotes;
         Symbols = new SymbolTable();
         Builtins = new BuiltinRegistry(Symbols);
         Array.Fill(_entryPoints, Undefined);
@@ -69,6 +83,19 @@ public sealed class BytecodeProgram
 
     /// <summary>The immutable language profile selected before source preparation.</summary>
     public PrologLanguageMode LanguageMode { get; }
+
+    /// <summary>
+    /// The value <c>double_quotes</c> was seeded with before any source was read. Source text and
+    /// <c>set_prolog_flag/2</c> move the live flag away from it; this records where it started.
+    /// </summary>
+    public DoubleQuotesMode InitialDoubleQuotes { get; }
+
+    /// <summary>
+    /// The initial <c>double_quotes</c> value a mode carries. ISO/IEC 13211-1 fixes it at
+    /// <c>codes</c>, which is what every mode but <see cref="PrologLanguageMode.Modern"/> keeps.
+    /// </summary>
+    private static DoubleQuotesMode InitialDoubleQuotesOf(PrologLanguageMode languageMode) =>
+        languageMode == PrologLanguageMode.Modern ? DoubleQuotesMode.Chars : DoubleQuotesMode.Codes;
 
     /// <summary>
     /// Whether the loader dispatches multi-clause static predicates through a first-argument

@@ -19,6 +19,25 @@ extended library predicate.
 Strict mode is an enforcement boundary, not a certification claim. The licensed-text
 requirement-by-requirement review described in the compatibility record remains separate.
 
+The opt-in `Modern` mode accepts the same surface as `Extended`, but starts the `double_quotes`
+flag at `chars` rather than the ISO initial value `codes`. A double-quoted token therefore reads as
+a list of one-character atoms:
+
+```prolog
+?- "abc" = [L|Ls].
+   L = a, Ls = [b,c].
+```
+
+This is the default the newer Prolog systems settled on, and it is what makes text convenient to
+work with in DCGs. Nothing else about the mode differs from `Extended`, and any mode may still move
+the flag with `:- set_prolog_flag(double_quotes, codes).`
+
+A mode is a curated dialect, not a flag matrix. A program that wants a combination no mode names —
+`double_quotes` starting at `atom`, say — sets the flag itself.
+
+Select a mode with the `PrologEngine` constructor, `dotnet prolog run --mode <name>`, or the
+`DotPrologLanguageMode` property in a `.dplproj`.
+
 ## Terms and clauses
 
 The reader supports variables, atoms, bounded integers, finite floats, lists, structures, and

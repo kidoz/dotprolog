@@ -59,6 +59,22 @@ public sealed class ProgramLoader
     {
         ArgumentNullException.ThrowIfNull(clauses);
 
+        // double_quotes belongs to the load unit. A directive still changes how the rest of this file
+        // reads, but the entering value is restored afterwards, so a library that declares its own
+        // convention cannot silently change how whatever is consulted next is read.
+        DoubleQuotesMode entering = _program.Flags.DoubleQuotes;
+        try
+        {
+            return LoadScoped(clauses, fileName, directiveExecutor);
+        }
+        finally
+        {
+            _program.Flags.DoubleQuotes = entering;
+        }
+    }
+
+    private LoadResult LoadScoped(IReadOnlyList<SyntaxTerm> clauses, string? fileName, Func<int, RunResult>? directiveExecutor)
+    {
         List<Diagnostic> diagnostics = [];
         List<int> directives = [];
         List<int> initialization = [];

@@ -252,6 +252,8 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 | Two modules exporting the same name | The first loaded gets the unqualified name | SWI reports a conflict |
 | Clause selection | First-argument indexed in the bytecode VM; linear in build-time generated C# | Indexed |
 | Arithmetic extensions | Evaluable `integer/1`, `e/0`, `inf/0`, `nan/0`, and several utility functions remain available in extended mode and are rejected in strict mode | Not part of the ISO core |
+| Initial `double_quotes` | `codes` in `Extended` and `StrictIso`, per ISO. The opt-in `Modern` mode starts it at `chars` | Scryer, Trealla, ichiban, Flowlog, and Trilog default to `chars`; SWI defaults to its own string type |
+| `double_quotes` scope | Scoped to the load unit: a directive governs the rest of its own file, and the entering value is restored afterwards | SWI and Scryer also scope it per file |
 
 ## Platforms
 

@@ -57,7 +57,13 @@ Atoms and source text use .NET Unicode strings. The reader accepts Unicode sourc
 the ISO numeric character escapes supported by the language guide. Character predicates require a
 one-character atom as represented by one .NET UTF-16 code unit.
 
-The initial `double_quotes` flag is `codes`. The initial `char_conversion` flag is `off`.
+The initial `double_quotes` flag is `codes` in the `Extended` and `StrictIso` language modes, as
+ISO/IEC 13211-1 requires. The opt-in `Modern` mode starts it at `chars` instead; that mode is an
+extension and is outside the conformance claim. The value is scoped to the load unit: a
+`set_prolog_flag(double_quotes, _)` directive governs the rest of the file that issued it, and the
+entering value is restored when that file finishes loading.
+
+The initial `char_conversion` flag is `off`.
 Character conversion applies to unquoted lexical input while quoted text, escapes, character-code
 literal payloads, and primitive character input remain unchanged.
 
