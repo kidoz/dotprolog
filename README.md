@@ -505,7 +505,14 @@ changelog section for that version, and only then pushes to NuGet — from a sep
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
-Nothing is published to NuGet yet, and the publication job fails unless `NUGET_API_KEY` is set.
+Nothing is published to NuGet yet. The publication job authenticates by trusted publishing: it
+exchanges the workflow's OIDC token for a short-lived nuget.org key, so no API key is stored, and
+the `NUGET_USER` secret names the account whose policy authorises the push.
+
+A version whose GitHub release succeeded but whose packages never reached the feed can be finished
+without re-tagging — run the workflow manually and give it the version, and it publishes the
+packages already attached to that release. Re-running the original tag run would not help, because
+a re-run replays the workflow file as it was at the tag.
 
 ## Licence
 

@@ -5,6 +5,14 @@ name: Release
 on:
   push:
     tags: ['v*']
+  # A version whose GitHub release succeeded but whose packages never reached the feed can be
+  # finished from here, without re-tagging: a re-run would replay the workflow file as it existed
+  # at the tag, so a fix landing later on main would not apply. Only the publish job runs.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to publish to nuget.org, for example 0.2.0
+        required: true
 
 permissions:
   contents: write
@@ -21,6 +29,9 @@ jobs:
   # The same gates CI applies, re-run against the tagged commit rather than trusted from a branch.
   verify:
     name: Verify ${{ matrix.os }}
+    # Skipping this cascades through native, package, and release, so a manual run reaches only
+    # the publish job.
+    if: github.event_name == 'push'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
@@ -242,31 +253,62 @@ jobs:
   publish:
     name: Publish to NuGet
     needs: release
+    # always() keeps this reachable on a manual run, where every build job above is skipped.
+    if: always() && (github.event_name == 'workflow_dispatch' || needs.release.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: release
+    # A job-level block replaces the workflow-level one, so contents has to be restated. Trusted
+    # publishing exchanges this OIDC token for a short-lived nuget.org key; without id-token the
+    # login step cannot run at all.
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/download-artifact@v4
+        if: github.event_name == 'push'
         with:
           name: packages
           path: artifacts
+
+      # A manual run publishes the packages already attached to that version's GitHub release,
+      # which are the same files the tag run built and checksummed.
+      - name: Download the release packages
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p artifacts
+          gh release download "v${{ inputs.version }}" --repo "$GITHUB_REPOSITORY" \
+            --pattern '*.nupkg' --dir artifacts
 
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
 
+      # Kept immediately before the push: the issued key is short-lived, and each OIDC token can
+      # be exchanged only once.
+      - name: Log in to nuget.org
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
       - name: Push
         env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
         run: |
           if [ -z "$NUGET_API_KEY" ]; then
-            echo "::error::NUGET_API_KEY is not configured for the release environment."
+            echo "::error::Trusted publishing did not return an API key."
             exit 1
           fi
-          version=$(grep -oE '<VersionPrefix>[^<]+' Directory.Build.props | cut -d'>' -f2)
+          version="${{ inputs.version }}"
+          if [ -z "$version" ]; then
+            version=$(grep -oE '<VersionPrefix>[^<]+' Directory.Build.props | cut -d'>' -f2)
+          fi
           pointer="DotProlog.Tool.$version.nupkg"
 
           find artifacts -maxdepth 1 -name '*.nupkg' ! -name "$pointer" -print0 |
