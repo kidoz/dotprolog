@@ -17,6 +17,7 @@
         <Project Path="tests/DotProlog.Runtime.Tests/DotProlog.Runtime.Tests.csproj" />
         <Project Path="tests/DotProlog.Syntax.Tests/DotProlog.Syntax.Tests.csproj" />
         <Project Path="tests/DotProlog.Testing.Tests/DotProlog.Testing.Tests.csproj" />
+        <Project Path="tests/DotProlog.Tool.Tests/DotProlog.Tool.Tests.csproj" />
     </Folder>
     <Folder Name="/samples/">
         <Project Path="samples/AotAcceptance/AotAcceptance.csproj" />

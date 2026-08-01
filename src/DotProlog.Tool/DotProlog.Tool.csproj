@@ -33,11 +33,15 @@
         <IsPackable>true</IsPackable>
         <PackageId>DotProlog.Tool</PackageId>
         <Title>DotProlog command line tool</Title>
-        <Description>The `dotnet prolog` command: consults and runs a Prolog file.</Description>
+        <Description>The `dotnet prolog` command: runs and statically analyzes Prolog source.</Description>
     </PropertyGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\DotProlog.Compiler\DotProlog.Compiler.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="DotProlog.Tool.Tests" />
     </ItemGroup>
 
     <!--
