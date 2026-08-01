@@ -6,6 +6,59 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-08-01
+
+A language-mode release. A mode now carries the initial ISO flag values that go with its predefined
+surface, not just the surface itself, and the new opt-in `Modern` mode starts `double_quotes` at
+`chars` — so a double-quoted token reads as a list of one-character atoms, which is the convention
+the newer Prolog systems settled on and what makes DCGs over text readable. `Extended` remains the
+default and keeps the ISO initial value `codes`, so existing programs are unaffected.
+
+Selecting a mode is now done by name everywhere, which replaces the 0.2.0 strict-ISO booleans.
+
+### Added
+
+- A `Modern` language mode: the extended predefined surface with `double_quotes` seeded at `chars`.
+  It is available from the embedding constructor, `dotnet prolog`, generated code, and `.dplproj`
+  builds, and generated source still refuses to install into an engine created in a different mode.
+- `dotnet prolog run --mode extended|strict-iso|modern`, and the `DotPrologLanguageMode` property
+  for `.dplproj` projects. Mode names parse case-insensitively from one shared table, so the command
+  line and MSBuild cannot drift apart.
+- `BytecodeProgram.InitialDoubleQuotes`, recording the value the flag was seeded with before any
+  source was read.
+- A `TextGrammar` sample: a `.dplproj` application in `Modern` mode that decomposes a string, sums a
+  run of numbers, and splits a sentence into words with DCGs written against characters.
+- NativeAOT acceptance coverage for `Modern` mode, exercising build-time compiled clauses, the
+  reader running inside the published binary, a consulted grammar, load-unit flag scope, and the
+  mode-mismatch guard.
+- Benchmarks comparing engine construction and consulting across language modes.
+
+### Changed
+
+- `double_quotes` is scoped to the load unit. A `set_prolog_flag(double_quotes, _)` directive still
+  governs the rest of the file that issued it, and the value in force when that file began is
+  restored when it finishes, including when a directive throws. A library that declares its own
+  convention can no longer change how whatever is consulted next is read. Deferred
+  `initialization/1` goals observe the restored value.
+- The bundled bootstrap and standard libraries are read under `codes` in every mode; they are
+  processor implementation, so a host's choice of dialect does not reinterpret them.
+- A program's language mode is validated against an explicit allowlist, so a mode cannot be accepted
+  before it has been given its initial flag values.
+
+### Removed
+
+- `dotnet prolog run --strict-iso`, replaced by `--mode strict-iso`.
+- The `DotPrologStrictIso` MSBuild property, replaced by `DotPrologLanguageMode`. A project setting
+  the old property now fails the build rather than silently ignoring it.
+
+### Compatibility
+
+- The initial `double_quotes` value stays `codes` in `Extended` and `StrictIso`, as ISO/IEC 13211-1
+  requires. `Modern` is an extension and sits outside the conformance claim.
+- Scoping `double_quotes` to the load unit changes an observable behavior that no previous release
+  pinned. Source that relied on a directive outliving its file must set the flag in each file that
+  needs it.
+
 ## [0.2.0] — 2026-08-01
 
 The second release of **DotProlog**, and the first with independent conformance evidence: all 768
@@ -189,6 +242,7 @@ binary: a published executable can consult a `.pl` file it has never seen and ru
 
 **Full Changelog**: https://github.com/kidoz/dotprolog/commits/v0.1.0
 
-[Unreleased]: https://github.com/kidoz/dotprolog/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/kidoz/dotprolog/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.3.0
 [0.2.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.2.0
 [0.1.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.1.0
