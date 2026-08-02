@@ -6,12 +6,40 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-08-03
+
+A conformance release. `StrictIso` now implements the ISO Prolog family rather than its core alone:
+ISO/IEC 13211-1:1995 with Technical Corrigenda 1:2007, 2:2012, and 3:2017, the ISO/IEC 13211-2:2000
+module system, and the ISO/IEC TS 13211-3:2025 definite clause grammars. Two traceability ledgers
+publish the licensed-text audit, one row per normative area with the executable evidence that
+covers it, and the audit is what found the defects fixed below.
+
+Modules moved to the standard interface-and-body representation. `Extended` and `Modern` keep the
+Quintus-family declarations they already accepted, so existing programs are unaffected; strict mode
+takes the standard spelling only.
+
 ### Added
 
 - ISO/IEC 13211-2 module interfaces and bodies, including export, import, re-export,
   metapredicates, module-local reader state, visible-database reflection, context-sensitive I/O and
   database operations, static clause inspection, and the fixed `colon_sets_calling_context` flag.
 - Generated-C# and NativeAOT preservation of Part 2 module metadata and retained static clauses.
+- The Corrigendum 3 `variable_names/1` write option. It writes the leftmost applicable name for a
+  variable and does not bind the option's terms.
+- Traceability ledgers for [Part 1](docs/reference/iso-part1-conformance.md) and
+  [Parts 2 and 3](docs/reference/iso-parts2-3-conformance.md). Each maps a normative area to the
+  focused, corpus, generated-C#, cross-path, and NativeAOT evidence that covers it, and paraphrases
+  rather than reproduces the licensed publications. The processor-characteristics reference records
+  the choices they point at.
+- A pinned Part 1 inventory of the predefined predicates and evaluable functors, so adding or
+  removing one has to be a deliberate change rather than a silent drift.
+- Corrigenda cases in the repository conformance corpus, which now stands at 608 and continues to
+  run on every execution path.
+
+### Changed
+
+- StrictIso accepts the Part 2 `module/1` interface and `body/1` representation and rejects the
+  Quintus-family `module/2`, `use_module/1,2`, and `meta_predicate/1` compatibility declarations.
 
 ### Fixed
 
@@ -20,11 +48,27 @@ All notable changes to DotProlog are recorded here. The format follows
 - `phrase/3` is steadfast in its third argument, and strict mode treats a runtime-built soft cut as
   an ordinary nonterminal just as it does in static grammar rules.
 - `phrase/2` reports the Part 3 `list` type for an invalid input sequence.
+- Strict mode no longer inherits the extended predefined operators `:=`, infix `.`, and `$`. The
+  strict initial table omits them; `Extended` and `Modern` keep them, and a strict program can
+  still declare its own permitted operators with `op/3`.
+- `op/3` rejects every prefix or postfix declaration of `|`, not only those below priority 1001.
+- `sort/2`, `sort/4`, `msort/2`, and `keysort/2` validate the result argument before unifying with
+  it, and `keysort/2` checks the pairs on both sides, so an improper result raises its ISO error
+  instead of failing.
+- `open/4`, `close/2`, and `write_term/2,3` reject an unknown option name with the domain error for
+  that option type, before the option's value is inspected.
 
-### Changed
+### Compatibility
 
-- StrictIso accepts the Part 2 `module/1` interface and `body/1` representation and rejects the
-  Quintus-family `module/2`, `use_module/1,2`, and `meta_predicate/1` compatibility declarations.
+- Part 2 module text is interfaces and bodies. Source that uses `module/2`, `use_module/1,2`, or
+  `meta_predicate/1` still loads in `Extended` and `Modern`, and must move to the standard
+  declarations to load under `StrictIso`.
+- Removing `:=`, infix `.`, and `$` from the strict initial operator table changes how strict
+  source that used them reads. Such source was outside Part 1 to begin with; `Extended` is
+  unchanged.
+- The complete applicable independent Part 1 corpus passes on every execution path. Parts 2 and 3
+  rest on licensed traceability plus focused managed, generated-C#, and NativeAOT evidence, not on
+  an independent suite. None of this is a claim of SWI-Prolog compatibility.
 
 ## [0.4.0] — 2026-08-02
 
@@ -287,7 +331,8 @@ binary: a published executable can consult a `.pl` file it has never seen and ru
 
 **Full Changelog**: https://github.com/kidoz/dotprolog/commits/v0.1.0
 
-[Unreleased]: https://github.com/kidoz/dotprolog/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/kidoz/dotprolog/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.5.0
 [0.4.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.4.0
 [0.3.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.3.0
 [0.2.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.2.0
