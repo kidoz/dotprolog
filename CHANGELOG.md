@@ -6,6 +6,13 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-08-02
+
+A linting release. `dotnet prolog lint` reads source and reports on it without consulting it or
+running a directive, so a file can be checked without being trusted. It ships with the semantic
+rules on by default and an opt-in `covington` profile carrying the layout guidelines that are
+automatically checkable, with every threshold configurable per project.
+
 ### Added
 
 - A non-executing `dotnet prolog lint` command with stable `DPL3xxx` diagnostics for singleton
@@ -16,6 +23,13 @@ All notable changes to DotProlog are recorded here. The format follows
 - An opt-in `covington` lint profile for spaces, indentation, line and clause length, comma spacing,
   clause and subgoal layout, and trailing whitespace. Numeric layout limits are configurable while
   the default profile remains semantic-only.
+
+### Changed
+
+- The codebase uses implicit types and the current language forms — pattern matching, switch
+  expressions, collection expressions, and range and index operators. `.editorconfig` now states
+  those preferences, so the style is expressed where tooling can apply it rather than by convention
+  alone. No observable behaviour changes, and the engine benchmarks are unmoved.
 
 ## [0.3.0] — 2026-08-01
 
@@ -253,7 +267,8 @@ binary: a published executable can consult a `.pl` file it has never seen and ru
 
 **Full Changelog**: https://github.com/kidoz/dotprolog/commits/v0.1.0
 
-[Unreleased]: https://github.com/kidoz/dotprolog/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/kidoz/dotprolog/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.4.0
 [0.3.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.3.0
 [0.2.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.2.0
 [0.1.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.1.0
