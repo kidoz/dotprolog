@@ -133,7 +133,7 @@ public sealed class ToolCommandTests : IDisposable
         (int exitCode, string output, string error) = Execute("run", path);
 
         Assert.Equal(0, exitCode);
-        Assert.Equal($"ok{Environment.NewLine}", output);
+        Assert.Equal("ok\n", output);
         Assert.Empty(error);
     }
 
