@@ -25,6 +25,30 @@ public static class PrologLinter
         return diagnostics;
     }
 
+    /// <summary>
+    /// Analyzes parsed clauses together with their original source, applying semantic rules and the
+    /// source-text rules selected by <paramref name="options"/>.
+    /// </summary>
+    /// <param name="source">The exact source from which <paramref name="clauses"/> were read.</param>
+    /// <param name="clauses">Parsed clauses and directives in source order.</param>
+    /// <param name="fileName">Source file used in diagnostics, when known.</param>
+    /// <param name="options">Layout policy; semantic-only analysis is used when omitted.</param>
+    public static IReadOnlyList<Diagnostic> AnalyzeSource(
+        string source,
+        IReadOnlyList<SyntaxTerm> clauses,
+        string? fileName = null,
+        PrologLintOptions? options = null
+    )
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(clauses);
+
+        List<Diagnostic> diagnostics = [.. Analyze(clauses, fileName)];
+        PrologLayoutLinter.Analyze(source, clauses, options ?? PrologLintOptions.SemanticOnly, fileName, diagnostics);
+
+        return [.. diagnostics.OrderBy(diagnostic => diagnostic.Span.Start).ThenBy(diagnostic => diagnostic.Id)];
+    }
+
     private static void AnalyzeClause(SyntaxTerm clause, string? fileName, List<Diagnostic> diagnostics)
     {
         List<VariableTerm> occurrences = VariableOccurrences(clause);
