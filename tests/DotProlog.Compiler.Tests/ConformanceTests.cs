@@ -37,6 +37,7 @@ public sealed class ConformanceTests
             .Select(line => int.Parse(line["cases ".Length..], System.Globalization.CultureInfo.InvariantCulture))
             .Single();
 
+        Assert.Equal(608, cases);
         Assert.Equal(cases, lines.Count(line => line.StartsWith("PASS ", StringComparison.Ordinal)) + failures.Length);
         Assert.True(failures.Length == 0, $"Conformance regressed:\n{string.Join("\n", failures)}");
     }
