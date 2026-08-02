@@ -2,12 +2,12 @@
 
 ## The claim
 
-DotProlog **does not yet claim complete ISO or SWI-Prolog compatibility**. The applicable
-independent Part 1 corpus passes on every execution path, but licensed-text traceability and the
-remaining Part 2 module and Part 3 grammar completion gates remain open. An opt-in strict mode now
-rejects known implementation-specific predefined features across all execution paths, but that
-enforcement boundary is not a substitute for certification. What follows is evidence and known
-variation.
+DotProlog's opt-in `StrictIso` mode **implements and declares conformance to ISO/IEC 13211-1:1995
+with Technical Corrigenda 1:2007, 2:2012, and 3:2017**. The licensed-text audit is published as the
+[Part 1 traceability ledger](docs/reference/iso-part1-conformance.md), and the complete applicable
+independent Part 1 corpus passes on every execution path. This declaration is limited to Part 1: it
+is not a claim of SWI-Prolog compatibility or completion of the separate Part 2 module and Part 3
+grammar standards. What follows is evidence and known variation.
 
 ## What has been measured
 
@@ -120,6 +120,10 @@ Writing them was worth it immediately: they found these real defects.
 - The licensed Corrigenda audit also exposed two older edge cases: `sort/2` and `keysort/2` now
   validate their result lists and pair elements before unification, and `op/3` rejects every
   prefix or postfix declaration of `|` rather than only declarations below priority 1001.
+- The licensed clause 5 audit found that strict mode inherited the predefined Extended-mode
+  operators `:=`, `.` as an infix operator, and `$`. The strict initial table now omits them, while
+  Extended and Modern modes retain them and a strict program can still define its own permitted
+  operators through `op/3`.
 - `read_term/2,3` now validates its complete option list before asking the stream for input.
   Unknown options, variable elements, and partial lists therefore raise their ISO errors without
   consuming the next term.
@@ -209,9 +213,9 @@ Writing them was worth it immediately: they found these real defects.
   the reader rejects. The named ISO escapes `\a \b \f \n \r \t \v` and delimited `\x...\` hex
   escapes for the rest now round-trip every control character.
 
-Beyond the conformance cases, the engine and toolchain are covered by 1357 xUnit cases and seven
-Prolog tests run through `dotnet test`, plus an opt-in integration suite that builds and runs the
-C#, F#, and Visual Basic samples and exercises NativeAOT.
+Beyond the conformance cases, the engine and toolchain are covered by more than 1,400 tests run
+through `dotnet test`, plus opt-in integration gates that build and run the C#, F#, and Visual Basic
+samples and exercise NativeAOT.
 
 ## Implemented
 
@@ -232,11 +236,10 @@ C#, F#, and Visual Basic samples and exercises NativeAOT.
 | Character conversion and state-dependent lexical reading | Implemented |
 | Opt-in strict ISO predefined-feature boundary | Implemented across source, generated code, runtime meta-call, host binding, SDK, CLI, and NativeAOT |
 
-## Known ISO gaps
+## Remaining ISO family gaps
 
 | Feature | Current state |
 |---|---|
-| Complete standard clause audit | The private maps still require a licensed-text, one-row-per-normative-requirement review |
 | Part 2 modules | Core behavior and the strict feature boundary are implemented; licensed-text built-in, error, and complete execution-matrix review remains |
 | Part 3 grammars | Common semantics, semicontexts, declarations, errors, strict additional-control handling, and all execution paths are tested; formal-expansion comparison and final-text traceability remain |
 

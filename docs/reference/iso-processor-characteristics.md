@@ -1,8 +1,8 @@
 # ISO processor characteristics
 
-This page records DotProlog’s processor-defined choices for the ISO-oriented core. It is a
-characteristics declaration, not a claim that every requirement of ISO/IEC 13211-1 has been
-certified.
+This page records the processor-defined choices that accompany DotProlog's ISO/IEC 13211-1
+conformance declaration. Requirement and execution-path evidence is recorded separately in the
+[Part 1 conformance ledger](iso-part1-conformance.md).
 
 ## Strict ISO mode
 
@@ -57,6 +57,13 @@ Atoms and source text use .NET Unicode strings. The reader accepts Unicode sourc
 the ISO numeric character escapes supported by the language guide. Character predicates require a
 one-character atom as represented by one .NET UTF-16 code unit.
 
+The required portable characters have their Unicode/ASCII ordinal values. Extended characters are
+classified before tokenization: Unicode uppercase letters and underscore begin variables, other
+Unicode letters begin unquoted atoms, ASCII digits begin numbers, and other supported punctuation
+is classified by the explicit graphic, solo, layout, and meta-character tables. Atom and character
+collation is ordinal by UTF-16 code unit. The byte sequence associated with a character is its UTF-8
+encoding for a text file; binary streams do not perform character conversion.
+
 The initial `double_quotes` flag is `codes` in the `Extended` and `StrictIso` language modes, as
 ISO/IEC 13211-1 requires. The opt-in `Modern` mode starts it at `chars` instead; that mode is an
 extension and is outside the conformance claim. The value is scoped to the load unit: a
@@ -71,16 +78,75 @@ literal payloads, and primitive character input remain unchanged.
 `Atom=Term` entries; the leftmost entry whose term is the variable being written supplies the
 output name. Inspecting the list neither unifies nor otherwise binds its terms.
 
+The `StrictIso` initial operator table contains the ISO Part 1 table as corrected by Corrigendum 2,
+together with the documented Part 2 and Part 3 operators. Extended and Modern modes additionally
+predefine the convenience directive operators and `:=`, `.` as an infix operator, and `$`.
+`current_op/3` enumerates a captured table version in ordinal operator-name order and then
+operator-specifier order. Mutating the table while an enumeration is active does not change that
+enumeration.
+
+Variables are ordered by their stable heap identity. The relative order of distinct variables is
+therefore implementation-dependent, but it remains constant for the lifetime of a sorting or
+solution-collection operation. Atoms use ordinal name order. Every float precedes every integer,
+including numerically equal cross-kind values.
+
+## Source preparation and goal delivery
+
+Hosts prepare text with `PrologEngine.ConsultText` or `ConsultFile`; applications use a `.dplproj`,
+and the command-line surface uses `dotnet prolog run`. A host delivers a goal through
+`PrologEngine.Query`, `RunGoal`, or a bound `PrologHost` predicate. Success and failure are returned
+as host results, while bindings are exposed as solution values.
+
+`include/1` inserts text at the directive position, resolves relative names from the containing
+file, and shares the containing reader's operator, flag, and character-conversion state.
+`ensure_loaded/1` also acts at its directive position, but canonical file identity ensures that a
+source unit is prepared only once. Initialization goals execute in source order after successful
+preparation. A failing ordinary directive stops preparation; `initialization/1` remains deferred.
+
+Operator and character-conversion directives affect the rest of their load unit and later runtime
+term reading by the same program. Their program-owned tables remain in force for subsequently
+loaded units. `set_prolog_flag/2` directives likewise change program state, except that
+`double_quotes` is load-unit scoped: its entering value is restored when that unit finishes.
+
 ## Procedures, errors, and streams
 
 The initial `unknown` flag is `error`, so calling an undefined procedure raises
 `existence_error(procedure, Name/Arity)`. Dynamic predicates use the logical update view.
+
+The `debug` flag starts as `off`. Setting it to `on` records the requested state but does not alter
+goal execution; DotProlog currently has no processor debugger. The error context in
+`error(Formal, Context)` is a fresh variable. If multiple error conditions apply, the explicitly
+tested argument and option validation order of the affected predicate determines which error is
+reported.
+
+`halt/0` requests process status zero. `halt/1` passes its bounded integer argument to the host
+process status after validating it. Embedding hosts observe the halt request through the engine
+rather than having the runtime terminate the CLR process directly.
 
 Text streams use the host .NET text readers and writers; binary streams use raw bytes. File-system
 names, invalid paths, permissions, seekability, and durable I/O failures follow the host operating
 system, translated to the documented Prolog `source_sink`, permission, and `system_error` terms.
 The permanent `user_input`, `user_output`, and `user_error` streams are text streams and are not
 repositionable.
+
+A source/sink is an atom interpreted as a host file-system path. A program-created stream is named
+by the opaque ground term `'$stream'(N)`; identifiers are monotonically allocated and never reused.
+Closing a current stream restores the corresponding permanent standard stream. The standard
+streams have the aliases `user_input`, `user_output`, and `user_error`.
+
+Text files are read through the .NET Unicode file reader and written as UTF-8 without a byte-order
+mark. DotProlog does not append a newline when a text sink is closed, does not treat text files as
+record-based streams, and outputs control characters unchanged. Binary output writes exactly the
+requested bytes and appends no padding bytes.
+
+Disk streams are repositionable by default. An explicit `reposition(false)` prevents
+`set_stream_position/2` even when the host file is seekable. Text positions are opaque logical
+character positions and binary positions are byte offsets. The permanent standard streams and
+in-memory capture streams are not repositionable.
+
+The default EOF action is `eof_code`. The default stream type is `text`, and the default close
+option is `force(false)`. A text stream reports its original file-system atom as `file_name/1` and
+reports opaque positions only when repositioning is enabled.
 
 ## Modules
 

@@ -412,10 +412,13 @@ reaches it, while normal control flow can leave it unevaluated.
 `call/2..8` checks the arity of the resulting goal; arity 255 is supported and 256 raises the
 catchable `representation_error(max_arity)`.
 
-DotProlog does not claim ISO or SWI-Prolog compatibility. It runs 549 conformance cases encoded
-from ISO/IEC 13211-1, all passing, but those are its own reading of the standard rather than an
-independent suite — see [COMPATIBILITY.md](COMPATIBILITY.md), which also lists the known
-differences.
+DotProlog's `StrictIso` mode implements and declares conformance to ISO/IEC 13211-1:1995 with
+Technical Corrigenda 1–3. The repository's 608-case standard-derived corpus and all 768 applicable
+declarations in the independent pinned Logtalk corpus pass across consulted bytecode, generated
+C#, both cross-path directions, and NativeAOT. This Part 1 declaration is not a claim of SWI-Prolog
+compatibility or completion of the separate Parts 2 and 3 standards. See
+[COMPATIBILITY.md](COMPATIBILITY.md) and the
+[Part 1 traceability ledger](docs/reference/iso-part1-conformance.md).
 
 ## Diagnostics
 

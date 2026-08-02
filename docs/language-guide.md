@@ -1,8 +1,10 @@
 # Language guide
 
-DotProlog implements an ISO-oriented Prolog core. It does **not** claim full ISO or SWI-Prolog
-compatibility; the repository's conformance cases are useful evidence, but not independent
-verification.
+DotProlog's `StrictIso` mode implements and declares conformance to ISO/IEC 13211-1:1995 with
+Technical Corrigenda 1–3. The declaration is backed by the repository's
+[Part 1 traceability ledger](reference/iso-part1-conformance.md), its 608 standard-derived cases,
+and a 768-case independent corpus executed through every engine path. It does not claim
+SWI-Prolog compatibility or completion of the separate Parts 2 and 3 standards.
 
 ## Language modes
 
@@ -16,8 +18,9 @@ Runtime-constructed meta-goals and host bindings reject the same extensions with
 predicates defined by the program remain valid, including a user definition whose name matches an
 extended library predicate.
 
-Strict mode is an enforcement boundary, not a certification claim. The licensed-text
-requirement-by-requirement review described in the compatibility record remains separate.
+Strict mode starts from the standardized operator table rather than the additional predefined
+operators in Extended and Modern modes. A program may still define any operator permitted by
+`op/3`.
 
 The opt-in `Modern` mode accepts the same surface as `Extended`, but starts the `double_quotes`
 flag at `chars` rather than the ISO initial value `codes`. A double-quoted token therefore reads as

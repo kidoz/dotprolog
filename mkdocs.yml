@@ -58,6 +58,7 @@ nav:
   - Architecture: architecture/index.md
   - Reference:
       - ISO processor characteristics: reference/iso-processor-characteristics.md
+      - ISO Part 1 conformance: reference/iso-part1-conformance.md
   - Contributing: contributing.md
 
 markdown_extensions:
