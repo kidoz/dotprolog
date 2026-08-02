@@ -63,11 +63,12 @@ fi
 dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" run HelloProlog/main.pl |
     grep -Fx "Hello from Prolog on .NET!"
 
-# The packaged command must preserve its documented warning exit code without consulting source.
-printf 'value(X).\n' >HelloProlog/lint-warning.pl
+# The packaged command must preserve its documented warning exit code and layout profile without
+# consulting source.
+printf 'pair(a,b).\n' >HelloProlog/lint-warning.pl
 if dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
-    --warnings-as-errors HelloProlog/lint-warning.pl; then
-    echo "lint unexpectedly accepted a singleton variable" >&2
+    --profile covington --warnings-as-errors HelloProlog/lint-warning.pl; then
+    echo "lint unexpectedly accepted compact comma layout" >&2
     exit 1
 else
     lint_exit=$?

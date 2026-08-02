@@ -65,6 +65,67 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void SemanticProfileDoesNotImposeLayoutRules()
+    {
+        string path = Source("compact.pl", "pair(a,b).\n");
+
+        (int exitCode, _, string error) = Execute("lint", "--warnings-as-errors", path);
+
+        Assert.Equal(0, exitCode);
+        Assert.Empty(error);
+    }
+
+    [Fact]
+    public void CovingtonProfileReportsLayoutWarnings()
+    {
+        string path = Source("compact.pl", "pair(a,b).\n");
+
+        (int exitCode, _, string error) = Execute("lint", "--profile", "covington", "--warnings-as-errors", path);
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains($"{path}(1,7): warning DPL3007", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void IndividualThresholdEnablesItsLayoutCheck()
+    {
+        string path = Source("wide.pl", "long_name.\n");
+
+        (int exitCode, _, string error) = Execute("lint", "--max-line-length", "5", "--warnings-as-errors", path);
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("DPL3005", error, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("--profile", "unknown", "unknown lint profile")]
+    [InlineData("--indent-size", "0", "invalid value")]
+    [InlineData("--max-line-length", "word", "invalid value")]
+    [InlineData("--max-clause-lines", "-1", "invalid value")]
+    public void InvalidLintOptionValuesAreUsageErrors(string option, string value, string message)
+    {
+        string path = Source("clean.pl", "clean.\n");
+
+        (int exitCode, _, string error) = Execute("lint", option, value, path);
+
+        Assert.Equal(64, exitCode);
+        Assert.Contains(message, error, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("--profile", "missing lint profile")]
+    [InlineData("--indent-size", "missing positive integer")]
+    [InlineData("--max-line-length", "missing positive integer")]
+    [InlineData("--max-clause-lines", "missing positive integer")]
+    public void MissingLintOptionValuesAreUsageErrors(string option, string message)
+    {
+        (int exitCode, _, string error) = Execute("lint", option);
+
+        Assert.Equal(64, exitCode);
+        Assert.Contains(message, error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RunWritesProgramOutputToTheProvidedStream()
     {
         string path = Source("run.pl", ":- initialization(writeln(ok)).\n");

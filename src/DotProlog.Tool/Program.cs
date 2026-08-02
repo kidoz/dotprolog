@@ -8,6 +8,7 @@ namespace DotProlog.Tool;
 internal static class Program
 {
     private const string LanguageModeNames = PrologLanguageModes.Names;
+    private const string LintProfileNames = "semantic|covington";
     private const int ExitLintWarnings = 1;
     private const int ExitSuccess = 0;
     private const int ExitUsage = 64;
@@ -104,7 +105,11 @@ internal static class Program
     private static int Lint(ReadOnlySpan<string> args, TextWriter error)
     {
         PrologLanguageMode languageMode = PrologLanguageMode.Extended;
+        PrologLintOptions lintOptions = PrologLintOptions.SemanticOnly;
         bool warningsAsErrors = false;
+        int? indentSize = null;
+        int? maxLineLength = null;
+        int? maxClauseLines = null;
         List<string> paths = [];
 
         for (int index = 0; index < args.Length; index++)
@@ -136,6 +141,67 @@ internal static class Program
                 continue;
             }
 
+            if (argument == "--profile")
+            {
+                if (index + 1 >= args.Length)
+                {
+                    error.WriteLine("error: missing lint profile after --profile");
+                    error.WriteLine($"       expected one of: {LintProfileNames}");
+                    return ExitUsage;
+                }
+
+                string selected = args[++index];
+                if (selected.Equals("semantic", StringComparison.OrdinalIgnoreCase))
+                {
+                    lintOptions = PrologLintOptions.SemanticOnly;
+                }
+                else if (selected.Equals("covington", StringComparison.OrdinalIgnoreCase))
+                {
+                    lintOptions = PrologLintOptions.Covington;
+                }
+                else
+                {
+                    error.WriteLine($"error: unknown lint profile: {selected}");
+                    error.WriteLine($"       expected one of: {LintProfileNames}");
+                    return ExitUsage;
+                }
+
+                continue;
+            }
+
+            if (argument == "--indent-size")
+            {
+                if (!TryReadPositiveLintInteger(args, ref index, argument, error, out int value))
+                {
+                    return ExitUsage;
+                }
+
+                indentSize = value;
+                continue;
+            }
+
+            if (argument == "--max-line-length")
+            {
+                if (!TryReadPositiveLintInteger(args, ref index, argument, error, out int value))
+                {
+                    return ExitUsage;
+                }
+
+                maxLineLength = value;
+                continue;
+            }
+
+            if (argument == "--max-clause-lines")
+            {
+                if (!TryReadPositiveLintInteger(args, ref index, argument, error, out int value))
+                {
+                    return ExitUsage;
+                }
+
+                maxClauseLines = value;
+                continue;
+            }
+
             if (argument.StartsWith('-'))
             {
                 error.WriteLine($"error: unknown lint option: {argument}");
@@ -151,6 +217,13 @@ internal static class Program
             WriteLintUsage(error);
             return ExitUsage;
         }
+
+        lintOptions = lintOptions with
+        {
+            IndentSize = indentSize ?? lintOptions.IndentSize,
+            MaxLineLength = maxLineLength ?? lintOptions.MaxLineLength,
+            MaxClauseLines = maxClauseLines ?? lintOptions.MaxClauseLines,
+        };
 
         bool foundErrors = false;
         bool foundWarnings = false;
@@ -184,7 +257,11 @@ internal static class Program
                 program.CharacterConversions,
                 program.Flags
             );
-            IReadOnlyList<Diagnostic> diagnostics = [.. parsed.Diagnostics, .. PrologLinter.Analyze(parsed.Clauses, absolute)];
+            IReadOnlyList<Diagnostic> diagnostics =
+            [
+                .. parsed.Diagnostics,
+                .. PrologLinter.AnalyzeSource(source, parsed.Clauses, absolute, lintOptions),
+            ];
 
             foreach (Diagnostic diagnostic in diagnostics)
             {
@@ -209,6 +286,32 @@ internal static class Program
         return ExitUsage;
     }
 
+    private static bool TryReadPositiveLintInteger(
+        ReadOnlySpan<string> args,
+        ref int index,
+        string option,
+        TextWriter error,
+        out int value
+    )
+    {
+        if (index + 1 >= args.Length)
+        {
+            error.WriteLine($"error: missing positive integer after {option}");
+            value = 0;
+            return false;
+        }
+
+        string selected = args[++index];
+        if (!int.TryParse(selected, out value) || value <= 0)
+        {
+            error.WriteLine($"error: invalid value for {option}: {selected}");
+            error.WriteLine("       expected a positive integer");
+            return false;
+        }
+
+        return true;
+    }
+
     private static void WriteUsage(TextWriter output)
     {
         output.WriteLine("dotnet prolog — run and analyze Prolog on .NET");
@@ -216,7 +319,8 @@ internal static class Program
         output.WriteLine("Usage:");
         output.WriteLine($"  dotnet prolog run [--mode {LanguageModeNames}] <file.pl>");
         output.WriteLine("      consult a file and run its goals");
-        output.WriteLine($"  dotnet prolog lint [--mode {LanguageModeNames}] [--warnings-as-errors] <file.pl>...");
+        output.WriteLine($"  dotnet prolog lint [--mode {LanguageModeNames}] [--profile {LintProfileNames}]");
+        output.WriteLine("      [--warnings-as-errors] <file.pl>...");
         output.WriteLine("      analyze source without consulting it or executing directives");
         output.WriteLine();
         output.WriteLine("Language modes:");
@@ -225,6 +329,10 @@ internal static class Program
         output.WriteLine("  modern       extended, with double_quotes starting at chars");
     }
 
-    private static void WriteLintUsage(TextWriter output) =>
-        output.WriteLine($"Usage: dotnet prolog lint [--mode {LanguageModeNames}] [--warnings-as-errors] <file.pl>...");
+    private static void WriteLintUsage(TextWriter output)
+    {
+        output.WriteLine($"Usage: dotnet prolog lint [--mode {LanguageModeNames}] [--profile {LintProfileNames}]");
+        output.WriteLine("       [--indent-size N] [--max-line-length N] [--max-clause-lines N]");
+        output.WriteLine("       [--warnings-as-errors] <file.pl>...");
+    }
 }
