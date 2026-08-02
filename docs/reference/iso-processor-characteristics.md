@@ -150,9 +150,14 @@ reports opaque positions only when repositioning is enabled.
 
 ## Modules
 
-A module text starts with one `module/2` declaration. Selected imports must name predicates the
-source module exports; malformed selections and two modules supplying the same visible predicate
-are rejected during source preparation. Local definitions take precedence over imports.
+DotProlog's current module extension starts a source unit with one `module/2` declaration and uses
+`use_module/1,2` and `meta_predicate/1`. This is the widely used Quintus-family module surface, not
+the module-interface and module-body representation standardized by ISO/IEC 13211-2. It must not be
+used as evidence of Part 2 conformance.
+
+Selected imports must name predicates the source module exports; malformed selections and two
+modules supplying the same visible predicate are rejected during source preparation. Local
+definitions take precedence over imports.
 
 An exported predicate is also published under its plain name when that name is still free. The
 first loaded export therefore owns a plain-name alias; later modules remain reachable through
@@ -171,7 +176,7 @@ If an ordinary `Name/(Arity+2)` clause and `Name//Arity` grammar rule coexist, D
 their expanded clauses into one procedure in source order. Grammar-rule heads that are themselves
 grammar control constructs or that expand to a predefined procedure are rejected.
 
-`phrase/2` reports `type_error(list, Culprit)` when its sequence cannot be a list. `phrase/3`
-selects the specification's implementation-defined unchecked option for its second and third
-arguments. A partial terminal list inside the grammar body raises `instantiation_error`; an
-improper terminal list raises `type_error(list, Culprit)`.
+`phrase/2` reports `type_error(terminal_sequence, Culprit)` when its sequence cannot be a terminal
+sequence. `phrase/3` selects the specification's implementation-defined unchecked option for its
+second and third arguments. A partial terminal list inside the grammar body raises
+`instantiation_error`; an improper terminal list raises `type_error(list, Culprit)`.

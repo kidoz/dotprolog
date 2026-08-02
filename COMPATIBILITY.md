@@ -240,8 +240,8 @@ samples and exercise NativeAOT.
 
 | Feature | Current state |
 |---|---|
-| Part 2 modules | Core behavior and the strict feature boundary are implemented; licensed-text built-in, error, and complete execution-matrix review remains |
-| Part 3 grammars | Common semantics, semicontexts, declarations, errors, strict additional-control handling, and all execution paths are tested; formal-expansion comparison and final-text traceability remain |
+| Part 2 modules | Not implemented: the current Quintus-family `module/2`, `use_module/1,2`, and `meta_predicate/1` surface differs from the standard's interface/body representation; the licensed text is also absent from `tmp/ISO/` |
+| Part 3 grammars | Static and runtime expansion, controls, steadfastness, terminal-sequence errors, strict additional-control handling, and NativeAOT paths are tested; final licensed-text traceability remains |
 
 ## Non-ISO features absent deliberately
 
