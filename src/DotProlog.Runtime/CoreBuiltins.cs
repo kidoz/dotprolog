@@ -458,19 +458,8 @@ public static class CoreBuiltins
             ("catch", 3) => [0, 2],
             ("with_output_to", 2) => [1],
             ("call", >= 1 and <= 8) => [0],
-
-            ("maplist", >= 2 and <= 5)
-            or
-            ("foldl", 4 or 5)
-            or
-            ("include", 3)
-            or
-            ("exclude", 3)
-            or
-            ("partition", 4)
-            or
-            ("predsort", 3)
-            or ("phrase", 2 or 3) => [0],
+            ("maplist", >= 2 and <= 5) or ("foldl", 4 or 5) or ("include", 3) or ("exclude", 3) => [0],
+            ("partition", 4) or ("predsort", 3) or ("phrase", 2 or 3) => [0],
             _ => [],
         };
 
