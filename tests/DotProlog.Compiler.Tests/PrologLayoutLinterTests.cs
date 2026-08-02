@@ -81,6 +81,49 @@ public sealed class PrologLayoutLinterTests
     }
 
     [Theory]
+    // A character-code literal is not a quote, so commas after one stay checked. Each form the
+    // lexer accepts is covered: plain, escaped, and the doubled quote that denotes ' itself.
+    [InlineData("c(0'a).\nd(X,Y).\n")]
+    [InlineData("c(0'\\n).\nd(X,Y).\n")]
+    [InlineData("c(0'').\nd(X,Y).\n")]
+    [InlineData("c(0''').\nd(X,Y).\n")]
+    [InlineData("c(0'\\').\nd(X,Y).\n")]
+    public void CommaSpacingSurvivesCharacterCodeLiterals(string source)
+    {
+        IReadOnlyList<Diagnostic> diagnostics = Lint(source, PrologLintOptions.Covington);
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == LintDiagnosticIds.MissingSpaceAfterComma);
+    }
+
+    [Fact]
+    public void OneCharacterCodeLiteralDoesNotSilenceTheRestOfTheFile()
+    {
+        // The defect this covers suppressed every comma diagnostic between one 0'c and the next.
+        const string source = "c(0'a).\nd(X,Y).\ne(P,Q).\nf(R,S).\n";
+
+        Assert.Equal(
+            3,
+            Lint(source, PrologLintOptions.Covington)
+                .Count(diagnostic => diagnostic.Id == LintDiagnosticIds.MissingSpaceAfterComma)
+        );
+    }
+
+    [Fact]
+    public void QuotedAtomsStayShieldedAfterACharacterCodeLiteral()
+    {
+        // Both halves at once: the 0'a must not open a quote, and the quoted atom following it must
+        // still shield its own comma. Only the comma between them is a violation.
+        const string source = "c(0'a,'x,y').\n";
+
+        Diagnostic diagnostic = Assert.Single(
+            Lint(source, PrologLintOptions.Covington),
+            diagnostic => diagnostic.Id == LintDiagnosticIds.MissingSpaceAfterComma
+        );
+
+        Assert.Equal(5, diagnostic.Span.Start);
+    }
+
+    [Theory]
     [InlineData("first. second.\n", 7, 8)]
     [InlineData("rule :- body.\n", 8, 9)]
     public void ReportsClauseBoundaryViolations(string source, int offset, int column)

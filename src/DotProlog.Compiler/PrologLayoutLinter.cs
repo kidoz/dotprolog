@@ -144,6 +144,14 @@ internal static class PrologLayoutLinter
                 continue;
             }
 
+            // 0'c is a character-code literal, so its quote opens nothing. Reading it as a delimiter
+            // would shield every comma up to the next quote in the file, silently reporting nothing.
+            if (current == '\'' && IsCharacterCodeQuote(source, offset))
+            {
+                offset = CharacterCodeEnd(source, offset);
+                continue;
+            }
+
             if (current is '\'' or '"' or '`')
             {
                 quote = current;
@@ -334,6 +342,46 @@ internal static class PrologLayoutLinter
                 pending.Push(compound.Arguments[index]);
             }
         }
+    }
+
+    /// <summary>
+    /// Whether the quote at <paramref name="quoteOffset"/> belongs to a <c>0'c</c> character-code
+    /// literal rather than opening a quoted token.
+    /// </summary>
+    /// <remarks>
+    /// Only a standalone <c>0</c> introduces one, which is how <c>Lexer.ReadNumber</c> decides:
+    /// <c>10'a'</c> and <c>x0'a'</c> are a number or a name followed by a quoted atom. There is no
+    /// general <c>Base'Digits</c> radix form to consider, only <c>0x</c>, <c>0o</c>, and <c>0b</c>.
+    /// </remarks>
+    private static bool IsCharacterCodeQuote(string source, int quoteOffset)
+    {
+        if (quoteOffset == 0 || source[quoteOffset - 1] != '0')
+        {
+            return false;
+        }
+
+        int preceding = quoteOffset - 2;
+        return preceding < 0 || !(char.IsLetterOrDigit(source[preceding]) || source[preceding] is '_' or '.');
+    }
+
+    /// <summary>The offset of the last character of the character-code literal whose quote is at
+    /// <paramref name="quoteOffset"/>, mirroring the escape and doubled-quote forms the lexer reads.</summary>
+    private static int CharacterCodeEnd(string source, int quoteOffset)
+    {
+        int body = quoteOffset + 1;
+        if (body >= source.Length)
+        {
+            return quoteOffset;
+        }
+
+        // A numeric escape such as 0'\x41\ runs past this, but its remainder holds no quote, so
+        // stopping at the escaped character cannot resynchronise the scan onto one.
+        if (source[body] == '\\')
+        {
+            return Math.Min(body + 1, source.Length - 1);
+        }
+
+        return source[body] == '\'' && body + 1 < source.Length && source[body + 1] == '\'' ? body + 1 : body;
     }
 
     private static int LastOffset(SourceSpan span) => span.Start + Math.Max(0, span.Length - 1);
