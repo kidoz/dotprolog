@@ -236,7 +236,7 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 | Grammars | `-->/2` with `{}/1`, `!`, `\+`, pushback lists; `phrase/2`, `phrase/3` |
 | Streams | `open/3,4` text and binary streams, `close/1,2`, configurable EOF actions, `current_stream/1`, `stream_property/2`, `set_stream_position/2`, current-stream selection, EOF inspection, flushing |
 | Reading | term, character, character-code, and byte input/output; `read_term_from_atom/3`, `term_to_atom/2`; `char_conversion/2`, `current_char_conversion/2` |
-| Modules | `:- module/2`, `use_module/1,2`, `:- meta_predicate/1`, `Module:Goal` |
+| Modules | ISO interfaces and bodies with `module/1`, `body/1`, export/import/re-export, `metapredicate/1`, reflection, and `Module:Goal`; Quintus-style declarations in extended modes |
 | Directives | `:- Goal`, `:- initialization(Goal)`, `halt/0`, `halt/1` |
 
 Control constructs are compiled in place inside a clause body, so cut scopes the way ISO specifies: opaque in the condition of if-then-else, transparent in its branches, clause-scoped elsewhere. A bootstrap library written in Prolog makes the same constructs reachable when a goal is assembled at run time and passed to `call/1`.
@@ -265,8 +265,9 @@ construction list, and shares the advertised arity-255 limit with `functor/3`.
 `current_op/3` validates bound priority, specifier, and name filters before enumeration.
 Its solutions come from the operator-table snapshot current when the goal starts, even if `op/3`
 changes the live table between solutions.
-`clause/2` rejects static and built-in predicates as private procedures and validates a bound body
-as callable. Attempts to retract a static procedure raise a catchable modification permission error.
+`clause/2` retains the Part 1 private-procedure rule for ordinary source, while ISO module bodies
+expose their static and dynamic clauses through the Part 2 calling context. Attempts to retract a
+static procedure raise a catchable modification permission error.
 
 ```prolog
 report(Rows) :-
@@ -374,33 +375,43 @@ main :-
 program that redirects itself with `set_output/1` or `with_output_to/2` cannot detach the host from
 the stream it handed in. `halt/0` flushes and closes whatever the program opened.
 
-A file that declares a module keeps to itself everything its export list omits. A predicate `p/1`
-in module `m` is compiled under the name `m:p`, and a call inside `m` to something `m` defines is
-rewritten to that name — so two files can each have a `helper/1` without ever meeting. Anything the
-module does not define falls through to the global name, which is how the standard library and
-`user` stay reachable.
+A standard module has an interface followed by zero or more, possibly non-contiguous bodies. The
+interface owns exports, re-exports, metapredicate declarations, and the initial operator,
+character-conversion, and flag state for every body:
 
 ```prolog
-:- module(shapes, [describe/1]).
+:- module(shapes).
+:- export(describe/1).
+:- end_module(shapes).
 
+:- body(shapes).
 describe(N) :- helper(N).        % shapes' own helper/1
-helper(N) :- write(area(N)).     % not exported, so not visible outside
+helper(N) :- write(area(N)).
+:- end_body(shapes).
 ```
 
 ```prolog
-:- use_module(shapes).
+:- module(drawing).
+:- export(draw/1).
+:- end_module(drawing).
 
-helper(N) :- write(mine(N)).     % a different helper/1 entirely
+:- body(drawing).
+:- import(shapes, describe/1).
+draw(N) :- describe(N).
+:- end_body(drawing).
 
-?- describe(4).                  % area(4)
-?- shapes:helper(9).             % area(9), reached by qualifying
+?- drawing:draw(4).              % area(4)
+?- shapes:helper(9).             % area(9), explicit qualification
 ```
 
 An exported predicate is also given its plain name when nothing else has claimed it, which is what
 lets a generated facade, `dotnet prolog run`, and an embedding host call it without knowing modules
 exist. A goal that is only known at run time carries its module and is resolved when called, so a
-closure handed to `maplist/3` finds the predicate it meant. `:- meta_predicate f(0, +, -)` says
-which of a predicate's own arguments are goals.
+closure handed to a metapredicate finds the predicate it meant. `:- metapredicate(run(:))` both
+declares and exports a Part 2 metapredicate. `current_module/1`, `current_predicate/1`, and
+`predicate_property/2` inspect the calling module's visible database. Extended and Modern modes
+also retain the compatibility declarations `module/2`, `use_module/1,2`, and `meta_predicate/1`;
+StrictIso rejects those spellings in favor of the standard interface/body representation.
 
 Nothing in the engine knows modules exist: resolution is a rewrite performed while loading.
 
@@ -412,13 +423,15 @@ reaches it, while normal control flow can leave it unevaluated.
 `call/2..8` checks the arity of the resulting goal; arity 255 is supported and 256 raises the
 catchable `representation_error(max_arity)`.
 
-DotProlog's `StrictIso` mode implements and declares conformance to ISO/IEC 13211-1:1995 with
-Technical Corrigenda 1–3. The repository's 608-case standard-derived corpus and all 768 applicable
-declarations in the independent pinned Logtalk corpus pass across consulted bytecode, generated
-C#, both cross-path directions, and NativeAOT. This Part 1 declaration is not a claim of SWI-Prolog
-compatibility or completion of the separate Parts 2 and 3 standards. See
+DotProlog's `StrictIso` mode implements ISO/IEC 13211-1:1995 with Technical Corrigenda 1–3,
+ISO/IEC 13211-2:2000 modules, and ISO/IEC TS 13211-3:2025 definite clause grammars. The repository's
+608-case Part 1 corpus and all 768 applicable declarations in the independent pinned Logtalk corpus
+pass across consulted bytecode, generated C#, both cross-path directions, and NativeAOT. Parts 2
+and 3 have licensed-text traceability and focused managed, generated, and NativeAOT coverage. This
+is not a claim of SWI-Prolog compatibility. See
 [COMPATIBILITY.md](COMPATIBILITY.md) and the
-[Part 1 traceability ledger](docs/reference/iso-part1-conformance.md).
+[Part 1](docs/reference/iso-part1-conformance.md) and
+[Parts 2 and 3](docs/reference/iso-parts2-3-conformance.md) traceability ledgers.
 
 ## Diagnostics
 

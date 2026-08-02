@@ -2,12 +2,13 @@
 
 ## The claim
 
-DotProlog's opt-in `StrictIso` mode **implements and declares conformance to ISO/IEC 13211-1:1995
-with Technical Corrigenda 1:2007, 2:2012, and 3:2017**. The licensed-text audit is published as the
-[Part 1 traceability ledger](docs/reference/iso-part1-conformance.md), and the complete applicable
-independent Part 1 corpus passes on every execution path. This declaration is limited to Part 1: it
-is not a claim of SWI-Prolog compatibility or completion of the separate Part 2 module and Part 3
-grammar standards. What follows is evidence and known variation.
+DotProlog's opt-in `StrictIso` mode implements ISO/IEC 13211-1:1995 with Technical Corrigenda
+1:2007, 2:2012, and 3:2017, ISO/IEC 13211-2:2000 modules, and ISO/IEC TS 13211-3:2025 definite
+clause grammars. The licensed-text audits are published as the [Part 1
+ledger](docs/reference/iso-part1-conformance.md) and [Parts 2 and 3
+ledger](docs/reference/iso-parts2-3-conformance.md). The complete applicable independent Part 1
+corpus passes on every execution path; Parts 2 and 3 use focused direct, generated-C#, and
+NativeAOT evidence. This is not a claim of SWI-Prolog compatibility.
 
 ## What has been measured
 
@@ -231,17 +232,18 @@ samples and exercise NativeAOT.
 | `op/3`, `current_op/3`, operator-aware writing | Implemented |
 | DCGs, `phrase/2,3` | Implemented |
 | Repositionable text and binary streams; close options; configurable EOF actions; term, character, code, and byte I/O | Implemented |
-| Modules, `use_module/1,2`, `meta_predicate/1` | Implemented |
+| ISO Part 2 interfaces, bodies, visibility, context, reflection, and database operations | Implemented |
 | ISO Prolog flags and state-dependent reading/calls | Implemented |
 | Character conversion and state-dependent lexical reading | Implemented |
 | Opt-in strict ISO predefined-feature boundary | Implemented across source, generated code, runtime meta-call, host binding, SDK, CLI, and NativeAOT |
 
-## Remaining ISO family gaps
+## ISO family coverage
 
 | Feature | Current state |
 |---|---|
-| Part 2 modules | Not implemented: the current Quintus-family `module/2`, `use_module/1,2`, and `meta_predicate/1` surface differs from the standard's interface/body representation; the licensed text is also absent from `tmp/ISO/` |
-| Part 3 grammars | Static and runtime expansion, controls, steadfastness, terminal-sequence errors, strict additional-control handling, and NativeAOT paths are tested; final licensed-text traceability remains |
+| Part 1 core | Licensed traceability plus the independent 768-declaration cross-path corpus |
+| Part 2 modules | Licensed traceability; interface/body preparation, visibility, reflection, database, generated-code, and NativeAOT tests |
+| Part 3 grammars | Licensed traceability; static/runtime expansion, controls, steadfastness, errors, generated-code, and NativeAOT tests |
 
 ## Non-ISO features absent deliberately
 

@@ -1,8 +1,8 @@
 # ISO processor characteristics
 
-This page records the processor-defined choices that accompany DotProlog's ISO/IEC 13211-1
-conformance declaration. Requirement and execution-path evidence is recorded separately in the
-[Part 1 conformance ledger](iso-part1-conformance.md).
+This page records the processor-defined choices that accompany DotProlog's ISO/IEC 13211
+implementation. Requirement and execution-path evidence is recorded separately in the
+[Part 1](iso-part1-conformance.md) and [Parts 2 and 3](iso-parts2-3-conformance.md) ledgers.
 
 ## Strict ISO mode
 
@@ -73,6 +73,8 @@ entering value is restored when that file finishes loading.
 The initial `char_conversion` flag is `off`.
 Character conversion applies to unquoted lexical input while quoted text, escapes, character-code
 literal payloads, and primitive character input remain unchanged.
+
+The Part 2 `colon_sets_calling_context` flag is fixed and has the value `true`.
 
 `write_term/2,3` implements the Corrigendum 3 `variable_names/1` option. Its value is a list of
 `Atom=Term` entries; the leftmost entry whose term is the variable being written supplies the
@@ -150,19 +152,28 @@ reports opaque positions only when repositioning is enabled.
 
 ## Modules
 
-DotProlog's current module extension starts a source unit with one `module/2` declaration and uses
-`use_module/1,2` and `meta_predicate/1`. This is the widely used Quintus-family module surface, not
-the module-interface and module-body representation standardized by ISO/IEC 13211-2. It must not be
-used as evidence of Part 2 conformance.
+DotProlog implements the Part 2 interface/body representation. An interface is bracketed by
+`module/1` and `end_module/1`; a body is bracketed by `body/1` and `end_body/1`. Interfaces may
+export, re-export, declare metapredicates, and establish module-local reader state. Bodies may
+import selectively or wholesale, and multiple bodies accumulate state in preparation order.
+Unbracketed module text belongs to `user`; another body may be embedded in that user text.
 
-Selected imports must name predicates the source module exports; malformed selections and two
-modules supplying the same visible predicate are rejected during source preparation. Local
-definitions take precedence over imports.
+Selected imports and re-exports must name exported procedures. Malformed selections, duplicate
+interfaces, imported local definitions, and two modules supplying the same
+visible predicate are rejected during source preparation.
+
+`colon_sets_calling_context` is fixed to `true`. Explicit qualification therefore sets the context
+of the Part 2 metapredicates, controls, reflection, database operations, operator and flag access,
+and term I/O. DotProlog provides no optional mechanism for hiding a module procedure from explicit
+qualification, so procedures in ISO modules report `public`; export remains a separate property.
 
 An exported predicate is also published under its plain name when that name is still free. The
 first loaded export therefore owns a plain-name alias; later modules remain reachable through
 qualification or an unambiguous import. Loading source and its relationship to files are DotProlog
 extensions rather than claims about the Part 2 filesystem model.
+
+Extended and Modern modes additionally accept the Quintus-family `module/2`, `use_module/1,2`, and
+`meta_predicate/1` declarations. They are compatibility extensions and are rejected in StrictIso.
 
 ## Definite clause grammars
 
@@ -176,7 +187,7 @@ If an ordinary `Name/(Arity+2)` clause and `Name//Arity` grammar rule coexist, D
 their expanded clauses into one procedure in source order. Grammar-rule heads that are themselves
 grammar control constructs or that expand to a predefined procedure are rejected.
 
-`phrase/2` reports `type_error(terminal_sequence, Culprit)` when its sequence cannot be a terminal
-sequence. `phrase/3` selects the specification's implementation-defined unchecked option for its
+`phrase/2` reports `type_error(list, Culprit)` when its sequence cannot be a terminal sequence.
+`phrase/3` selects the specification's implementation-defined unchecked option for its
 second and third arguments. A partial terminal list inside the grammar body raises
 `instantiation_error`; an improper terminal list raises `type_error(list, Culprit)`.

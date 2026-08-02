@@ -6,13 +6,25 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- ISO/IEC 13211-2 module interfaces and bodies, including export, import, re-export,
+  metapredicates, module-local reader state, visible-database reflection, context-sensitive I/O and
+  database operations, static clause inspection, and the fixed `colon_sets_calling_context` flag.
+- Generated-C# and NativeAOT preservation of Part 2 module metadata and retained static clauses.
+
 ### Fixed
 
 - Runtime-built DCG bodies are expanded into one goal before execution, so `|` alternatives and
   grammar or embedded cuts have the same behavior as statically translated grammar rules.
 - `phrase/3` is steadfast in its third argument, and strict mode treats a runtime-built soft cut as
   an ordinary nonterminal just as it does in static grammar rules.
-- `phrase/2` reports the Part 3 `terminal_sequence` type for an invalid input sequence.
+- `phrase/2` reports the Part 3 `list` type for an invalid input sequence.
+
+### Changed
+
+- StrictIso accepts the Part 2 `module/1` interface and `body/1` representation and rejects the
+  Quintus-family `module/2`, `use_module/1,2`, and `meta_predicate/1` compatibility declarations.
 
 ## [0.4.0] — 2026-08-02
 

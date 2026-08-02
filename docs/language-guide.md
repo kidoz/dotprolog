@@ -1,10 +1,11 @@
 # Language guide
 
-DotProlog's `StrictIso` mode implements and declares conformance to ISO/IEC 13211-1:1995 with
-Technical Corrigenda 1–3. The declaration is backed by the repository's
+DotProlog's `StrictIso` mode implements ISO/IEC 13211-1:1995 with Technical Corrigenda 1–3,
+ISO/IEC 13211-2:2000, and ISO/IEC TS 13211-3:2025. The declaration is backed by the repository's
 [Part 1 traceability ledger](reference/iso-part1-conformance.md), its 608 standard-derived cases,
-and a 768-case independent corpus executed through every engine path. It does not claim
-SWI-Prolog compatibility or completion of the separate Parts 2 and 3 standards.
+and a 768-case independent corpus executed through every engine path, plus the
+[Parts 2 and 3 traceability ledger](reference/iso-parts2-3-conformance.md) and focused cross-path
+tests. It does not claim SWI-Prolog compatibility.
 
 ## Language modes
 
@@ -111,10 +112,25 @@ that goal began, even if it changes the predicate while enumerating.
 
 ## Modules, grammars, and operators
 
-Modules declare exports with `module/2`, import with `use_module/1,2`, and qualify calls with
-`Module:Goal`. `meta_predicate/1` declares goal arguments. A module declaration must be the first
-term in its source, selected imports must be exported predicate indicators, and conflicting
-imports are rejected.
+ISO modules separate their interface from one or more bodies:
+
+```prolog
+:- module(values).
+:- export(value/1).
+:- end_module(values).
+
+:- body(values).
+value(ok).
+:- end_body(values).
+```
+
+Interfaces use `export/1`, `reexport/1,2`, and `metapredicate/1`; bodies use `import/1,2`.
+`Module:Goal` selects a module explicitly. Operators, character conversions, flags, term I/O,
+database operations, and meta-arguments all observe the calling module. Conflicting visibility,
+missing interfaces, invalid exports, and implicit modification of imports are rejected.
+
+Extended and Modern modes retain `module/2`, `use_module/1,2`, and `meta_predicate/1` as
+compatibility extensions. StrictIso requires the standard Part 2 forms.
 
 Definite clause grammars use `-->/2` and run through `phrase/2,3`:
 
