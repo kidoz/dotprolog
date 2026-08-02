@@ -91,6 +91,7 @@ public sealed class OperatorDeclarationTests
     [InlineData("op(500, xfy, [{}])", "permission_error(create,operator,{})")]
     [InlineData("op(1000, xfy, '|')", "permission_error(create,operator,(|))")]
     [InlineData("op(1000, fx, '|')", "permission_error(create,operator,(|))")]
+    [InlineData("op(1150, fx, '|')", "permission_error(create,operator,(|))")]
     // The culprit prints as (,) rather than ',' because write/1 does not quote, and an operator
     // atom in an argument position is bracketed so that the output still reads back.
     [InlineData("op(700, xfx, ',')", "permission_error(modify,operator,(,))")]

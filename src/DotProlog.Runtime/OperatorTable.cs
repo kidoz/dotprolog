@@ -106,12 +106,12 @@ public sealed class OperatorTable
             return OperatorDefinitionConflict.None;
         }
 
-        if (name is "[]" or "{}" || (name == "|" && priority <= 1000))
+        var requestedInfix = type is OperatorType.Xfx or OperatorType.Xfy or OperatorType.Yfx;
+        if (name is "[]" or "{}" || (name == "|" && (priority <= 1000 || !requestedInfix)))
         {
             return OperatorDefinitionConflict.Create;
         }
 
-        var requestedInfix = type is OperatorType.Xfx or OperatorType.Xfy or OperatorType.Yfx;
         var requestedPostfix = type is OperatorType.Xf or OperatorType.Yf;
         if (
             (requestedInfix || requestedPostfix)

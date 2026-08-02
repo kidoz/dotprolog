@@ -135,6 +135,17 @@ public sealed class StandardLibraryTests
     public void KeysortLeavesEqualKeysInTheirOriginalOrder() =>
         Assert.Equal("[a-1,a-2,a-3]", PrologTestHost.RunGoal("keysort([a-1, a-2, a-3], L), write(L)"));
 
+    [Theory]
+    [InlineData("sort([1|_], _)", "instantiation_error")]
+    [InlineData("sort(atom, _)", "type_error(list,atom)")]
+    [InlineData("sort([], atom)", "type_error(list,atom)")]
+    [InlineData("keysort([_], _)", "instantiation_error")]
+    [InlineData("keysort([not_a_pair], _)", "type_error(pair,not_a_pair)")]
+    [InlineData("keysort([], atom)", "type_error(list,atom)")]
+    [InlineData("keysort([], [not_a_pair])", "type_error(pair,not_a_pair)")]
+    public void IsoSortsValidateBothListArguments(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+
     [Fact]
     public void PredsortDropsElementsItsOrderCallsEqual()
     {

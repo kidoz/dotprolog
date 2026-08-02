@@ -61,6 +61,7 @@ internal static class SortBuiltins
     private static bool Sort(Machine machine, int key, bool descending, bool dedupe, int listIndex = 0, int resultIndex = 1)
     {
         List<Cell> elements = TermList.ReadProper(machine, machine.Argument(listIndex));
+        ValidatePartialResult(machine, machine.Argument(resultIndex));
         Cell[] sorted = Arrange(machine, elements, element => KeyOf(machine, element, key), descending, dedupe);
         return machine.Unify(machine.Argument(resultIndex), TermList.Build(machine, sorted));
     }
@@ -74,27 +75,53 @@ internal static class SortBuiltins
         List<Cell> elements = TermList.ReadProper(machine, machine.Argument(0));
         var pair = machine.Symbols.InternFunctor("-", 2);
 
+        ValidatePairElements(machine, elements, pair, allowVariables: false);
+        List<Cell> resultElements = ValidatePartialResult(machine, machine.Argument(1));
+        ValidatePairElements(machine, resultElements, pair, allowVariables: true);
+
         Cell[] sorted = Arrange(
             machine,
             elements,
-            element =>
-            {
-                Cell cell = machine.Dereference(element);
-
-                if (cell.Tag == CellTag.Reference)
-                {
-                    throw PrologErrors.Instantiation(machine);
-                }
-
-                return cell.Tag == CellTag.Structure && machine.HeapAt(cell.Index).Index == pair
-                    ? machine.HeapAt(cell.Index + 1)
-                    : throw PrologErrors.Type(machine, "pair", cell);
-            },
+            element => machine.HeapAt(machine.Dereference(element).Index + 1),
             descending: false,
             dedupe: false
         );
 
         return machine.Unify(machine.Argument(1), TermList.Build(machine, sorted));
+    }
+
+    private static List<Cell> ValidatePartialResult(Machine machine, Cell result)
+    {
+        List<Cell> elements = [];
+        Cell tail = TermList.Read(machine, result, elements);
+        if (!TermList.IsEmpty(machine, tail) && tail.Tag != CellTag.Reference)
+        {
+            throw PrologErrors.Type(machine, "list", machine.Dereference(result));
+        }
+
+        return elements;
+    }
+
+    private static void ValidatePairElements(Machine machine, List<Cell> elements, int pair, bool allowVariables)
+    {
+        foreach (Cell element in elements)
+        {
+            Cell cell = machine.Dereference(element);
+            if (cell.Tag == CellTag.Reference)
+            {
+                if (allowVariables)
+                {
+                    continue;
+                }
+
+                throw PrologErrors.Instantiation(machine);
+            }
+
+            if (cell.Tag != CellTag.Structure || machine.HeapAt(cell.Index).Index != pair)
+            {
+                throw PrologErrors.Type(machine, "pair", cell);
+            }
+        }
     }
 
     private static Cell[] Arrange(Machine machine, List<Cell> elements, Func<Cell, Cell> keyOf, bool descending, bool dedupe)
