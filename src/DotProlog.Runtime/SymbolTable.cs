@@ -51,7 +51,7 @@ public sealed class SymbolTable
     {
         ArgumentNullException.ThrowIfNull(name);
 
-        if (_atomIds.TryGetValue(name, out int id))
+        if (_atomIds.TryGetValue(name, out var id))
         {
             return id;
         }
@@ -69,7 +69,7 @@ public sealed class SymbolTable
     public int InternFunctor(int nameAtom, int arity)
     {
         var functor = new Functor(nameAtom, arity);
-        if (_functorIds.TryGetValue(functor, out int id))
+        if (_functorIds.TryGetValue(functor, out var id))
         {
             return id;
         }
@@ -102,7 +102,7 @@ public sealed class SymbolTable
     /// </summary>
     public int InternFloat(double value)
     {
-        if (_floatIds.TryGetValue(value, out int id))
+        if (_floatIds.TryGetValue(value, out var id))
         {
             return id;
         }

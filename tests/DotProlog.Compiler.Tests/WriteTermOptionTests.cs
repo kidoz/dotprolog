@@ -42,7 +42,7 @@ public sealed class WriteTermOptionTests : IDisposable
     [Fact]
     public void WriteTermThreeWritesToTheSelectedStream()
     {
-        string path = Path("explicit.txt");
+        var path = Path("explicit.txt");
 
         Assert.Equal(
             "yes\n",

@@ -51,8 +51,8 @@ public class LanguageModeBenchmarks
     public bool ConsultManyUnits()
     {
         var engine = new PrologEngine(Mode) { Output = TextWriter.Null };
-        bool success = true;
-        for (int index = 0; index < ManyUnits.Length; index++)
+        var success = true;
+        for (var index = 0; index < ManyUnits.Length; index++)
         {
             success &= engine.ConsultText(ManyUnits[index], $"unit{index}.pl").Success;
         }

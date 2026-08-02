@@ -61,7 +61,7 @@ public sealed class ArithmeticTests
     [Fact]
     public void ComparisonFailureBacktracksRatherThanThrowing()
     {
-        (RunResult result, string output, _) = PrologTestHost.Execute(":- initialization((2 < 1, write(no))).");
+        (RunResult result, var output, _) = PrologTestHost.Execute(":- initialization((2 < 1, write(no))).");
 
         Assert.Equal(RunResult.Success, result);
         Assert.Equal("Warning: initialization goal failed.\n", output);

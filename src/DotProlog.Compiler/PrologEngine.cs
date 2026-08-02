@@ -114,7 +114,7 @@ public sealed class PrologEngine : IRuntimeCompiler
     public LoadResult ConsultFile(string path)
     {
         ArgumentNullException.ThrowIfNull(path);
-        string absolute = Path.GetFullPath(path);
+        var absolute = Path.GetFullPath(path);
         LoadResult loaded = ConsultText(File.ReadAllText(absolute), absolute);
         if (loaded.Success)
         {
@@ -144,7 +144,7 @@ public sealed class PrologEngine : IRuntimeCompiler
         // Which module a file declared is what use_module/1 needs to know when it is imported later.
         if (loaded.Success && fileName is not null && File.Exists(fileName))
         {
-            string absolute = Path.GetFullPath(fileName);
+            var absolute = Path.GetFullPath(fileName);
             _modules.RecordLoad(absolute, loader.Module);
             _loadedSourceFiles.Add(absolute);
         }
@@ -195,7 +195,7 @@ public sealed class PrologEngine : IRuntimeCompiler
     private ParseResult ReadProgramWithIncludes(string text, string? fileName)
     {
         HashSet<string> active = new(PathComparer);
-        string? rootPath = ExistingFullPath(fileName);
+        var rootPath = ExistingFullPath(fileName);
         if (rootPath is not null)
         {
             active.Add(rootPath);
@@ -233,7 +233,7 @@ public sealed class PrologEngine : IRuntimeCompiler
                 );
             }
 
-            string? path = ResolveSourcePath(file.Name, includingFile);
+            var path = ResolveSourcePath(file.Name, includingFile);
             if (path is null)
             {
                 return IncludeError(
@@ -282,13 +282,13 @@ public sealed class PrologEngine : IRuntimeCompiler
 
     private static string? ResolveSourcePath(string name, string? includingFile)
     {
-        string directory = includingFile is null
+        var directory = includingFile is null
             ? Directory.GetCurrentDirectory()
             : (Path.GetDirectoryName(Path.GetFullPath(includingFile)) ?? ".");
 
-        foreach (string candidate in (string[])[name, name + ".pl"])
+        foreach (var candidate in (string[])[name, name + ".pl"])
         {
-            string absolute = Path.IsPathRooted(candidate) ? candidate : Path.Combine(directory, candidate);
+            var absolute = Path.IsPathRooted(candidate) ? candidate : Path.Combine(directory, candidate);
             if (File.Exists(absolute))
             {
                 return Path.GetFullPath(absolute);
@@ -382,7 +382,7 @@ public sealed class PrologEngine : IRuntimeCompiler
 
         List<Diagnostic> compileDiagnostics = [];
         var compiler = new ClauseCompiler(Program, new ConstantPool(Program), compileDiagnostics, null);
-        int address = compiler.Compile(new AtomTerm("$goal", parsed.Clauses[0].Span), parsed.Clauses[0]);
+        var address = compiler.Compile(new AtomTerm("$goal", parsed.Clauses[0].Span), parsed.Clauses[0]);
         diagnostics = compileDiagnostics;
         return address;
     }
@@ -408,7 +408,7 @@ public sealed class PrologEngine : IRuntimeCompiler
         }
 
         SyntaxTerm goal = parsed.Clauses[0];
-        string[] names = CollectVariableNames(goal);
+        var names = CollectVariableNames(goal);
         SyntaxTerm body = goal;
 
         if (names.Length > 0)
@@ -424,7 +424,7 @@ public sealed class PrologEngine : IRuntimeCompiler
 
         List<Diagnostic> diagnostics = [];
         var compiler = new ClauseCompiler(Program, new ConstantPool(Program), diagnostics, null, allowQueryBindings: true);
-        int address = compiler.Compile(new AtomTerm("$query", goal.Span), body);
+        var address = compiler.Compile(new AtomTerm("$query", goal.Span), body);
 
         return address < 0
             ? throw new PrologException($"The goal did not compile: {string.Join("; ", diagnostics)}")
@@ -453,7 +453,7 @@ public sealed class PrologEngine : IRuntimeCompiler
             {
                 // '_' is deliberately not reported: each occurrence is a different variable.
                 case VariableTerm { IsAnonymous: false } variable:
-                    if (counts.TryGetValue(variable.Name, out int count))
+                    if (counts.TryGetValue(variable.Name, out var count))
                     {
                         counts[variable.Name] = count + 1;
                     }
@@ -466,7 +466,7 @@ public sealed class PrologEngine : IRuntimeCompiler
                     break;
 
                 case CompoundTerm compound:
-                    for (int i = compound.Arity - 1; i >= 0; i--)
+                    for (var i = compound.Arity - 1; i >= 0; i--)
                     {
                         pending.Add(compound.Arguments[i]);
                     }
@@ -488,7 +488,7 @@ public sealed class PrologEngine : IRuntimeCompiler
     /// <param name="diagnostics">Diagnostics raised while reading or compiling the goal.</param>
     public RunResult RunGoal(string goalText, out IReadOnlyList<Diagnostic> diagnostics)
     {
-        int address = CompileGoal(goalText, out diagnostics);
+        var address = CompileGoal(goalText, out diagnostics);
         return address < 0 ? RunResult.Failure : Machine.Run(address);
     }
 
@@ -505,11 +505,11 @@ public sealed class PrologEngine : IRuntimeCompiler
     {
         ArgumentNullException.ThrowIfNull(machine);
 
-        string key = ControlGoalKey(machine, goal, out List<Cell> goalVariables);
+        var key = ControlGoalKey(machine, goal, out List<Cell> goalVariables);
 
         if (_controlGoals.TryGetValue(key, out (int Address, int ArgumentCount) cached))
         {
-            for (int i = 0; i < cached.ArgumentCount; i++)
+            for (var i = 0; i < cached.ArgumentCount; i++)
             {
                 arguments[i] = goalVariables[i];
             }
@@ -520,7 +520,7 @@ public sealed class PrologEngine : IRuntimeCompiler
 
         var variables = new Dictionary<string, Cell>(StringComparer.Ordinal);
         SyntaxTerm body = TermReifier.ToSyntax(machine, goal, variables);
-        string[] names = CollectVariableNames(body);
+        var names = CollectVariableNames(body);
 
         if (names.Length >= Machine.ArgumentRegisterCount || names.Length > arguments.Length)
         {
@@ -528,9 +528,9 @@ public sealed class PrologEngine : IRuntimeCompiler
         }
 
         var headArguments = new SyntaxTerm[names.Length];
-        for (int i = 0; i < names.Length; i++)
+        for (var i = 0; i < names.Length; i++)
         {
-            string name = names[i];
+            var name = names[i];
             headArguments[i] = new VariableTerm(name, SourceSpan.None);
             arguments[i] = variables[name];
         }
@@ -542,7 +542,7 @@ public sealed class PrologEngine : IRuntimeCompiler
 
         List<Diagnostic> diagnostics = [];
         var compiler = new ClauseCompiler(Program, new ConstantPool(Program), diagnostics, null);
-        int address = compiler.Compile(head, body);
+        var address = compiler.Compile(head, body);
         argumentCount = names.Length;
 
         if (address < 0)
@@ -573,7 +573,7 @@ public sealed class PrologEngine : IRuntimeCompiler
 
         while (work.Count > 0)
         {
-            (Cell source, bool leaving) = work[^1];
+            (Cell source, var leaving) = work[^1];
             work.RemoveAt(work.Count - 1);
 
             if (leaving)
@@ -587,7 +587,7 @@ public sealed class PrologEngine : IRuntimeCompiler
             switch (cell.Tag)
             {
                 case CellTag.Reference:
-                    if (!ordinals.TryGetValue(cell.Index, out int ordinal))
+                    if (!ordinals.TryGetValue(cell.Index, out var ordinal))
                     {
                         ordinal = variables.Count;
                         ordinals[cell.Index] = ordinal;
@@ -618,10 +618,10 @@ public sealed class PrologEngine : IRuntimeCompiler
                         throw PrologErrors.Representation(machine, "cyclic_term");
                     }
 
-                    int functorId = machine.HeapAt(cell.Index).Index;
+                    var functorId = machine.HeapAt(cell.Index).Index;
                     key.Append('s').Append(functorId).Append('(');
                     work.Add((cell, true));
-                    for (int i = machine.Symbols.ArityOf(functorId); i >= 1; i--)
+                    for (var i = machine.Symbols.ArityOf(functorId); i >= 1; i--)
                     {
                         work.Add((machine.HeapAt(cell.Index + i), false));
                     }
@@ -659,8 +659,8 @@ public sealed class PrologEngine : IRuntimeCompiler
 
         Cell headCell = whole;
         Cell bodyCell = default;
-        bool hasBody = false;
-        int rule2 = machine.Symbols.InternFunctor(":-", 2);
+        var hasBody = false;
+        var rule2 = machine.Symbols.InternFunctor(":-", 2);
 
         if (whole.Tag == CellTag.Structure && machine.HeapAt(whole.Index).Index == rule2)
         {
@@ -723,7 +723,7 @@ public sealed class PrologEngine : IRuntimeCompiler
         };
 
         var compiler = new ClauseCompiler(Program, new ConstantPool(Program), diagnostics, null);
-        int address = compiler.Compile(head, body);
+        var address = compiler.Compile(head, body);
 
         // ISO 8.9.1.3: a body that is not callable is type_error(callable, Body). Anything else the
         // compiler rejects is reported the same way, since the body is what could not be compiled.
@@ -741,12 +741,9 @@ public sealed class PrologEngine : IRuntimeCompiler
         ArgumentNullException.ThrowIfNull(machine);
         ArgumentNullException.ThrowIfNull(path);
 
-        string? resolved = ResolveSourcePath(path, null);
-        if (resolved is null)
-        {
-            throw ExistenceError(machine, "source_sink", Cell.Atom(machine.Symbols.InternAtom(path)));
-        }
-
+        var resolved =
+            ResolveSourcePath(path, null)
+            ?? throw ExistenceError(machine, "source_sink", Cell.Atom(machine.Symbols.InternAtom(path)));
         LoadResult loaded = ConsultFile(resolved);
         if (!loaded.Success)
         {
@@ -760,12 +757,9 @@ public sealed class PrologEngine : IRuntimeCompiler
         ArgumentNullException.ThrowIfNull(machine);
         ArgumentNullException.ThrowIfNull(path);
 
-        string? resolved = ResolveSourcePath(path, null);
-        if (resolved is null)
-        {
-            throw ExistenceError(machine, "source_sink", Cell.Atom(machine.Symbols.InternAtom(path)));
-        }
-
+        var resolved =
+            ResolveSourcePath(path, null)
+            ?? throw ExistenceError(machine, "source_sink", Cell.Atom(machine.Symbols.InternAtom(path)));
         if (_loadedSourceFiles.Contains(resolved) || !_loadingSourceFiles.Add(resolved))
         {
             return;
@@ -809,16 +803,16 @@ public sealed class PrologEngine : IRuntimeCompiler
         variables = Cell.Atom(machine.Symbols.EmptyList);
         singletons = Cell.Atom(machine.Symbols.EmptyList);
 
-        int end = ClauseScanner.FindClauseEnd(buffer, Program.CharacterConversions, Program.Flags);
+        var end = ClauseScanner.FindClauseEnd(buffer, Program.CharacterConversions, Program.Flags);
         while (end < 0)
         {
-            string? chunk = ReadLinePreservingTerminator(input);
+            var chunk = ReadLinePreservingTerminator(input);
             if (chunk is null)
             {
                 // What is left at end of input is either nothing, which is end_of_file, or a clause
                 // missing its terminator. Reading the incomplete text as if it were whole would
                 // quietly return a prefix of what the file says.
-                bool blank = ClauseScanner.IsBlank(buffer, Program.CharacterConversions, Program.Flags);
+                var blank = ClauseScanner.IsBlank(buffer, Program.CharacterConversions, Program.Flags);
                 buffer = string.Empty;
 
                 return blank ? false : throw SyntaxError(machine, "unexpected_end_of_file");
@@ -828,13 +822,13 @@ public sealed class PrologEngine : IRuntimeCompiler
             end = ClauseScanner.FindClauseEnd(buffer, Program.CharacterConversions, Program.Flags);
         }
 
-        string text = buffer[..end];
+        var text = buffer[..end];
         buffer = buffer[end..];
 
         ParseResult parsed = ReadTerm(text);
         if (!parsed.Success || parsed.Clauses.Count == 0)
         {
-            string error = parsed.Diagnostics.Count > 0 ? parsed.Diagnostics[0].Id : "cannot_start_term";
+            var error = parsed.Diagnostics.Count > 0 ? parsed.Diagnostics[0].Id : "cannot_start_term";
             throw error switch
             {
                 DiagnosticIds.MaxIntegerExceeded => PrologErrors.Representation(machine, "max_integer"),
@@ -857,7 +851,7 @@ public sealed class PrologEngine : IRuntimeCompiler
         // variable_names/1 and singletons/1 read the way the source does.
         List<Cell> pairs = [];
         List<Cell> singletonPairs = [];
-        int equals = machine.Symbols.InternFunctor("=", 2);
+        var equals = machine.Symbols.InternFunctor("=", 2);
         foreach (NamedVariable named in CollectNamedVariables(parsed.Clauses[0]))
         {
             if (namedVariables.TryGetValue(named.Name, out Cell variable))
@@ -884,13 +878,13 @@ public sealed class PrologEngine : IRuntimeCompiler
 
         while (true)
         {
-            int value = input.Read();
+            var value = input.Read();
             if (value < 0)
             {
                 return chunk.Length == 0 ? null : chunk.ToString();
             }
 
-            char character = (char)value;
+            var character = (char)value;
             chunk.Append(character);
             if (character is '\r' or '\n')
             {
@@ -928,7 +922,7 @@ public sealed class PrologEngine : IRuntimeCompiler
 
     private RunResult RunQueue(List<int> queue, string description)
     {
-        foreach (int address in queue)
+        foreach (var address in queue)
         {
             RunResult result = Machine.Run(address);
             if (result == RunResult.Halted)

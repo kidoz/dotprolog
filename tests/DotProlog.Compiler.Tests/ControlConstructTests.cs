@@ -31,7 +31,7 @@ public sealed class ControlConstructTests
     [InlineData(1, "small")]
     public void IfThenElseCommitsToTheBranchTheConditionSelects(int input, string expected)
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             $"""
             classify(X, R) :- ( X > 5 -> R = big ; R = small ).
 
@@ -45,7 +45,7 @@ public sealed class ControlConstructTests
     [Fact]
     public void IfThenElseCommitsToTheFirstSolutionOfItsCondition()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             q(1).
             q(2).
@@ -62,7 +62,7 @@ public sealed class ControlConstructTests
     [Fact]
     public void IfThenWithoutAnElseFailsWhenItsConditionFails()
     {
-        (RunResult result, string output, _) = PrologTestHost.Execute(":- initialization(( fail -> write(then) )).");
+        (RunResult result, var output, _) = PrologTestHost.Execute(":- initialization(( fail -> write(then) )).");
 
         Assert.Equal(RunResult.Success, result);
         Assert.Equal("Warning: initialization goal failed.\n", output);
@@ -80,7 +80,7 @@ public sealed class ControlConstructTests
     public void ACutInTheLeftBranchOfADisjunctionPrunesTheRightOne()
     {
         // The cut is transparent to ;/2, so it removes the alternative and the whole goal fails.
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             p :- ( !, fail ; true ).
 
@@ -98,7 +98,7 @@ public sealed class ControlConstructTests
     [Fact]
     public void CutInsideAConditionStillPrunesTheConditionsOwnAlternatives()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             q(1).
             q(2).
@@ -115,7 +115,7 @@ public sealed class ControlConstructTests
     [Fact]
     public void CutInsideABranchIsTransparentAndPrunesTheWholeClause()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             p(1).
             p(2).
@@ -133,7 +133,7 @@ public sealed class ControlConstructTests
     [Fact]
     public void SoftCutKeepsEverySolutionOfItsCondition()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             q(1).
             q(2).
@@ -157,7 +157,7 @@ public sealed class ControlConstructTests
     public void SoftCutDoesNotRunItsElseBranchAfterTheConditionSucceeded()
     {
         // Backtracking past both solutions of q/1 must not fall through to the else branch.
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             q(1).
             q(2).
@@ -180,7 +180,7 @@ public sealed class ControlConstructTests
     [Fact]
     public void NegationFailsWhenItsGoalSucceeds()
     {
-        (RunResult result, string output, _) = PrologTestHost.Execute(":- initialization(( \\+ (1 = 1), write(no) )).");
+        (RunResult result, var output, _) = PrologTestHost.Execute(":- initialization(( \\+ (1 = 1), write(no) )).");
 
         Assert.Equal(RunResult.Success, result);
         Assert.Equal("Warning: initialization goal failed.\n", output);
@@ -195,7 +195,7 @@ public sealed class ControlConstructTests
     [Fact]
     public void ControlConstructsNestAndStillReturnFromTheClause()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             sign(N, R) :- ( N > 0 -> R = positive ; N < 0 -> R = negative ; R = zero ).
 

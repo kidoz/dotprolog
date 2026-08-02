@@ -18,7 +18,7 @@ public sealed class ConformanceTests
     [Fact]
     public void EveryConformanceCaseBehavesAsTheStandardSays()
     {
-        string suite = Path.Combine(RepositoryRoot(), "tests", "conformance", "iso_conformance.pl");
+        var suite = Path.Combine(RepositoryRoot(), "tests", "conformance", "iso_conformance.pl");
         Assert.True(File.Exists(suite), $"The conformance suite is missing from {suite}.");
 
         var output = new StringWriter();
@@ -29,10 +29,10 @@ public sealed class ConformanceTests
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
         Assert.Equal(RunResult.Success, engine.RunGoal("run_conformance", out _));
 
-        string[] lines = output.ToString().ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var lines = output.ToString().ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
 
         string[] failures = [.. lines.Where(line => line.StartsWith("FAIL ", StringComparison.Ordinal))];
-        int cases = lines
+        var cases = lines
             .Where(line => line.StartsWith("cases ", StringComparison.Ordinal))
             .Select(line => int.Parse(line["cases ".Length..], System.Globalization.CultureInfo.InvariantCulture))
             .Single();

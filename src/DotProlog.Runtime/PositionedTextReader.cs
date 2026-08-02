@@ -18,13 +18,13 @@ internal sealed class PositionedTextReader(string text) : TextReader
             return null;
         }
 
-        int start = _position;
+        var start = _position;
         while (_position < text.Length && text[_position] is not ('\r' or '\n'))
         {
             _position++;
         }
 
-        int contentEnd = _position;
+        var contentEnd = _position;
         if (_position < text.Length && text[_position] == '\r')
         {
             _position++;
@@ -46,7 +46,7 @@ internal sealed class PositionedTextReader(string text) : TextReader
 
     public override int Read(Span<char> buffer)
     {
-        int count = Math.Min(buffer.Length, text.Length - _position);
+        var count = Math.Min(buffer.Length, text.Length - _position);
         text.AsSpan(_position, count).CopyTo(buffer);
         _position += count;
         return count;

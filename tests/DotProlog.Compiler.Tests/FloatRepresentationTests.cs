@@ -45,7 +45,7 @@ public sealed class FloatRepresentationTests : IDisposable
     [Fact]
     public void FloatOverflowConsumesOnlyTheRejectedStreamTerm()
     {
-        string path = Path("float-overflow.pl");
+        var path = Path("float-overflow.pl");
         File.WriteAllText(path, "1.0e9999. next.");
 
         Assert.Equal(

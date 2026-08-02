@@ -28,7 +28,7 @@ public sealed class StreamOpenErrorTests : IDisposable
     [InlineData("1")]
     public void BoundOutputRaisesBeforeOpeningTheFile(string target)
     {
-        string path = Path("must-not-exist.txt");
+        var path = Path("must-not-exist.txt");
 
         Assert.Equal(
             $"uninstantiation_error({target})",
@@ -69,8 +69,8 @@ public sealed class StreamOpenErrorTests : IDisposable
     [Fact]
     public void DuplicateAliasDoesNotReplaceTheOpenStreamOrTouchTheSecondFile()
     {
-        string first = Path("first.txt");
-        string second = Path("must-not-exist.txt");
+        var first = Path("first.txt");
+        var second = Path("must-not-exist.txt");
 
         Assert.Equal(
             "permission_error(open,source_sink,alias(shared)) yes\n",
@@ -92,7 +92,7 @@ public sealed class StreamOpenErrorTests : IDisposable
     [Fact]
     public void StandardAliasesCannotBeReplaced()
     {
-        string path = Path("must-not-exist.txt");
+        var path = Path("must-not-exist.txt");
 
         Assert.Equal(
             "permission_error(open,source_sink,alias(user_output))",
@@ -104,7 +104,7 @@ public sealed class StreamOpenErrorTests : IDisposable
     [Fact]
     public void ExistingSourceThatCannotBeOpenedReportsPermissionError()
     {
-        string directory = _directory.Replace("\\", "/", StringComparison.Ordinal);
+        var directory = _directory.Replace("\\", "/", StringComparison.Ordinal);
 
         Assert.Equal(
             $"permission_error(open,source_sink,'{directory}')",
@@ -115,7 +115,7 @@ public sealed class StreamOpenErrorTests : IDisposable
     [Fact]
     public void RightmostAliasIsTheOnlyOneApplied()
     {
-        string path = Path("rightmost.txt");
+        var path = Path("rightmost.txt");
 
         Assert.Equal(
             "yes\n",

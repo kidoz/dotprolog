@@ -55,23 +55,16 @@ internal sealed class ModuleResolver
     /// <summary>Rewrites a goal, and every goal reachable from it, to the predicates they mean.</summary>
     internal SyntaxTerm ResolveGoal(SyntaxTerm goal)
     {
-        switch (goal)
+        return goal switch
         {
             // A variable goal is only known at run time, so it carries its module and is resolved then.
-            case VariableTerm:
-                return Qualify(goal);
-
-            case AtomTerm atom:
-                return atom.Name is "!" or "true" or "fail" or "false" ? atom
-                    : Rename(atom.Name, 0) is { } renamed ? new AtomTerm(renamed, atom.Span)
-                    : atom;
-
-            case CompoundTerm compound:
-                return ResolveCompound(compound);
-
-            default:
-                return goal;
-        }
+            VariableTerm => Qualify(goal),
+            AtomTerm atom => atom.Name is "!" or "true" or "fail" or "false" ? atom
+            : Rename(atom.Name, 0) is { } renamed ? new AtomTerm(renamed, atom.Span)
+            : atom,
+            CompoundTerm compound => ResolveCompound(compound),
+            _ => goal,
+        };
     }
 
     private CompoundTerm ResolveCompound(CompoundTerm compound)
@@ -99,7 +92,7 @@ internal sealed class ModuleResolver
         }
 
         var indicator = new PredicateIndicator(compound.Name, compound.Arity);
-        int[]? meta = _modules.MetaArgumentsOf(indicator);
+        var meta = _modules.MetaArgumentsOf(indicator);
         IReadOnlyList<SyntaxTerm> arguments = meta is null ? compound.Arguments : ResolveMetaArguments(compound, meta);
 
         return Rename(compound.Name, compound.Arity) is { } renamed
@@ -114,7 +107,7 @@ internal sealed class ModuleResolver
     {
         var arguments = new SyntaxTerm[compound.Arity];
 
-        for (int i = 0; i < compound.Arity; i++)
+        for (var i = 0; i < compound.Arity; i++)
         {
             arguments[i] = meta[i] switch
             {
@@ -169,7 +162,7 @@ internal sealed class ModuleResolver
             return ModuleTable.QualifiedName(_module, name);
         }
 
-        string? from = _modules.ImportedFrom(_module, indicator);
+        var from = _modules.ImportedFrom(_module, indicator);
         return from is null ? null : ModuleTable.QualifiedName(from, name);
     }
 

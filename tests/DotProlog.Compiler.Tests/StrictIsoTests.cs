@@ -103,12 +103,12 @@ public sealed class StrictIsoTests
     [Fact]
     public void StrictModeAcceptsAStandardModuleImport()
     {
-        string directory = Directory.CreateTempSubdirectory("dotprolog-strict-modules-").FullName;
+        var directory = Directory.CreateTempSubdirectory("dotprolog-strict-modules-").FullName;
 
         try
         {
-            string library = Path.Combine(directory, "library.pl");
-            string main = Path.Combine(directory, "main.pl");
+            var library = Path.Combine(directory, "library.pl");
+            var main = Path.Combine(directory, "main.pl");
             File.WriteAllText(library, ":- module(library, [answer/1]).\nanswer(42).\n");
             File.WriteAllText(
                 main,

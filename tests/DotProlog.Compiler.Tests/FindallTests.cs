@@ -24,7 +24,7 @@ public sealed class FindallTests
     [Fact]
     public void CollectsAnInstantiatedTemplateRatherThanTheGoal()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             $"""
             {Facts}
 
@@ -38,7 +38,7 @@ public sealed class FindallTests
     [Fact]
     public void CollectsAcrossAConjunctiveGoal()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             $"""
             {Facts}
 
@@ -52,7 +52,7 @@ public sealed class FindallTests
     [Fact]
     public void LeavesTheTemplateVariableUnboundAfterwards()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             $"""
             {Facts}
 
@@ -67,7 +67,7 @@ public sealed class FindallTests
     public void RenamesVariablesApartBetweenSolutions()
     {
         // Two solutions that are both unbound must not come back sharing one variable.
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             q(_).
             q(_).
@@ -82,7 +82,7 @@ public sealed class FindallTests
     [Fact]
     public void NestsWithoutTheInnerCollectionDisturbingTheOuter()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             p(1).
             p(2).
@@ -99,7 +99,7 @@ public sealed class FindallTests
     {
         // The collection depth is recorded on every choice point, so unwinding restores it and the
         // next findall starts clean rather than appending to an abandoned buffer.
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             $"""
             {Facts}
 

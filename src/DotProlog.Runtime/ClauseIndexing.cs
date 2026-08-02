@@ -27,7 +27,7 @@ internal static class ClauseIndexing
     /// </summary>
     internal static int NextMatch(Cell[] keys, int from, Cell callKey)
     {
-        for (int i = from; i < keys.Length; i++)
+        for (var i = from; i < keys.Length; i++)
         {
             if (Matches(keys[i], callKey))
             {

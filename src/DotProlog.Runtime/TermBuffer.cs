@@ -31,9 +31,7 @@ internal sealed class TermBuffer
 
     internal static TermBuffer FromCells(ReadOnlySpan<Cell> cells)
     {
-        var buffer = new TermBuffer();
-        buffer._cells = cells.ToArray();
-        buffer._count = cells.Length;
+        var buffer = new TermBuffer { _cells = cells.ToArray(), _count = cells.Length };
         return buffer;
     }
 
@@ -54,12 +52,12 @@ internal sealed class TermBuffer
         _work.Clear();
         _active.Clear();
 
-        int root = Reserve(1);
+        var root = Reserve(1);
         _work.Add((term, root));
 
         while (_work.Count > 0)
         {
-            (Cell source, int slot) = _work[^1];
+            (Cell source, var slot) = _work[^1];
             _work.RemoveAt(_work.Count - 1);
 
             // A negative slot marks leaving the structure whose heap index the entry carries.
@@ -74,7 +72,7 @@ internal sealed class TermBuffer
             {
                 case CellTag.Reference:
                 {
-                    if (!_variables.TryGetValue(cell.Index, out int variable))
+                    if (!_variables.TryGetValue(cell.Index, out var variable))
                     {
                         variable = Reserve(1);
                         _cells[variable] = Cell.Reference(variable);
@@ -97,12 +95,12 @@ internal sealed class TermBuffer
 
                     _work.Add((cell, -1));
 
-                    int arity = machine.Symbols.ArityOf(machine.HeapAt(cell.Index).Index);
-                    int structure = Reserve(arity + 1);
+                    var arity = machine.Symbols.ArityOf(machine.HeapAt(cell.Index).Index);
+                    var structure = Reserve(arity + 1);
                     _cells[structure] = machine.HeapAt(cell.Index);
                     _cells[slot] = Cell.Structure(structure);
 
-                    for (int i = 1; i <= arity; i++)
+                    for (var i = 1; i <= arity; i++)
                     {
                         _work.Add((machine.HeapAt(cell.Index + i), structure + i));
                     }
@@ -125,9 +123,9 @@ internal sealed class TermBuffer
     /// </summary>
     internal int Materialize(Machine machine)
     {
-        int origin = machine.ReserveHeap(_count);
+        var origin = machine.ReserveHeap(_count);
 
-        for (int i = 0; i < _count; i++)
+        for (var i = 0; i < _count; i++)
         {
             Cell cell = _cells[i];
             machine.WriteHeap(
@@ -151,7 +149,7 @@ internal sealed class TermBuffer
             Array.Resize(ref _cells, Math.Max(_cells.Length * 2, _count + count));
         }
 
-        int slot = _count;
+        var slot = _count;
         _count += count;
         return slot;
     }

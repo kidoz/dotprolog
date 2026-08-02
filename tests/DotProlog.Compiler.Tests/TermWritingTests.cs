@@ -22,7 +22,7 @@ public sealed class TermWritingTests
     [Fact]
     public void WriteRendersAPartialListWithABar()
     {
-        string output = PrologTestHost.RunGoal("X = [a,b|Tail], write(X)");
+        var output = PrologTestHost.RunGoal("X = [a,b|Tail], write(X)");
 
         Assert.StartsWith("[a,b|_G", output, StringComparison.Ordinal);
         Assert.EndsWith("]", output, StringComparison.Ordinal);

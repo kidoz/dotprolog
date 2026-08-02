@@ -65,7 +65,7 @@ internal sealed class DcgTranslator
 
         SyntaxTerm left = rule.Arguments[0];
         SyntaxTerm pushback = new AtomTerm(TermReader.EmptyListAtom, rule.Span);
-        bool hasPushback = false;
+        var hasPushback = false;
 
         // Head, PushBack --> Body puts PushBack back onto the input after the body has run.
         if (left is CompoundTerm { Name: ",", Arity: 2 } withPushback)
@@ -110,7 +110,7 @@ internal sealed class DcgTranslator
 
     private bool TryTranslateSemicontext(SyntaxTerm semicontext, SyntaxTerm start, SyntaxTerm end, out SyntaxTerm goal)
     {
-        if (semicontext is not AtomTerm { Name: "[]" } && semicontext is not CompoundTerm { Name: ".", Arity: 2 })
+        if (semicontext is not AtomTerm { Name: "[]" } and not CompoundTerm { Name: ".", Arity: 2 })
         {
             goal = semicontext;
             Report(semicontext, "A grammar rule semicontext must be a terminal sequence.");
@@ -311,7 +311,7 @@ internal sealed class DcgTranslator
         }
 
         SyntaxTerm matched = end;
-        for (int i = terminals.Count - 1; i >= 0; i--)
+        for (var i = terminals.Count - 1; i >= 0; i--)
         {
             matched = new CompoundTerm(TermReader.ListFunctor, [terminals[i], matched], list.Span);
         }
@@ -329,10 +329,9 @@ internal sealed class DcgTranslator
         };
 
     private static CompoundTerm Conjunction(SyntaxTerm first, SyntaxTerm second, SourceSpan span) =>
-        new CompoundTerm(",", [first, second], span);
+        new(",", [first, second], span);
 
-    private static CompoundTerm Unify(SyntaxTerm left, SyntaxTerm right, SourceSpan span) =>
-        new CompoundTerm("=", [left, right], span);
+    private static CompoundTerm Unify(SyntaxTerm left, SyntaxTerm right, SourceSpan span) => new("=", [left, right], span);
 
     private VariableTerm NewVariable(SourceSpan span) => new($"{VariablePrefix}{_next++}", span);
 

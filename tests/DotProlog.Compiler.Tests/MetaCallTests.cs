@@ -11,7 +11,7 @@ public sealed class MetaCallTests
     [Fact]
     public void CallsAnAtomGoal()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             greet :- write(hi), nl.
 
@@ -25,7 +25,7 @@ public sealed class MetaCallTests
     [Fact]
     public void CallsACompoundGoalAndPropagatesBindings()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             double(X, Y) :- Y is X * 2.
 
@@ -45,7 +45,7 @@ public sealed class MetaCallTests
     [Fact]
     public void AVariableInGoalPositionIsAMetaCall()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             run(G) :- G.
 
@@ -89,7 +89,7 @@ public sealed class MetaCallTests
     [Fact]
     public void CallsASoftCutBuiltAtRunTime()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             q(1).
             q(2).
@@ -119,7 +119,7 @@ public sealed class MetaCallTests
     [Fact]
     public void CutInsideAMetaCalledGoalCommitsWithinTheMetaCall()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             q(1).
             q(2).
@@ -138,7 +138,7 @@ public sealed class MetaCallTests
     [Fact]
     public void MetaCalledCutDoesNotPruneTheCallersAlternatives()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             q(1).
             q(2).
@@ -222,17 +222,17 @@ public sealed class MetaCallTests
     {
         var engine = new PrologEngine { Output = new StringWriter() };
         Machine machine = engine.Machine;
-        int conjunction = machine.Symbols.InternFunctor(",", 2);
+        var conjunction = machine.Symbols.InternFunctor(",", 2);
         Cell yes = Cell.Atom(machine.Symbols.InternAtom("true"));
         var registers = new Cell[Machine.ArgumentRegisterCount];
 
         Cell first = machine.CreateStructure(conjunction, [yes, machine.CreateVariable()]);
-        int address = engine.CompileControlGoal(machine, first, registers, out int arity);
-        int size = engine.Program.CodeLength;
+        var address = engine.CompileControlGoal(machine, first, registers, out var arity);
+        var size = engine.Program.CodeLength;
 
         Cell variable = machine.CreateVariable();
         Cell second = machine.CreateStructure(conjunction, [yes, variable]);
-        int reused = engine.CompileControlGoal(machine, second, registers, out int reusedArity);
+        var reused = engine.CompileControlGoal(machine, second, registers, out var reusedArity);
 
         Assert.Equal(address, reused);
         Assert.Equal(arity, reusedArity);

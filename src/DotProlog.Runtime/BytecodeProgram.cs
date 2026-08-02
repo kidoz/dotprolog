@@ -135,7 +135,7 @@ public sealed class BytecodeProgram
         ArgumentNullException.ThrowIfNull(block);
         ArgumentNullException.ThrowIfNull(program);
 
-        int index = _compiledBlocks.Count;
+        var index = _compiledBlocks.Count;
         _compiledBlocks.Add((block, program));
         return EncodeCompiledTarget(index);
     }
@@ -161,7 +161,7 @@ public sealed class BytecodeProgram
     /// </param>
     public void DefinePredicate(int functorId, int address, bool userDefined = true)
     {
-        if (_staticAliasTargets.Remove(functorId, out int previousTarget))
+        if (_staticAliasTargets.Remove(functorId, out var previousTarget))
         {
             _staticAliases[previousTarget].Remove(functorId);
         }
@@ -170,7 +170,7 @@ public sealed class BytecodeProgram
 
         if (_staticAliases.TryGetValue(functorId, out HashSet<int>? aliases))
         {
-            foreach (int alias in aliases)
+            foreach (var alias in aliases)
             {
                 SetPredicate(alias, address, userDefined);
             }
@@ -248,7 +248,7 @@ public sealed class BytecodeProgram
             throw new PrologException($"permission_error(modify, static_procedure, {Symbols.DescribeFunctor(functorId)})");
         }
 
-        int trampoline = CodeLength;
+        var trampoline = CodeLength;
         Emit(OpCode.EnterDynamic, functorId);
 
         var predicate = new DynamicPredicate
@@ -340,7 +340,7 @@ public sealed class BytecodeProgram
         predicate.Abolish(NextGeneration());
 
         List<int> aliases = [];
-        foreach ((int alias, DynamicPredicate candidate) in _dynamicPredicates)
+        foreach ((var alias, DynamicPredicate candidate) in _dynamicPredicates)
         {
             if (ReferenceEquals(candidate, predicate))
             {
@@ -348,7 +348,7 @@ public sealed class BytecodeProgram
             }
         }
 
-        foreach (int alias in aliases)
+        foreach (var alias in aliases)
         {
             _dynamicPredicates.Remove(alias);
             _entryPoints[alias] = Undefined;
@@ -394,7 +394,7 @@ public sealed class BytecodeProgram
     /// <summary>Appends an instruction with one operand and returns its address.</summary>
     public int Emit(OpCode opCode, int operand)
     {
-        int address = EmitWord((int)opCode);
+        var address = EmitWord((int)opCode);
         EmitWord(operand);
         return address;
     }
@@ -402,7 +402,7 @@ public sealed class BytecodeProgram
     /// <summary>Appends an instruction with two operands and returns its address.</summary>
     public int Emit(OpCode opCode, int first, int second)
     {
-        int address = EmitWord((int)opCode);
+        var address = EmitWord((int)opCode);
         EmitWord(first);
         EmitWord(second);
         return address;
@@ -430,7 +430,7 @@ public sealed class BytecodeProgram
             Array.Resize(ref _code, _code.Length * 2);
         }
 
-        int address = CodeLength;
+        var address = CodeLength;
         _code[address] = word;
         CodeLength = address + 1;
         return address;
@@ -443,13 +443,13 @@ public sealed class BytecodeProgram
             return;
         }
 
-        int capacity = _entryPoints.Length;
+        var capacity = _entryPoints.Length;
         while (capacity < required)
         {
             capacity *= 2;
         }
 
-        int previous = _entryPoints.Length;
+        var previous = _entryPoints.Length;
         Array.Resize(ref _entryPoints, capacity);
         Array.Resize(ref _userPredicates, capacity);
         Array.Fill(_entryPoints, Undefined, previous, capacity - previous);

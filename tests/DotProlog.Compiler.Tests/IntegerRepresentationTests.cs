@@ -42,7 +42,7 @@ public sealed class IntegerRepresentationTests : IDisposable
     [Fact]
     public void RepresentationErrorConsumesOnlyTheRejectedStreamTerm()
     {
-        string path = Path("limits.pl");
+        var path = Path("limits.pl");
         File.WriteAllText(path, "999999999999999999999999999999. next.");
 
         Assert.Equal(

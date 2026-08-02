@@ -295,7 +295,7 @@ public sealed class TermReader
 
         while (true)
         {
-            string? name = InfixName(_current);
+            var name = InfixName(_current);
             if (name is null || !_operators.TryGetInfixOrPostfix(name, out PrologOperator op))
             {
                 return left;
@@ -323,7 +323,7 @@ public sealed class TermReader
             }
 
             // '|' used as an infix operator at priority 1100 denotes disjunction.
-            string functor = name == "|" && op.Priority == 1100 ? ";" : name;
+            var functor = name == "|" && op.Priority == 1100 ? ";" : name;
             left = new CompoundTerm(functor, [left, right], left.Span.To(right.Span));
             priority = op.Priority;
         }
@@ -405,7 +405,7 @@ public sealed class TermReader
     {
         priority = 0;
         Token token = _current;
-        string name = token.Text;
+        var name = token.Text;
 
         // 'foo(' with no intervening layout is a compound term; 'foo (' is not.
         Token next = Peek();
@@ -423,7 +423,7 @@ public sealed class TermReader
             Token literal = _current;
             Advance();
             SourceSpan span = token.Span.To(literal.Span);
-            bool negate = name == "-";
+            var negate = name == "-";
             return literal.Kind == TokenKind.Integer
                 ? IntegerLiteral(literal, negate, span)
                 : FloatLiteral(literal, negate, span);
@@ -452,8 +452,8 @@ public sealed class TermReader
     {
         if (token.IntegerOverflow)
         {
-            string id = negate ? DiagnosticIds.MinIntegerExceeded : DiagnosticIds.MaxIntegerExceeded;
-            string limit = negate ? "minimum" : "maximum";
+            var id = negate ? DiagnosticIds.MinIntegerExceeded : DiagnosticIds.MaxIntegerExceeded;
+            var limit = negate ? "minimum" : "maximum";
             Report(id, $"Integer literal '{(negate ? "-" : string.Empty)}{token.Text}' exceeds the {limit} value.", span);
             return new IntegerTerm(0, span);
         }
@@ -579,7 +579,7 @@ public sealed class TermReader
         }
 
         SyntaxTerm result = tail;
-        for (int i = elements.Count - 1; i >= 0; i--)
+        for (var i = elements.Count - 1; i >= 0; i--)
         {
             result = new CompoundTerm(ListFunctor, [elements[i], result], listSpan);
         }

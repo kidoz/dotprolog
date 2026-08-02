@@ -98,7 +98,7 @@ internal static class SyntaxFacts
             return false;
         }
 
-        foreach (char c in name)
+        foreach (var c in name)
         {
             if (!char.IsLetterOrDigit(c) && c != '_')
             {
@@ -118,9 +118,9 @@ internal static class SyntaxFacts
     /// </summary>
     internal static bool MapsToIdentifier(string name)
     {
-        bool first = true;
+        var first = true;
 
-        foreach (char c in name)
+        foreach (var c in name)
         {
             if (c == '_')
             {
@@ -149,7 +149,7 @@ internal static class SyntaxFacts
         var text = new StringBuilder(value.Length + 2);
         text.Append('"');
 
-        foreach (char c in value)
+        foreach (var c in value)
         {
             switch (c)
             {

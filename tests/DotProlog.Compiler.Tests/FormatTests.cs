@@ -110,9 +110,7 @@ public sealed class FormatTests
     [InlineData("format(user_input, \"x\", [])", "permission_error(output,stream,user_input)")]
     public void FormatToABadStreamIsReported(string goal, string expected)
     {
-        (RunResult result, string output, _) = PrologTestHost.Execute(
-            $":- initialization(catch({goal}, error(E, _), write(E)))."
-        );
+        (RunResult result, var output, _) = PrologTestHost.Execute($":- initialization(catch({goal}, error(E, _), write(E))).");
 
         Assert.Equal(RunResult.Success, result);
         Assert.Equal(expected, output);

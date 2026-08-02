@@ -25,20 +25,20 @@ public sealed class NativeAotAcceptanceTests
             $"Set {OptInVariable}=1 to run the NativeAOT strict ISO test."
         );
 
-        string root = Path.Combine(Path.GetTempPath(), $"dotprolog-aot-strict-{Environment.ProcessId}");
-        string output = Path.Combine(root, "publish");
+        var root = Path.Combine(Path.GetTempPath(), $"dotprolog-aot-strict-{Environment.ProcessId}");
+        var output = Path.Combine(root, "publish");
         Directory.CreateDirectory(output);
 
         try
         {
-            string generated = Path.Combine(root, "StrictIso.g.cs");
+            var generated = Path.Combine(root, "StrictIso.g.cs");
             await File.WriteAllTextAsync(
                 generated,
                 CompiledConformanceSourceGenerator.GenerateStrictIsoSmoke(),
                 TestContext.Current.CancellationToken
             );
 
-            (int exitCode, string log) = await RunAsync(
+            (var exitCode, var log) = await RunAsync(
                 "dotnet",
                 [
                     "publish",
@@ -61,11 +61,11 @@ public sealed class NativeAotAcceptanceTests
             Assert.True(exitCode == 0, $"Strict ISO publish failed:\n{log}");
             Assert.DoesNotContain("warning IL", log, StringComparison.Ordinal);
 
-            string executable = Path.Combine(output, OperatingSystem.IsWindows() ? "Integration.Tests.exe" : "Integration.Tests");
+            var executable = Path.Combine(output, OperatingSystem.IsWindows() ? "Integration.Tests.exe" : "Integration.Tests");
             Assert.True(File.Exists(executable), $"No published executable at {executable}.");
             Assert.Empty(Directory.GetFiles(output, "*.dll"));
 
-            (int runExit, string runLog) = await RunAsync(executable, [], RepositoryLayout.Root);
+            (var runExit, var runLog) = await RunAsync(executable, [], RepositoryLayout.Root);
             Assert.True(runExit == 0, $"Strict ISO executable failed:\n{runLog}");
             Assert.Contains("strict-iso-native: passed", runLog, StringComparison.Ordinal);
         }
@@ -83,20 +83,20 @@ public sealed class NativeAotAcceptanceTests
             $"Set {OptInVariable}=1 to run the NativeAOT Modern mode test."
         );
 
-        string root = Path.Combine(Path.GetTempPath(), $"dotprolog-aot-modern-{Environment.ProcessId}");
-        string output = Path.Combine(root, "publish");
+        var root = Path.Combine(Path.GetTempPath(), $"dotprolog-aot-modern-{Environment.ProcessId}");
+        var output = Path.Combine(root, "publish");
         Directory.CreateDirectory(output);
 
         try
         {
-            string generated = Path.Combine(root, "ModernMode.g.cs");
+            var generated = Path.Combine(root, "ModernMode.g.cs");
             await File.WriteAllTextAsync(
                 generated,
                 CompiledConformanceSourceGenerator.GenerateModernModeSmoke(),
                 TestContext.Current.CancellationToken
             );
 
-            (int exitCode, string log) = await RunAsync(
+            (var exitCode, var log) = await RunAsync(
                 "dotnet",
                 [
                     "publish",
@@ -119,11 +119,11 @@ public sealed class NativeAotAcceptanceTests
             Assert.True(exitCode == 0, $"Modern mode publish failed:\n{log}");
             Assert.DoesNotContain("warning IL", log, StringComparison.Ordinal);
 
-            string executable = Path.Combine(output, OperatingSystem.IsWindows() ? "Integration.Tests.exe" : "Integration.Tests");
+            var executable = Path.Combine(output, OperatingSystem.IsWindows() ? "Integration.Tests.exe" : "Integration.Tests");
             Assert.True(File.Exists(executable), $"No published executable at {executable}.");
             Assert.Empty(Directory.GetFiles(output, "*.dll"));
 
-            (int runExit, string runLog) = await RunAsync(executable, [], RepositoryLayout.Root);
+            (var runExit, var runLog) = await RunAsync(executable, [], RepositoryLayout.Root);
             Assert.True(runExit == 0, $"Modern mode executable failed:\n{runLog}");
             Assert.Contains("modern-native: passed", runLog, StringComparison.Ordinal);
         }
@@ -141,12 +141,12 @@ public sealed class NativeAotAcceptanceTests
             $"Set {OptInVariable}=1 to run the NativeAOT acceptance test."
         );
 
-        string output = Path.Combine(Path.GetTempPath(), $"dotprolog-aot-{Environment.ProcessId}");
+        var output = Path.Combine(Path.GetTempPath(), $"dotprolog-aot-{Environment.ProcessId}");
         Directory.CreateDirectory(output);
 
         try
         {
-            (int exitCode, string log) = await RunAsync(
+            (var exitCode, var log) = await RunAsync(
                 "dotnet",
                 [
                     "publish",
@@ -170,13 +170,13 @@ public sealed class NativeAotAcceptanceTests
             Assert.DoesNotContain("warning IL", log, StringComparison.Ordinal);
             Assert.DoesNotContain("AOT analysis", log, StringComparison.Ordinal);
 
-            string executable = Path.Combine(output, OperatingSystem.IsWindows() ? "AotAcceptance.exe" : "AotAcceptance");
+            var executable = Path.Combine(output, OperatingSystem.IsWindows() ? "AotAcceptance.exe" : "AotAcceptance");
             Assert.True(File.Exists(executable), $"No published executable at {executable}.");
 
             // No managed assemblies should ship beside it; only the native image and debug artefacts.
             Assert.Empty(Directory.GetFiles(output, "*.dll"));
 
-            (int runExit, string runLog) = await RunAsync(executable, [], output);
+            (var runExit, var runLog) = await RunAsync(executable, [], output);
 
             Assert.True(runExit == 0, $"Published executable failed:\n{runLog}");
             Assert.Equal(
@@ -261,12 +261,12 @@ public sealed class NativeAotAcceptanceTests
             $"Set {OptInVariable}=1 to run the NativeAOT conformance test."
         );
 
-        string output = Path.Combine(Path.GetTempPath(), $"dotprolog-aot-iso-{Environment.ProcessId}");
+        var output = Path.Combine(Path.GetTempPath(), $"dotprolog-aot-iso-{Environment.ProcessId}");
         Directory.CreateDirectory(output);
 
         try
         {
-            (int exitCode, string log) = await RunAsync(
+            (var exitCode, var log) = await RunAsync(
                 "dotnet",
                 [
                     "publish",
@@ -288,12 +288,12 @@ public sealed class NativeAotAcceptanceTests
             Assert.True(exitCode == 0, $"Native conformance publish failed:\n{log}");
             Assert.DoesNotContain("warning IL", log, StringComparison.Ordinal);
 
-            string executable = Path.Combine(output, OperatingSystem.IsWindows() ? "Integration.Tests.exe" : "Integration.Tests");
-            string report = Path.Combine(output, "native-iso-report.json");
+            var executable = Path.Combine(output, OperatingSystem.IsWindows() ? "Integration.Tests.exe" : "Integration.Tests");
+            var report = Path.Combine(output, "native-iso-report.json");
             Assert.True(File.Exists(executable), $"No published executable at {executable}.");
             Assert.Empty(Directory.GetFiles(output, "*.dll"));
 
-            (int runExit, string runLog) = await RunAsync(executable, [report], RepositoryLayout.Root);
+            (var runExit, var runLog) = await RunAsync(executable, [report], RepositoryLayout.Root);
             Assert.True(runExit == 0, $"Native independent ISO corpus failed:\n{runLog}");
             Assert.Contains("768/768 passed", runLog, StringComparison.Ordinal);
 

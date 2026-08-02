@@ -35,7 +35,7 @@ internal static class TermReifier
         {
             case CellTag.Reference:
             {
-                string name = string.Create(CultureInfo.InvariantCulture, $"_G{cell.Index}");
+                var name = string.Create(CultureInfo.InvariantCulture, $"_G{cell.Index}");
                 variables?.TryAdd(name, cell);
                 return new VariableTerm(name, SourceSpan.None);
             }
@@ -53,7 +53,7 @@ internal static class TermReifier
             {
                 Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(cell.Index).Index);
                 var arguments = new SyntaxTerm[functor.Arity];
-                for (int i = 0; i < functor.Arity; i++)
+                for (var i = 0; i < functor.Arity; i++)
                 {
                     arguments[i] = ToSyntaxCore(machine, machine.HeapAt(cell.Index + 1 + i), variables);
                 }
@@ -119,7 +119,7 @@ internal static class TermReifier
                 }
 
                 var arguments = new Cell[compound.Arity];
-                for (int i = 0; i < compound.Arity; i++)
+                for (var i = 0; i < compound.Arity; i++)
                 {
                     arguments[i] = ToHeap(machine, compound.Arguments[i], variables, variableOrder);
                 }

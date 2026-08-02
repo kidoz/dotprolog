@@ -20,7 +20,7 @@ public sealed class SourceDirectiveTests : IDisposable
             """
         );
 
-        string main = Write(
+        var main = Write(
             "main.pl",
             """
             before.
@@ -44,7 +44,7 @@ public sealed class SourceDirectiveTests : IDisposable
             """
         );
 
-        string main = Write(
+        var main = Write(
             "main.pl",
             """
             :- include(conversion).
@@ -62,7 +62,7 @@ public sealed class SourceDirectiveTests : IDisposable
         Directory.CreateDirectory(Path.Combine(_directory, "nested"));
         Write("leaf.pl", "leaf(ok).");
         Write("nested/middle.pl", ":- include('../leaf.pl').");
-        string main = Write(
+        var main = Write(
             "main.pl",
             """
             :- include('nested/middle.pl').
@@ -77,7 +77,7 @@ public sealed class SourceDirectiveTests : IDisposable
     public void MissingIncludeProducesAStableDiagnostic()
     {
         var engine = new PrologEngine();
-        string main = Write("main.pl", ":- include(missing).");
+        var main = Write("main.pl", ":- include(missing).");
 
         LoadResult loaded = engine.ConsultFile(main);
 
@@ -87,7 +87,7 @@ public sealed class SourceDirectiveTests : IDisposable
     [Fact]
     public void RecursiveIncludeProducesAStableDiagnostic()
     {
-        string main = Write("main.pl", ":- include(main).");
+        var main = Write("main.pl", ":- include(main).");
         var engine = new PrologEngine();
 
         LoadResult loaded = engine.ConsultFile(main);
@@ -99,7 +99,7 @@ public sealed class SourceDirectiveTests : IDisposable
     public void EnsureLoadedDirectiveLoadsOnceRelativeToItsSource()
     {
         Write("nested/dependency.pl", ":- initialization(write(dependency)).");
-        string main = Write(
+        var main = Write(
             "nested/main.pl",
             """
             :- ensure_loaded(dependency).
@@ -114,7 +114,7 @@ public sealed class SourceDirectiveTests : IDisposable
     [Fact]
     public void RuntimeEnsureLoadedRemembersAPreviouslyConsultedFile()
     {
-        string dependency = Write("dependency.pl", ":- initialization(write(dependency)).");
+        var dependency = Write("dependency.pl", ":- initialization(write(dependency)).");
         var output = new StringWriter();
         var engine = new PrologEngine { Output = output, Input = TextReader.Null };
 
@@ -130,7 +130,7 @@ public sealed class SourceDirectiveTests : IDisposable
     public void MissingEnsureLoadedProducesAStableDiagnostic()
     {
         var engine = new PrologEngine();
-        string main = Write("main.pl", ":- ensure_loaded(missing).");
+        var main = Write("main.pl", ":- ensure_loaded(missing).");
 
         LoadResult loaded = engine.ConsultFile(main);
 
@@ -154,7 +154,7 @@ public sealed class SourceDirectiveTests : IDisposable
             value(second).
             """
         );
-        string main = Write(
+        var main = Write(
             "main.pl",
             """
             :- ensure_loaded(first).
@@ -169,7 +169,7 @@ public sealed class SourceDirectiveTests : IDisposable
     [Fact]
     public void StaticMultifilePredicatesRemainProtectedFromModification()
     {
-        string main = Write(
+        var main = Write(
             "main.pl",
             """
             :- multifile value/1.
@@ -200,7 +200,7 @@ public sealed class SourceDirectiveTests : IDisposable
             value(second).
             """
         );
-        string main = Write(
+        var main = Write(
             "main.pl",
             """
             :- use_module(first).
@@ -237,7 +237,7 @@ public sealed class SourceDirectiveTests : IDisposable
     [Fact]
     public void DynamicClausesKeepSourceOrderAcrossAnExecutableDirective()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             :- dynamic value/1.
             value(before).
@@ -253,7 +253,7 @@ public sealed class SourceDirectiveTests : IDisposable
     [Fact]
     public void RuntimeConsultQueuesDirectivesUntilTheMachineReturns()
     {
-        string dependency = Write(
+        var dependency = Write(
             "dependency.pl",
             """
             loaded.
@@ -289,7 +289,7 @@ public sealed class SourceDirectiveTests : IDisposable
 
     private string Write(string name, string source)
     {
-        string path = Path.Combine(_directory, name);
+        var path = Path.Combine(_directory, name);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, source);
         return path;

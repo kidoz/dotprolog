@@ -34,7 +34,7 @@ public static class PrologMarshal
         }
 
         var converted = new T[items.Count];
-        for (int i = 0; i < items.Count; i++)
+        for (var i = 0; i < items.Count; i++)
         {
             converted[i] = element(items[i]);
         }

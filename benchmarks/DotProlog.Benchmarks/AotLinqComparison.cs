@@ -11,14 +11,14 @@ internal static class AotLinqComparison
 
     public static int Run(ReadOnlySpan<string> arguments)
     {
-        if (!TryReadArguments(arguments, out int iterations, out string rid))
+        if (!TryReadArguments(arguments, out var iterations, out var rid))
         {
             Console.Error.WriteLine("Usage: --aot-linq [iterations] [runtime-identifier]");
             return 64;
         }
 
-        string repositoryRoot = FindRepositoryRoot();
-        string comparisonRoot = Path.Combine(Path.GetTempPath(), $"dotprolog-aot-linq-{Guid.NewGuid():N}");
+        var repositoryRoot = FindRepositoryRoot();
+        var comparisonRoot = Path.Combine(Path.GetTempPath(), $"dotprolog-aot-linq-{Guid.NewGuid():N}");
         Directory.CreateDirectory(comparisonRoot);
 
         try
@@ -46,9 +46,9 @@ internal static class AotLinqComparison
         bool useSizeOptimizedLinq
     )
     {
-        string mode = useSizeOptimizedLinq ? "size" : "speed";
-        string publishDirectory = Path.Combine(comparisonRoot, mode);
-        string project = Path.Combine(repositoryRoot, "src", "DotProlog.Tool", "DotProlog.Tool.csproj");
+        var mode = useSizeOptimizedLinq ? "size" : "speed";
+        var publishDirectory = Path.Combine(comparisonRoot, mode);
+        var project = Path.Combine(repositoryRoot, "src", "DotProlog.Tool", "DotProlog.Tool.csproj");
 
         RunProcess(
             "dotnet",
@@ -69,19 +69,19 @@ internal static class AotLinqComparison
             expectedOutput: null
         );
 
-        string executable = Path.Combine(publishDirectory, OperatingSystem.IsWindows() ? "dotnet-prolog.exe" : "dotnet-prolog");
-        string program = Path.Combine(repositoryRoot, "samples", "HelloProlog", "hello.pl");
+        var executable = Path.Combine(publishDirectory, OperatingSystem.IsWindows() ? "dotnet-prolog.exe" : "dotnet-prolog");
+        var program = Path.Combine(repositoryRoot, "samples", "HelloProlog", "hello.pl");
 
         RunProcess(executable, ["run", program], repositoryRoot, "Hello! World!");
 
-        long started = Stopwatch.GetTimestamp();
-        for (int i = 0; i < iterations; i++)
+        var started = Stopwatch.GetTimestamp();
+        for (var i = 0; i < iterations; i++)
         {
             RunProcess(executable, ["run", program], repositoryRoot, "Hello! World!");
         }
 
         TimeSpan elapsed = Stopwatch.GetElapsedTime(started);
-        long publishBytes = Directory
+        var publishBytes = Directory
             .EnumerateFiles(publishDirectory, "*", SearchOption.AllDirectories)
             .Where(IsDeploymentFile)
             .Sum(path => new FileInfo(path).Length);
@@ -102,14 +102,14 @@ internal static class AotLinqComparison
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
-        foreach (string argument in arguments)
+        foreach (var argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);
         }
 
         using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException($"Could not start {fileName}.");
-        string output = process.StandardOutput.ReadToEnd();
-        string error = process.StandardError.ReadToEnd();
+        var output = process.StandardOutput.ReadToEnd();
+        var error = process.StandardError.ReadToEnd();
         process.WaitForExit();
 
         if (process.ExitCode != 0)

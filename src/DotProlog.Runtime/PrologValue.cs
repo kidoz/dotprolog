@@ -95,7 +95,7 @@ public abstract record PrologValue
         {
             Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(structure.Index).Index);
             var arguments = new Cell[functor.Arity];
-            for (int i = 0; i < functor.Arity; i++)
+            for (var i = 0; i < functor.Arity; i++)
             {
                 arguments[i] = machine.HeapAt(structure.Index + 1 + i);
             }

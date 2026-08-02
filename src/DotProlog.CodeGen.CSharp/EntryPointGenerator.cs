@@ -37,7 +37,7 @@ public static class EntryPointGenerator
         ArgumentNullException.ThrowIfNull(@namespace);
         ArgumentNullException.ThrowIfNull(sources);
 
-        string compiledProgram = CompiledProgramEmitter.Generate(
+        var compiledProgram = CompiledProgramEmitter.Generate(
             sources,
             "__CompiledTests",
             [],
@@ -112,7 +112,7 @@ public static class EntryPointGenerator
         ArgumentNullException.ThrowIfNull(@namespace);
         ArgumentNullException.ThrowIfNull(sources);
 
-        string compiledProgram = CompiledProgramEmitter.Generate(
+        var compiledProgram = CompiledProgramEmitter.Generate(
             sources,
             "__CompiledProgram",
             [],

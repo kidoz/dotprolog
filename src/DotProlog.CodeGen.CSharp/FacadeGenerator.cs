@@ -52,7 +52,7 @@ public static class FacadeGenerator
 
         AppendResultTypes(text, contract);
         AppendInterface(text, contract);
-        string compiledProgram = CompiledProgramEmitter.Generate(
+        var compiledProgram = CompiledProgramEmitter.Generate(
             [(sourceName, prologSource)],
             "__CompiledModule",
             [],
@@ -73,10 +73,7 @@ public static class FacadeGenerator
     {
         foreach (ContractExport export in contract.Exports.Where(e => e.Outputs.Count() > 1))
         {
-            string members = string.Join(
-                ", ",
-                export.Outputs.Select(output => $"{output.Type.ClrTypeName} {Pascal(output.Name)}")
-            );
+            var members = string.Join(", ", export.Outputs.Select(output => $"{output.Type.ClrTypeName} {Pascal(output.Name)}"));
 
             text.AppendLine(
                 CultureInfo.InvariantCulture,
@@ -118,7 +115,7 @@ public static class FacadeGenerator
         PrologLanguageMode languageMode
     )
     {
-        string type = $"{contract.ClrTypeName}Module";
+        var type = $"{contract.ClrTypeName}Module";
 
         text.AppendLine(
             CultureInfo.InvariantCulture,
@@ -192,7 +189,7 @@ public static class FacadeGenerator
 
     private static void AppendMethod(StringBuilder text, ContractExport export)
     {
-        string arguments = string.Join(
+        var arguments = string.Join(
             ", ",
             export.Arguments.Select(argument =>
                 argument.Mode == ArgumentMode.In
@@ -201,7 +198,7 @@ public static class FacadeGenerator
             )
         );
 
-        string call = arguments.Length == 0 ? Field(export) : $"{Field(export)}, {arguments}";
+        var call = arguments.Length == 0 ? Field(export) : $"{Field(export)}, {arguments}";
 
         text.AppendLine("    /// <inheritdoc />");
         text.AppendLine(CultureInfo.InvariantCulture, $"    public {Signature(export)}");
@@ -267,7 +264,7 @@ public static class FacadeGenerator
     /// </remarks>
     private static void AppendNullGuards(StringBuilder text, ContractExport export)
     {
-        bool wrote = false;
+        var wrote = false;
 
         foreach (ContractArgument input in export.Inputs.Where(input => IsReferenceType(input.Type)))
         {
@@ -290,15 +287,15 @@ public static class FacadeGenerator
 
     private static string Signature(ContractExport export)
     {
-        string parameters = string.Join(", ", export.Inputs.Select(input => $"{input.Type.ClrTypeName} {Camel(input.Name)}"));
+        var parameters = string.Join(", ", export.Inputs.Select(input => $"{input.Type.ClrTypeName} {Camel(input.Name)}"));
 
-        string name = MethodName(export);
+        var name = MethodName(export);
 
         if (export.IsStreaming)
         {
             // A streaming call can enumerate for as long as the caller keeps pulling, so it has to be
             // possible to stop it. .NET expects that to be a CancellationToken.
-            string before = parameters.Length == 0 ? string.Empty : ", ";
+            var before = parameters.Length == 0 ? string.Empty : ", ";
             return $"global::System.Collections.Generic.IEnumerable<{ResultTypeExpression(export)}> {name}({parameters}{before}"
                 + "global::System.Threading.CancellationToken cancellationToken = default)";
         }
@@ -313,7 +310,7 @@ public static class FacadeGenerator
             return $"{ResultTypeExpression(export)} {name}({parameters})";
         }
 
-        string separator = parameters.Length == 0 ? string.Empty : ", ";
+        var separator = parameters.Length == 0 ? string.Empty : ", ";
         return $"bool Try{name}({parameters}{separator}out {ResultTypeExpression(export)} {ResultParameterName(export)})";
     }
 
@@ -340,10 +337,7 @@ public static class FacadeGenerator
             return outputs[0].Type.ToOutputExpression("__outputs[0]");
         }
 
-        string members = string.Join(
-            ", ",
-            outputs.Select((output, index) => output.Type.ToOutputExpression($"__outputs[{index}]"))
-        );
+        var members = string.Join(", ", outputs.Select((output, index) => output.Type.ToOutputExpression($"__outputs[{index}]")));
 
         return $"new {ResultTypeName(export)}({members})";
     }
@@ -372,9 +366,9 @@ public static class FacadeGenerator
     private static string Pascal(string name)
     {
         var text = new StringBuilder(name.Length);
-        bool upper = true;
+        var upper = true;
 
-        foreach (char c in name)
+        foreach (var c in name)
         {
             if (c == '_')
             {
@@ -392,7 +386,7 @@ public static class FacadeGenerator
     /// <summary>A parameter or local name, escaped with <c>@</c> when it collides with a keyword.</summary>
     private static string Camel(string name)
     {
-        string camel = LowerFirst(Pascal(name));
+        var camel = LowerFirst(Pascal(name));
         return SyntaxFacts.IsKeyword(camel) ? "@" + camel : camel;
     }
 

@@ -13,7 +13,7 @@ public sealed class CharacterConversionTable
     internal int Version => _versions.Count - 1;
 
     /// <summary>Maps one unquoted input character through the current table.</summary>
-    public char Convert(char input) => _mappings.TryGetValue(input, out char output) ? output : input;
+    public char Convert(char input) => _mappings.TryGetValue(input, out var output) ? output : input;
 
     /// <summary>Sets a mapping, removing it when input and output are identical.</summary>
     public void Set(char input, char output)
@@ -25,7 +25,7 @@ public sealed class CharacterConversionTable
         }
         else
         {
-            changed = !_mappings.TryGetValue(input, out char previous) || previous != output;
+            changed = !_mappings.TryGetValue(input, out var previous) || previous != output;
             _mappings[input] = output;
         }
 

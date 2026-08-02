@@ -60,16 +60,14 @@ internal static class Program
             return ExitUsage;
         }
 
-        string path = args[0];
+        var path = args[0];
         if (!File.Exists(path))
         {
             error.WriteLine($"error: file not found: {path}");
             return ExitUsage;
         }
 
-        var engine = new PrologEngine(languageMode);
-        engine.Output = output;
-        engine.Error = error;
+        var engine = new PrologEngine(languageMode) { Output = output, Error = error };
 
         LoadResult loaded = engine.ConsultFile(path);
         foreach (Diagnostic diagnostic in loaded.Diagnostics)
@@ -106,15 +104,15 @@ internal static class Program
     {
         PrologLanguageMode languageMode = PrologLanguageMode.Extended;
         PrologLintOptions lintOptions = PrologLintOptions.SemanticOnly;
-        bool warningsAsErrors = false;
+        var warningsAsErrors = false;
         int? indentSize = null;
         int? maxLineLength = null;
         int? maxClauseLines = null;
         List<string> paths = [];
 
-        for (int index = 0; index < args.Length; index++)
+        for (var index = 0; index < args.Length; index++)
         {
-            string argument = args[index];
+            var argument = args[index];
             if (argument == "--warnings-as-errors")
             {
                 warningsAsErrors = true;
@@ -130,7 +128,7 @@ internal static class Program
                     return ExitUsage;
                 }
 
-                string selected = args[++index];
+                var selected = args[++index];
                 if (!PrologLanguageModes.TryParse(selected, out languageMode))
                 {
                     error.WriteLine($"error: unknown language mode: {selected}");
@@ -150,7 +148,7 @@ internal static class Program
                     return ExitUsage;
                 }
 
-                string selected = args[++index];
+                var selected = args[++index];
                 if (selected.Equals("semantic", StringComparison.OrdinalIgnoreCase))
                 {
                     lintOptions = PrologLintOptions.SemanticOnly;
@@ -171,7 +169,7 @@ internal static class Program
 
             if (argument == "--indent-size")
             {
-                if (!TryReadPositiveLintInteger(args, ref index, argument, error, out int value))
+                if (!TryReadPositiveLintInteger(args, ref index, argument, error, out var value))
                 {
                     return ExitUsage;
                 }
@@ -182,7 +180,7 @@ internal static class Program
 
             if (argument == "--max-line-length")
             {
-                if (!TryReadPositiveLintInteger(args, ref index, argument, error, out int value))
+                if (!TryReadPositiveLintInteger(args, ref index, argument, error, out var value))
                 {
                     return ExitUsage;
                 }
@@ -193,7 +191,7 @@ internal static class Program
 
             if (argument == "--max-clause-lines")
             {
-                if (!TryReadPositiveLintInteger(args, ref index, argument, error, out int value))
+                if (!TryReadPositiveLintInteger(args, ref index, argument, error, out var value))
                 {
                     return ExitUsage;
                 }
@@ -225,9 +223,9 @@ internal static class Program
             MaxClauseLines = maxClauseLines ?? lintOptions.MaxClauseLines,
         };
 
-        bool foundErrors = false;
-        bool foundWarnings = false;
-        foreach (string path in paths)
+        var foundErrors = false;
+        var foundWarnings = false;
+        foreach (var path in paths)
         {
             if (!File.Exists(path))
             {
@@ -236,7 +234,7 @@ internal static class Program
                 continue;
             }
 
-            string absolute = Path.GetFullPath(path);
+            var absolute = Path.GetFullPath(path);
             string source;
             try
             {
@@ -301,7 +299,7 @@ internal static class Program
             return false;
         }
 
-        string selected = args[++index];
+        var selected = args[++index];
         if (!int.TryParse(selected, out value) || value <= 0)
         {
             error.WriteLine($"error: invalid value for {option}: {selected}");

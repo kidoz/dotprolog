@@ -35,7 +35,7 @@ public static class TermOrder
                 continue;
             }
 
-            int rank = RankOf(a).CompareTo(RankOf(b));
+            var rank = RankOf(a).CompareTo(RankOf(b));
             if (rank != 0)
             {
                 return rank;
@@ -48,7 +48,7 @@ public static class TermOrder
 
                 case CellTag.Atom:
                 {
-                    int names = string.CompareOrdinal(machine.Symbols.AtomName(a.Index), machine.Symbols.AtomName(b.Index));
+                    var names = string.CompareOrdinal(machine.Symbols.AtomName(a.Index), machine.Symbols.AtomName(b.Index));
                     if (names != 0)
                     {
                         return names;
@@ -60,7 +60,7 @@ public static class TermOrder
                 case CellTag.Integer:
                 case CellTag.Float:
                 {
-                    int numbers = CompareNumbers(machine, a, b);
+                    var numbers = CompareNumbers(machine, a, b);
                     if (numbers != 0)
                     {
                         return numbers;
@@ -71,13 +71,13 @@ public static class TermOrder
 
                 default:
                 {
-                    ulong pair = ((ulong)(uint)a.Index << 32) | (uint)b.Index;
+                    var pair = ((ulong)(uint)a.Index << 32) | (uint)b.Index;
                     if (!visitedStructures.Add(pair))
                     {
                         continue;
                     }
 
-                    int structures = CompareStructures(machine, a, b, work);
+                    var structures = CompareStructures(machine, a, b, work);
                     if (structures != 0)
                     {
                         return structures;
@@ -96,25 +96,25 @@ public static class TermOrder
 
     private static int CompareStructures(Machine machine, Cell a, Cell b, List<(Cell, Cell)> work)
     {
-        int leftFunctor = machine.HeapAt(a.Index).Index;
-        int rightFunctor = machine.HeapAt(b.Index).Index;
+        var leftFunctor = machine.HeapAt(a.Index).Index;
+        var rightFunctor = machine.HeapAt(b.Index).Index;
         Functor left = machine.Symbols.GetFunctor(leftFunctor);
         Functor right = machine.Symbols.GetFunctor(rightFunctor);
 
-        int arity = left.Arity.CompareTo(right.Arity);
+        var arity = left.Arity.CompareTo(right.Arity);
         if (arity != 0)
         {
             return arity;
         }
 
-        int name = string.CompareOrdinal(machine.Symbols.AtomName(left.NameAtom), machine.Symbols.AtomName(right.NameAtom));
+        var name = string.CompareOrdinal(machine.Symbols.AtomName(left.NameAtom), machine.Symbols.AtomName(right.NameAtom));
         if (name != 0)
         {
             return name;
         }
 
         // Pushed in reverse so the leftmost argument is compared first.
-        for (int i = left.Arity; i >= 1; i--)
+        for (var i = left.Arity; i >= 1; i--)
         {
             work.Add((machine.HeapAt(a.Index + i), machine.HeapAt(b.Index + i)));
         }

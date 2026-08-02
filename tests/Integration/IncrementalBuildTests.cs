@@ -18,7 +18,7 @@ public sealed class IncrementalBuildTests : IDisposable
 
     private static string CreateProjectDirectory()
     {
-        string path = Directory.CreateTempSubdirectory("dotprolog-incremental").FullName;
+        var path = Directory.CreateTempSubdirectory("dotprolog-incremental").FullName;
 
         // macOS puts temporary files under /var, a symlink to /private/var. MSBuild computes
         // relative paths between projects from the literal strings, which then miss by one level,
@@ -48,7 +48,7 @@ public sealed class IncrementalBuildTests : IDisposable
         );
 
         // The task assembly is loaded by MSBuild, so it has to exist before the project builds.
-        (int taskExit, string taskLog) = await Run(
+        (var taskExit, var taskLog) = await Run(
             "dotnet",
             ["build", "-nodereuse:false", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
         );
@@ -58,17 +58,17 @@ public sealed class IncrementalBuildTests : IDisposable
         WriteProjectFile();
         WriteModule("rules", "Rules");
 
-        string generatedPath = Path.Combine(_project, "obj", "prolog");
-        string stamp = Path.Combine(generatedPath, ".generated");
-        string rulesFacade = Path.Combine(generatedPath, "RulesModule.g.cs");
+        var generatedPath = Path.Combine(_project, "obj", "prolog");
+        var stamp = Path.Combine(generatedPath, ".generated");
+        var rulesFacade = Path.Combine(generatedPath, "RulesModule.g.cs");
 
-        (int firstExit, string firstLog) = await Build();
+        (var firstExit, var firstLog) = await Build();
         Assert.True(firstExit == 0, $"The first build failed:\n{firstLog}");
         Assert.True(File.Exists(rulesFacade), $"No generated facade at {rulesFacade}.");
         DateTime generatedAt = File.GetLastWriteTimeUtc(stamp);
 
         // Nothing changed, so the stamp the generation target touches must not move.
-        (int secondExit, string secondLog) = await Build();
+        (var secondExit, var secondLog) = await Build();
         Assert.True(secondExit == 0, $"The second build failed:\n{secondLog}");
         Assert.Equal(generatedAt, File.GetLastWriteTimeUtc(stamp));
 
@@ -77,7 +77,7 @@ public sealed class IncrementalBuildTests : IDisposable
         File.Delete(Path.Combine(_project, "rules.dpli"));
         WriteModule("pricing", "Pricing");
 
-        (int thirdExit, string thirdLog) = await Build();
+        (var thirdExit, var thirdLog) = await Build();
         Assert.True(thirdExit == 0, $"The build after the rename failed:\n{thirdLog}");
         Assert.True(File.Exists(Path.Combine(generatedPath, "PricingModule.g.cs")), "The renamed module was not generated.");
         Assert.False(File.Exists(rulesFacade), $"The stale facade {rulesFacade} survived the rename.");
@@ -85,16 +85,16 @@ public sealed class IncrementalBuildTests : IDisposable
         // A deletion is the truly timestamp-invisible change: every file that remains is untouched,
         // and only the recorded input list can tell this build from the one before it.
         WriteModule("extra", "Extra");
-        string extraFacade = Path.Combine(generatedPath, "ExtraModule.g.cs");
+        var extraFacade = Path.Combine(generatedPath, "ExtraModule.g.cs");
 
-        (int fourthExit, string fourthLog) = await Build();
+        (var fourthExit, var fourthLog) = await Build();
         Assert.True(fourthExit == 0, $"The build with a second module failed:\n{fourthLog}");
         Assert.True(File.Exists(extraFacade), $"No generated facade at {extraFacade}.");
 
         File.Delete(Path.Combine(_project, "extra.pl"));
         File.Delete(Path.Combine(_project, "extra.dpli"));
 
-        (int fifthExit, string fifthLog) = await Build();
+        (var fifthExit, var fifthLog) = await Build();
         Assert.True(fifthExit == 0, $"The build after the deletion failed:\n{fifthLog}");
         Assert.False(File.Exists(extraFacade), $"The stale facade {extraFacade} survived the deletion.");
 
@@ -106,7 +106,7 @@ public sealed class IncrementalBuildTests : IDisposable
             "value(one) :- member(one, [one]).\n",
             TestContext.Current.CancellationToken
         );
-        (int rejectedExit, string rejectedLog) = await Build("-p:DotPrologLanguageMode=strict-iso");
+        (var rejectedExit, var rejectedLog) = await Build("-p:DotPrologLanguageMode=strict-iso");
         Assert.True(rejectedExit != 0, "Strict generation accepted a bundled extension.");
         Assert.Contains("DPL1018", rejectedLog, StringComparison.Ordinal);
 
@@ -115,7 +115,7 @@ public sealed class IncrementalBuildTests : IDisposable
             "value(one).\n",
             TestContext.Current.CancellationToken
         );
-        (int strictExit, string strictLog) = await Build("-p:DotPrologLanguageMode=strict-iso");
+        (var strictExit, var strictLog) = await Build("-p:DotPrologLanguageMode=strict-iso");
         Assert.True(strictExit == 0, $"The strict build failed:\n{strictLog}");
         Assert.Contains(
             "PrologLanguageMode.StrictIso",
@@ -124,7 +124,7 @@ public sealed class IncrementalBuildTests : IDisposable
         );
 
         // The generated files live outside IntermediateOutputPath, so Clean needs its own proof.
-        (int cleanExit, string cleanLog) = await Run(
+        (var cleanExit, var cleanLog) = await Run(
             "dotnet",
             ["clean", "-nodereuse:false", Path.Combine(_project, "Incremental.dplproj"), "--nologo"]
         );
@@ -136,7 +136,7 @@ public sealed class IncrementalBuildTests : IDisposable
 
     private void WriteProjectFile()
     {
-        string source = Path.Combine(RepositoryLayout.Root, "src");
+        var source = Path.Combine(RepositoryLayout.Root, "src");
 
         File.WriteAllText(
             Path.Combine(_project, "Incremental.dplproj"),

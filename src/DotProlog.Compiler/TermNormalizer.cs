@@ -20,7 +20,7 @@ internal static class TermNormalizer
     private static CompoundTerm NormalizeCompound(CompoundTerm compound, DoubleQuotesMode doubleQuotes)
     {
         SyntaxTerm[]? rewritten = null;
-        for (int i = 0; i < compound.Arguments.Count; i++)
+        for (var i = 0; i < compound.Arguments.Count; i++)
         {
             SyntaxTerm normalized = Normalize(compound.Arguments[i], doubleQuotes);
             if (!ReferenceEquals(normalized, compound.Arguments[i]) && rewritten is null)
@@ -28,10 +28,7 @@ internal static class TermNormalizer
                 rewritten = [.. compound.Arguments];
             }
 
-            if (rewritten is not null)
-            {
-                rewritten[i] = normalized;
-            }
+            rewritten?[i] = normalized;
         }
 
         return rewritten is null ? compound : compound with { Arguments = rewritten };
@@ -46,7 +43,7 @@ internal static class TermNormalizer
 
         SyntaxTerm result = new AtomTerm(TermReader.EmptyListAtom, text.Span);
 
-        for (int i = text.Value.Length - 1; i >= 0; i--)
+        for (var i = text.Value.Length - 1; i >= 0; i--)
         {
             SyntaxTerm character =
                 doubleQuotes == DoubleQuotesMode.Codes

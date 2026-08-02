@@ -13,7 +13,7 @@ internal sealed class ConstantPool
     /// <summary>Returns the pool index of <paramref name="constant"/>, adding it if it is new.</summary>
     internal int IndexOf(Cell constant)
     {
-        if (_indices.TryGetValue(constant, out int index))
+        if (_indices.TryGetValue(constant, out var index))
         {
             return index;
         }

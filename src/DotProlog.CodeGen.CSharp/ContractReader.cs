@@ -145,8 +145,8 @@ public static class ContractReader
 
         foreach (ContractExport export in exports)
         {
-            string name = export.ClrName ?? export.PredicateName;
-            string signature = $"{name}({string.Join(",", export.Inputs.Select(input => input.Type.ClrTypeName))})";
+            var name = export.ClrName ?? export.PredicateName;
+            var signature = $"{name}({string.Join(",", export.Inputs.Select(input => input.Type.ClrTypeName))})";
 
             if (seen.Add(signature))
             {

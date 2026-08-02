@@ -70,7 +70,7 @@ public sealed class StreamSystemErrorTests
     public void CloseNormalizesDisposedOutputAccordingToForce(string force, string expected)
     {
         var engine = new PrologEngine { Output = new DisposedWriter() };
-        string goal =
+        var goal =
             force == "true"
                 ? "close(user_output, [force(true)]), write(forced)"
                 : "catch(close(user_output, [force(false)]), error(system_error, _), true), write(catchable)";

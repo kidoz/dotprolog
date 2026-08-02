@@ -41,17 +41,17 @@ internal static class CompiledProgramEmitter
         // indexing stays a bytecode-VM dispatch strategy.
         engine.Program.EmitFirstArgumentIndexing = false;
 
-        foreach ((string name, int arity) in hostBuiltins)
+        foreach ((var name, var arity) in hostBuiltins)
         {
             engine.Program.Builtins.Register(name, arity, static _ => false);
         }
 
-        int codeStart = engine.Program.CodeLength;
+        var codeStart = engine.Program.CodeLength;
         List<Diagnostic> allDiagnostics = [];
         List<int> initialization = [];
         List<RawPreparationStep> preparation = [];
 
-        foreach ((string name, string source) in sources)
+        foreach ((var name, var source) in sources)
         {
             LoadResult loaded = engine.CompileForGeneratedCode(
                 source,
@@ -75,9 +75,9 @@ internal static class CompiledProgramEmitter
     private static List<(int Functor, int Entry)> SnapshotPredicates(BytecodeProgram program, int codeStart)
     {
         List<(int Functor, int Entry)> predicates = [];
-        for (int functor = 0; functor < program.Symbols.FunctorCount; functor++)
+        for (var functor = 0; functor < program.Symbols.FunctorCount; functor++)
         {
-            int entry = program.EntryPointOf(functor);
+            var entry = program.EntryPointOf(functor);
             if (program.IsUserPredicate(functor) && !program.IsDynamic(functor) && entry >= codeStart)
             {
                 predicates.Add((functor, entry));
@@ -116,7 +116,7 @@ internal static class CompiledProgramEmitter
         );
         text.AppendLine();
 
-        for (int i = 0; i < model.Instructions.Count; i++)
+        for (var i = 0; i < model.Instructions.Count; i++)
         {
             text.AppendLine(
                 CultureInfo.InvariantCulture,
@@ -161,14 +161,14 @@ internal static class CompiledProgramEmitter
             );
             foreach (CompiledDynamicClause clause in predicate.Clauses)
             {
-                string cells = string.Join(", ", clause.Term.Select(cell => TermCell(cell, "compiled")));
+                var cells = string.Join(", ", clause.Term.Select(cell => TermCell(cell, "compiled")));
                 text.AppendLine(
                     CultureInfo.InvariantCulture,
                     $"        runtime.AddCompiledDynamicClause(functors[{predicate.Functor}], compiled.Target({clause.Entry}), [{cells}], {clause.Root});"
                 );
             }
 
-            foreach (int alias in predicate.Aliases)
+            foreach (var alias in predicate.Aliases)
             {
                 text.AppendLine(
                     CultureInfo.InvariantCulture,
@@ -177,7 +177,7 @@ internal static class CompiledProgramEmitter
             }
         }
 
-        string initializers = string.Join(", ", model.Initialization.Select(index => $"compiled.Target({index})"));
+        var initializers = string.Join(", ", model.Initialization.Select(index => $"compiled.Target({index})"));
         text.AppendLine(CultureInfo.InvariantCulture, $"        return [{initializers}];");
         text.AppendLine("    }");
 
@@ -199,7 +199,7 @@ internal static class CompiledProgramEmitter
             text.AppendLine("    }");
         }
 
-        for (int i = 0; i < model.Instructions.Count; i++)
+        for (var i = 0; i < model.Instructions.Count; i++)
         {
             text.AppendLine();
             text.AppendLine(
@@ -217,7 +217,7 @@ internal static class CompiledProgramEmitter
     {
         text.AppendLine("        int[] functors =");
         text.AppendLine("        [");
-        foreach ((string name, int arity) in model.Functors)
+        foreach ((var name, var arity) in model.Functors)
         {
             text.AppendLine(
                 CultureInfo.InvariantCulture,
@@ -232,7 +232,7 @@ internal static class CompiledProgramEmitter
     {
         text.AppendLine("        int[] builtins =");
         text.AppendLine("        [");
-        foreach (int functor in model.Builtins)
+        foreach (var functor in model.Builtins)
         {
             text.AppendLine(CultureInfo.InvariantCulture, $"            RequireBuiltin(runtime, functors[{functor}]),");
         }
@@ -246,7 +246,7 @@ internal static class CompiledProgramEmitter
         text.AppendLine("        [");
         foreach (CompiledConstant constant in model.Constants)
         {
-            string expression = constant.Tag switch
+            var expression = constant.Tag switch
             {
                 CellTag.Atom => $"global::DotProlog.Runtime.Cell.Atom(symbols.InternAtom({SyntaxFacts.Literal(constant.Text!)}))",
                 CellTag.Integer =>
@@ -264,9 +264,9 @@ internal static class CompiledProgramEmitter
     private static string Operation(CompiledModel model, int index)
     {
         CompiledInstruction instruction = model.Instructions[index];
-        string next = Target(model, instruction.NextAddress);
-        string a = instruction.First.ToString(CultureInfo.InvariantCulture);
-        string b = instruction.Second.ToString(CultureInfo.InvariantCulture);
+        var next = Target(model, instruction.NextAddress);
+        var a = instruction.First.ToString(CultureInfo.InvariantCulture);
+        var b = instruction.Second.ToString(CultureInfo.InvariantCulture);
 
         return instruction.OpCode switch
         {
@@ -313,7 +313,7 @@ internal static class CompiledProgramEmitter
     }
 
     private static string Target(CompiledModel model, int address) =>
-        model.InstructionByAddress.TryGetValue(address, out int target)
+        model.InstructionByAddress.TryGetValue(address, out var target)
             ? $"program.Target({target})"
             : address.ToString(CultureInfo.InvariantCulture);
 
@@ -375,12 +375,12 @@ internal static class CompiledProgramEmitter
             Dictionary<int, int> builtins = [];
             Dictionary<int, int> constants = [];
             Dictionary<Cell, int> termConstants = [];
-            int[] code = program.Code;
+            var code = program.Code;
 
-            for (int address = codeStart; address < program.CodeLength; )
+            for (var address = codeStart; address < program.CodeLength; )
             {
                 var opCode = (OpCode)code[address];
-                int operands = OperandCount(opCode);
+                var operands = OperandCount(opCode);
                 var instruction = new CompiledInstruction
                 {
                     Address = address,
@@ -410,13 +410,13 @@ internal static class CompiledProgramEmitter
 
                     case OpCode.CallBuiltin:
                     {
-                        string display = program.Builtins.NameOf(instruction.First);
-                        int slash = display.LastIndexOf('/');
-                        string name = display[..slash];
-                        int arity = int.Parse(display.AsSpan(slash + 1), CultureInfo.InvariantCulture);
-                        int functorId = program.Symbols.InternFunctor(name, arity);
-                        int functor = AddFunctor(program, model, functors, functorId);
-                        if (!builtins.TryGetValue(instruction.First, out int reference))
+                        var display = program.Builtins.NameOf(instruction.First);
+                        var slash = display.LastIndexOf('/');
+                        var name = display[..slash];
+                        var arity = int.Parse(display.AsSpan(slash + 1), CultureInfo.InvariantCulture);
+                        var functorId = program.Symbols.InternFunctor(name, arity);
+                        var functor = AddFunctor(program, model, functors, functorId);
+                        if (!builtins.TryGetValue(instruction.First, out var reference))
                         {
                             reference = model.Builtins.Count;
                             builtins[instruction.First] = reference;
@@ -430,7 +430,7 @@ internal static class CompiledProgramEmitter
                     case OpCode.GetConstant:
                     case OpCode.UnifyConstant:
                     case OpCode.PutConstant:
-                        if (!constants.TryGetValue(instruction.First, out int constant))
+                        if (!constants.TryGetValue(instruction.First, out var constant))
                         {
                             constant = model.Constants.Count;
                             constants[instruction.First] = constant;
@@ -442,22 +442,22 @@ internal static class CompiledProgramEmitter
                 }
             }
 
-            for (int functorId = 0; functorId < program.Symbols.FunctorCount; functorId++)
+            for (var functorId = 0; functorId < program.Symbols.FunctorCount; functorId++)
             {
-                int entry = program.EntryPointOf(functorId);
+                var entry = program.EntryPointOf(functorId);
                 if (
                     program.IsUserPredicate(functorId)
                     && !program.IsDynamic(functorId)
-                    && model.InstructionByAddress.TryGetValue(entry, out int compiledEntry)
+                    && model.InstructionByAddress.TryGetValue(entry, out var compiledEntry)
                 )
                 {
                     model.Predicates.Add(new CompiledPredicate(AddFunctor(program, model, functors, functorId), compiledEntry));
                 }
             }
 
-            foreach (int address in initialization)
+            foreach (var address in initialization)
             {
-                if (model.InstructionByAddress.TryGetValue(address, out int compiledEntry))
+                if (model.InstructionByAddress.TryGetValue(address, out var compiledEntry))
                 {
                     model.Initialization.Add(compiledEntry);
                 }
@@ -465,15 +465,15 @@ internal static class CompiledProgramEmitter
 
             foreach (RawPreparationStep raw in preparation)
             {
-                if (!model.InstructionByAddress.TryGetValue(raw.Directive, out int directive))
+                if (!model.InstructionByAddress.TryGetValue(raw.Directive, out var directive))
                 {
                     continue;
                 }
 
                 List<CompiledPredicate> predicates = [];
-                foreach ((int functor, int entry) in raw.Predicates)
+                foreach ((var functor, var entry) in raw.Predicates)
                 {
-                    if (model.InstructionByAddress.TryGetValue(entry, out int compiledEntry))
+                    if (model.InstructionByAddress.TryGetValue(entry, out var compiledEntry))
                     {
                         predicates.Add(new CompiledPredicate(AddFunctor(program, model, functors, functor), compiledEntry));
                     }
@@ -490,9 +490,9 @@ internal static class CompiledProgramEmitter
                     continue;
                 }
 
-                int functor = AddFunctor(program, model, functors, predicate.FunctorId);
+                var functor = AddFunctor(program, model, functors, predicate.FunctorId);
                 List<int> aliases = [];
-                foreach ((int candidateFunctor, DynamicPredicate candidate) in program.DynamicPredicates)
+                foreach ((var candidateFunctor, DynamicPredicate candidate) in program.DynamicPredicates)
                 {
                     if (candidateFunctor != predicate.FunctorId && ReferenceEquals(candidate, predicate))
                     {
@@ -503,7 +503,7 @@ internal static class CompiledProgramEmitter
                 List<CompiledDynamicClause> clauses = [];
                 for (DynamicClause? clause = predicate.First; clause is not null; clause = clause.Next)
                 {
-                    if (!model.InstructionByAddress.TryGetValue(clause.CodeAddress, out int entry))
+                    if (!model.InstructionByAddress.TryGetValue(clause.CodeAddress, out var entry))
                     {
                         continue;
                     }
@@ -511,7 +511,7 @@ internal static class CompiledProgramEmitter
                     List<CompiledTermCell> term = [];
                     foreach (Cell cell in clause.Term.Cells)
                     {
-                        int value = cell.Tag switch
+                        var value = cell.Tag switch
                         {
                             CellTag.Reference or CellTag.Structure => cell.Index,
                             CellTag.Functor => AddFunctor(program, model, functors, cell.Index),
@@ -542,7 +542,7 @@ internal static class CompiledProgramEmitter
             Cell cell
         )
         {
-            if (constants.TryGetValue(cell, out int reference))
+            if (constants.TryGetValue(cell, out var reference))
             {
                 return reference;
             }
@@ -560,7 +560,7 @@ internal static class CompiledProgramEmitter
             int functorId
         )
         {
-            if (references.TryGetValue(functorId, out int reference))
+            if (references.TryGetValue(functorId, out var reference))
             {
                 return reference;
             }

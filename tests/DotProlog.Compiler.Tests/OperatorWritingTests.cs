@@ -74,7 +74,7 @@ public sealed class OperatorWritingTests
         var engine = new PrologEngine();
 
         Cell original = ReadOntoHeap(engine, source);
-        string written = TermWriter.ToDisplayString(engine.Machine, original, quoted: true);
+        var written = TermWriter.ToDisplayString(engine.Machine, original, quoted: true);
         Cell reread = ReadOntoHeap(engine, written);
 
         Assert.True(

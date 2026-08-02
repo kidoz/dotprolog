@@ -88,7 +88,7 @@ public sealed class GeneratedFacadeTests
 
     private static object CreateModule(out Type moduleType)
     {
-        string source = FacadeGenerator.Generate(ReadContract(), PrologSource, "pricing.pl");
+        var source = FacadeGenerator.Generate(ReadContract(), PrologSource, "pricing.pl");
         Assembly assembly = CompileGenerated(source);
         moduleType = assembly.GetType("Generated.Pricing.PricingModule")!;
         Assert.NotNull(moduleType);
@@ -124,7 +124,7 @@ public sealed class GeneratedFacadeTests
 
     private static MetadataReference[] ReferenceAssemblies()
     {
-        string runtime = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
+        var runtime = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
 
         return
         [
@@ -143,7 +143,7 @@ public sealed class GeneratedFacadeTests
     [Fact]
     public void GeneratedFacadeCompilesAndLoads()
     {
-        object module = CreateModule(out Type type);
+        var module = CreateModule(out Type type);
 
         Assert.NotNull(module);
         Assert.Contains(type.GetInterfaces(), i => i.Name == "IPricingModule");
@@ -152,7 +152,7 @@ public sealed class GeneratedFacadeTests
     [Fact]
     public void GeneratedFacadeContainsCompiledBlocksInsteadOfEmbeddedSource()
     {
-        string source = FacadeGenerator.Generate(ReadContract(), PrologSource, "pricing.pl");
+        var source = FacadeGenerator.Generate(ReadContract(), PrologSource, "pricing.pl");
 
         Assert.Contains("RegisterCompiledBlock", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ConsultOrThrow", source, StringComparison.Ordinal);
@@ -162,7 +162,7 @@ public sealed class GeneratedFacadeTests
     [Fact]
     public void DeterministicExportReturnsItsOutput()
     {
-        object module = CreateModule(out Type type);
+        var module = CreateModule(out Type type);
 
         Assert.Equal(90.0, Call(module, type, "Discount", 100.0, 10L));
     }
@@ -170,7 +170,7 @@ public sealed class GeneratedFacadeTests
     [Fact]
     public void SemiDeterministicExportWithNoOutputsReturnsBool()
     {
-        object module = CreateModule(out Type type);
+        var module = CreateModule(out Type type);
 
         Assert.Equal(true, Call(module, type, "InStock", "widget"));
         Assert.Equal(false, Call(module, type, "InStock", "sprocket"));
@@ -179,7 +179,7 @@ public sealed class GeneratedFacadeTests
     [Fact]
     public void SemiDeterministicExportWithAnOutputBecomesATryMethod()
     {
-        object module = CreateModule(out Type type);
+        var module = CreateModule(out Type type);
         MethodInfo tryStockLevel = type.GetMethod("TryStockLevel")!;
 
         object?[] found = ["widget", null];
@@ -193,7 +193,7 @@ public sealed class GeneratedFacadeTests
     [Fact]
     public void NondeterministicExportStreamsEverySolution()
     {
-        object module = CreateModule(out Type type);
+        var module = CreateModule(out Type type);
 
         // Streaming methods take a CancellationToken, which reflection must supply explicitly.
         var colours = (IEnumerable<string>)Call(module, type, "Colour", CancellationToken.None)!;
@@ -207,7 +207,7 @@ public sealed class GeneratedFacadeTests
         // chained/1 reaches match/1 by last-call optimisation while pair/1's choice point still
         // references its frame, and note/1 allocates a frame before backtracking. The compiled
         // blocks share the machine's stack-protection watermark, so both solutions must survive.
-        object module = CreateModule(out Type type);
+        var module = CreateModule(out Type type);
 
         var values = (IEnumerable<string>)Call(module, type, "Audited", CancellationToken.None)!;
 
@@ -217,7 +217,7 @@ public sealed class GeneratedFacadeTests
     [Fact]
     public void NondeterministicExportWithNoOutputsStreamsAUnitPerSolution()
     {
-        object module = CreateModule(out Type type);
+        var module = CreateModule(out Type type);
 
         var found = (IEnumerable<Runtime.Unit>)Call(module, type, "Catalogued", "widget", CancellationToken.None)!;
         Assert.Single(found);
@@ -229,12 +229,12 @@ public sealed class GeneratedFacadeTests
     [Fact]
     public void ListsCrossTheBoundaryInBothDirections()
     {
-        object module = CreateModule(out Type type);
+        var module = CreateModule(out Type type);
 
         var splits = (System.Collections.IEnumerable)Call(module, type, "Split", SplitInput, CancellationToken.None)!;
         List<string> shapes = [];
 
-        foreach (object split in splits)
+        foreach (var split in splits)
         {
             Type resultType = split.GetType();
             var left = (IReadOnlyList<string>)resultType.GetProperty("Left")!.GetValue(split)!;
@@ -248,7 +248,7 @@ public sealed class GeneratedFacadeTests
     [Fact]
     public void SeveralOutputsBecomeAGeneratedRecord()
     {
-        string source = FacadeGenerator.Generate(ReadContract(), PrologSource, "pricing.pl");
+        var source = FacadeGenerator.Generate(ReadContract(), PrologSource, "pricing.pl");
 
         Assert.Contains("public readonly record struct SplitResult(", source, StringComparison.Ordinal);
     }
@@ -256,10 +256,10 @@ public sealed class GeneratedFacadeTests
     [Fact]
     public void CompiledPredicateCallsAConsultedPredicate()
     {
-        object unused = CreateModule(out Type type);
+        var unused = CreateModule(out Type type);
         _ = unused;
         var engine = new Compiler.PrologEngine();
-        object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
+        var module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
         engine.ConsultOrThrow("runtime_value(alpha). runtime_value(beta).", "runtime.pl");
 
         var values = (IEnumerable<string>)Call(module, type, "RuntimeBridge", CancellationToken.None)!;
@@ -270,7 +270,7 @@ public sealed class GeneratedFacadeTests
     [Fact]
     public void CompiledGrammarRulesCrossBothExecutionBoundaries()
     {
-        object module = CreateModule(out Type type);
+        var module = CreateModule(out Type type);
 
         Assert.Equal(true, Call(module, type, "GrammarAccepts", "token"));
         Assert.Equal(true, Call(module, type, "GrammarLooksAhead", "token"));
@@ -279,7 +279,7 @@ public sealed class GeneratedFacadeTests
     [Fact]
     public void ConsultedPredicateCallsACompiledPredicate()
     {
-        object unused = CreateModule(out Type type);
+        var unused = CreateModule(out Type type);
         _ = unused;
         var engine = new Compiler.PrologEngine();
         type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine]);
@@ -287,7 +287,7 @@ public sealed class GeneratedFacadeTests
         var host = new Runtime.PrologHost(engine.Machine);
         Runtime.PrologPredicate predicate = host.Bind("consulted_colour", 1);
 
-        string[] values = host.CallAll(predicate, Runtime.PrologInput.Output)
+        var values = host.CallAll(predicate, Runtime.PrologInput.Output)
             .Select(outputs => Runtime.PrologMarshal.ToAtom(outputs[0]))
             .ToArray();
 
@@ -297,7 +297,7 @@ public sealed class GeneratedFacadeTests
     [Fact]
     public void ExecutableDirectiveRunsAgainstItsCompiledSourcePosition()
     {
-        object unused = CreateModule(out Type type);
+        var unused = CreateModule(out Type type);
         _ = unused;
         using var output = new StringWriter();
         var engine = new Compiler.PrologEngine { Output = output };
@@ -310,10 +310,10 @@ public sealed class GeneratedFacadeTests
     [Fact]
     public void CompiledDynamicPredicateKeepsItsLogicalDatabase()
     {
-        object unused = CreateModule(out Type type);
+        var unused = CreateModule(out Type type);
         _ = unused;
         var engine = new Compiler.PrologEngine();
-        object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
+        var module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
 
         var initial = (IEnumerable<string>)Call(module, type, "DynamicValue", CancellationToken.None)!;
         Assert.Equal(["first"], initial);
@@ -340,7 +340,7 @@ public sealed class GeneratedFacadeTests
 
         Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
 
-        string source = FacadeGenerator.Generate(contract.Contract!, "double(X, Y) :- Y is X * 2.", "maths.pl");
+        var source = FacadeGenerator.Generate(contract.Contract!, "double(X, Y) :- Y is X * 2.", "maths.pl");
 
         Assert.Contains("_double2;", source, StringComparison.Ordinal);
         Assert.DoesNotContain("_@", source, StringComparison.Ordinal);
@@ -350,7 +350,7 @@ public sealed class GeneratedFacadeTests
     [Fact]
     public void PrologNamesBecomeIdiomaticCSharpNames()
     {
-        string source = FacadeGenerator.Generate(ReadContract(), PrologSource, "pricing.pl");
+        var source = FacadeGenerator.Generate(ReadContract(), PrologSource, "pricing.pl");
 
         Assert.Contains("bool InStock(string item)", source, StringComparison.Ordinal);
         Assert.Contains("_host.Bind(\"in_stock\", 1)", source, StringComparison.Ordinal);
@@ -370,7 +370,7 @@ public sealed class GeneratedFacadeTests
         );
         Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
 
-        string source = FacadeGenerator.Generate(
+        var source = FacadeGenerator.Generate(
             contract.Contract!,
             "answer(42).",
             "strict.pl",
@@ -378,7 +378,7 @@ public sealed class GeneratedFacadeTests
         );
         Assembly assembly = CompileGenerated(source);
         Type type = assembly.GetType("Generated.Strict.StrictModule")!;
-        object module = type.GetMethod("Create", BindingFlags.Public | BindingFlags.Static, Type.EmptyTypes)!.Invoke(null, null)!;
+        var module = type.GetMethod("Create", BindingFlags.Public | BindingFlags.Static, Type.EmptyTypes)!.Invoke(null, null)!;
 
         Assert.Equal(true, Call(module, type, "Answer", 42L));
 

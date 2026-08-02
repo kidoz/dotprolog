@@ -25,8 +25,8 @@ public sealed class BuiltinRegistry
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(implementation);
 
-        int functorId = _symbols.InternFunctor(name, arity);
-        int id = _implementations.Count;
+        var functorId = _symbols.InternFunctor(name, arity);
+        var id = _implementations.Count;
         _implementations.Add(implementation);
         _retries.Add(null);
         _names.Add($"{name}/{arity}");
@@ -43,7 +43,7 @@ public sealed class BuiltinRegistry
     {
         ArgumentNullException.ThrowIfNull(retry);
 
-        int id = Register(name, arity, implementation);
+        var id = Register(name, arity, implementation);
         _retries[id] = retry;
         return id;
     }

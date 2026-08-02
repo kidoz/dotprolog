@@ -54,7 +54,7 @@ internal static class PrologLayoutLinter
 
             if (options.CheckTrailingWhitespace)
             {
-                int trailingStart = line.End;
+                var trailingStart = line.End;
                 while (trailingStart > line.Start && source[trailingStart - 1] is ' ' or '\t')
                 {
                     trailingStart--;
@@ -79,7 +79,7 @@ internal static class PrologLayoutLinter
             return;
         }
 
-        for (int offset = 0; offset < source.Length; offset++)
+        for (var offset = 0; offset < source.Length; offset++)
         {
             // A tab inside quoted text is the atom's own value, so no edit to the layout can remove
             // it. One in a comment is still layout a reader sees, and stays reportable.
@@ -100,14 +100,14 @@ internal static class PrologLayoutLinter
         List<Diagnostic> diagnostics
     )
     {
-        for (int offset = 0; offset < source.Length; offset++)
+        for (var offset = 0; offset < source.Length; offset++)
         {
             if (regions[offset] != SourceRegion.Code || source[offset] != ',')
             {
                 continue;
             }
 
-            char next = offset + 1 < source.Length ? source[offset + 1] : '\0';
+            var next = offset + 1 < source.Length ? source[offset + 1] : '\0';
             if (!char.IsWhiteSpace(next))
             {
                 diagnostics.Add(
@@ -132,11 +132,11 @@ internal static class PrologLayoutLinter
         List<Diagnostic> diagnostics
     )
     {
-        int previousEndLine = 0;
+        var previousEndLine = 0;
         foreach (SyntaxTerm clause in clauses)
         {
-            int startLine = clause.Span.Line;
-            int endLine = lines.LineNumberAt(LastOffset(clause.Span));
+            var startLine = clause.Span.Line;
+            var endLine = lines.LineNumberAt(LastOffset(clause.Span));
 
             if (options.RequireClauseLayout && (clause.Span.Column != 1 || startLine == previousEndLine))
             {
@@ -210,10 +210,10 @@ internal static class PrologLayoutLinter
         List<Diagnostic> diagnostics
     )
     {
-        for (int lineNumber = startLine + 1; lineNumber <= endLine; lineNumber++)
+        for (var lineNumber = startLine + 1; lineNumber <= endLine; lineNumber++)
         {
             SourceLine line = lines[lineNumber];
-            int content = line.Start;
+            var content = line.Start;
             while (content < line.End && source[content] == ' ')
             {
                 content++;
@@ -232,7 +232,7 @@ internal static class PrologLayoutLinter
                 continue;
             }
 
-            int indentation = content - line.Start;
+            var indentation = content - line.Start;
             if (indentation >= indentSize && indentation % indentSize == 0)
             {
                 continue;
@@ -291,13 +291,13 @@ internal static class PrologLayoutLinter
                 );
             }
 
-            int controlArity = compound.Name switch
+            var controlArity = compound.Name switch
             {
                 "," or ";" or "->" or "*->" when compound.Arity == 2 => 2,
                 "\\+" or "once" or "ignore" when compound.Arity == 1 => 1,
                 _ => 0,
             };
-            for (int index = controlArity - 1; index >= 0; index--)
+            for (var index = controlArity - 1; index >= 0; index--)
             {
                 pending.Push(compound.Arguments[index]);
             }
@@ -313,14 +313,14 @@ internal static class PrologLayoutLinter
     {
         var regions = new SourceRegion[source.Length];
 
-        for (int offset = 0; offset < source.Length; offset++)
+        for (var offset = 0; offset < source.Length; offset++)
         {
-            char current = source[offset];
-            char next = offset + 1 < source.Length ? source[offset + 1] : '\0';
+            var current = source[offset];
+            var next = offset + 1 < source.Length ? source[offset + 1] : '\0';
 
             // Each shielded token decides only where it ends; one fill and one advance serve them
             // all, so no branch can leave the scan pointing at a character it already consumed.
-            (int end, SourceRegion region) = (current, next) switch
+            (var end, SourceRegion region) = (current, next) switch
             {
                 ('%', _) => (LineCommentEnd(source, offset), SourceRegion.Comment),
                 ('/', '*') => (BlockCommentEnd(source, offset), SourceRegion.Comment),
@@ -345,7 +345,7 @@ internal static class PrologLayoutLinter
     /// code so the line-length and trailing-whitespace rules still see it.</summary>
     private static int LineCommentEnd(ReadOnlySpan<char> source, int start)
     {
-        int newline = source[start..].IndexOf('\n');
+        var newline = source[start..].IndexOf('\n');
         return newline < 0 ? source.Length - 1 : start + newline - 1;
     }
 
@@ -353,15 +353,15 @@ internal static class PrologLayoutLinter
     /// runs to the end of the source.</summary>
     private static int BlockCommentEnd(ReadOnlySpan<char> source, int start)
     {
-        int close = source[(start + 2)..].IndexOf("*/", StringComparison.Ordinal);
+        var close = source[(start + 2)..].IndexOf("*/", StringComparison.Ordinal);
         return close < 0 ? source.Length - 1 : start + close + 3;
     }
 
     /// <summary>The closing delimiter of the quoted token opened at <paramref name="start"/>.</summary>
     private static int QuotedTokenEnd(ReadOnlySpan<char> source, int start)
     {
-        char quote = source[start];
-        for (int offset = start + 1; offset < source.Length; offset++)
+        var quote = source[start];
+        for (var offset = start + 1; offset < source.Length; offset++)
         {
             // A backslash escapes the next character, including the newline of a line continuation.
             if (source[offset] == '\\')
@@ -405,7 +405,7 @@ internal static class PrologLayoutLinter
             return false;
         }
 
-        int preceding = quoteOffset - 2;
+        var preceding = quoteOffset - 2;
         return preceding < 0 || !(char.IsLetterOrDigit(source[preceding]) || source[preceding] is '_' or '.');
     }
 
@@ -413,7 +413,7 @@ internal static class PrologLayoutLinter
     /// <paramref name="quoteOffset"/>, mirroring the escape and doubled-quote forms the lexer reads.</summary>
     private static int CharacterCodeEnd(ReadOnlySpan<char> source, int quoteOffset)
     {
-        int body = quoteOffset + 1;
+        var body = quoteOffset + 1;
         if (body >= source.Length)
         {
             return quoteOffset;
@@ -473,16 +473,16 @@ internal static class PrologLayoutLinter
 
         internal SourceLines(string source)
         {
-            int start = 0;
-            int number = 1;
-            for (int offset = 0; offset < source.Length; offset++)
+            var start = 0;
+            var number = 1;
+            for (var offset = 0; offset < source.Length; offset++)
             {
                 if (source[offset] != '\n')
                 {
                     continue;
                 }
 
-                int length = offset - start;
+                var length = offset - start;
                 if (length > 0 && source[offset - 1] == '\r')
                 {
                     length--;
@@ -501,13 +501,13 @@ internal static class PrologLayoutLinter
 
         internal int LineNumberAt(int offset)
         {
-            int lower = 0;
-            int upper = _lines.Count - 1;
+            var lower = 0;
+            var upper = _lines.Count - 1;
             while (lower <= upper)
             {
-                int middle = lower + ((upper - lower) / 2);
+                var middle = lower + ((upper - lower) / 2);
                 SourceLine line = _lines[middle];
-                int nextStart = middle + 1 < _lines.Count ? _lines[middle + 1].Start : int.MaxValue;
+                var nextStart = middle + 1 < _lines.Count ? _lines[middle + 1].Start : int.MaxValue;
                 if (offset < line.Start)
                 {
                     upper = middle - 1;
@@ -527,7 +527,7 @@ internal static class PrologLayoutLinter
 
         internal SourceSpan Span(int offset, int length)
         {
-            int lineNumber = LineNumberAt(offset);
+            var lineNumber = LineNumberAt(offset);
             SourceLine line = this[lineNumber];
             return new SourceSpan(offset, length, lineNumber, offset - line.Start + 1);
         }

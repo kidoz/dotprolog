@@ -14,8 +14,8 @@ public sealed record Diagnostic(string Id, DiagnosticSeverity Severity, string M
     /// <inheritdoc />
     public override string ToString()
     {
-        string location = FileName is null ? $"({Span.Line},{Span.Column})" : $"{FileName}({Span.Line},{Span.Column})";
-        string severity = Severity == DiagnosticSeverity.Error ? "error" : "warning";
+        var location = FileName is null ? $"({Span.Line},{Span.Column})" : $"{FileName}({Span.Line},{Span.Column})";
+        var severity = Severity == DiagnosticSeverity.Error ? "error" : "warning";
         return $"{location}: {severity} {Id}: {Message}";
     }
 }

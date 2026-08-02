@@ -53,7 +53,7 @@ internal static class CompiledConformanceSourceGenerator
         text.AppendLine("    {");
         text.AppendLine("        int failed = 0;");
         text.AppendLine("        int passed = 0;");
-        for (int i = 0; i < groups.Count; i++)
+        for (var i = 0; i < groups.Count; i++)
         {
             text.AppendLine(CultureInfo.InvariantCulture, $"        Fixture{i}.Run(ref passed, ref failed);");
         }
@@ -65,7 +65,7 @@ internal static class CompiledConformanceSourceGenerator
         text.AppendLine("        return failed == 0 ? 0 : 1;");
         text.AppendLine("    }");
 
-        for (int i = 0; i < groups.Count; i++)
+        for (var i = 0; i < groups.Count; i++)
         {
             AppendGroup(text, groups[i], i, testsRoot);
         }
@@ -76,7 +76,7 @@ internal static class CompiledConformanceSourceGenerator
 
     internal static string GenerateStrictIsoSmoke()
     {
-        string compiled = CompiledProgramEmitter.Generate(
+        var compiled = CompiledProgramEmitter.Generate(
             [("strict-native.pl", "answer(42).")],
             "__StrictCompiled",
             [],
@@ -128,7 +128,7 @@ internal static class CompiledConformanceSourceGenerator
     {
         // The clause carries a double-quoted literal, so the bytecode it compiles to is the proof
         // that the build-time reader ran in chars mode.
-        string compiled = CompiledProgramEmitter.Generate(
+        var compiled = CompiledProgramEmitter.Generate(
             [("modern-native.pl", "head(L, Ls) :- \"abc\" = [L|Ls].")],
             "__ModernCompiled",
             [],
@@ -230,9 +230,9 @@ internal static class CompiledConformanceSourceGenerator
     {
         IReadOnlyList<(string Name, string Text)> compiledCases = [($"{group.SourcePath}.cases.pl", group.Cases)];
         IReadOnlyList<(string Name, string Text)> combined = [.. group.CompiledSupport, .. compiledCases];
-        string all = Emit(combined, "__AllCompiled");
-        string cases = Emit(compiledCases, "__CompiledCases");
-        string support = Emit(group.CompiledSupport, "__CompiledSupport");
+        var all = Emit(combined, "__AllCompiled");
+        var cases = Emit(compiledCases, "__CompiledCases");
+        var support = Emit(group.CompiledSupport, "__CompiledSupport");
 
         text.AppendLine();
         text.AppendLine(CultureInfo.InvariantCulture, $"    private static class Fixture{index}");
@@ -289,7 +289,7 @@ internal static class CompiledConformanceSourceGenerator
         text.AppendLine("                }");
         text.AppendLine("                var host = new global::DotProlog.Runtime.PrologHost(engine.Machine);");
 
-        foreach ((string name, bool deterministic) in group.CasePredicates)
+        foreach ((var name, var deterministic) in group.CasePredicates)
         {
             text.AppendLine("                try");
             text.AppendLine("                {");
@@ -354,7 +354,7 @@ internal static class CompiledConformanceSourceGenerator
 
     private static string Emit(IReadOnlyList<(string Name, string Text)> sources, string typeName)
     {
-        string generated = CompiledProgramEmitter.Generate(
+        var generated = CompiledProgramEmitter.Generate(
             sources,
             typeName,
             HostBuiltins,

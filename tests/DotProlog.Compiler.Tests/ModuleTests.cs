@@ -13,7 +13,7 @@ public sealed class ModuleTests : IDisposable
 
     private string Write(string name, string source)
     {
-        string path = System.IO.Path.Combine(_directory, name);
+        var path = System.IO.Path.Combine(_directory, name);
         File.WriteAllText(path, source);
         return path.Replace("\\", "/", StringComparison.Ordinal);
     }
@@ -46,7 +46,7 @@ public sealed class ModuleTests : IDisposable
             """
         );
 
-        string main = Write(
+        var main = Write(
             "main.pl",
             """
             :- use_module(shapes).
@@ -63,7 +63,7 @@ public sealed class ModuleTests : IDisposable
     [Fact]
     public void AnExportedPredicateIsCallableByItsPlainName()
     {
-        string path = Write(
+        var path = Write(
             "exported.pl",
             """
             :- module(exported, [square/2]).
@@ -80,7 +80,7 @@ public sealed class ModuleTests : IDisposable
     [Fact]
     public void ALocalPredicateIsNotCallableByItsPlainName()
     {
-        string path = Write(
+        var path = Write(
             "hidden.pl",
             """
             :- module(hidden, [visible/0]).
@@ -108,7 +108,7 @@ public sealed class ModuleTests : IDisposable
             """
         );
 
-        string main = Write(
+        var main = Write(
             "main.pl",
             """
             :- use_module(library).
@@ -132,7 +132,7 @@ public sealed class ModuleTests : IDisposable
             """
         );
 
-        string main = Write(
+        var main = Write(
             "main.pl",
             """
             :- use_module(pair, [first/1]).
@@ -155,7 +155,7 @@ public sealed class ModuleTests : IDisposable
             hidden.
             """
         );
-        string main = Write("main.pl", ":- use_module(library, [hidden/0]).\n");
+        var main = Write("main.pl", ":- use_module(library, [hidden/0]).\n");
 
         var engine = new PrologEngine { Output = TextWriter.Null };
         LoadResult loaded = engine.ConsultFile(main);
@@ -173,7 +173,7 @@ public sealed class ModuleTests : IDisposable
             visible.
             """
         );
-        string main = Write("main.pl", ":- use_module(library, [visible]).\n");
+        var main = Write("main.pl", ":- use_module(library, [visible]).\n");
 
         var engine = new PrologEngine { Output = TextWriter.Null };
         LoadResult loaded = engine.ConsultFile(main);
@@ -186,7 +186,7 @@ public sealed class ModuleTests : IDisposable
     {
         Write("first.pl", ":- module(first, [item/1]).\nitem(first).\n");
         Write("second.pl", ":- module(second, [item/1]).\nitem(second).\n");
-        string main = Write(
+        var main = Write(
             "main.pl",
             """
             :- module(main, []).
@@ -204,7 +204,7 @@ public sealed class ModuleTests : IDisposable
     [Fact]
     public void AModuleDeclarationMustBeFirst()
     {
-        string path = Write(
+        var path = Write(
             "late.pl",
             """
             before.
@@ -221,7 +221,7 @@ public sealed class ModuleTests : IDisposable
     [Fact]
     public void AModuleTextCannotDeclareTwoModules()
     {
-        string path = Write(
+        var path = Write(
             "duplicate.pl",
             """
             :- module(first, []).
@@ -238,7 +238,7 @@ public sealed class ModuleTests : IDisposable
     [Fact]
     public void AModuleSeesTheStandardLibrary()
     {
-        string path = Write(
+        var path = Write(
             "uses-library.pl",
             """
             :- module(uses_library, [go/0]).
@@ -257,7 +257,7 @@ public sealed class ModuleTests : IDisposable
     {
         // maplist/3 lives in the library, so the closure it calls has to carry the module it came
         // from. Without that, double/2 would be looked for in user and not found.
-        string path = Write(
+        var path = Write(
             "closures.pl",
             """
             :- module(closures, [go/0]).
@@ -276,7 +276,7 @@ public sealed class ModuleTests : IDisposable
     [Fact]
     public void AGoalPassedToFindallResolvesInItsOwnModule()
     {
-        string path = Write(
+        var path = Write(
             "collects.pl",
             """
             :- module(collects, [go/0]).
@@ -296,7 +296,7 @@ public sealed class ModuleTests : IDisposable
     [Fact]
     public void AGoalBuiltAtRunTimeResolvesInItsOwnModule()
     {
-        string path = Write(
+        var path = Write(
             "meta.pl",
             """
             :- module(meta, [go/0]).
@@ -325,7 +325,7 @@ public sealed class ModuleTests : IDisposable
             """
         );
 
-        string main = Write(
+        var main = Write(
             "main.pl",
             """
             :- use_module(runner).
@@ -351,7 +351,7 @@ public sealed class ModuleTests : IDisposable
             """
         );
 
-        string main = Write(
+        var main = Write(
             "main.pl",
             """
             :- use_module(store).
@@ -379,7 +379,7 @@ public sealed class ModuleTests : IDisposable
             """
         );
 
-        string main = Write(
+        var main = Write(
             "main.pl",
             """
             :- use_module(notes).
@@ -408,7 +408,7 @@ public sealed class ModuleTests : IDisposable
             """
         );
 
-        string main = Write(
+        var main = Write(
             "main.pl",
             """
             :- use_module(grammar).
@@ -426,7 +426,7 @@ public sealed class ModuleTests : IDisposable
     [InlineData("discontiguous")]
     public void AGrammarRuleIndicatorIsAcceptedByPredicateDeclarations(string declaration)
     {
-        string path = Write(
+        var path = Write(
             $"{declaration}.pl",
             $$"""
             :- {{declaration}} token//1.
@@ -446,7 +446,7 @@ public sealed class ModuleTests : IDisposable
     [InlineData("discontiguous")]
     public void AMalformedGrammarRuleIndicatorIsReportedByPredicateDeclarations(string declaration)
     {
-        string path = Write($"{declaration}-bad.pl", $":- {declaration} token//-1.\n");
+        var path = Write($"{declaration}-bad.pl", $":- {declaration} token//-1.\n");
 
         var engine = new PrologEngine { Output = TextWriter.Null };
         LoadResult loaded = engine.ConsultFile(path);
@@ -478,7 +478,7 @@ public sealed class ModuleTests : IDisposable
             """
         );
 
-        string main = Write(
+        var main = Write(
             "main.pl",
             """
             :- use_module(counter).
@@ -494,7 +494,7 @@ public sealed class ModuleTests : IDisposable
     [Fact]
     public void AFileWithNoModuleDeclarationKeepsItsPlainNames()
     {
-        string path = Write(
+        var path = Write(
             "plain.pl",
             """
             helper(X) :- write(X).
@@ -509,7 +509,7 @@ public sealed class ModuleTests : IDisposable
     [Fact]
     public void AMissingModuleFileIsReported()
     {
-        string path = Write("missing.pl", ":- use_module(nowhere).\n");
+        var path = Write("missing.pl", ":- use_module(nowhere).\n");
 
         var engine = new PrologEngine { Output = TextWriter.Null };
         LoadResult loaded = engine.ConsultFile(path);
@@ -520,7 +520,7 @@ public sealed class ModuleTests : IDisposable
     [Fact]
     public void AMalformedExportListIsReported()
     {
-        string path = Write("bad.pl", ":- module(bad, [oops]).\n");
+        var path = Write("bad.pl", ":- module(bad, [oops]).\n");
 
         var engine = new PrologEngine { Output = TextWriter.Null };
         LoadResult loaded = engine.ConsultFile(path);

@@ -9,9 +9,9 @@ public sealed class ToolCommandTests : IDisposable
     [Fact]
     public void LintReportsWarningsWithoutFailingByDefault()
     {
-        string path = Source("singleton.pl", "value(X).\n");
+        var path = Source("singleton.pl", "value(X).\n");
 
-        (int exitCode, string output, string error) = Execute("lint", path);
+        (var exitCode, var output, var error) = Execute("lint", path);
 
         Assert.Equal(0, exitCode);
         Assert.Empty(output);
@@ -21,9 +21,9 @@ public sealed class ToolCommandTests : IDisposable
     [Fact]
     public void WarningsAsErrorsReturnsOne()
     {
-        string path = Source("singleton.pl", "value(X).\n");
+        var path = Source("singleton.pl", "value(X).\n");
 
-        (int exitCode, _, string error) = Execute("lint", "--warnings-as-errors", path);
+        (var exitCode, _, var error) = Execute("lint", "--warnings-as-errors", path);
 
         Assert.Equal(1, exitCode);
         Assert.Contains("DPL3001", error, StringComparison.Ordinal);
@@ -32,9 +32,9 @@ public sealed class ToolCommandTests : IDisposable
     [Fact]
     public void ReaderErrorsTakePrecedenceOverWarnings()
     {
-        string path = Source("broken.pl", "value(X\n");
+        var path = Source("broken.pl", "value(X\n");
 
-        (int exitCode, _, string error) = Execute("lint", "--warnings-as-errors", path);
+        (var exitCode, _, var error) = Execute("lint", "--warnings-as-errors", path);
 
         Assert.Equal(65, exitCode);
         Assert.Contains("error DPL", error, StringComparison.Ordinal);
@@ -43,10 +43,10 @@ public sealed class ToolCommandTests : IDisposable
     [Fact]
     public void LintAcceptsModesAndMultipleFiles()
     {
-        string clean = Source("clean.pl", "same(X, X).\n");
-        string warning = Source("warning.pl", "same(_Value, _Value).\n");
+        var clean = Source("clean.pl", "same(X, X).\n");
+        var warning = Source("warning.pl", "same(_Value, _Value).\n");
 
-        (int exitCode, _, string error) = Execute("lint", "--mode", "modern", clean, warning);
+        (var exitCode, _, var error) = Execute("lint", "--mode", "modern", clean, warning);
 
         Assert.Equal(0, exitCode);
         Assert.Contains("DPL3002", error, StringComparison.Ordinal);
@@ -55,9 +55,9 @@ public sealed class ToolCommandTests : IDisposable
     [Fact]
     public void LintDoesNotExecuteDirectives()
     {
-        string path = Source("directive.pl", ":- initialization(halt(9)).\nsafe.\n");
+        var path = Source("directive.pl", ":- initialization(halt(9)).\nsafe.\n");
 
-        (int exitCode, string output, string error) = Execute("lint", path);
+        (var exitCode, var output, var error) = Execute("lint", path);
 
         Assert.Equal(0, exitCode);
         Assert.Empty(output);
@@ -67,9 +67,9 @@ public sealed class ToolCommandTests : IDisposable
     [Fact]
     public void SemanticProfileDoesNotImposeLayoutRules()
     {
-        string path = Source("compact.pl", "pair(a,b).\n");
+        var path = Source("compact.pl", "pair(a,b).\n");
 
-        (int exitCode, _, string error) = Execute("lint", "--warnings-as-errors", path);
+        (var exitCode, _, var error) = Execute("lint", "--warnings-as-errors", path);
 
         Assert.Equal(0, exitCode);
         Assert.Empty(error);
@@ -78,9 +78,9 @@ public sealed class ToolCommandTests : IDisposable
     [Fact]
     public void CovingtonProfileReportsLayoutWarnings()
     {
-        string path = Source("compact.pl", "pair(a,b).\n");
+        var path = Source("compact.pl", "pair(a,b).\n");
 
-        (int exitCode, _, string error) = Execute("lint", "--profile", "covington", "--warnings-as-errors", path);
+        (var exitCode, _, var error) = Execute("lint", "--profile", "covington", "--warnings-as-errors", path);
 
         Assert.Equal(1, exitCode);
         Assert.Contains($"{path}(1,7): warning DPL3007", error, StringComparison.Ordinal);
@@ -89,9 +89,9 @@ public sealed class ToolCommandTests : IDisposable
     [Fact]
     public void IndividualThresholdEnablesItsLayoutCheck()
     {
-        string path = Source("wide.pl", "long_name.\n");
+        var path = Source("wide.pl", "long_name.\n");
 
-        (int exitCode, _, string error) = Execute("lint", "--max-line-length", "5", "--warnings-as-errors", path);
+        (var exitCode, _, var error) = Execute("lint", "--max-line-length", "5", "--warnings-as-errors", path);
 
         Assert.Equal(1, exitCode);
         Assert.Contains("DPL3005", error, StringComparison.Ordinal);
@@ -104,9 +104,9 @@ public sealed class ToolCommandTests : IDisposable
     [InlineData("--max-clause-lines", "-1", "invalid value")]
     public void InvalidLintOptionValuesAreUsageErrors(string option, string value, string message)
     {
-        string path = Source("clean.pl", "clean.\n");
+        var path = Source("clean.pl", "clean.\n");
 
-        (int exitCode, _, string error) = Execute("lint", option, value, path);
+        (var exitCode, _, var error) = Execute("lint", option, value, path);
 
         Assert.Equal(64, exitCode);
         Assert.Contains(message, error, StringComparison.Ordinal);
@@ -119,7 +119,7 @@ public sealed class ToolCommandTests : IDisposable
     [InlineData("--max-clause-lines", "missing positive integer")]
     public void MissingLintOptionValuesAreUsageErrors(string option, string message)
     {
-        (int exitCode, _, string error) = Execute("lint", option);
+        (var exitCode, _, var error) = Execute("lint", option);
 
         Assert.Equal(64, exitCode);
         Assert.Contains(message, error, StringComparison.Ordinal);
@@ -128,9 +128,9 @@ public sealed class ToolCommandTests : IDisposable
     [Fact]
     public void RunWritesProgramOutputToTheProvidedStream()
     {
-        string path = Source("run.pl", ":- initialization(writeln(ok)).\n");
+        var path = Source("run.pl", ":- initialization(writeln(ok)).\n");
 
-        (int exitCode, string output, string error) = Execute("run", path);
+        (var exitCode, var output, var error) = Execute("run", path);
 
         Assert.Equal(0, exitCode);
         Assert.Equal("ok\n", output);
@@ -140,7 +140,7 @@ public sealed class ToolCommandTests : IDisposable
     [Fact]
     public void MissingLintInputIsAUsageError()
     {
-        (int exitCode, _, string error) = Execute("lint");
+        (var exitCode, _, var error) = Execute("lint");
 
         Assert.Equal(64, exitCode);
         Assert.Contains("Usage: dotnet prolog lint", error, StringComparison.Ordinal);
@@ -149,7 +149,7 @@ public sealed class ToolCommandTests : IDisposable
     [Fact]
     public void MissingLintModeIsAUsageError()
     {
-        (int exitCode, _, string error) = Execute("lint", "--mode");
+        (var exitCode, _, var error) = Execute("lint", "--mode");
 
         Assert.Equal(64, exitCode);
         Assert.Contains("missing language mode", error, StringComparison.Ordinal);
@@ -159,7 +159,7 @@ public sealed class ToolCommandTests : IDisposable
 
     private string Source(string name, string contents)
     {
-        string path = Path.Combine(_directory, name);
+        var path = Path.Combine(_directory, name);
         File.WriteAllText(path, contents);
         return path;
     }
@@ -168,7 +168,7 @@ public sealed class ToolCommandTests : IDisposable
     {
         using var output = new StringWriter();
         using var error = new StringWriter();
-        int exitCode = Program.Execute(arguments, output, error);
+        var exitCode = Program.Execute(arguments, output, error);
         return (exitCode, output.ToString(), error.ToString());
     }
 }

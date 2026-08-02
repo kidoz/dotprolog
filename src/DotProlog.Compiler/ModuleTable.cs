@@ -61,12 +61,12 @@ public sealed class ModuleTable
         DeclareMeta("retractall", 1, [(0, HeadArgument)]);
         DeclareMeta("clause", 2, [(0, HeadArgument)]);
 
-        for (int extra = 1; extra <= 7; extra++)
+        for (var extra = 1; extra <= 7; extra++)
         {
             DeclareMeta("call", extra + 1, [(0, extra)]);
         }
 
-        for (int lists = 1; lists <= 4; lists++)
+        for (var lists = 1; lists <= 4; lists++)
         {
             DeclareMeta("maplist", lists + 1, [(0, lists)]);
         }
@@ -119,7 +119,7 @@ public sealed class ModuleTable
             _imports[importer] = map;
         }
 
-        if (map.TryGetValue(predicate, out string? existing))
+        if (map.TryGetValue(predicate, out var existing))
         {
             conflictingModule = existing;
             return existing == from;
@@ -133,7 +133,7 @@ public sealed class ModuleTable
     /// <summary>The module <paramref name="importer"/> imported <paramref name="predicate"/> from, if any.</summary>
     public string? ImportedFrom(string importer, PredicateIndicator predicate) =>
         _imports.TryGetValue(importer, out Dictionary<PredicateIndicator, string>? map)
-        && map.TryGetValue(predicate, out string? from)
+        && map.TryGetValue(predicate, out var from)
             ? from
             : null;
 
@@ -149,7 +149,7 @@ public sealed class ModuleTable
         var positions = new int[arity];
         Array.Fill(positions, OrdinaryArgument);
 
-        foreach ((int position, int extra) in arguments)
+        foreach ((var position, var extra) in arguments)
         {
             if (position >= 0 && position < arity)
             {
@@ -165,7 +165,7 @@ public sealed class ModuleTable
     /// being called, or -1 when it is not a goal. Null when the predicate is not a meta-predicate.
     /// </summary>
     public int[]? MetaArgumentsOf(PredicateIndicator predicate) =>
-        _metaArguments.TryGetValue(predicate, out int[]? positions) ? positions : null;
+        _metaArguments.TryGetValue(predicate, out var positions) ? positions : null;
 
     /// <summary>
     /// Records that <paramref name="path"/> is being loaded, before it is, so that two files that
@@ -189,7 +189,7 @@ public sealed class ModuleTable
     public string? LoadedModuleOf(string path)
     {
         ArgumentNullException.ThrowIfNull(path);
-        return _loaded.TryGetValue(path, out string? module) ? module : null;
+        return _loaded.TryGetValue(path, out var module) ? module : null;
     }
 
     /// <summary>Declares a predicate to accept static clauses from more than one source unit.</summary>

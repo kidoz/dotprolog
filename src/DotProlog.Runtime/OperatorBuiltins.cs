@@ -90,11 +90,11 @@ internal static class OperatorBuiltins
                 throw PrologErrors.Type(machine, "atom", name);
             }
 
-            string text = machine.Symbols.AtomName(name.Index);
+            var text = machine.Symbols.AtomName(name.Index);
             OperatorDefinitionConflict conflict = machine.Operators.DefinitionConflict((int)priority.Integer, specifier, text);
             if (conflict != OperatorDefinitionConflict.None)
             {
-                string operation = conflict == OperatorDefinitionConflict.Create ? "create" : "modify";
+                var operation = conflict == OperatorDefinitionConflict.Create ? "create" : "modify";
                 throw PrologErrors.Permission(machine, operation, "operator", name);
             }
 
@@ -103,7 +103,7 @@ internal static class OperatorBuiltins
 
         // Validate the whole list before changing the table so a later invalid name cannot leave
         // earlier names installed.
-        foreach ((_, string text) in definitions)
+        foreach ((_, var text) in definitions)
         {
             machine.Operators.Define((int)priority.Integer, specifier, text);
         }
@@ -126,7 +126,7 @@ internal static class OperatorBuiltins
     private static bool Current(Machine machine, int version, int start)
     {
         ReadOnlySpan<PrologOperator> entries = machine.Operators.Entries(version);
-        for (int index = start; index < entries.Length; index++)
+        for (var index = start; index < entries.Length; index++)
         {
             PrologOperator entry = entries[index];
             Cell priority = Cell.Integer60(entry.Priority);

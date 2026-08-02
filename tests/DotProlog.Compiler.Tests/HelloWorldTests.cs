@@ -21,7 +21,7 @@ public sealed class HelloWorldTests
     [Fact]
     public void InlineHelloWorldPrintsItsGreeting()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             :- initialization(main).
 

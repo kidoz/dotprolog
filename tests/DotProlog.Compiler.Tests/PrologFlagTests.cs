@@ -69,7 +69,7 @@ public sealed class PrologFlagTests
     [Fact]
     public void DoubleQuotesDirectiveAffectsFollowingSourceText()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             :- set_prolog_flag(double_quotes, atom).
             atom_text("ab").

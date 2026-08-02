@@ -71,7 +71,7 @@ public static class PrologLinter
         }
 
         List<Diagnostic> clauseDiagnostics = [];
-        foreach ((string name, List<VariableTerm> namedOccurrences) in byName)
+        foreach ((var name, List<VariableTerm> namedOccurrences) in byName)
         {
             if (name.StartsWith('_'))
             {
@@ -125,7 +125,7 @@ public static class PrologLinter
                 continue;
             }
 
-            for (int index = compound.Arguments.Count - 1; index >= 0; index--)
+            for (var index = compound.Arguments.Count - 1; index >= 0; index--)
             {
                 pending.Push(compound.Arguments[index]);
             }

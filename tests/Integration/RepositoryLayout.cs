@@ -8,13 +8,13 @@ internal static class RepositoryLayout
 
     private static string FindRoot()
     {
-        string? fromBinary = FindAbove(AppContext.BaseDirectory);
+        var fromBinary = FindAbove(AppContext.BaseDirectory);
         if (fromBinary is not null)
         {
             return fromBinary;
         }
 
-        string? fromWorkingDirectory = FindAbove(Directory.GetCurrentDirectory());
+        var fromWorkingDirectory = FindAbove(Directory.GetCurrentDirectory());
         return fromWorkingDirectory
             ?? throw new InvalidOperationException(
                 $"No DotProlog.slnx above {AppContext.BaseDirectory} or {Directory.GetCurrentDirectory()}."

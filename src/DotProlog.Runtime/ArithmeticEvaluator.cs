@@ -32,7 +32,7 @@ public static class ArithmeticEvaluator
 
             case CellTag.Atom:
             {
-                string constantName = machine.Symbols.AtomName(cell.Index);
+                var constantName = machine.Symbols.AtomName(cell.Index);
                 if (
                     machine.Program.LanguageMode == PrologLanguageMode.StrictIso
                     && !IsoLanguageProfile.IsStandardEvaluable(constantName, 0)
@@ -51,9 +51,9 @@ public static class ArithmeticEvaluator
                 throw PrologErrors.Type(machine, "evaluable", cell);
         }
 
-        int functorId = machine.HeapAt(cell.Index).Index;
+        var functorId = machine.HeapAt(cell.Index).Index;
         Functor functor = machine.Symbols.GetFunctor(functorId);
-        string name = machine.Symbols.AtomName(functor.NameAtom);
+        var name = machine.Symbols.AtomName(functor.NameAtom);
         if (
             machine.Program.LanguageMode == PrologLanguageMode.StrictIso
             && !IsoLanguageProfile.IsStandardEvaluable(name, functor.Arity)
@@ -159,7 +159,7 @@ public static class ArithmeticEvaluator
 
     private static PrologNumber EvaluateBinary(string name, PrologNumber left, PrologNumber right, Machine machine, int functorId)
     {
-        bool real = left.IsFloat || right.IsFloat;
+        var real = left.IsFloat || right.IsFloat;
 
         try
         {
@@ -192,26 +192,26 @@ public static class ArithmeticEvaluator
 
                 case "//":
                 {
-                    long leftInteger = RequireInteger(machine, left);
-                    long rightInteger = RequireInteger(machine, right);
+                    var leftInteger = RequireInteger(machine, left);
+                    var rightInteger = RequireInteger(machine, right);
                     ThrowIfZero(machine, rightInteger);
                     return IntegerResult(machine, leftInteger / rightInteger);
                 }
 
                 case "div":
                 {
-                    long leftInteger = RequireInteger(machine, left);
-                    long rightInteger = RequireInteger(machine, right);
+                    var leftInteger = RequireInteger(machine, left);
+                    var rightInteger = RequireInteger(machine, right);
                     ThrowIfZero(machine, rightInteger);
                     return IntegerResult(machine, FloorDivide(leftInteger, rightInteger));
                 }
 
                 case "mod":
                 {
-                    long leftInteger = RequireInteger(machine, left);
-                    long rightInteger = RequireInteger(machine, right);
+                    var leftInteger = RequireInteger(machine, left);
+                    var rightInteger = RequireInteger(machine, right);
                     ThrowIfZero(machine, rightInteger);
-                    long remainder = leftInteger % rightInteger;
+                    var remainder = leftInteger % rightInteger;
                     return IntegerResult(
                         machine,
                         remainder != 0 && (remainder < 0) != (rightInteger < 0) ? checked(remainder + rightInteger) : remainder
@@ -220,8 +220,8 @@ public static class ArithmeticEvaluator
 
                 case "rem":
                 {
-                    long leftInteger = RequireInteger(machine, left);
-                    long rightInteger = RequireInteger(machine, right);
+                    var leftInteger = RequireInteger(machine, left);
+                    var rightInteger = RequireInteger(machine, right);
                     ThrowIfZero(machine, rightInteger);
                     return IntegerResult(machine, leftInteger % rightInteger);
                 }
@@ -300,8 +300,8 @@ public static class ArithmeticEvaluator
     private static long IntegerPower(Machine machine, long value, long exponent)
     {
         long result = 1;
-        long factor = value;
-        long remaining = exponent;
+        var factor = value;
+        var remaining = exponent;
 
         while (remaining > 0)
         {
@@ -344,8 +344,8 @@ public static class ArithmeticEvaluator
 
     private static PrologNumber FloatToInteger(Machine machine, PrologNumber value, Func<double, double> operation)
     {
-        double operand = RequireFloat(machine, value);
-        double result = operation(operand);
+        var operand = RequireFloat(machine, value);
+        var result = operation(operand);
 
         if (double.IsNaN(result))
         {
@@ -362,7 +362,7 @@ public static class ArithmeticEvaluator
 
     private static PrologNumber FloatPart(Machine machine, PrologNumber value, bool fractional)
     {
-        double operand = RequireFloat(machine, value);
+        var operand = RequireFloat(machine, value);
         return FloatResult(machine, fractional ? operand % 1.0 : Math.Truncate(operand));
     }
 
@@ -429,7 +429,7 @@ public static class ArithmeticEvaluator
 
     private static PrologNumber Minimum(PrologNumber left, PrologNumber right)
     {
-        int order = Compare(left, right);
+        var order = Compare(left, right);
         if (order < 0)
         {
             return left;
@@ -445,7 +445,7 @@ public static class ArithmeticEvaluator
 
     private static PrologNumber Maximum(PrologNumber left, PrologNumber right)
     {
-        int order = Compare(left, right);
+        var order = Compare(left, right);
         if (order > 0)
         {
             return left;
@@ -461,8 +461,8 @@ public static class ArithmeticEvaluator
 
     private static long FloorDivide(long left, long right)
     {
-        long quotient = left / right;
-        long remainder = left % right;
+        var quotient = left / right;
+        var remainder = left % right;
         return remainder != 0 && (remainder < 0) != (right < 0) ? checked(quotient - 1) : quotient;
     }
 

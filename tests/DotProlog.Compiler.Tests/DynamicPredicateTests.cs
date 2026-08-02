@@ -51,7 +51,7 @@ public sealed class DynamicPredicateTests
     [Fact]
     public void ConsultedVariableGoalsHaveTheIsoClauseRepresentation()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             :- dynamic legs/2.
 
@@ -157,7 +157,7 @@ public sealed class DynamicPredicateTests
     [Fact]
     public void ModifyingAStaticPredicateIsAPermissionError()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             fixed(1).
 
@@ -173,7 +173,7 @@ public sealed class DynamicPredicateTests
     [InlineData("retractall(fixed(_))")]
     public void RemovingAStaticPredicateIsAPermissionError(string goal)
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             $"""
             fixed(1).
 
@@ -197,7 +197,7 @@ public sealed class DynamicPredicateTests
     [Fact]
     public void ClausesAssertedDuringAGoalAreVisibleToTheNextOne()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             $"""
             {Declared}
 

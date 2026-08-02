@@ -26,9 +26,9 @@ internal static class PrologFlagBuiltins
 
         Cell pattern = machine.CreateStructure(machine.Symbols.InternFunctor("-", 2), [flag, machine.Argument(1)]);
 
-        for (int index = (int)state; index < FlagCount; index++)
+        for (var index = (int)state; index < FlagCount; index++)
         {
-            (string name, Cell value) = ValueAt(machine, index);
+            (var name, Cell value) = ValueAt(machine, index);
             Cell candidate = machine.CreateStructure(
                 machine.Symbols.InternFunctor("-", 2),
                 [Cell.Atom(machine.Symbols.InternAtom(name)), value]
@@ -65,7 +65,7 @@ internal static class PrologFlagBuiltins
             throw PrologErrors.Type(machine, "atom", flag);
         }
 
-        string name = machine.Symbols.AtomName(flag.Index);
+        var name = machine.Symbols.AtomName(flag.Index);
         return name switch
         {
             "char_conversion" => SetOnOff(machine, name, value, static (flags, enabled) => flags.SetCharConversion(enabled)),
@@ -88,14 +88,14 @@ internal static class PrologFlagBuiltins
 
     private static bool SetOnOff(Machine machine, string flag, Cell value, Action<PrologFlags, bool> update)
     {
-        string atom = RequireValue(machine, flag, value, "on", "off");
+        var atom = RequireValue(machine, flag, value, "on", "off");
         update(machine.Program.Flags, atom == "on");
         return true;
     }
 
     private static bool SetDoubleQuotes(Machine machine, string flag, Cell value)
     {
-        string atom = RequireValue(machine, flag, value, "codes", "chars", "atom");
+        var atom = RequireValue(machine, flag, value, "codes", "chars", "atom");
         machine.Program.Flags.DoubleQuotes = atom switch
         {
             "codes" => DoubleQuotesMode.Codes,
@@ -107,7 +107,7 @@ internal static class PrologFlagBuiltins
 
     private static bool SetUnknown(Machine machine, string flag, Cell value)
     {
-        string atom = RequireValue(machine, flag, value, "error", "warning", "fail");
+        var atom = RequireValue(machine, flag, value, "error", "warning", "fail");
         machine.Program.Flags.Unknown = atom switch
         {
             "error" => UnknownProcedureAction.Error,
@@ -121,7 +121,7 @@ internal static class PrologFlagBuiltins
     {
         if (value.Tag == CellTag.Atom)
         {
-            string atom = machine.Symbols.AtomName(value.Index);
+            var atom = machine.Symbols.AtomName(value.Index);
             if (allowed.Contains(atom, StringComparer.Ordinal))
             {
                 return atom;

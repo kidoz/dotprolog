@@ -263,8 +263,8 @@ public sealed class TermBuiltinTests
     [Fact]
     public void UnivEnforcesTheMaximumArity()
     {
-        string maximum = string.Join(",", Enumerable.Repeat("a", Machine.ArgumentRegisterCount - 1));
-        string oversized = $"{maximum},a";
+        var maximum = string.Join(",", Enumerable.Repeat("a", Machine.ArgumentRegisterCount - 1));
+        var oversized = $"{maximum},a";
 
         Assert.Equal(
             "255 representation_error(max_arity)",

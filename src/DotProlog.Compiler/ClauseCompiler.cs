@@ -62,8 +62,8 @@ internal sealed class ClauseCompiler
             return -1;
         }
 
-        int start = _program.Emit(OpCode.Allocate, 0);
-        int slotCountOperand = start + 1;
+        var start = _program.Emit(OpCode.Allocate, 0);
+        var slotCountOperand = start + 1;
 
         CompileHead(head);
 
@@ -101,7 +101,7 @@ internal sealed class ClauseCompiler
             return;
         }
 
-        for (int i = 0; i < goals.Count; i++)
+        for (var i = 0; i < goals.Count; i++)
         {
             CompileGoal(goals[i], isLast: isTail && i == goals.Count - 1);
         }
@@ -121,14 +121,14 @@ internal sealed class ClauseCompiler
 
         List<(int Slot, CompoundTerm Term)> deferred = [];
 
-        for (int i = 0; i < compound.Arity; i++)
+        for (var i = 0; i < compound.Arity; i++)
         {
             SyntaxTerm argument = compound.Arguments[i];
             switch (argument)
             {
                 case VariableTerm variable:
                 {
-                    bool isFirst = ResolveSlot(variable, out int slot);
+                    var isFirst = ResolveSlot(variable, out var slot);
                     _program.Emit(isFirst ? OpCode.GetVariable : OpCode.GetValue, slot, i);
                     break;
                 }
@@ -145,9 +145,9 @@ internal sealed class ClauseCompiler
         }
 
         // Nested structures are matched breadth-first; the list grows while it is being walked.
-        for (int i = 0; i < deferred.Count; i++)
+        for (var i = 0; i < deferred.Count; i++)
         {
-            (int slot, CompoundTerm term) = deferred[i];
+            (var slot, CompoundTerm term) = deferred[i];
             _program.Emit(OpCode.GetStructureSlot, FunctorOf(term), slot);
             EmitStructureArguments(term, deferred);
         }
@@ -166,14 +166,14 @@ internal sealed class ClauseCompiler
             {
                 case VariableTerm variable:
                 {
-                    bool isFirst = ResolveSlot(variable, out int slot);
+                    var isFirst = ResolveSlot(variable, out var slot);
                     _program.Emit(isFirst ? OpCode.UnifyVariable : OpCode.UnifyValue, slot);
                     break;
                 }
 
                 case CompoundTerm nested:
                 {
-                    int slot = AllocateTemporary();
+                    var slot = AllocateTemporary();
                     _program.Emit(OpCode.UnifyVariable, slot);
                     deferred.Add((slot, nested));
                     break;
@@ -220,8 +220,8 @@ internal sealed class ClauseCompiler
             return;
         }
 
-        string name = goal is CompoundTerm compound ? compound.Name : ((AtomTerm)goal).Name;
-        int arity = goal is CompoundTerm withArguments ? withArguments.Arity : 0;
+        var name = goal is CompoundTerm compound ? compound.Name : ((AtomTerm)goal).Name;
+        var arity = goal is CompoundTerm withArguments ? withArguments.Arity : 0;
 
         if (goal is CompoundTerm control && CompileControlConstruct(control, name, isLast))
         {
@@ -238,7 +238,7 @@ internal sealed class ClauseCompiler
             EmitArguments(callable);
         }
 
-        int functorId = _program.Symbols.InternFunctor(name, arity);
+        var functorId = _program.Symbols.InternFunctor(name, arity);
 
         if (IsStrictIsoExtension(functorId, name, arity))
         {
@@ -250,7 +250,7 @@ internal sealed class ClauseCompiler
             return;
         }
 
-        if (_program.Builtins.TryGetId(functorId, out int builtinId))
+        if (_program.Builtins.TryGetId(functorId, out var builtinId))
         {
             _program.Emit(OpCode.CallBuiltin, builtinId, arity);
             EmitReturnIfLast(isLast);
@@ -347,11 +347,11 @@ internal sealed class ClauseCompiler
             return;
         }
 
-        int slot = AllocateTemporary();
-        int alternative = _program.Emit(OpCode.TryBranch, slot, 0) + 2;
+        var slot = AllocateTemporary();
+        var alternative = _program.Emit(OpCode.TryBranch, slot, 0) + 2;
 
         CompileSequence(left, isTail: false);
-        int end = _program.Emit(OpCode.Jump, 0) + 1;
+        var end = _program.Emit(OpCode.Jump, 0) + 1;
 
         _program.Patch(alternative, _program.CodeLength);
         _program.Emit(OpCode.TrustMe);
@@ -363,9 +363,9 @@ internal sealed class ClauseCompiler
 
     private void CompileIfThenElse(SyntaxTerm condition, SyntaxTerm then, SyntaxTerm? elseGoal, bool soft, bool isLast)
     {
-        int slot = AllocateTemporary();
-        int conditionSlot = AllocateTemporary();
-        int alternative = _program.Emit(OpCode.TryBranch, slot, 0) + 2;
+        var slot = AllocateTemporary();
+        var conditionSlot = AllocateTemporary();
+        var alternative = _program.Emit(OpCode.TryBranch, slot, 0) + 2;
         _program.Emit(OpCode.MarkBarrier, conditionSlot);
 
         CompileCondition(condition, conditionSlot);
@@ -374,7 +374,7 @@ internal sealed class ClauseCompiler
         // removes the branch to the else goal.
         _program.Emit(soft ? OpCode.SoftCut : OpCode.CutTo, slot);
         CompileSequence(then, isTail: false);
-        int end = _program.Emit(OpCode.Jump, 0) + 1;
+        var end = _program.Emit(OpCode.Jump, 0) + 1;
 
         _program.Patch(alternative, _program.CodeLength);
         _program.Emit(OpCode.TrustMe);
@@ -394,9 +394,9 @@ internal sealed class ClauseCompiler
 
     private void CompileNegation(SyntaxTerm goal, bool isLast)
     {
-        int slot = AllocateTemporary();
-        int goalSlot = AllocateTemporary();
-        int alternative = _program.Emit(OpCode.TryBranch, slot, 0) + 2;
+        var slot = AllocateTemporary();
+        var goalSlot = AllocateTemporary();
+        var alternative = _program.Emit(OpCode.TryBranch, slot, 0) + 2;
         _program.Emit(OpCode.MarkBarrier, goalSlot);
 
         CompileCondition(goal, goalSlot);
@@ -434,7 +434,7 @@ internal sealed class ClauseCompiler
                 // An anonymous variable is never read back, so each occurrence can stay branch-local.
                 case VariableTerm { IsAnonymous: false } variable when !_slots.ContainsKey(variable.Name):
                 {
-                    int slot = AllocateTemporary();
+                    var slot = AllocateTemporary();
                     _slots[variable.Name] = slot;
                     _program.Emit(OpCode.InitVariable, slot);
                     break;
@@ -453,7 +453,7 @@ internal sealed class ClauseCompiler
     /// <summary>Compiles a goal whose cut is local to it: the condition of if-then-else, or of negation.</summary>
     private void CompileCondition(SyntaxTerm condition, int slot)
     {
-        int enclosing = _cutSlot;
+        var enclosing = _cutSlot;
         _cutSlot = slot;
         CompileSequence(condition, isTail: false);
         _cutSlot = enclosing;
@@ -465,7 +465,7 @@ internal sealed class ClauseCompiler
         {
             case VariableTerm variable:
             {
-                bool isFirst = ResolveSlot(variable, out int slot);
+                var isFirst = ResolveSlot(variable, out var slot);
                 _program.Emit(isFirst ? OpCode.PutVariable : OpCode.PutValue, slot, 0);
                 break;
             }
@@ -496,14 +496,14 @@ internal sealed class ClauseCompiler
 
     private void EmitArguments(CompoundTerm goal)
     {
-        for (int i = 0; i < goal.Arity; i++)
+        for (var i = 0; i < goal.Arity; i++)
         {
             SyntaxTerm argument = goal.Arguments[i];
             switch (argument)
             {
                 case VariableTerm variable:
                 {
-                    bool isFirst = ResolveSlot(variable, out int slot);
+                    var isFirst = ResolveSlot(variable, out var slot);
                     _program.Emit(isFirst ? OpCode.PutVariable : OpCode.PutValue, slot, i);
                     break;
                 }
@@ -527,8 +527,8 @@ internal sealed class ClauseCompiler
         }
 
         // Inner structures must exist on the heap before the outer one references them.
-        int[] childSlots = new int[term.Arity];
-        for (int i = 0; i < term.Arity; i++)
+        var childSlots = new int[term.Arity];
+        for (var i = 0; i < term.Arity; i++)
         {
             if (term.Arguments[i] is CompoundTerm nested)
             {
@@ -543,7 +543,7 @@ internal sealed class ClauseCompiler
 
         _program.Emit(target, FunctorOf(term), targetIndex);
 
-        for (int i = 0; i < term.Arity; i++)
+        for (var i = 0; i < term.Arity; i++)
         {
             if (childSlots[i] >= 0)
             {
@@ -555,7 +555,7 @@ internal sealed class ClauseCompiler
             {
                 case VariableTerm variable:
                 {
-                    bool isFirst = ResolveSlot(variable, out int slot);
+                    var isFirst = ResolveSlot(variable, out var slot);
                     _program.Emit(isFirst ? OpCode.UnifyVariable : OpCode.UnifyValue, slot);
                     break;
                 }

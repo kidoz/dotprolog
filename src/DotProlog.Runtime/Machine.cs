@@ -140,7 +140,7 @@ public sealed class Machine
     /// <exception cref="PrologException">The predicate is not defined.</exception>
     public RunResult Solve(int functorId)
     {
-        if (!TryEntryPoint(functorId, out int entry))
+        if (!TryEntryPoint(functorId, out var entry))
         {
             return RunResult.Failure;
         }
@@ -181,7 +181,7 @@ public sealed class Machine
             throw PrologErrors.Representation(this, "max_arity");
         }
 
-        for (int i = 0; i < arguments.Length; i++)
+        for (var i = 0; i < arguments.Length; i++)
         {
             _x[i] = arguments[i];
         }
@@ -268,12 +268,12 @@ public sealed class Machine
     private RunResult Execute()
     {
         // Cached for the dispatch loop; the program is not mutated while a goal is running.
-        int[] code = _program.Code;
+        var code = _program.Code;
         Cell[] constants = _program.Constants;
 
         while (true)
         {
-            bool proved = true;
+            var proved = true;
 
             if (BytecodeProgram.IsCompiledTarget(_pc))
             {
@@ -315,7 +315,7 @@ public sealed class Machine
 
                 case OpCode.Call:
                 {
-                    int functorId = code[_pc++];
+                    var functorId = code[_pc++];
                     _argumentCount = code[_pc++];
                     _continuation = _pc;
                     _b0 = _b;
@@ -325,7 +325,7 @@ public sealed class Machine
 
                 case OpCode.Execute:
                 {
-                    int functorId = code[_pc++];
+                    var functorId = code[_pc++];
                     _argumentCount = code[_pc++];
                     _b0 = _b;
                     proved = TryEntryPoint(functorId, out _pc);
@@ -334,7 +334,7 @@ public sealed class Machine
 
                 case OpCode.CallBuiltin:
                 {
-                    int builtinId = code[_pc++];
+                    var builtinId = code[_pc++];
                     _argumentCount = code[_pc++];
                     _currentBuiltin = builtinId;
                     proved = _program.Builtins.Implementation(builtinId)(this);
@@ -360,7 +360,7 @@ public sealed class Machine
 
                 case OpCode.SoftCut:
                 {
-                    int barrier = (int)_stack[_e + FrameHeaderSize + code[_pc++]].Integer;
+                    var barrier = (int)_stack[_e + FrameHeaderSize + code[_pc++]].Integer;
                     if (barrier < _b)
                     {
                         _choicePoints[barrier].Alternative = BytecodeProgram.PopAndFailAddress;
@@ -381,7 +381,7 @@ public sealed class Machine
                 {
                     // A branch barrier needs no argument registers: each branch reloads its own.
                     _stack[_e + FrameHeaderSize + code[_pc++]] = Cell.Integer60(_b);
-                    int savedArity = _argumentCount;
+                    var savedArity = _argumentCount;
                     _argumentCount = 0;
                     PushChoicePoint(code[_pc++]);
                     _argumentCount = savedArity;
@@ -407,8 +407,8 @@ public sealed class Machine
                     // Reached through a choice point's alternative, so that choice point is still on top.
                     ChoicePoint point = _choicePoints[_b - 1];
                     BytecodeProgram.StaticClauseIndex table = _program.StaticIndex(point.IndexTable);
-                    int current = point.IndexNext;
-                    int following = ClauseIndexing.NextMatch(table.Keys, current + 1, point.IndexKey);
+                    var current = point.IndexNext;
+                    var following = ClauseIndexing.NextMatch(table.Keys, current + 1, point.IndexKey);
 
                     if (following < 0)
                     {
@@ -471,9 +471,9 @@ public sealed class Machine
 
                 case OpCode.PushCatch:
                 {
-                    int catcherSlot = code[_pc++];
-                    int recovery = code[_pc++];
-                    int savedArity = _argumentCount;
+                    var catcherSlot = code[_pc++];
+                    var recovery = code[_pc++];
+                    var savedArity = _argumentCount;
                     _argumentCount = 0;
 
                     // The frame fails through on ordinary backtracking; only a throw uses the recovery.
@@ -489,8 +489,8 @@ public sealed class Machine
 
                 case OpCode.PopCatch:
                 {
-                    int index = (int)_stack[_e + FrameHeaderSize + code[_pc++]].Integer;
-                    int reactivate = code[_pc++];
+                    var index = (int)_stack[_e + FrameHeaderSize + code[_pc++]].Integer;
+                    var reactivate = code[_pc++];
 
                     if (index >= _b)
                     {
@@ -507,7 +507,7 @@ public sealed class Machine
 
                     // The goal left alternatives. Keep the frame for a redo, but out of scope until then.
                     _choicePoints[index].CatchActive = false;
-                    int savedArity = _argumentCount;
+                    var savedArity = _argumentCount;
                     _argumentCount = 0;
                     PushChoicePoint(reactivate);
                     _argumentCount = savedArity;
@@ -516,7 +516,7 @@ public sealed class Machine
 
                 case OpCode.ReactivateCatch:
                 {
-                    int index = (int)_stack[_e + FrameHeaderSize + code[_pc++]].Integer;
+                    var index = (int)_stack[_e + FrameHeaderSize + code[_pc++]].Integer;
                     if (index < _b)
                     {
                         _choicePoints[index].CatchActive = true;
@@ -540,14 +540,14 @@ public sealed class Machine
 
                 case OpCode.GetVariable:
                 {
-                    int slot = code[_pc++];
+                    var slot = code[_pc++];
                     _stack[_e + FrameHeaderSize + slot] = _x[code[_pc++]];
                     break;
                 }
 
                 case OpCode.GetValue:
                 {
-                    int slot = code[_pc++];
+                    var slot = code[_pc++];
                     proved = Unify(_stack[_e + FrameHeaderSize + slot], _x[code[_pc++]]);
                     break;
                 }
@@ -561,21 +561,21 @@ public sealed class Machine
 
                 case OpCode.GetStructureArgument:
                 {
-                    int functorId = code[_pc++];
+                    var functorId = code[_pc++];
                     proved = GetStructure(functorId, _x[code[_pc++]]);
                     break;
                 }
 
                 case OpCode.GetStructureSlot:
                 {
-                    int functorId = code[_pc++];
+                    var functorId = code[_pc++];
                     proved = GetStructure(functorId, _stack[_e + FrameHeaderSize + code[_pc++]]);
                     break;
                 }
 
                 case OpCode.UnifyVariable:
                 {
-                    int slot = code[_pc++];
+                    var slot = code[_pc++];
                     if (_writeMode)
                     {
                         _stack[_e + FrameHeaderSize + slot] = NewVariable();
@@ -590,7 +590,7 @@ public sealed class Machine
 
                 case OpCode.UnifyValue:
                 {
-                    int slot = code[_pc++];
+                    var slot = code[_pc++];
                     if (_writeMode)
                     {
                         EnsureHeap(1);
@@ -622,7 +622,7 @@ public sealed class Machine
 
                 case OpCode.PutVariable:
                 {
-                    int slot = code[_pc++];
+                    var slot = code[_pc++];
                     Cell variable = NewVariable();
                     _stack[_e + FrameHeaderSize + slot] = variable;
                     _x[code[_pc++]] = variable;
@@ -635,7 +635,7 @@ public sealed class Machine
 
                 case OpCode.PutValue:
                 {
-                    int slot = code[_pc++];
+                    var slot = code[_pc++];
                     _x[code[_pc++]] = _stack[_e + FrameHeaderSize + slot];
                     break;
                 }
@@ -649,14 +649,14 @@ public sealed class Machine
 
                 case OpCode.PutStructureArgument:
                 {
-                    int functorId = code[_pc++];
+                    var functorId = code[_pc++];
                     _x[code[_pc++]] = BeginStructure(functorId);
                     break;
                 }
 
                 case OpCode.PutStructureSlot:
                 {
-                    int functorId = code[_pc++];
+                    var functorId = code[_pc++];
                     _stack[_e + FrameHeaderSize + code[_pc++]] = BeginStructure(functorId);
                     break;
                 }
@@ -714,8 +714,8 @@ public sealed class Machine
             throw new PrologException("PushRetry was called outside a builtin.");
         }
 
-        int resume = _pc;
-        int builtin = _currentBuiltin;
+        var resume = _pc;
+        var builtin = _currentBuiltin;
 
         PushChoicePoint(BytecodeProgram.RedoBuiltinAddress);
 
@@ -745,7 +745,7 @@ public sealed class Machine
     /// This is a generated-code contract. Every operation mutates the same explicit state used by
     /// bytecode, so continuations and choice-point alternatives may cross either execution path.
     /// </remarks>
-    public ref struct CompiledExecution
+    public readonly ref struct CompiledExecution
     {
         private readonly Machine _machine;
 
@@ -819,7 +819,7 @@ public sealed class Machine
         public bool TryBranch(int slot, int alternative, int next)
         {
             _machine._stack[_machine._e + FrameHeaderSize + slot] = Cell.Integer60(_machine._b);
-            int savedArity = _machine._argumentCount;
+            var savedArity = _machine._argumentCount;
             _machine._argumentCount = 0;
             _machine.PushChoicePoint(alternative);
             _machine._argumentCount = savedArity;
@@ -853,7 +853,7 @@ public sealed class Machine
         /// <summary>Applies soft cut to the branch stored in a slot.</summary>
         public bool SoftCut(int slot, int next)
         {
-            int barrier = (int)_machine._stack[_machine._e + FrameHeaderSize + slot].Integer;
+            var barrier = (int)_machine._stack[_machine._e + FrameHeaderSize + slot].Integer;
             if (barrier < _machine._b)
             {
                 _machine._choicePoints[barrier].Alternative = BytecodeProgram.PopAndFailAddress;
@@ -873,7 +873,7 @@ public sealed class Machine
         /// <summary>Pushes a Prolog exception frame.</summary>
         public bool PushCatch(int catcherSlot, int recovery, int next)
         {
-            int savedArity = _machine._argumentCount;
+            var savedArity = _machine._argumentCount;
             _machine._argumentCount = 0;
             _machine.PushChoicePoint(BytecodeProgram.PopAndFailAddress);
             _machine._argumentCount = savedArity;
@@ -889,7 +889,7 @@ public sealed class Machine
         /// <summary>Removes or deactivates a successful Prolog exception frame.</summary>
         public bool PopCatch(int slot, int reactivate, int next)
         {
-            int index = (int)_machine._stack[_machine._e + FrameHeaderSize + slot].Integer;
+            var index = (int)_machine._stack[_machine._e + FrameHeaderSize + slot].Integer;
             if (index < _machine._b)
             {
                 if (index == _machine._b - 1)
@@ -900,7 +900,7 @@ public sealed class Machine
                 else
                 {
                     _machine._choicePoints[index].CatchActive = false;
-                    int savedArity = _machine._argumentCount;
+                    var savedArity = _machine._argumentCount;
                     _machine._argumentCount = 0;
                     _machine.PushChoicePoint(reactivate);
                     _machine._argumentCount = savedArity;
@@ -914,7 +914,7 @@ public sealed class Machine
         /// <summary>Reactivates a suspended Prolog exception frame.</summary>
         public bool ReactivateCatch(int slot, int next)
         {
-            int index = (int)_machine._stack[_machine._e + FrameHeaderSize + slot].Integer;
+            var index = (int)_machine._stack[_machine._e + FrameHeaderSize + slot].Integer;
             if (index < _machine._b)
             {
                 _machine._choicePoints[index].CatchActive = true;
@@ -998,7 +998,7 @@ public sealed class Machine
         /// <summary>Reads or writes a structure argument from an environment slot.</summary>
         public bool UnifyValue(int slot, int next)
         {
-            bool proved = true;
+            var proved = true;
             if (_machine._writeMode)
             {
                 _machine.EnsureHeap(1);
@@ -1019,7 +1019,7 @@ public sealed class Machine
         /// <summary>Reads or writes a constant structure argument.</summary>
         public bool UnifyConstant(Cell constant, int next)
         {
-            bool proved = true;
+            var proved = true;
             if (_machine._writeMode)
             {
                 _machine.EnsureHeap(1);
@@ -1127,12 +1127,12 @@ public sealed class Machine
             throw PrologErrors.Type(this, "callable", whole);
         }
 
-        int functorId = _heap[goal.Index].Index;
+        var functorId = _heap[goal.Index].Index;
         Functor functor = _symbols.GetFunctor(functorId);
-        string name = _symbols.AtomName(functor.NameAtom);
+        var name = _symbols.AtomName(functor.NameAtom);
 
-        bool binary = functor.Arity == 2 && name is "," or ";" or "->" or "*->";
-        bool unary = functor.Arity == 1 && name == "\\+";
+        var binary = functor.Arity == 2 && name is "," or ";" or "->" or "*->";
+        var unary = functor.Arity == 1 && name == "\\+";
 
         // A rational control term revisits a construct it already validated; stop rather than
         // recurse forever. The set is cleared by the two entry points before the walk starts.
@@ -1176,7 +1176,7 @@ public sealed class Machine
     public PrologException CreateBall(Cell term, string description)
     {
         var ball = new TermBuffer();
-        int root = ball.Copy(this, term);
+        var root = ball.Copy(this, term);
         return new PrologException(description, ball, root);
     }
 
@@ -1204,10 +1204,10 @@ public sealed class Machine
     internal Cell EndCollect()
     {
         Collection collection = _collections[--_collectDepth];
-        int origin = collection.Buffer.Materialize(this);
+        var origin = collection.Buffer.Materialize(this);
 
         Cell list = Cell.Atom(_symbols.EmptyList);
-        for (int i = collection.Roots.Count - 1; i >= 0; i--)
+        for (var i = collection.Roots.Count - 1; i >= 0; i--)
         {
             Cell element = _heap[origin + collection.Roots[i]];
             list = CreateStructure(_symbols.ListFunctor, [element, list]);
@@ -1220,7 +1220,7 @@ public sealed class Machine
     internal int ReserveHeap(int count)
     {
         EnsureHeap(count);
-        int origin = _h;
+        var origin = _h;
         _h += count;
         return origin;
     }
@@ -1236,7 +1236,7 @@ public sealed class Machine
     {
         DynamicPredicate predicate = _program.FindDynamic(functorId) ?? throw PrologErrors.UndefinedProcedure(this, functorId);
 
-        int generation = _program.Generation;
+        var generation = _program.Generation;
         Cell callKey = predicate.Arity >= 1 ? ClauseIndexing.CallKey(this, _x[0]) : ClauseIndexing.AnyKey;
         DynamicClause? clause = DynamicPredicate.FirstVisibleMatching(predicate.First, generation, callKey);
         if (clause is null)
@@ -1267,13 +1267,13 @@ public sealed class Machine
         BytecodeProgram.StaticClauseIndex table = _program.StaticIndex(tableId);
         Cell callKey = ClauseIndexing.CallKey(this, _x[0]);
 
-        int first = ClauseIndexing.NextMatch(table.Keys, 0, callKey);
+        var first = ClauseIndexing.NextMatch(table.Keys, 0, callKey);
         if (first < 0)
         {
             return false;
         }
 
-        int following = ClauseIndexing.NextMatch(table.Keys, first + 1, callKey);
+        var following = ClauseIndexing.NextMatch(table.Keys, first + 1, callKey);
         if (following >= 0)
         {
             PushChoicePoint(BytecodeProgram.NextStaticClauseAddress);
@@ -1289,7 +1289,7 @@ public sealed class Machine
 
     private bool HasCatchFrame()
     {
-        for (int i = _b - 1; i >= 0; i--)
+        for (var i = _b - 1; i >= 0; i--)
         {
             if (_choicePoints[i].CatchRecovery >= 0 && _choicePoints[i].CatchActive)
             {
@@ -1308,7 +1308,7 @@ public sealed class Machine
     {
         while (_b > 0)
         {
-            int index = _b - 1;
+            var index = _b - 1;
             if (_choicePoints[index].CatchRecovery < 0 || !_choicePoints[index].CatchActive)
             {
                 _b--;
@@ -1330,14 +1330,14 @@ public sealed class Machine
             _collectDepth = frame.CollectDepth;
 
             // Rebuild the ball above the restored heap top, then try the catcher against it.
-            int origin = error.Ball!.Materialize(this);
+            var origin = error.Ball!.Materialize(this);
             Cell ball = _heap[origin + error.BallRoot];
             Cell catcher = _stack[frame.Environment + FrameHeaderSize + frame.CatcherSlot];
 
-            int mark = _tr;
-            bool previous = _forceTrail;
+            var mark = _tr;
+            var previous = _forceTrail;
             _forceTrail = true;
-            bool matched = Unify(catcher, ball);
+            var matched = Unify(catcher, ball);
             _forceTrail = previous;
 
             if (matched)
@@ -1365,7 +1365,7 @@ public sealed class Machine
     public Cell CreateStructure(int functorId, ReadOnlySpan<Cell> arguments)
     {
         EnsureHeap(1 + arguments.Length);
-        int address = _h;
+        var address = _h;
         _heap[_h++] = Cell.Functor(functorId);
         foreach (Cell argument in arguments)
         {
@@ -1379,7 +1379,7 @@ public sealed class Machine
     public Cell CreateList(ReadOnlySpan<Cell> items, Cell tail)
     {
         Cell result = tail;
-        for (int i = items.Length - 1; i >= 0; i--)
+        for (var i = items.Length - 1; i >= 0; i--)
         {
             result = CreateStructure(_symbols.ListFunctor, [items[i], result]);
         }
@@ -1393,10 +1393,10 @@ public sealed class Machine
     /// </summary>
     public bool CanUnify(Cell left, Cell right)
     {
-        int trailMark = _tr;
-        bool previous = _forceTrail;
+        var trailMark = _tr;
+        var previous = _forceTrail;
         _forceTrail = true;
-        bool unified = Unify(left, right);
+        var unified = Unify(left, right);
         _forceTrail = previous;
         UndoTrail(trailMark);
         return unified;
@@ -1409,9 +1409,9 @@ public sealed class Machine
     /// </summary>
     internal bool UnifyWithOccursCheck(Cell left, Cell right)
     {
-        int trailMark = _tr;
-        bool previous = _forceTrail;
-        bool unified = false;
+        var trailMark = _tr;
+        var previous = _forceTrail;
+        var unified = false;
         _forceTrail = true;
 
         try
@@ -1455,7 +1455,7 @@ public sealed class Machine
 
         if (IsControlGoal(goal) && _program.RuntimeCompiler is not null)
         {
-            int entry = _program.RuntimeCompiler.CompileControlGoal(this, goal, _x, out int controlArity);
+            var entry = _program.RuntimeCompiler.CompileControlGoal(this, goal, _x, out var controlArity);
             _argumentCount = controlArity;
             _continuation = _pc;
             _b0 = _b;
@@ -1476,7 +1476,7 @@ public sealed class Machine
             case CellTag.Structure:
                 functorId = _heap[goal.Index].Index;
                 arity = _symbols.ArityOf(functorId);
-                for (int i = 0; i < arity; i++)
+                for (var i = 0; i < arity; i++)
                 {
                     _x[i] = _heap[goal.Index + 1 + i];
                 }
@@ -1497,7 +1497,7 @@ public sealed class Machine
             throw PrologErrors.Permission(this, "access", "implementation_specific_feature", functorId);
         }
 
-        if (_program.Builtins.TryGetId(functorId, out int builtinId))
+        if (_program.Builtins.TryGetId(functorId, out var builtinId))
         {
             _currentBuiltin = builtinId;
             return _program.Builtins.Implementation(builtinId)(this);
@@ -1520,7 +1520,7 @@ public sealed class Machine
         }
 
         Functor functor = _symbols.GetFunctor(_heap[goal.Index].Index);
-        string name = _symbols.AtomName(functor.NameAtom);
+        var name = _symbols.AtomName(functor.NameAtom);
         return (functor.Arity == 2 && name is "," or ";" or "->" or "*->") || (functor.Arity == 1 && name == "\\+");
     }
 
@@ -1618,7 +1618,7 @@ public sealed class Machine
                 return false;
             }
 
-            int functorId = _heap[a.Index].Index;
+            var functorId = _heap[a.Index].Index;
             if (functorId != _heap[b.Index].Index)
             {
                 _unificationTop = 0;
@@ -1628,16 +1628,16 @@ public sealed class Machine
             // Rational trees can lead back to the same pair of structures. Their arguments were
             // already scheduled on the first visit, so revisiting the pair adds no constraint and
             // would otherwise make ordinary unification loop forever.
-            uint lower = (uint)Math.Min(a.Index, b.Index);
-            uint upper = (uint)Math.Max(a.Index, b.Index);
-            ulong pair = ((ulong)lower << 32) | upper;
+            var lower = (uint)Math.Min(a.Index, b.Index);
+            var upper = (uint)Math.Max(a.Index, b.Index);
+            var pair = ((ulong)lower << 32) | upper;
             if (!_unificationVisited.Add(pair))
             {
                 continue;
             }
 
-            int arity = _symbols.ArityOf(functorId);
-            for (int i = arity; i >= 1; i--)
+            var arity = _symbols.ArityOf(functorId);
+            for (var i = arity; i >= 1; i--)
             {
                 PushUnification(_heap[a.Index + i], _heap[b.Index + i]);
             }
@@ -1692,10 +1692,10 @@ public sealed class Machine
 
     private void Allocate(int slots)
     {
-        int previousTop = _stackTop;
+        var previousTop = _stackTop;
 
         // A frame may not overwrite stack space a live choice point still needs.
-        int frameBase = _b > 0 ? Math.Max(_stackTop, _choicePoints[_b - 1].StackTop) : _stackTop;
+        var frameBase = _b > 0 ? Math.Max(_stackTop, _choicePoints[_b - 1].StackTop) : _stackTop;
         EnsureStack(frameBase + FrameHeaderSize + slots);
 
         _stack[frameBase + FrameContinuation] = Cell.Integer60(_continuation);
@@ -1709,7 +1709,7 @@ public sealed class Machine
 
     private void Deallocate()
     {
-        int frame = _e;
+        var frame = _e;
         _continuation = (int)_stack[frame + FrameContinuation].Integer;
         _stackTop = (int)_stack[frame + FramePreviousTop].Integer;
         _e = (int)_stack[frame + FrameEnvironment].Integer;
@@ -1717,9 +1717,9 @@ public sealed class Machine
 
     private Cell BeginStructure(int functorId)
     {
-        int arity = _symbols.ArityOf(functorId);
+        var arity = _symbols.ArityOf(functorId);
         EnsureHeap(1 + arity);
-        int address = _h;
+        var address = _h;
         _heap[_h++] = Cell.Functor(functorId);
         _writeMode = true;
         return Cell.Structure(address);
@@ -1766,7 +1766,7 @@ public sealed class Machine
     private Cell NewVariable()
     {
         EnsureHeap(1);
-        int address = _h;
+        var address = _h;
         var cell = Cell.Reference(address);
         _heap[address] = cell;
         _h = address + 1;
@@ -1794,7 +1794,7 @@ public sealed class Machine
     {
         while (_tr > mark)
         {
-            int address = _trail[--_tr];
+            var address = _trail[--_tr];
             _heap[address] = Cell.Reference(address);
         }
     }
@@ -1884,7 +1884,7 @@ public sealed class Machine
 
     private bool OccursIn(int variableAddress, Cell term)
     {
-        int epoch = NextOccursCheckEpoch();
+        var epoch = NextOccursCheckEpoch();
         _occursCheckTop = 0;
         PushOccursCheck(term);
 
@@ -1909,8 +1909,8 @@ public sealed class Machine
             }
 
             _occursCheckVisited[cell.Index] = epoch;
-            int arity = _symbols.ArityOf(_heap[cell.Index].Index);
-            for (int i = arity; i >= 1; i--)
+            var arity = _symbols.ArityOf(_heap[cell.Index].Index);
+            for (var i = arity; i >= 1; i--)
             {
                 PushOccursCheck(_heap[cell.Index + i]);
             }
@@ -1950,9 +1950,9 @@ public sealed class Machine
             return;
         }
 
-        int heapTop = _choicePoints[_b - 1].HeapTop;
-        int write = trailMark;
-        for (int read = trailMark; read < _tr; read++)
+        var heapTop = _choicePoints[_b - 1].HeapTop;
+        var write = trailMark;
+        for (var read = trailMark; read < _tr; read++)
         {
             if (_trail[read] < heapTop)
             {

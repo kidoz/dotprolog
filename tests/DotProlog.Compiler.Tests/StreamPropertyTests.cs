@@ -23,7 +23,7 @@ public sealed class StreamPropertyTests : IDisposable
     [Fact]
     public void ReportsTruthfulPropertiesOfAnOpenedStream()
     {
-        string path = Path("append.txt");
+        var path = Path("append.txt");
 
         Assert.Equal(
             "yes\n",
@@ -49,7 +49,7 @@ public sealed class StreamPropertyTests : IDisposable
     [Fact]
     public void CurrentStreamTracksOpenAndClosedHandles()
     {
-        string path = Path("current.txt");
+        var path = Path("current.txt");
 
         Assert.Equal(
             "yes\n",
@@ -85,7 +85,7 @@ public sealed class StreamPropertyTests : IDisposable
     [Fact]
     public void EndOfStreamMovesFromNotToAtToPast()
     {
-        string path = Path("eof.txt");
+        var path = Path("eof.txt");
 
         Assert.Equal(
             "yes\n",

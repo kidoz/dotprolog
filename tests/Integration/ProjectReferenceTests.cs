@@ -24,21 +24,21 @@ public sealed class ProjectReferenceTests
             $"Set {OptInVariable}=1 to run the toolchain integration tests."
         );
 
-        string console = Path.Combine(RepositoryLayout.Root, "samples", "PricingConsole");
+        var console = Path.Combine(RepositoryLayout.Root, "samples", "PricingConsole");
 
         // The task assembly is loaded by MSBuild, so it has to exist before the sample builds.
-        (int taskExit, string taskLog) = await Run(
+        (var taskExit, var taskLog) = await Run(
             "dotnet",
             ["build", "-nodereuse:false", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
         );
 
         Assert.True(taskExit == 0, $"Building the task failed:\n{taskLog}");
 
-        (int buildExit, string buildLog) = await Run("dotnet", ["build", "-nodereuse:false", console, "--nologo"]);
+        (var buildExit, var buildLog) = await Run("dotnet", ["build", "-nodereuse:false", console, "--nologo"]);
         Assert.True(buildExit == 0, $"Building the sample failed:\n{buildLog}");
 
         // The facade must be generated into obj/, not beside the sources.
-        string generated = Path.Combine(RepositoryLayout.Root, "samples", "PricingRules", "obj", "prolog", "PricingModule.g.cs");
+        var generated = Path.Combine(RepositoryLayout.Root, "samples", "PricingRules", "obj", "prolog", "PricingModule.g.cs");
         Assert.True(File.Exists(generated), $"No generated facade at {generated}.");
         Assert.Contains(
             "public partial interface IPricingModule",
@@ -46,10 +46,10 @@ public sealed class ProjectReferenceTests
             StringComparison.Ordinal
         );
 
-        (int runExit, string output) = await Run("dotnet", ["run", "--project", console, "--no-build"]);
+        (var runExit, var output) = await Run("dotnet", ["run", "--project", console, "--no-build"]);
         Assert.True(runExit == 0, $"Running the sample failed:\n{output}");
 
-        string[] lines = output.ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var lines = output.ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
 
         Assert.Equal(
             [
@@ -77,9 +77,9 @@ public sealed class ProjectReferenceTests
             $"Run on Windows with {FullMsBuildOptInVariable}=1 to test full MSBuild task hosting."
         );
 
-        string console = Path.Combine(RepositoryLayout.Root, "samples", "PricingConsole", "PricingConsole.csproj");
+        var console = Path.Combine(RepositoryLayout.Root, "samples", "PricingConsole", "PricingConsole.csproj");
 
-        (int buildExit, string buildLog) = await Run(
+        (var buildExit, var buildLog) = await Run(
             "msbuild",
             [
                 console,
@@ -94,10 +94,10 @@ public sealed class ProjectReferenceTests
 
         Assert.True(buildExit == 0, $"Full MSBuild could not host the .NET facade generator:\n{buildLog}");
 
-        string generated = Path.Combine(RepositoryLayout.Root, "samples", "PricingRules", "obj", "prolog", "PricingModule.g.cs");
+        var generated = Path.Combine(RepositoryLayout.Root, "samples", "PricingRules", "obj", "prolog", "PricingModule.g.cs");
         Assert.True(File.Exists(generated), $"No generated facade at {generated}.");
 
-        (int runExit, string output) = await Run("dotnet", ["run", "--project", console, "-c", "Release", "--no-build"]);
+        (var runExit, var output) = await Run("dotnet", ["run", "--project", console, "-c", "Release", "--no-build"]);
         Assert.True(runExit == 0, $"Running the full-MSBuild output failed:\n{output}");
         Assert.Contains("100 less 15% = 85", output, StringComparison.Ordinal);
     }
@@ -114,22 +114,22 @@ public sealed class ProjectReferenceTests
             $"Set {OptInVariable}=1 to run the toolchain integration tests."
         );
 
-        string project = Path.Combine(RepositoryLayout.Root, "samples", sample);
+        var project = Path.Combine(RepositoryLayout.Root, "samples", sample);
 
-        (int taskExit, string taskLog) = await Run(
+        (var taskExit, var taskLog) = await Run(
             "dotnet",
             ["build", "-nodereuse:false", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
         );
 
         Assert.True(taskExit == 0, $"Building the task failed:\n{taskLog}");
 
-        (int buildExit, string buildLog) = await Run("dotnet", ["build", "-nodereuse:false", project, "--nologo"]);
+        (var buildExit, var buildLog) = await Run("dotnet", ["build", "-nodereuse:false", project, "--nologo"]);
         Assert.True(buildExit == 0, $"Building {sample} failed:\n{buildLog}");
 
-        (int runExit, string output) = await Run("dotnet", ["run", "--project", project, "--no-build"]);
+        (var runExit, var output) = await Run("dotnet", ["run", "--project", project, "--no-build"]);
         Assert.True(runExit == 0, $"Running {sample} failed:\n{output}");
 
-        string[] lines = output.ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var lines = output.ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
 
         Assert.Equal(
             [
@@ -153,19 +153,19 @@ public sealed class ProjectReferenceTests
             $"Set {OptInVariable}=1 to run the toolchain integration tests."
         );
 
-        string project = Path.Combine(RepositoryLayout.Root, "samples", "GreetingApp");
+        var project = Path.Combine(RepositoryLayout.Root, "samples", "GreetingApp");
 
-        (int taskExit, string taskLog) = await Run(
+        (var taskExit, var taskLog) = await Run(
             "dotnet",
             ["build", "-nodereuse:false", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
         );
 
         Assert.True(taskExit == 0, $"Building the task failed:\n{taskLog}");
 
-        (int buildExit, string buildLog) = await Run("dotnet", ["build", "-nodereuse:false", project, "--nologo"]);
+        (var buildExit, var buildLog) = await Run("dotnet", ["build", "-nodereuse:false", project, "--nologo"]);
         Assert.True(buildExit == 0, $"Building GreetingApp failed:\n{buildLog}");
 
-        (int runExit, string output) = await Run("dotnet", ["run", "--project", project, "--no-build"]);
+        (var runExit, var output) = await Run("dotnet", ["run", "--project", project, "--no-build"]);
         Assert.True(runExit == 0, $"Running GreetingApp failed:\n{output}");
 
         Assert.Equal(
@@ -184,19 +184,19 @@ public sealed class ProjectReferenceTests
             $"Set {OptInVariable}=1 to run the toolchain integration tests."
         );
 
-        string project = Path.Combine(RepositoryLayout.Root, "samples", "PricingTests");
+        var project = Path.Combine(RepositoryLayout.Root, "samples", "PricingTests");
 
-        (int taskExit, string taskLog) = await Run(
+        (var taskExit, var taskLog) = await Run(
             "dotnet",
             ["build", "-nodereuse:false", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
         );
 
         Assert.True(taskExit == 0, $"Building the task failed:\n{taskLog}");
 
-        (int buildExit, string buildLog) = await Run("dotnet", ["build", "-nodereuse:false", project, "--nologo"]);
+        (var buildExit, var buildLog) = await Run("dotnet", ["build", "-nodereuse:false", project, "--nologo"]);
         Assert.True(buildExit == 0, $"Building PricingTests failed:\n{buildLog}");
 
-        (int listExit, string listLog) = await Run(
+        (var listExit, var listLog) = await Run(
             "dotnet",
             ["test", "--project", project, "--no-build", "--no-restore", "--list-tests", "--no-ansi"]
         );
@@ -204,7 +204,7 @@ public sealed class ProjectReferenceTests
         Assert.Contains("test_discount_reduces_price", listLog, StringComparison.Ordinal);
         Assert.Contains("Discovered 7 tests.", listLog, StringComparison.Ordinal);
 
-        (int runExit, string runLog) = await Run(
+        (var runExit, var runLog) = await Run(
             "dotnet",
             ["test", "--project", project, "--no-build", "--no-restore", "--no-ansi"]
         );

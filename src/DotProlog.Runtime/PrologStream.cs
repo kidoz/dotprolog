@@ -160,7 +160,7 @@ public sealed class PrologStream
     /// <summary>Restores a logical position and clears input lookahead and EOF state.</summary>
     internal bool TrySetPosition(long position)
     {
-        bool changed =
+        var changed =
             Reader is PositionedTextReader reader ? reader.TrySeek(position)
             : Writer is PositionedTextWriter writer ? writer.TrySeek(position)
             : TrySeekBinary(position);

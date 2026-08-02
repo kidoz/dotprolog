@@ -17,7 +17,7 @@ public sealed class MachineTests
 
     private static int BuiltinId(BytecodeProgram program, string name, int arity)
     {
-        Assert.True(program.Builtins.TryGetId(program.Symbols.InternFunctor(name, arity), out int id));
+        Assert.True(program.Builtins.TryGetId(program.Symbols.InternFunctor(name, arity), out var id));
         return id;
     }
 
@@ -25,7 +25,7 @@ public sealed class MachineTests
     public void ProvesAFactAndReturnsToTheHost()
     {
         BytecodeProgram program = NewProgram();
-        int p = program.Symbols.InternFunctor("p", 0);
+        var p = program.Symbols.InternFunctor("p", 0);
 
         program.DefinePredicate(p, program.CodeLength);
         program.Emit(OpCode.Allocate, 0);
@@ -39,11 +39,11 @@ public sealed class MachineTests
     public void BacktracksFromAFailedClauseIntoTheNextAlternative()
     {
         BytecodeProgram program = NewProgram();
-        int p = program.Symbols.InternFunctor("p", 0);
-        int fail = BuiltinId(program, "fail", 0);
+        var p = program.Symbols.InternFunctor("p", 0);
+        var fail = BuiltinId(program, "fail", 0);
 
         program.DefinePredicate(p, program.CodeLength);
-        int alternative = program.Emit(OpCode.TryMeElse, 0) + 1;
+        var alternative = program.Emit(OpCode.TryMeElse, 0) + 1;
         program.Emit(OpCode.Allocate, 0);
         program.Emit(OpCode.CallBuiltin, fail, 0);
         program.Emit(OpCode.Deallocate);
@@ -62,11 +62,11 @@ public sealed class MachineTests
     public void FailsWhenEveryAlternativeIsExhausted()
     {
         BytecodeProgram program = NewProgram();
-        int p = program.Symbols.InternFunctor("p", 0);
-        int fail = BuiltinId(program, "fail", 0);
+        var p = program.Symbols.InternFunctor("p", 0);
+        var fail = BuiltinId(program, "fail", 0);
 
         program.DefinePredicate(p, program.CodeLength);
-        int alternative = program.Emit(OpCode.TryMeElse, 0) + 1;
+        var alternative = program.Emit(OpCode.TryMeElse, 0) + 1;
         program.Emit(OpCode.Allocate, 0);
         program.Emit(OpCode.CallBuiltin, fail, 0);
         program.Emit(OpCode.Deallocate);
@@ -86,10 +86,10 @@ public sealed class MachineTests
     public void CallReturnsToItsContinuation()
     {
         BytecodeProgram program = NewProgram();
-        int p = program.Symbols.InternFunctor("p", 0);
-        int q = program.Symbols.InternFunctor("q", 0);
-        int write = BuiltinId(program, "write", 1);
-        int done = program.AddConstant(Cell.Atom(program.Symbols.InternAtom("done")));
+        var p = program.Symbols.InternFunctor("p", 0);
+        var q = program.Symbols.InternFunctor("q", 0);
+        var write = BuiltinId(program, "write", 1);
+        var done = program.AddConstant(Cell.Atom(program.Symbols.InternAtom("done")));
 
         program.DefinePredicate(q, program.CodeLength);
         program.Emit(OpCode.Allocate, 0);
@@ -115,9 +115,9 @@ public sealed class MachineTests
     public void HaltStopsTheRunAndReportsItsExitCode()
     {
         BytecodeProgram program = NewProgram();
-        int p = program.Symbols.InternFunctor("p", 0);
-        int halt = BuiltinId(program, "halt", 1);
-        int seven = program.AddConstant(Cell.Integer60(7));
+        var p = program.Symbols.InternFunctor("p", 0);
+        var halt = BuiltinId(program, "halt", 1);
+        var seven = program.AddConstant(Cell.Integer60(7));
 
         program.DefinePredicate(p, program.CodeLength);
         program.Emit(OpCode.Allocate, 0);
@@ -136,7 +136,7 @@ public sealed class MachineTests
     public void CallingAnUndefinedPredicateRaisesAnExistenceError()
     {
         BytecodeProgram program = NewProgram();
-        int missing = program.Symbols.InternFunctor("missing", 2);
+        var missing = program.Symbols.InternFunctor("missing", 2);
 
         PrologException exception = Assert.Throws<PrologException>(() => new Machine(program).Solve(missing));
 
@@ -173,7 +173,7 @@ public sealed class MachineTests
         BytecodeProgram program = NewProgram();
         var machine = new Machine(program);
         Cell variable = machine.CreateVariable();
-        int pair = program.Symbols.InternFunctor("pair", 2);
+        var pair = program.Symbols.InternFunctor("pair", 2);
         Cell left = machine.CreateStructure(pair, [variable, variable]);
         Cell right = machine.CreateStructure(
             pair,
@@ -205,8 +205,8 @@ public sealed class MachineTests
     {
         BytecodeProgram program = NewProgram();
         var machine = new Machine(program);
-        int a = program.Symbols.InternFunctor("a", 1);
-        int f = program.Symbols.InternFunctor("f", 4);
+        var a = program.Symbols.InternFunctor("a", 1);
+        var f = program.Symbols.InternFunctor("f", 4);
         Cell x = machine.CreateVariable();
         Cell y = machine.CreateVariable();
         Cell left = machine.CreateStructure(f, [x, y, x, Cell.Integer60(1)]);
@@ -241,9 +241,9 @@ public sealed class MachineTests
     public void ProgramDistinguishesUserPredicatesFromBuiltinsAndInternalBytecode()
     {
         BytecodeProgram program = NewProgram();
-        int user = program.Symbols.InternFunctor("user_predicate", 0);
-        int write = program.Symbols.InternFunctor("write", 1);
-        int catchFunctor = program.Symbols.InternFunctor("catch", 3);
+        var user = program.Symbols.InternFunctor("user_predicate", 0);
+        var write = program.Symbols.InternFunctor("write", 1);
+        var catchFunctor = program.Symbols.InternFunctor("catch", 3);
 
         program.DefinePredicate(user, program.CodeLength);
 
@@ -256,8 +256,8 @@ public sealed class MachineTests
     public void AbolishingADynamicPredicateRemovesEveryAlias()
     {
         BytecodeProgram program = NewProgram();
-        int target = program.Symbols.InternFunctor("module:entry", 1);
-        int alias = program.Symbols.InternFunctor("entry", 1);
+        var target = program.Symbols.InternFunctor("module:entry", 1);
+        var alias = program.Symbols.InternFunctor("entry", 1);
         program.DeclareDynamic(target);
         Assert.True(program.AliasPredicate(alias, target));
 

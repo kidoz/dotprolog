@@ -97,7 +97,7 @@ public sealed class ProgramLoader
         Dictionary<int, List<(SyntaxTerm Head, SyntaxTerm? Body)>> pending = [];
         List<int> dirtyOrder = [];
         HashSet<int> dirty = [];
-        bool halted = false;
+        var halted = false;
 
         foreach (LoadItem item in unit.Items)
         {
@@ -106,7 +106,7 @@ public sealed class ProgramLoader
                 SyntaxTerm resolvedHead = resolver.ResolveHead(clause.Head);
                 SyntaxTerm? resolvedBody = clause.Body is null ? null : resolver.ResolveGoal(clause.Body);
 
-                if (!TryGetHeadFunctor(resolvedHead, out int functorId))
+                if (!TryGetHeadFunctor(resolvedHead, out var functorId))
                 {
                     Report(
                         diagnostics,
@@ -149,7 +149,7 @@ public sealed class ProgramLoader
                 continue;
             }
 
-            int address = CompileDirective(resolver.ResolveGoal(goal), diagnostics, out bool deferred, fileName, unitDefinitions);
+            var address = CompileDirective(resolver.ResolveGoal(goal), diagnostics, out var deferred, fileName, unitDefinitions);
             if (address < 0)
             {
                 continue;
@@ -186,7 +186,7 @@ public sealed class ProgramLoader
 
         void FlushPredicates()
         {
-            foreach (int functorId in dirtyOrder)
+            foreach (var functorId in dirtyOrder)
             {
                 if (dynamicPredicates.Contains(functorId) || _program.IsDynamic(functorId))
                 {
@@ -241,7 +241,7 @@ public sealed class ProgramLoader
                 continue;
             }
 
-            int qualified = _program.Symbols.InternFunctor(ModuleTable.QualifiedName(unit.Module, export.Name), export.Arity);
+            var qualified = _program.Symbols.InternFunctor(ModuleTable.QualifiedName(unit.Module, export.Name), export.Arity);
 
             _program.AliasPredicate(_program.Symbols.InternFunctor(export.Name, export.Arity), qualified);
         }
@@ -251,12 +251,12 @@ public sealed class ProgramLoader
     private void Collect(IReadOnlyList<SyntaxTerm> clauses, LoadUnit unit, List<Diagnostic> diagnostics, string? fileName)
     {
         DoubleQuotesMode doubleQuotes = _program.Flags.DoubleQuotes;
-        bool firstTerm = true;
+        var firstTerm = true;
 
         foreach (SyntaxTerm rawClause in clauses)
         {
             SyntaxTerm clause = TermNormalizer.Normalize(rawClause, doubleQuotes);
-            bool isFirstTerm = firstTerm;
+            var isFirstTerm = firstTerm;
             firstTerm = false;
 
             if (clause is CompoundTerm { Name: ":-", Arity: 1 } directive)
@@ -440,7 +440,7 @@ public sealed class ProgramLoader
                 return false;
         }
 
-        int functor = _program.Symbols.InternFunctor(name, arity);
+        var functor = _program.Symbols.InternFunctor(name, arity);
         return _program.Builtins.TryGetId(functor, out _) || (_program.IsDefined(functor) && !_program.IsUserPredicate(functor));
     }
 
@@ -476,7 +476,7 @@ public sealed class ProgramLoader
             return;
         }
 
-        string? path = ResolvePath(file.Name, fileName);
+        var path = ResolvePath(file.Name, fileName);
         if (path is null || _program.RuntimeCompiler is null || _machine is null)
         {
             Report(
@@ -587,7 +587,7 @@ public sealed class ProgramLoader
             return;
         }
 
-        string? path = ResolvePath(file.Name, fileName);
+        var path = ResolvePath(file.Name, fileName);
         if (path is null)
         {
             Report(
@@ -600,7 +600,7 @@ public sealed class ProgramLoader
             return;
         }
 
-        string? loaded = _modules.LoadedModuleOf(path);
+        var loaded = _modules.LoadedModuleOf(path);
         if (loaded is null)
         {
             if (_program.RuntimeCompiler is null || _machine is null)
@@ -661,7 +661,7 @@ public sealed class ProgramLoader
                 continue;
             }
 
-            if (!_modules.TryImport(unit.Module, indicator, loaded, out string? conflictingModule))
+            if (!_modules.TryImport(unit.Module, indicator, loaded, out var conflictingModule))
             {
                 Report(
                     diagnostics,
@@ -677,13 +677,13 @@ public sealed class ProgramLoader
     /// <summary>Finds the file a <c>use_module</c> names, relative to the file that asked for it.</summary>
     private static string? ResolvePath(string name, string? fileName)
     {
-        string directory = fileName is null
+        var directory = fileName is null
             ? Directory.GetCurrentDirectory()
             : (Path.GetDirectoryName(Path.GetFullPath(fileName)) ?? ".");
 
-        foreach (string candidate in (string[])[name, name + ".pl"])
+        foreach (var candidate in (string[])[name, name + ".pl"])
         {
-            string absolute = Path.IsPathRooted(candidate) ? candidate : Path.Combine(directory, candidate);
+            var absolute = Path.IsPathRooted(candidate) ? candidate : Path.Combine(directory, candidate);
             if (File.Exists(absolute))
             {
                 return Path.GetFullPath(absolute);
@@ -710,7 +710,7 @@ public sealed class ProgramLoader
             }
 
             List<(int Position, int Extra)> arguments = [];
-            for (int i = 0; i < spec.Arity; i++)
+            for (var i = 0; i < spec.Arity; i++)
             {
                 // An integer says the argument is a closure gaining that many arguments; ':' says it
                 // is module-sensitive but not called here. Anything else is an ordinary argument.
@@ -828,7 +828,7 @@ public sealed class ProgramLoader
             return false;
         }
 
-        long compiledArity = arity.Value + (slash.Name == "//" ? 2 : 0);
+        var compiledArity = arity.Value + (slash.Name == "//" ? 2 : 0);
         if (compiledArity is < 0 or >= Machine.ArgumentRegisterCount)
         {
             return false;
@@ -928,7 +928,7 @@ public sealed class ProgramLoader
                 continue;
             }
 
-            int functorId = _program.Symbols.InternFunctor(ModuleTable.QualifiedName(module, indicator.Name), indicator.Arity);
+            var functorId = _program.Symbols.InternFunctor(ModuleTable.QualifiedName(module, indicator.Name), indicator.Arity);
             _program.DeclareDynamic(functorId, _userPredicates);
             declared.Add(functorId);
         }
@@ -945,7 +945,7 @@ public sealed class ProgramLoader
     {
         DynamicPredicate predicate = _program.DeclareDynamic(functorId, _userPredicates);
         Machine machine = _machine!;
-        int rule = _program.Symbols.InternFunctor(":-", 2);
+        var rule = _program.Symbols.InternFunctor(":-", 2);
 
         foreach ((SyntaxTerm head, SyntaxTerm? body) in clauses)
         {
@@ -957,7 +957,7 @@ public sealed class ProgramLoader
                 unitDefinitions,
                 trustedImplementation: !_userPredicates
             );
-            int address = compiler.Compile(head, body);
+            var address = compiler.Compile(head, body);
             if (address < 0)
             {
                 continue;
@@ -970,7 +970,7 @@ public sealed class ProgramLoader
 
             var term = new TermBuffer();
             Cell clause = machine.CreateStructure(rule, [headCell, bodyCell]);
-            int root = term.Copy(machine, DatabaseBuiltins.NormalizeClause(machine, clause));
+            var root = term.Copy(machine, DatabaseBuiltins.NormalizeClause(machine, clause));
 
             predicate.Append(
                 new DynamicClause
@@ -1024,10 +1024,10 @@ public sealed class ProgramLoader
             return;
         }
 
-        int entry = _program.CodeLength;
-        int pendingAlternative = -1;
+        var entry = _program.CodeLength;
+        var pendingAlternative = -1;
 
-        for (int i = 0; i < clauses.Count; i++)
+        for (var i = 0; i < clauses.Count; i++)
         {
             if (clauses.Count > 1)
             {
@@ -1074,7 +1074,7 @@ public sealed class ProgramLoader
         IReadOnlySet<int> unitDefinitions
     )
     {
-        int stub = _program.Emit(OpCode.EnterStatic, 0);
+        var stub = _program.Emit(OpCode.EnterStatic, 0);
         List<int> addresses = new(clauses.Count);
         List<Cell> keys = new(clauses.Count);
 
@@ -1088,7 +1088,7 @@ public sealed class ProgramLoader
                 unitDefinitions,
                 trustedImplementation: !_userPredicates
             );
-            int address = compiler.Compile(head, body);
+            var address = compiler.Compile(head, body);
             if (address < 0)
             {
                 continue;
@@ -1144,8 +1144,8 @@ public sealed class ProgramLoader
     private PredicateIndicator SourceIndicatorOf(string module, int functorId)
     {
         Functor functor = _program.Symbols.GetFunctor(functorId);
-        string compiledName = _program.Symbols.AtomName(functor.NameAtom);
-        string sourceName = module == ModuleTable.UserModule ? compiledName : compiledName[(module.Length + 1)..];
+        var compiledName = _program.Symbols.AtomName(functor.NameAtom);
+        var sourceName = module == ModuleTable.UserModule ? compiledName : compiledName[(module.Length + 1)..];
         return new PredicateIndicator(sourceName, functor.Arity);
     }
 }

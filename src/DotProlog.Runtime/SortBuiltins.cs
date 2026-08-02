@@ -43,7 +43,7 @@ internal static class SortBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        (bool descending, bool dedupe) =
+        (var descending, var dedupe) =
             orderCell.Tag == CellTag.Atom
                 ? machine.Symbols.AtomName(orderCell.Index) switch
                 {
@@ -72,7 +72,7 @@ internal static class SortBuiltins
     private static bool KeySort(Machine machine)
     {
         List<Cell> elements = TermList.ReadProper(machine, machine.Argument(0));
-        int pair = machine.Symbols.InternFunctor("-", 2);
+        var pair = machine.Symbols.InternFunctor("-", 2);
 
         Cell[] sorted = Arrange(
             machine,
@@ -100,7 +100,7 @@ internal static class SortBuiltins
     private static Cell[] Arrange(Machine machine, List<Cell> elements, Func<Cell, Cell> keyOf, bool descending, bool dedupe)
     {
         var keyed = new (Cell Key, Cell Element, int Position)[elements.Count];
-        for (int i = 0; i < elements.Count; i++)
+        for (var i = 0; i < elements.Count; i++)
         {
             keyed[i] = (keyOf(elements[i]), elements[i], i);
         }
@@ -109,7 +109,7 @@ internal static class SortBuiltins
             keyed,
             (left, right) =>
             {
-                int order = TermOrder.Compare(machine, left.Key, right.Key);
+                var order = TermOrder.Compare(machine, left.Key, right.Key);
                 if (order != 0)
                 {
                     return descending ? -order : order;
@@ -126,7 +126,7 @@ internal static class SortBuiltins
         }
 
         List<Cell> unique = [];
-        for (int i = 0; i < keyed.Length; i++)
+        for (var i = 0; i < keyed.Length; i++)
         {
             if (i == 0 || TermOrder.Compare(machine, keyed[i - 1].Key, keyed[i].Key) != 0)
             {
@@ -152,7 +152,7 @@ internal static class SortBuiltins
             throw PrologErrors.Type(machine, "compound", cell);
         }
 
-        int arity = machine.Symbols.ArityOf(machine.HeapAt(cell.Index).Index);
+        var arity = machine.Symbols.ArityOf(machine.HeapAt(cell.Index).Index);
         return key <= arity ? machine.HeapAt(cell.Index + key) : throw PrologErrors.Type(machine, "compound", cell);
     }
 }

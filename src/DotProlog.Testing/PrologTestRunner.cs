@@ -45,7 +45,7 @@ public sealed class PrologTestRunner
                 Error = TextWriter.Null,
                 Input = TextReader.Null,
             };
-            foreach ((string name, string text) in sources)
+            foreach ((var name, var text) in sources)
             {
                 engine.ConsultOrThrow(text, name);
             }
@@ -76,7 +76,7 @@ public sealed class PrologTestRunner
         HashSet<string> seen = new(StringComparer.Ordinal);
 
         // Names are read back from the symbol table, which holds every atom the sources mentioned.
-        for (int functorId = 0; functorId < engine.Program.Symbols.FunctorCount; functorId++)
+        for (var functorId = 0; functorId < engine.Program.Symbols.FunctorCount; functorId++)
         {
             Functor functor = engine.Program.Symbols.GetFunctor(functorId);
             if (functor.Arity != 0 || !engine.Program.IsDefined(functorId))
@@ -84,7 +84,7 @@ public sealed class PrologTestRunner
                 continue;
             }
 
-            string name = engine.Program.Symbols.AtomName(functor.NameAtom);
+            var name = engine.Program.Symbols.AtomName(functor.NameAtom);
             if (name.StartsWith(TestPrefix, StringComparison.Ordinal) && seen.Add(name))
             {
                 tests.Add(new PrologTest(name, functorId));
@@ -146,7 +146,7 @@ public sealed class PrologTestRunner
     {
         try
         {
-            int functorId = engine.Program.Symbols.InternFunctor(test.Name, 0);
+            var functorId = engine.Program.Symbols.InternFunctor(test.Name, 0);
             RunResult result = engine.Machine.Solve(functorId);
 
             return result switch
@@ -171,7 +171,7 @@ public sealed class PrologTestRunner
             Environment.GetEnvironmentVariable(TimeoutVariable),
             NumberStyles.None,
             CultureInfo.InvariantCulture,
-            out int seconds
+            out var seconds
         )
         && seconds > 0
             ? TimeSpan.FromSeconds(seconds)

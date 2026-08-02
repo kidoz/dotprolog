@@ -11,8 +11,8 @@ internal static class CharacterConversionBuiltins
 
     private static bool CharConversion(Machine machine)
     {
-        char input = RequireConversionCharacter(machine, machine.Argument(0));
-        char output = RequireConversionCharacter(machine, machine.Argument(1));
+        var input = RequireConversionCharacter(machine, machine.Argument(0));
+        var output = RequireConversionCharacter(machine, machine.Argument(1));
         machine.Program.CharacterConversions.Set(input, output);
         return true;
     }
@@ -30,7 +30,7 @@ internal static class CharacterConversionBuiltins
     private static bool CurrentCharConversion(Machine machine, int version, int start)
     {
         ReadOnlySpan<CharacterConversionTable.Entry> entries = machine.Program.CharacterConversions.Entries(version);
-        for (int index = start; index < entries.Length; index++)
+        for (var index = start; index < entries.Length; index++)
         {
             CharacterConversionTable.Entry entry = entries[index];
             Cell input = Character(machine, entry.Input);
@@ -66,14 +66,14 @@ internal static class CharacterConversionBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        return TryCharacter(machine, cell, out char character)
+        return TryCharacter(machine, cell, out var character)
             ? character
             : throw PrologErrors.Representation(machine, "character");
     }
 
     private static char RequireCharacter(Machine machine, Cell cell)
     {
-        if (!TryCharacter(machine, cell, out char character))
+        if (!TryCharacter(machine, cell, out var character))
         {
             throw PrologErrors.Type(machine, "character", cell);
         }
@@ -89,7 +89,7 @@ internal static class CharacterConversionBuiltins
             return false;
         }
 
-        string text = machine.Symbols.AtomName(cell.Index);
+        var text = machine.Symbols.AtomName(cell.Index);
         if (text.Length != 1)
         {
             return false;

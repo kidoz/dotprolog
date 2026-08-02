@@ -60,7 +60,7 @@ public class EngineBenchmarks
 
     private static int CompileGoal(PrologEngine engine, string goal)
     {
-        int address = engine.CompileGoal(goal, out IReadOnlyList<Syntax.Diagnostic> diagnostics);
+        var address = engine.CompileGoal(goal, out IReadOnlyList<Syntax.Diagnostic> diagnostics);
         if (address < 0)
         {
             throw new InvalidOperationException($"Benchmark goal failed to compile: {string.Join("; ", diagnostics)}");

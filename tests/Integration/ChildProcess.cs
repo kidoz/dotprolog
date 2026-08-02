@@ -42,7 +42,7 @@ internal static class ChildProcess
             RedirectStandardInput = true,
         };
 
-        foreach (string argument in arguments)
+        foreach (var argument in arguments)
         {
             start.ArgumentList.Add(argument);
         }
@@ -65,7 +65,7 @@ internal static class ChildProcess
             // The whole tree, because dotnet leaves MSBuild worker processes behind it.
             process.Kill(entireProcessTree: true);
 
-            string partial = await DrainAsync(standardOutput, standardError);
+            var partial = await DrainAsync(standardOutput, standardError);
             throw new TimeoutException(
                 $"{fileName} {string.Join(' ', arguments)} did not finish within "
                     + $"{Limit.TotalMinutes.ToString("F0", System.Globalization.CultureInfo.InvariantCulture)} minutes. "

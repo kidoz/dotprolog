@@ -21,7 +21,7 @@ internal static class Program
         Console.WriteLine($"100 less 15% = {pricing.Discount(100.0, 15)}");
 
         // det with an atom result.
-        foreach (long total in (long[])[1200, 700, 100])
+        foreach (var total in (long[])[1200, 700, 100])
         {
             Console.WriteLine($"total {total} is {pricing.Tier(total)}");
         }

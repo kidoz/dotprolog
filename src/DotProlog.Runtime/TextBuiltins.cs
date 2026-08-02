@@ -72,7 +72,7 @@ internal static class TextBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        return TryText(machine, cell, out string text) ? text : throw PrologErrors.Type(machine, "atomic", cell);
+        return TryText(machine, cell, out var text) ? text : throw PrologErrors.Type(machine, "atomic", cell);
     }
 
     private static string AtomArgument(Machine machine, int index)
@@ -89,7 +89,7 @@ internal static class TextBuiltins
 
     private static bool AtomLength(Machine machine)
     {
-        int actual = AtomArgument(machine, 0).Length;
+        var actual = AtomArgument(machine, 0).Length;
         Cell length = machine.Argument(1);
 
         if (length.Tag == CellTag.Reference)
@@ -117,7 +117,7 @@ internal static class TextBuiltins
 
         if (character.Tag == CellTag.Atom)
         {
-            string name = machine.Symbols.AtomName(character.Index);
+            var name = machine.Symbols.AtomName(character.Index);
             return name.Length == 1
                 ? machine.Unify(code, Cell.Integer60(name[0]))
                 : throw PrologErrors.Type(machine, "character", character);
@@ -143,14 +143,14 @@ internal static class TextBuiltins
             throw PrologErrors.Representation(machine, "character_code");
         }
 
-        string text = ((char)code.Integer).ToString();
+        var text = ((char)code.Integer).ToString();
         return machine.Unify(character, Cell.Atom(machine.Symbols.InternAtom(text)));
     }
 
     private static bool ChangeCase(Machine machine, bool upper)
     {
-        string text = TextArgument(machine, 0);
-        string changed = upper ? text.ToUpperInvariant() : text.ToLowerInvariant();
+        var text = TextArgument(machine, 0);
+        var changed = upper ? text.ToUpperInvariant() : text.ToLowerInvariant();
         return machine.Unify(machine.Argument(1), Cell.Atom(machine.Symbols.InternAtom(changed)));
     }
 
@@ -164,7 +164,7 @@ internal static class TextBuiltins
 
         if (atom.Tag == CellTag.Atom)
         {
-            string text = machine.Symbols.AtomName(atom.Index);
+            var text = machine.Symbols.AtomName(atom.Index);
             return TryParseNumber(machine, text, out PrologNumber number)
                 && machine.Unify(machine.Argument(1), ArithmeticEvaluator.ToCell(machine, number));
         }
@@ -180,7 +180,7 @@ internal static class TextBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        return TryText(machine, value, out string written)
+        return TryText(machine, value, out var written)
             ? machine.Unify(atom, Cell.Atom(machine.Symbols.InternAtom(written)))
             : throw PrologErrors.Type(machine, "number", value);
     }
@@ -210,9 +210,9 @@ internal static class TextBuiltins
             // ISO 8.16.4-8.16.8: a bound first argument decides the direction. It is converted and
             // the result unified with the list, whatever the list holds — a list of unbound
             // elements is filled in, and a list of the wrong length fails.
-            string written =
+            var written =
                 source.Tag == CellTag.Atom ? machine.Symbols.AtomName(source.Index)
-                : TryText(machine, source, out string value) ? value
+                : TryText(machine, source, out var value) ? value
                 : throw new InvalidOperationException("Validated text source has no textual representation.");
             return machine.Unify(list, BuildText(machine, written, chars));
         }
@@ -224,7 +224,7 @@ internal static class TextBuiltins
             throw tail.Tag == CellTag.Reference ? PrologErrors.Instantiation(machine) : PrologErrors.Type(machine, "list", list);
         }
 
-        string text = ReadText(machine, list, chars);
+        var text = ReadText(machine, list, chars);
 
         if (!numeric)
         {
@@ -255,7 +255,7 @@ internal static class TextBuiltins
 
             if (chars)
             {
-                string name =
+                var name =
                     cell.Tag == CellTag.Atom
                         ? machine.Symbols.AtomName(cell.Index)
                         : throw PrologErrors.Type(machine, "character", cell);
@@ -285,7 +285,7 @@ internal static class TextBuiltins
     {
         var items = new Cell[text.Length];
 
-        for (int i = 0; i < text.Length; i++)
+        for (var i = 0; i < text.Length; i++)
         {
             items[i] = chars ? Cell.Atom(machine.Symbols.InternAtom(text[i].ToString())) : Cell.Integer60(text[i]);
         }
@@ -321,14 +321,14 @@ internal static class TextBuiltins
 
         if (first.Tag == CellTag.Atom && second.Tag == CellTag.Atom)
         {
-            string left = machine.Symbols.AtomName(first.Index);
-            string right = machine.Symbols.AtomName(second.Index);
+            var left = machine.Symbols.AtomName(first.Index);
+            var right = machine.Symbols.AtomName(second.Index);
             return machine.Unify(whole, Cell.Atom(machine.Symbols.InternAtom(left + right)));
         }
 
-        string text = machine.Symbols.AtomName(whole.Index);
+        var text = machine.Symbols.AtomName(whole.Index);
 
-        int split = (int)state;
+        var split = (int)state;
         if (split > text.Length)
         {
             return false;
@@ -364,10 +364,10 @@ internal static class TextBuiltins
     /// </param>
     private static bool SubAtom(Machine machine, long state)
     {
-        string text = AtomArgument(machine, 0);
-        long? before = Constraint(machine, 1);
-        long? length = Constraint(machine, 2);
-        long? after = Constraint(machine, 3);
+        var text = AtomArgument(machine, 0);
+        var before = Constraint(machine, 1);
+        var length = Constraint(machine, 2);
+        var after = Constraint(machine, 3);
 
         Cell sub = machine.Argument(4);
         if (sub.Tag == CellTag.Reference)
@@ -386,17 +386,17 @@ internal static class TextBuiltins
     /// <summary>SubAtom is known, so the solutions are its occurrences and nothing else is scanned.</summary>
     private static bool Search(Machine machine, string text, string wanted, long? before, long? after, long state)
     {
-        int start = (int)state;
+        var start = (int)state;
 
         while (start + wanted.Length <= text.Length)
         {
-            int found = text.IndexOf(wanted, start, StringComparison.Ordinal);
+            var found = text.IndexOf(wanted, start, StringComparison.Ordinal);
             if (found < 0)
             {
                 return false;
             }
 
-            int tail = text.Length - found - wanted.Length;
+            var tail = text.Length - found - wanted.Length;
             if ((before is null || before == found) && (after is null || after == tail))
             {
                 if (found + wanted.Length < text.Length)
@@ -419,14 +419,14 @@ internal static class TextBuiltins
     private static bool Enumerate(Machine machine, string text, long? before, long? length, long? after, long state)
     {
         long span = text.Length + 1;
-        long candidate = Advance(text.Length, state, before, length, after);
+        var candidate = Advance(text.Length, state, before, length, after);
         if (candidate < 0)
         {
             return false;
         }
 
-        int start = (int)(candidate / span);
-        int size = (int)(candidate % span);
+        var start = (int)(candidate / span);
+        var size = (int)(candidate % span);
 
         if (Advance(text.Length, candidate + 1, before, length, after) >= 0)
         {
@@ -448,10 +448,10 @@ internal static class TextBuiltins
     {
         long span = textLength + 1;
 
-        for (long candidate = Math.Max(from, 0); candidate < span * span; candidate++)
+        for (var candidate = Math.Max(from, 0); candidate < span * span; candidate++)
         {
-            long start = candidate / span;
-            long size = candidate % span;
+            var start = candidate / span;
+            var size = candidate % span;
 
             if (start + size > textLength)
             {
@@ -488,7 +488,7 @@ internal static class TextBuiltins
     /// <summary><c>atomic_list_concat/3</c>, which joins when the list is proper and splits otherwise.</summary>
     private static bool AtomicListConcat3(Machine machine)
     {
-        string separator = TextArgument(machine, 1);
+        var separator = TextArgument(machine, 1);
         Cell list = machine.Argument(0);
 
         if (TermList.IsProper(machine, list))
@@ -501,11 +501,11 @@ internal static class TextBuiltins
             throw PrologErrors.Domain(machine, "non_empty_atom", machine.Argument(1));
         }
 
-        string text = TextArgument(machine, 2);
-        string[] parts = text.Split(separator, StringSplitOptions.None);
+        var text = TextArgument(machine, 2);
+        var parts = text.Split(separator, StringSplitOptions.None);
         var items = new Cell[parts.Length];
 
-        for (int i = 0; i < parts.Length; i++)
+        for (var i = 0; i < parts.Length; i++)
         {
             items[i] = Cell.Atom(machine.Symbols.InternAtom(parts[i]));
         }
@@ -518,7 +518,7 @@ internal static class TextBuiltins
         var text = new StringBuilder();
         List<Cell> elements = TermList.ReadProper(machine, list);
 
-        for (int i = 0; i < elements.Count; i++)
+        for (var i = 0; i < elements.Count; i++)
         {
             Cell element = machine.Dereference(elements[i]);
 
@@ -532,7 +532,7 @@ internal static class TextBuiltins
                 text.Append(separator);
             }
 
-            text.Append(TryText(machine, element, out string part) ? part : throw PrologErrors.Type(machine, "atomic", element));
+            text.Append(TryText(machine, element, out var part) ? part : throw PrologErrors.Type(machine, "atomic", element));
         }
 
         return machine.Unify(machine.Argument(resultIndex), Cell.Atom(machine.Symbols.InternAtom(text.ToString())));
@@ -570,7 +570,7 @@ internal static class TextBuiltins
             return false;
         }
 
-        bool negative = span[0] == '-';
+        var negative = span[0] == '-';
         if (span[0] is '-' or '+')
         {
             span = span[1..];
@@ -581,7 +581,7 @@ internal static class TextBuiltins
             return false;
         }
 
-        if (TryParseRadix(span, out long radixValue, out bool radixOverflow))
+        if (TryParseRadix(span, out var radixValue, out var radixOverflow))
         {
             if (radixOverflow || !Cell.FitsInteger(negative ? -radixValue : radixValue))
             {
@@ -592,7 +592,7 @@ internal static class TextBuiltins
             return true;
         }
 
-        foreach (char c in span)
+        foreach (var c in span)
         {
             if (!char.IsAsciiDigit(c) && c != '.' && c != 'e' && c != 'E' && c != '+' && c != '-')
             {
@@ -600,11 +600,11 @@ internal static class TextBuiltins
             }
         }
 
-        bool real = span.Contains('.');
+        var real = span.Contains('.');
 
         if (!real)
         {
-            foreach (char c in span)
+            foreach (var c in span)
             {
                 if (!char.IsAsciiDigit(c))
                 {
@@ -613,7 +613,7 @@ internal static class TextBuiltins
             }
 
             if (
-                !long.TryParse(span, NumberStyles.None, CultureInfo.InvariantCulture, out long integer)
+                !long.TryParse(span, NumberStyles.None, CultureInfo.InvariantCulture, out var integer)
                 || !Cell.FitsInteger(negative ? -integer : integer)
             )
             {
@@ -625,13 +625,13 @@ internal static class TextBuiltins
         }
 
         // A Prolog float needs digits on both sides of the point, so ".5" and "1." are not numbers.
-        int point = span.IndexOf('.');
+        var point = span.IndexOf('.');
         if (point == 0 || (point > 0 && (point == span.Length - 1 || !char.IsAsciiDigit(span[point + 1]))))
         {
             return false;
         }
 
-        if (!double.TryParse(span, NumberStyles.Float, CultureInfo.InvariantCulture, out double value))
+        if (!double.TryParse(span, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
         {
             return false;
         }
@@ -669,7 +669,7 @@ internal static class TextBuiltins
             return true;
         }
 
-        int radix = char.ToLowerInvariant(span[1]) switch
+        var radix = char.ToLowerInvariant(span[1]) switch
         {
             'x' => 16,
             'o' => 8,
@@ -682,9 +682,9 @@ internal static class TextBuiltins
             return false;
         }
 
-        foreach (char c in span[2..])
+        foreach (var c in span[2..])
         {
-            int digit =
+            var digit =
                 char.IsAsciiDigit(c) ? c - '0'
                 : char.IsAsciiLetter(c) ? char.ToLowerInvariant(c) - 'a' + 10
                 : -1;
@@ -713,7 +713,7 @@ internal static class TextBuiltins
     internal static string TextOfList(Machine machine, Cell list)
     {
         List<Cell> elements = TermList.ReadProper(machine, list);
-        bool chars = elements.Count > 0 && machine.Dereference(elements[0]).Tag == CellTag.Atom;
+        var chars = elements.Count > 0 && machine.Dereference(elements[0]).Tag == CellTag.Atom;
         return ReadText(machine, elements, chars);
     }
 }

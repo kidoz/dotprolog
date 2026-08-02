@@ -72,10 +72,10 @@ internal static class DatabaseBuiltins
         // compiler's term traversal.
         Cell normalized = NormalizeClause(machine, clause);
         var term = new TermBuffer();
-        int root = term.Copy(machine, normalized);
+        var root = term.Copy(machine, normalized);
 
         IRuntimeCompiler compiler = CompilerOf(machine);
-        int address = compiler.CompileClause(machine, clause, out int functorId);
+        var address = compiler.CompileClause(machine, clause, out var functorId);
         RequireModifiable(machine, functorId);
         DynamicPredicate predicate = machine.Program.DeclareDynamic(functorId);
 
@@ -113,7 +113,7 @@ internal static class DatabaseBuiltins
         }
 
         Cell normalized = NormalizeClausePattern(machine, pattern);
-        int functorId = FunctorOf(machine, normalized);
+        var functorId = FunctorOf(machine, normalized);
         RequireModifiable(machine, functorId);
         DynamicPredicate? predicate = FindPredicate(machine, normalized, declareIfMissing: false);
         if (predicate is null)
@@ -136,7 +136,7 @@ internal static class DatabaseBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        int functorId = FunctorOf(machine, head);
+        var functorId = FunctorOf(machine, head);
         RequireClauseAccessible(machine, functorId);
 
         Cell body = machine.Argument(1);
@@ -212,7 +212,7 @@ internal static class DatabaseBuiltins
 
         // retractall/1 leaves the predicate defined but empty, even if it did not exist before.
         DynamicPredicate predicate = FindPredicate(machine, head, declareIfMissing: true)!;
-        int generation = machine.Program.Generation;
+        var generation = machine.Program.Generation;
 
         for (DynamicClause? clause = predicate.First; clause is not null; clause = clause.Next)
         {
@@ -243,10 +243,10 @@ internal static class DatabaseBuiltins
         Cell indicator = machine.Argument(0);
         ValidatePredicateIndicator(machine, indicator, variablesAllowed: true, out _, out _);
 
-        int count = machine.Symbols.FunctorCount;
-        int slash = machine.Symbols.InternFunctor("/", 2);
+        var count = machine.Symbols.FunctorCount;
+        var slash = machine.Symbols.InternFunctor("/", 2);
 
-        for (int functorId = (int)state; functorId < count; functorId++)
+        for (var functorId = (int)state; functorId < count; functorId++)
         {
             if (!machine.Program.IsUserPredicate(functorId))
             {
@@ -254,7 +254,7 @@ internal static class DatabaseBuiltins
             }
 
             Functor functor = machine.Symbols.GetFunctor(functorId);
-            string name = machine.Symbols.AtomName(functor.NameAtom);
+            var name = machine.Symbols.AtomName(functor.NameAtom);
             if (name.StartsWith('$'))
             {
                 continue;
@@ -283,7 +283,7 @@ internal static class DatabaseBuiltins
         Cell indicator = machine.Argument(0);
         ValidatePredicateIndicator(machine, indicator, variablesAllowed: false, out Cell name, out Cell arity);
 
-        int functorId = machine.Symbols.InternFunctor(name.Index, (int)arity.Integer);
+        var functorId = machine.Symbols.InternFunctor(name.Index, (int)arity.Integer);
         RequireModifiable(machine, functorId);
         machine.Program.AbolishDynamic(functorId);
         return true;
@@ -309,7 +309,7 @@ internal static class DatabaseBuiltins
             return;
         }
 
-        int slash = machine.Symbols.InternFunctor("/", 2);
+        var slash = machine.Symbols.InternFunctor("/", 2);
         if (indicator.Tag != CellTag.Structure || machine.HeapAt(indicator.Index).Index != slash)
         {
             throw PrologErrors.Type(machine, "predicate_indicator", indicator);
@@ -413,7 +413,7 @@ internal static class DatabaseBuiltins
     private static Cell CanonicalizeGoal(Machine machine, Cell goal)
     {
         goal = machine.Dereference(goal);
-        int call = machine.Symbols.InternFunctor("call", 1);
+        var call = machine.Symbols.InternFunctor("call", 1);
         if (goal.Tag == CellTag.Reference)
         {
             return machine.CreateStructure(call, [goal]);
@@ -431,7 +431,7 @@ internal static class DatabaseBuiltins
 
         while (work.Count > 0)
         {
-            (Cell current, bool leaving) = work[^1];
+            (Cell current, var leaving) = work[^1];
             work.RemoveAt(work.Count - 1);
             current = machine.Dereference(current);
 
@@ -448,10 +448,10 @@ internal static class DatabaseBuiltins
                     continue;
                 }
 
-                int functor = machine.HeapAt(current.Index).Index;
-                int arity = machine.Symbols.ArityOf(functor);
+                var functor = machine.HeapAt(current.Index).Index;
+                var arity = machine.Symbols.ArityOf(functor);
                 var arguments = new Cell[arity];
-                for (int i = 0; i < arity; i++)
+                for (var i = 0; i < arity; i++)
                 {
                     Cell argument = machine.Dereference(machine.HeapAt(current.Index + i + 1));
                     arguments[i] =
@@ -478,8 +478,8 @@ internal static class DatabaseBuiltins
             }
 
             work.Add((current, true));
-            int childCount = machine.Symbols.ArityOf(machine.HeapAt(current.Index).Index);
-            for (int i = childCount; i >= 1; i--)
+            var childCount = machine.Symbols.ArityOf(machine.HeapAt(current.Index).Index);
+            for (var i = childCount; i >= 1; i--)
             {
                 Cell child = machine.Dereference(machine.HeapAt(current.Index + i));
                 if (child.Tag == CellTag.Structure && IsControlConstruct(machine, child))
@@ -494,9 +494,9 @@ internal static class DatabaseBuiltins
 
     private static bool IsControlConstruct(Machine machine, Cell goal)
     {
-        int functorId = machine.HeapAt(goal.Index).Index;
+        var functorId = machine.HeapAt(goal.Index).Index;
         Functor functor = machine.Symbols.GetFunctor(functorId);
-        string name = machine.Symbols.AtomName(functor.NameAtom);
+        var name = machine.Symbols.AtomName(functor.NameAtom);
         return (functor.Arity == 2 && name is "," or ";" or "->" or "*->") || (functor.Arity == 1 && name == "\\+");
     }
 
@@ -519,7 +519,7 @@ internal static class DatabaseBuiltins
 
     private static DynamicPredicate? FindPredicate(Machine machine, Cell clauseOrHead, bool declareIfMissing)
     {
-        int functorId = FunctorOf(machine, clauseOrHead);
+        var functorId = FunctorOf(machine, clauseOrHead);
         if (!declareIfMissing)
         {
             return machine.Program.FindDynamic(functorId);

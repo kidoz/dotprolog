@@ -15,7 +15,7 @@ public sealed class StreamEofActionTests : IDisposable
     [InlineData("reset")]
     public void OpenReportsTheSelectedEofAction(string action)
     {
-        string path = Path($"{action}.txt");
+        var path = Path($"{action}.txt");
         File.WriteAllText(path, string.Empty);
 
         Assert.Equal(
@@ -31,7 +31,7 @@ public sealed class StreamEofActionTests : IDisposable
     [Fact]
     public void EofCodeReturnsTheMarkerRepeatedly()
     {
-        string path = Path("eof-code.txt");
+        var path = Path("eof-code.txt");
         File.WriteAllText(path, string.Empty);
 
         Assert.Equal(
@@ -52,7 +52,7 @@ public sealed class StreamEofActionTests : IDisposable
     [InlineData("read(S, end_of_file), read(S, _)")]
     public void ErrorRejectsTextInputPastTheEnd(string operations)
     {
-        string path = Path("error.txt");
+        var path = Path("error.txt");
         File.WriteAllText(path, string.Empty);
 
         Assert.Equal(
@@ -68,7 +68,7 @@ public sealed class StreamEofActionTests : IDisposable
     [Fact]
     public void ErrorRejectsByteInputPastTheEnd()
     {
-        string path = Path("error.bin");
+        var path = Path("error.bin");
         File.WriteAllBytes(path, []);
 
         Assert.Equal(
@@ -87,7 +87,7 @@ public sealed class StreamEofActionTests : IDisposable
     [InlineData("get_code(S, bad)", "type_error(integer,bad)")]
     public void InvalidCharacterInputTakesPriorityOverPastEndPermission(string operation, string expected)
     {
-        string path = Path("past-end-priority.txt");
+        var path = Path("past-end-priority.txt");
         File.WriteAllText(path, string.Empty);
 
         Assert.Equal(
@@ -102,7 +102,7 @@ public sealed class StreamEofActionTests : IDisposable
     [Fact]
     public void InvalidByteInputTakesPriorityOverPastEndPermission()
     {
-        string path = Path("past-end-priority.bin");
+        var path = Path("past-end-priority.bin");
         File.WriteAllBytes(path, []);
 
         Assert.Equal(
@@ -117,7 +117,7 @@ public sealed class StreamEofActionTests : IDisposable
     [Fact]
     public void ResetRechecksTheSourceAfterPastEnd()
     {
-        string path = Path("reset.txt");
+        var path = Path("reset.txt");
         File.WriteAllText(path, string.Empty);
 
         Assert.Equal(
@@ -137,7 +137,7 @@ public sealed class StreamEofActionTests : IDisposable
     [Fact]
     public void RightmostEofActionWins()
     {
-        string path = Path("rightmost.txt");
+        var path = Path("rightmost.txt");
         File.WriteAllText(path, string.Empty);
 
         Assert.Equal(
@@ -155,7 +155,7 @@ public sealed class StreamEofActionTests : IDisposable
     [InlineData("eof_action(_)", "instantiation_error")]
     public void ReportsEofActionOptionErrors(string option, string expected)
     {
-        string path = Path("option.txt");
+        var path = Path("option.txt");
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch(open('{path}', read, _, [{option}]), error(E, _), write(E))"));
     }
 

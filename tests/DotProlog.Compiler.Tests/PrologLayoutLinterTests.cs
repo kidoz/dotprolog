@@ -73,7 +73,7 @@ public sealed class PrologLayoutLinterTests
     public void CommaSpacingIgnoresQuotedTextAndComments()
     {
         const string source = "value('a,b', /* x,y */ [a,b]).\n";
-        int comma = source.IndexOf("[a,b]", StringComparison.Ordinal) + 2;
+        var comma = source.IndexOf("[a,b]", StringComparison.Ordinal) + 2;
 
         Diagnostic diagnostic = Assert.Single(Lint(source, PrologLintOptions.Covington));
 

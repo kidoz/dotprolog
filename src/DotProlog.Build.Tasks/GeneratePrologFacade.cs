@@ -77,11 +77,11 @@ public sealed class GeneratePrologFacade : Task
             var sources = new List<(string Name, string Text)>();
             foreach (ITaskItem source in Sources)
             {
-                string path = source.GetMetadata("FullPath");
+                var path = source.GetMetadata("FullPath");
                 sources.Add((Path.GetFileName(path), File.ReadAllText(path)));
             }
 
-            string entryPoint = Path.Combine(OutputPath, $"{EntryPointGenerator.TypeName}.g.cs");
+            var entryPoint = Path.Combine(OutputPath, $"{EntryPointGenerator.TypeName}.g.cs");
             WriteIfChanged(
                 entryPoint,
                 GenerateTestHost
@@ -93,10 +93,10 @@ public sealed class GeneratePrologFacade : Task
 
         foreach (ITaskItem contractItem in Contracts)
         {
-            string contractPath = contractItem.GetMetadata("FullPath");
-            string moduleName = Path.GetFileNameWithoutExtension(contractPath);
+            var contractPath = contractItem.GetMetadata("FullPath");
+            var moduleName = Path.GetFileNameWithoutExtension(contractPath);
 
-            if (!TryFindSource(moduleName, out string sourcePath))
+            if (!TryFindSource(moduleName, out var sourcePath))
             {
                 Log.LogError(
                     subcategory: null,
@@ -121,14 +121,14 @@ public sealed class GeneratePrologFacade : Task
                 continue;
             }
 
-            string facade = FacadeGenerator.Generate(
+            var facade = FacadeGenerator.Generate(
                 result.Contract!,
                 File.ReadAllText(sourcePath),
                 Path.GetFileName(sourcePath),
                 languageMode
             );
 
-            string target = Path.Combine(OutputPath, $"{result.Contract!.ClrTypeName}Module.g.cs");
+            var target = Path.Combine(OutputPath, $"{result.Contract!.ClrTypeName}Module.g.cs");
             WriteIfChanged(target, facade);
             generated.Add(new TaskItem(target));
 
@@ -154,9 +154,9 @@ public sealed class GeneratePrologFacade : Task
             expected.Add(Path.GetFullPath(item.ItemSpec));
         }
 
-        foreach (string file in Directory.EnumerateFiles(OutputPath, "*.g.cs", SearchOption.AllDirectories))
+        foreach (var file in Directory.EnumerateFiles(OutputPath, "*.g.cs", SearchOption.AllDirectories))
         {
-            string path = Path.GetFullPath(file);
+            var path = Path.GetFullPath(file);
             if (expected.Contains(path))
             {
                 continue;
@@ -171,7 +171,7 @@ public sealed class GeneratePrologFacade : Task
     {
         foreach (ITaskItem source in Sources)
         {
-            string candidate = source.GetMetadata("FullPath");
+            var candidate = source.GetMetadata("FullPath");
             if (string.Equals(Path.GetFileNameWithoutExtension(candidate), moduleName, StringComparison.Ordinal))
             {
                 path = candidate;
@@ -187,7 +187,7 @@ public sealed class GeneratePrologFacade : Task
     {
         foreach (Diagnostic diagnostic in diagnostics)
         {
-            string file = diagnostic.FileName ?? defaultFile;
+            var file = diagnostic.FileName ?? defaultFile;
 
             if (diagnostic.Severity == DiagnosticSeverity.Error)
             {

@@ -100,7 +100,7 @@ public readonly record struct PrologInput
             case PrologInputKind.List:
             {
                 var items = new Cell[_items!.Length];
-                for (int i = 0; i < items.Length; i++)
+                for (var i = 0; i < items.Length; i++)
                 {
                     items[i] = _items[i].Build(machine);
                 }
@@ -111,7 +111,7 @@ public readonly record struct PrologInput
             default:
             {
                 var arguments = new Cell[_items!.Length];
-                for (int i = 0; i < arguments.Length; i++)
+                for (var i = 0; i < arguments.Length; i++)
                 {
                     arguments[i] = _items[i].Build(machine);
                 }

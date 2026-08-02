@@ -255,7 +255,7 @@ public static class CoreBuiltins
         }
 
         // A nested qualification names the innermost module, as M1:M2:G means M2:G.
-        int colon = machine.Symbols.InternFunctor(":", 2);
+        var colon = machine.Symbols.InternFunctor(":", 2);
         while (goal.Tag == CellTag.Structure && machine.HeapAt(goal.Index).Index == colon)
         {
             module = machine.Dereference(machine.HeapAt(goal.Index + 1));
@@ -269,11 +269,11 @@ public static class CoreBuiltins
             }
         }
 
-        string prefix = machine.Symbols.AtomName(module.Index);
+        var prefix = machine.Symbols.AtomName(module.Index);
 
         if (goal.Tag == CellTag.Atom)
         {
-            int qualified = machine.Symbols.InternFunctor($"{prefix}:{machine.Symbols.AtomName(goal.Index)}", 0);
+            var qualified = machine.Symbols.InternFunctor($"{prefix}:{machine.Symbols.AtomName(goal.Index)}", 0);
             return machine.Unify(
                 machine.Argument(2),
                 machine.Program.IsDefined(qualified) ? Cell.Atom(machine.Symbols.GetFunctor(qualified).NameAtom) : goal
@@ -286,7 +286,7 @@ public static class CoreBuiltins
         }
 
         Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(goal.Index).Index);
-        int target = machine.Symbols.InternFunctor($"{prefix}:{machine.Symbols.AtomName(functor.NameAtom)}", functor.Arity);
+        var target = machine.Symbols.InternFunctor($"{prefix}:{machine.Symbols.AtomName(functor.NameAtom)}", functor.Arity);
 
         if (!machine.Program.IsDefined(target) && !machine.Program.IsDynamic(target))
         {
@@ -294,7 +294,7 @@ public static class CoreBuiltins
         }
 
         var arguments = new Cell[functor.Arity];
-        for (int i = 0; i < functor.Arity; i++)
+        for (var i = 0; i < functor.Arity; i++)
         {
             arguments[i] = machine.HeapAt(goal.Index + 1 + i);
         }
@@ -319,7 +319,7 @@ public static class CoreBuiltins
 
         // A qualified closure keeps its qualification: M:foo with an extra argument is M:foo(X), so
         // that the resolution happens once, when the goal is finally called.
-        int colon = machine.Symbols.InternFunctor(":", 2);
+        var colon = machine.Symbols.InternFunctor(":", 2);
         if (goal.Tag == CellTag.Structure && machine.HeapAt(goal.Index).Index == colon && extra.Count > 0)
         {
             Cell module = machine.HeapAt(goal.Index + 1);
@@ -343,7 +343,7 @@ public static class CoreBuiltins
 
         if (goal.Tag == CellTag.Atom)
         {
-            int atomFunctor = machine.Symbols.InternFunctor(goal.Index, extra.Count);
+            var atomFunctor = machine.Symbols.InternFunctor(goal.Index, extra.Count);
             return machine.Unify(target, machine.CreateStructure(atomFunctor, CollectionsMarshal.AsSpan(extra)));
         }
 
@@ -353,7 +353,7 @@ public static class CoreBuiltins
         }
 
         Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(goal.Index).Index);
-        int arity = functor.Arity + extra.Count;
+        var arity = functor.Arity + extra.Count;
 
         if (arity >= Machine.ArgumentRegisterCount)
         {
@@ -361,7 +361,7 @@ public static class CoreBuiltins
         }
 
         var arguments = new Cell[arity];
-        for (int i = 0; i < functor.Arity; i++)
+        for (var i = 0; i < functor.Arity; i++)
         {
             arguments[i] = machine.HeapAt(goal.Index + 1 + i);
         }
@@ -405,7 +405,7 @@ public static class CoreBuiltins
             throw PrologErrors.Type(machine, "integer", high);
         }
 
-        long value = next == long.MinValue ? low.Integer : next;
+        var value = next == long.MinValue ? low.Integer : next;
         Cell target = machine.Argument(2);
 
         // With X already bound, between/3 is a range check with no solutions to enumerate.

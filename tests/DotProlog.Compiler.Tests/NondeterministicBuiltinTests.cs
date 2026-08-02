@@ -62,7 +62,7 @@ public sealed class NondeterministicBuiltinTests
     public void RetractRemovesAFurtherClauseOnEachRedo()
     {
         // ISO requires retract/1 to be nondeterministic; the whole predicate empties here.
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             $"""
             {Declared}
 
@@ -88,7 +88,7 @@ public sealed class NondeterministicBuiltinTests
     [Fact]
     public void ClauseEnumeratesWithoutRemoving()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             $"""
             {Declared}
 
@@ -123,7 +123,7 @@ public sealed class NondeterministicBuiltinTests
     [InlineData("write(_)", "write/1")]
     public void ClauseRejectsPrivateProcedures(string head, string indicator)
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             $"""
             fixed(1).
             :- initialization(catch(clause({head}, _), error(E, _), write(E))).

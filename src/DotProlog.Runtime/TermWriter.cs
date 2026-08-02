@@ -144,7 +144,7 @@ public static class TermWriter
                 return;
         }
 
-        int functorId = machine.HeapAt(cell.Index).Index;
+        var functorId = machine.HeapAt(cell.Index).Index;
         Functor functor = machine.Symbols.GetFunctor(functorId);
 
         if (numberVariables && TryWriteNumberVariable(machine, cell, functor, output))
@@ -170,7 +170,7 @@ public static class TermWriter
             return;
         }
 
-        string name = machine.Symbols.AtomName(functor.NameAtom);
+        var name = machine.Symbols.AtomName(functor.NameAtom);
 
         if (!ignoreOperators)
         {
@@ -193,7 +193,7 @@ public static class TermWriter
         output.Write("(");
         work.Add(Item.OfText(")"));
 
-        for (int i = functor.Arity; i >= 1; i--)
+        for (var i = functor.Arity; i >= 1; i--)
         {
             work.Add(Item.OfTerm(machine.HeapAt(cell.Index + i), ArgumentPriority));
             if (i > 1)
@@ -216,9 +216,9 @@ public static class TermWriter
             return false;
         }
 
-        long value = number.Integer;
-        char letter = (char)('A' + (value % 26));
-        long suffix = value / 26;
+        var value = number.Integer;
+        var letter = (char)('A' + (value % 26));
+        var suffix = value / 26;
         output.Write(suffix == 0 ? letter.ToString() : $"{letter}{suffix.ToString(CultureInfo.InvariantCulture)}");
 
         return true;
@@ -243,7 +243,7 @@ public static class TermWriter
 
         if (functor.Arity == 2 && operators.TryGetInfixOrPostfix(name, out PrologOperator infix) && infix.IsInfix)
         {
-            bool bracket = infix.Priority > maxPriority;
+            var bracket = infix.Priority > maxPriority;
             if (bracket)
             {
                 output.Write("(");
@@ -259,7 +259,7 @@ public static class TermWriter
 
         if (functor.Arity == 1 && operators.TryGetPrefix(name, out PrologOperator prefix))
         {
-            bool bracket = prefix.Priority > maxPriority;
+            var bracket = prefix.Priority > maxPriority;
             if (bracket)
             {
                 output.Write("(");
@@ -274,7 +274,7 @@ public static class TermWriter
 
         if (functor.Arity == 1 && operators.TryGetInfixOrPostfix(name, out PrologOperator postfix) && postfix.IsPostfix)
         {
-            bool bracket = postfix.Priority > maxPriority;
+            var bracket = postfix.Priority > maxPriority;
             if (bracket)
             {
                 output.Write("(");
@@ -326,7 +326,7 @@ public static class TermWriter
     /// </summary>
     private static void WriteAtom(Machine machine, int atomId, int maxPriority, Emitter output, bool quoted, bool ignoreOperators)
     {
-        string name = machine.Symbols.AtomName(atomId);
+        var name = machine.Symbols.AtomName(atomId);
 
         if (!ignoreOperators && machine.Operators.MaxPriority(name) > maxPriority)
         {
@@ -341,7 +341,7 @@ public static class TermWriter
 
     private static string FloatText(double value)
     {
-        string text = value.ToString("R", CultureInfo.InvariantCulture);
+        var text = value.ToString("R", CultureInfo.InvariantCulture);
 
         // A Prolog float must be readable back as a float, so it always carries a decimal point.
         if (text.Contains('.', StringComparison.Ordinal))
@@ -349,7 +349,7 @@ public static class TermWriter
             return text;
         }
 
-        int exponent = text.IndexOf('E', StringComparison.Ordinal);
+        var exponent = text.IndexOf('E', StringComparison.Ordinal);
         if (exponent < 0)
         {
             exponent = text.IndexOf('e', StringComparison.Ordinal);
@@ -380,7 +380,7 @@ public static class TermWriter
         var quotedText = new System.Text.StringBuilder(name.Length + 2);
         quotedText.Append('\'');
 
-        foreach (char c in name)
+        foreach (var c in name)
         {
             _ = c switch
             {
@@ -425,7 +425,7 @@ public static class TermWriter
 
         if (char.IsLower(name[0]))
         {
-            foreach (char c in name)
+            foreach (var c in name)
             {
                 if (c != '_' && !char.IsLetterOrDigit(c))
                 {
@@ -436,7 +436,7 @@ public static class TermWriter
             return false;
         }
 
-        foreach (char c in name)
+        foreach (var c in name)
         {
             if (!SymbolCharacters.Contains(c, StringComparison.Ordinal))
             {

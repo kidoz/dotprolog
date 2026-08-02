@@ -16,7 +16,7 @@ internal sealed record LogtalkTestDeclaration(
     {
         get
         {
-            int opening = Outcome.IndexOf('(');
+            var opening = Outcome.IndexOf('(');
             return opening < 0 ? Outcome : Outcome[..opening];
         }
     }

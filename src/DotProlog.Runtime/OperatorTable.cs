@@ -75,7 +75,7 @@ public sealed class OperatorTable
     /// <summary>The highest priority of any definition for <paramref name="name"/>, or zero if it is not an operator.</summary>
     public int MaxPriority(string name)
     {
-        int priority = 0;
+        var priority = 0;
         if (_prefix.TryGetValue(name, out PrologOperator prefix))
         {
             priority = prefix.Priority;
@@ -111,8 +111,8 @@ public sealed class OperatorTable
             return OperatorDefinitionConflict.Create;
         }
 
-        bool requestedInfix = type is OperatorType.Xfx or OperatorType.Xfy or OperatorType.Yfx;
-        bool requestedPostfix = type is OperatorType.Xf or OperatorType.Yf;
+        var requestedInfix = type is OperatorType.Xfx or OperatorType.Xfy or OperatorType.Yfx;
+        var requestedPostfix = type is OperatorType.Xf or OperatorType.Yf;
         if (
             (requestedInfix || requestedPostfix)
             && _infixOrPostfix.TryGetValue(name, out PrologOperator existing)
@@ -132,7 +132,7 @@ public sealed class OperatorTable
         Define(1200, OperatorType.Fx, ":-");
         Define(1200, OperatorType.Fx, "?-");
         foreach (
-            string name in (string[])
+            var name in (string[])
                 [
                     "dynamic",
                     "discontiguous",
@@ -158,7 +158,7 @@ public sealed class OperatorTable
         Define(900, OperatorType.Fy, "\\+");
 
         foreach (
-            string name in (string[])
+            var name in (string[])
                 ["=", "\\=", "==", "\\==", "@<", "@>", "@=<", "@>=", "=..", "is", "=:=", "=\\=", "<", ">", "=<", ">="]
         )
         {
@@ -166,12 +166,12 @@ public sealed class OperatorTable
         }
 
         Define(600, OperatorType.Xfy, ":");
-        foreach (string name in (string[])["+", "-", "/\\", "\\/", "xor"])
+        foreach (var name in (string[])["+", "-", "/\\", "\\/", "xor"])
         {
             Define(500, OperatorType.Yfx, name);
         }
 
-        foreach (string name in (string[])["*", "/", "//", "rem", "mod", "div", "<<", ">>"])
+        foreach (var name in (string[])["*", "/", "//", "rem", "mod", "div", "<<", ">>"])
         {
             Define(400, OperatorType.Yfx, name);
         }

@@ -51,9 +51,9 @@ internal static class TermBuiltins
             static machine => machine.UnifyWithOccursCheck(machine.Argument(0), machine.Argument(1))
         );
 
-        int less = symbols.InternAtom("<");
-        int equal = symbols.InternAtom("=");
-        int greater = symbols.InternAtom(">");
+        var less = symbols.InternAtom("<");
+        var equal = symbols.InternAtom("=");
+        var greater = symbols.InternAtom(">");
         registry.Register("compare", 3, machine => Compare(machine, less, equal, greater));
     }
 
@@ -64,7 +64,7 @@ internal static class TermBuiltins
         registry.Register("copy_term", 2, CopyTerm);
         registry.Register("term_variables", 2, TermVariables);
 
-        int emptyList = symbols.EmptyList;
+        var emptyList = symbols.EmptyList;
         registry.Register("=..", 2, machine => Univ(machine, emptyList));
     }
 
@@ -79,8 +79,8 @@ internal static class TermBuiltins
     private static bool CopyTerm(Machine machine)
     {
         var buffer = new TermBuffer();
-        int root = buffer.Copy(machine, machine.Argument(0));
-        int origin = buffer.Materialize(machine);
+        var root = buffer.Copy(machine, machine.Argument(0));
+        var origin = buffer.Materialize(machine);
         return machine.Unify(machine.Argument(1), machine.HeapAt(origin + root));
     }
 
@@ -123,8 +123,8 @@ internal static class TermBuiltins
             }
 
             // Pushed in reverse so the leftmost argument is walked first.
-            int arity = machine.Symbols.ArityOf(machine.HeapAt(cell.Index).Index);
-            for (int i = arity; i >= 1; i--)
+            var arity = machine.Symbols.ArityOf(machine.HeapAt(cell.Index).Index);
+            for (var i = arity; i >= 1; i--)
             {
                 work.Add(machine.HeapAt(cell.Index + i));
             }
@@ -186,20 +186,20 @@ internal static class TermBuiltins
                 return false;
             }
 
-            int candidateFunctor = machine.HeapAt(candidate.Index).Index;
+            var candidateFunctor = machine.HeapAt(candidate.Index).Index;
             if (candidateFunctor != machine.HeapAt(instance.Index).Index)
             {
                 return false;
             }
 
-            ulong pair = ((ulong)(uint)candidate.Index << 32) | (uint)instance.Index;
+            var pair = ((ulong)(uint)candidate.Index << 32) | (uint)instance.Index;
             if (!visitedStructures.Add(pair))
             {
                 continue;
             }
 
-            int arity = machine.Symbols.ArityOf(candidateFunctor);
-            for (int i = arity; i >= 1; i--)
+            var arity = machine.Symbols.ArityOf(candidateFunctor);
+            for (var i = arity; i >= 1; i--)
             {
                 work.Add((machine.HeapAt(candidate.Index + i), machine.HeapAt(instance.Index + i)));
             }
@@ -230,8 +230,8 @@ internal static class TermBuiltins
                 continue;
             }
 
-            int arity = machine.Symbols.ArityOf(machine.HeapAt(cell.Index).Index);
-            for (int i = arity; i >= 1; i--)
+            var arity = machine.Symbols.ArityOf(machine.HeapAt(cell.Index).Index);
+            for (var i = arity; i >= 1; i--)
             {
                 work.Add(machine.HeapAt(cell.Index + i));
             }
@@ -256,8 +256,8 @@ internal static class TermBuiltins
             }
         }
 
-        int order = TermOrder.Compare(machine, machine.Argument(1), machine.Argument(2));
-        int result =
+        var order = TermOrder.Compare(machine, machine.Argument(1), machine.Argument(2));
+        var result =
             order < 0 ? less
             : order > 0 ? greater
             : equal;
@@ -321,12 +321,12 @@ internal static class TermBuiltins
         }
 
         var arguments = new Cell[(int)arity.Integer];
-        for (int i = 0; i < arguments.Length; i++)
+        for (var i = 0; i < arguments.Length; i++)
         {
             arguments[i] = machine.CreateVariable();
         }
 
-        int functorId = machine.Symbols.InternFunctor(name.Index, arguments.Length);
+        var functorId = machine.Symbols.InternFunctor(name.Index, arguments.Length);
         return machine.Unify(term, machine.CreateStructure(functorId, arguments));
     }
 
@@ -360,7 +360,7 @@ internal static class TermBuiltins
             throw PrologErrors.Domain(machine, "not_less_than_zero", index);
         }
 
-        int arity = machine.Symbols.ArityOf(machine.HeapAt(term.Index).Index);
+        var arity = machine.Symbols.ArityOf(machine.HeapAt(term.Index).Index);
         if (index.Integer == 0 || index.Integer > arity)
         {
             return false;
@@ -380,7 +380,7 @@ internal static class TermBuiltins
                 Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(term.Index).Index);
                 var items = new Cell[functor.Arity + 1];
                 items[0] = Cell.Atom(functor.NameAtom);
-                for (int i = 0; i < functor.Arity; i++)
+                for (var i = 0; i < functor.Arity; i++)
                 {
                     items[i + 1] = machine.HeapAt(term.Index + 1 + i);
                 }
@@ -430,7 +430,7 @@ internal static class TermBuiltins
             throw PrologErrors.Representation(machine, "max_arity");
         }
 
-        int functorId = machine.Symbols.InternFunctor(head.Index, elements.Count - 1);
+        var functorId = machine.Symbols.InternFunctor(head.Index, elements.Count - 1);
         return machine.Unify(term, machine.CreateStructure(functorId, CollectionsMarshal.AsSpan(elements)[1..]));
     }
 
@@ -453,8 +453,8 @@ internal static class TermBuiltins
                 continue;
             }
 
-            int arity = machine.Symbols.ArityOf(machine.HeapAt(cell.Index).Index);
-            for (int i = 1; i <= arity; i++)
+            var arity = machine.Symbols.ArityOf(machine.HeapAt(cell.Index).Index);
+            for (var i = 1; i <= arity; i++)
             {
                 work.Add(machine.HeapAt(cell.Index + i));
             }
@@ -470,7 +470,7 @@ internal static class TermBuiltins
 
         while (work.Count > 0)
         {
-            (Cell cell, bool exit) = work[^1];
+            (Cell cell, var exit) = work[^1];
             work.RemoveAt(work.Count - 1);
             cell = machine.Dereference(cell);
 
@@ -485,7 +485,7 @@ internal static class TermBuiltins
                 continue;
             }
 
-            if (state.TryGetValue(cell.Index, out bool complete))
+            if (state.TryGetValue(cell.Index, out var complete))
             {
                 if (!complete)
                 {
@@ -498,8 +498,8 @@ internal static class TermBuiltins
             state.Add(cell.Index, false);
             work.Add((cell, true));
 
-            int arity = machine.Symbols.ArityOf(machine.HeapAt(cell.Index).Index);
-            for (int i = arity; i >= 1; i--)
+            var arity = machine.Symbols.ArityOf(machine.HeapAt(cell.Index).Index);
+            for (var i = arity; i >= 1; i--)
             {
                 work.Add((machine.HeapAt(cell.Index + i), false));
             }

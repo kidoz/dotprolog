@@ -35,7 +35,7 @@ public sealed class PrologHost
     {
         ArgumentNullException.ThrowIfNull(name);
 
-        int functorId = _machine.Symbols.InternFunctor(name, arity);
+        var functorId = _machine.Symbols.InternFunctor(name, arity);
         if (_machine.Program.IsStrictIsoExtension(functorId))
         {
             throw PrologErrors.Permission(_machine, "access", "implementation_specific_feature", functorId);
@@ -91,7 +91,7 @@ public sealed class PrologHost
         _machine.BeginCall();
 
         cells = new Cell[arguments.Length];
-        for (int i = 0; i < arguments.Length; i++)
+        for (var i = 0; i < arguments.Length; i++)
         {
             cells[i] = arguments[i].Build(_machine);
         }
@@ -101,7 +101,7 @@ public sealed class PrologHost
 
     private PrologValue[] ReadOutputs(PrologInput[] arguments, Cell[] cells)
     {
-        int count = 0;
+        var count = 0;
         foreach (PrologInput argument in arguments)
         {
             if (argument.IsOutput)
@@ -111,9 +111,9 @@ public sealed class PrologHost
         }
 
         var outputs = new PrologValue[count];
-        int next = 0;
+        var next = 0;
 
-        for (int i = 0; i < arguments.Length; i++)
+        for (var i = 0; i < arguments.Length; i++)
         {
             if (arguments[i].IsOutput)
             {

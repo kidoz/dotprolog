@@ -74,7 +74,7 @@ internal static class FormatBuiltins
     private static bool Format3(Machine machine)
     {
         Cell sink = machine.Argument(0);
-        string text = Render(machine, machine.Argument(1), machine.Argument(2));
+        var text = Render(machine, machine.Argument(1), machine.Argument(2));
 
         if (sink.Tag == CellTag.Structure && machine.Symbols.ArityOf(machine.HeapAt(sink.Index).Index) == 1)
         {
@@ -98,12 +98,12 @@ internal static class FormatBuiltins
 
     private static string Render(Machine machine, Cell format, Cell arguments)
     {
-        string text = FormatText(machine, format);
+        var text = FormatText(machine, format);
         List<Cell> given = ArgumentsOf(machine, arguments);
         var output = new Layout();
-        int next = 0;
+        var next = 0;
 
-        for (int i = 0; i < text.Length; i++)
+        for (var i = 0; i < text.Length; i++)
         {
             if (text[i] != '~')
             {
@@ -133,7 +133,7 @@ internal static class FormatBuiltins
             }
             else
             {
-                int start = i;
+                var start = i;
                 while (i < text.Length && char.IsAsciiDigit(text[i]))
                 {
                     i++;
@@ -186,9 +186,7 @@ internal static class FormatBuiltins
             {
                 Cell cell = Next(machine, given, ref next, arguments);
                 output.Append(
-                    TextBuiltins.TryText(machine, cell, out string value)
-                        ? value
-                        : throw PrologErrors.Type(machine, "atomic", cell)
+                    TextBuiltins.TryText(machine, cell, out var value) ? value : throw PrologErrors.Type(machine, "atomic", cell)
                 );
                 break;
             }
@@ -260,7 +258,7 @@ internal static class FormatBuiltins
             throw PrologErrors.Type(machine, "integer", cell);
         }
 
-        long value = cell.Integer;
+        var value = cell.Integer;
 
         if (grouped)
         {
@@ -274,14 +272,14 @@ internal static class FormatBuiltins
 
         // ~Nd writes the integer with a decimal point N digits from the right, which is how money
         // held as minor units is printed without ever becoming a float.
-        string digits = Math.Abs(value).ToString(CultureInfo.InvariantCulture).PadLeft(shift.Value + 1, '0');
-        string sign = value < 0 ? "-" : "";
+        var digits = Math.Abs(value).ToString(CultureInfo.InvariantCulture).PadLeft(shift.Value + 1, '0');
+        var sign = value < 0 ? "-" : "";
         return $"{sign}{digits[..^shift.Value]}.{digits[^shift.Value..]}";
     }
 
     private static string Real(Machine machine, Cell cell, char directive, int digits)
     {
-        double value = cell.Tag switch
+        var value = cell.Tag switch
         {
             CellTag.Integer => cell.Integer,
             CellTag.Float => machine.Symbols.GetFloat(cell.Index),
@@ -292,7 +290,7 @@ internal static class FormatBuiltins
         // shape is spelled out as a custom format instead.
         if (directive == 'e')
         {
-            string mantissa = digits > 0 ? $"0.{new string('0', digits)}" : "0";
+            var mantissa = digits > 0 ? $"0.{new string('0', digits)}" : "0";
             return value.ToString($"{mantissa}e+00", CultureInfo.InvariantCulture);
         }
 
@@ -370,7 +368,7 @@ internal static class FormatBuiltins
 
         internal void Append(string text)
         {
-            foreach (char character in text)
+            foreach (var character in text)
             {
                 Append(character);
             }
@@ -380,8 +378,8 @@ internal static class FormatBuiltins
 
         internal void Column(int column, bool relative)
         {
-            int target = relative ? _stop - _lineStart + column : column;
-            int padding = target - CurrentColumn;
+            var target = relative ? _stop - _lineStart + column : column;
+            var padding = target - CurrentColumn;
 
             if (padding > 0)
             {
@@ -400,13 +398,13 @@ internal static class FormatBuiltins
                 return;
             }
 
-            int share = padding / _fills.Count;
-            int remainder = padding % _fills.Count;
+            var share = padding / _fills.Count;
+            var remainder = padding % _fills.Count;
 
             // Inserted back to front so that an earlier fill position is still where it was.
-            for (int i = _fills.Count - 1; i >= 0; i--)
+            for (var i = _fills.Count - 1; i >= 0; i--)
             {
-                int amount = share + (i == _fills.Count - 1 ? remainder : 0);
+                var amount = share + (i == _fills.Count - 1 ? remainder : 0);
                 _text.Insert(_fills[i].Position, new string(_fills[i].Fill, amount));
             }
         }

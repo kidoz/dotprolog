@@ -70,7 +70,7 @@ public sealed class ExceptionTests
     [Fact]
     public void CatcherStaysActiveWhenExecutionBacktracksIntoTheGoal()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             q(1).
             q(2) :- throw(oops).
@@ -85,7 +85,7 @@ public sealed class ExceptionTests
     [Fact]
     public void BacktrackingThroughCatchReachesLaterSolutions()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             r(1).
             r(2).

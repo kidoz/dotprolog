@@ -144,7 +144,7 @@ public sealed class StreamTests : IDisposable
     [InlineData("[variables(_)|tail]", "type_error(list, [variables(_)|tail])")]
     public void InvalidReadOptionsDoNotConsumeTheNextTerm(string options, string formal)
     {
-        string path = Path("read-options.pl");
+        var path = Path("read-options.pl");
         File.WriteAllText(path, "first. second.");
 
         Assert.Equal(
@@ -169,7 +169,7 @@ public sealed class StreamTests : IDisposable
     [Fact]
     public void WritesAndReadsBackAFile()
     {
-        string path = Path("round-trip.pl");
+        var path = Path("round-trip.pl");
 
         Assert.Equal(
             "[first,'a b',end_of_file]\n",
@@ -189,7 +189,7 @@ public sealed class StreamTests : IDisposable
     [Fact]
     public void AppendAddsToWhatIsThere()
     {
-        string path = Path("append.pl");
+        var path = Path("append.pl");
 
         Assert.Equal(
             "[one,two]\n",
@@ -207,7 +207,7 @@ public sealed class StreamTests : IDisposable
     [Fact]
     public void CharactersAreReadOneAtATime()
     {
-        string path = Path("chars.txt");
+        var path = Path("chars.txt");
 
         Assert.Equal(
             "a-b-b-c\n",
@@ -226,7 +226,7 @@ public sealed class StreamTests : IDisposable
     [Fact]
     public void CharacterCodesAreWrittenReadAndPeeked()
     {
-        string path = Path("codes.txt");
+        var path = Path("codes.txt");
 
         Assert.Equal(
             "[97,98,98,-1]\n",
@@ -258,7 +258,7 @@ public sealed class StreamTests : IDisposable
     [Fact]
     public void ReadingPastTheEndOfAFileGivesEndOfFile()
     {
-        string path = Path("empty.txt");
+        var path = Path("empty.txt");
 
         Assert.Equal(
             "end_of_file-end_of_file\n",
@@ -275,7 +275,7 @@ public sealed class StreamTests : IDisposable
     [Fact]
     public void AtEndOfStreamReportsWhereTheReaderIs()
     {
-        string path = Path("at-end.txt");
+        var path = Path("at-end.txt");
 
         Assert.Equal(
             "false-true\n",
@@ -296,7 +296,7 @@ public sealed class StreamTests : IDisposable
     [Fact]
     public void SetOutputRedirectsWritesWithNoStreamArgument()
     {
-        string path = Path("redirect.txt");
+        var path = Path("redirect.txt");
 
         Assert.Equal(
             "before-after\n",
@@ -316,7 +316,7 @@ public sealed class StreamTests : IDisposable
     [Fact]
     public void AnAliasNamesAStream()
     {
-        string path = Path("alias.txt");
+        var path = Path("alias.txt");
 
         Assert.Equal(
             "aliased\n",
@@ -388,7 +388,7 @@ public sealed class StreamTests : IDisposable
     [InlineData("peek_char('')", "type_error(in_character,'')")]
     public void ReportsInputCharacterErrorsWithoutReading(string operation, string expected)
     {
-        string path = Path("character-errors.txt");
+        var path = Path("character-errors.txt");
         File.WriteAllText(path, "a");
 
         Assert.Equal(
@@ -404,7 +404,7 @@ public sealed class StreamTests : IDisposable
     [Fact]
     public void EndOfFileIsAValidBoundInputCharacter()
     {
-        string path = Path("empty.txt");
+        var path = Path("empty.txt");
         File.WriteAllText(path, string.Empty);
 
         Assert.Equal(
@@ -418,7 +418,7 @@ public sealed class StreamTests : IDisposable
     [Fact]
     public void AClosedStreamIsGoneRatherThanReused()
     {
-        string path = Path("closed.txt");
+        var path = Path("closed.txt");
 
         Assert.Equal(
             "existence_error(stream,$stream(3))",
@@ -485,7 +485,7 @@ public sealed class StreamTests : IDisposable
     {
         // A file written and then left to halt must still be on disk, which means the close cannot
         // be left to a finalizer.
-        string path = Path("halted.txt");
+        var path = Path("halted.txt");
         var engine = new PrologEngine { Output = TextWriter.Null };
 
         engine.ConsultOrThrow($":- initialization((open('{path}', write, S), write(S, 'kept .'), halt)).", "halt.pl");

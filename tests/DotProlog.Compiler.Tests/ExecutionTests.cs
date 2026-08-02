@@ -15,7 +15,7 @@ public sealed class ExecutionTests
     [Fact]
     public void UnifiesNestedStructuresInAClauseHead()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             unwrap(box(inner(Value)), Value).
 
@@ -29,7 +29,7 @@ public sealed class ExecutionTests
     [Fact]
     public void RepeatedHeadVariableForcesArgumentsToMatch()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             same(X, X).
 
@@ -43,7 +43,7 @@ public sealed class ExecutionTests
     [Fact]
     public void FailedGoalIsReportedRatherThanThrowing()
     {
-        (RunResult result, string output, _) = PrologTestHost.Execute(
+        (RunResult result, var output, _) = PrologTestHost.Execute(
             """
             same(X, X).
 
@@ -58,7 +58,7 @@ public sealed class ExecutionTests
     [Fact]
     public void BacktracksThroughClauseAlternativesUntilAGoalSucceeds()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             p(1).
             p(2).
@@ -74,7 +74,7 @@ public sealed class ExecutionTests
     [Fact]
     public void BacktrackingUndoesBindingsMadeByTheFailedBranch()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             p(f(1)).
             p(f(2)).
@@ -91,7 +91,7 @@ public sealed class ExecutionTests
     [Fact]
     public void CutDiscardsRemainingAlternatives()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             p(1).
             p(2).
@@ -110,7 +110,7 @@ public sealed class ExecutionTests
     public void CutIsLocalToItsOwnPredicate()
     {
         // The cut in first/1 must not remove the choice point q/1 created for the caller.
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             p(1).
             p(2).
@@ -131,7 +131,7 @@ public sealed class ExecutionTests
     public void TailRecursionRunsAtConstantStackDepth()
     {
         // 200,000 iterations would exhaust the CLR stack if Prolog calls were CLR calls.
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             count(0) :- !.
             count(N) :- M is N - 1, count(M).
@@ -146,7 +146,7 @@ public sealed class ExecutionTests
     [Fact]
     public void RecursesOverListsBuiltFromHeadDecomposition()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             last([X], X).
             last([_|Tail], X) :- last(Tail, X).
@@ -178,7 +178,7 @@ public sealed class ExecutionTests
     [Fact]
     public void HaltStopsBeforeLaterGoalsRun()
     {
-        (RunResult result, string output, _) = PrologTestHost.Execute(
+        (RunResult result, var output, _) = PrologTestHost.Execute(
             """
             :- initialization((write(before), nl, halt(3), write(after))).
             """
@@ -202,7 +202,7 @@ public sealed class ExecutionTests
     [Fact]
     public void AGoalThatIsNotCallableRaisesACatchableRuntimeError()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             p :- 42.
             :- initialization(catch(p, error(E, _), write(E))).
@@ -233,7 +233,7 @@ public sealed class ExecutionTests
     {
         // A file written to load in any Prolog system opens with declarations this release does not
         // act on. Running them as goals would raise existence_error and make the file unusable.
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             $"""
             {declaration}
 

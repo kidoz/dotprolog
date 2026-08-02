@@ -8,7 +8,7 @@ public sealed class PredicateInformationTests
     [Fact]
     public void EnumeratesStaticPredicatesAndPartiallyInstantiatedIndicators()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             apple.
             dog(_).
@@ -84,7 +84,7 @@ public sealed class PredicateInformationTests
     [Fact]
     public void CallStartedBeforeAbolitionKeepsItsLogicalUpdateView()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             :- dynamic p/1.
             p(1).
@@ -120,7 +120,7 @@ public sealed class PredicateInformationTests
     [Fact]
     public void AbolishRejectsAStaticProcedure()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             fixed.
             :- initialization(catch(abolish(fixed/0), error(E, _), write(E))).

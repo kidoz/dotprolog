@@ -52,12 +52,12 @@ internal static class LogtalkTestAdapter
     {
         var declarations = new List<LogtalkTestDeclaration>();
         var conditionals = new List<ConditionalFrame>();
-        bool directiveFixture = IsIsoDirectiveFixture(relativePath);
+        var directiveFixture = IsIsoDirectiveFixture(relativePath);
 
-        foreach (string clause in SplitClauses(source))
+        foreach (var clause in SplitClauses(source))
         {
-            string text = TrimLeadingTrivia(clause);
-            if (TryReadDirectiveArgument(text, "if", out string condition))
+            var text = TrimLeadingTrivia(clause);
+            if (TryReadDirectiveArgument(text, "if", out var condition))
             {
                 conditionals.Add(new ConditionalFrame(condition));
                 continue;
@@ -96,14 +96,14 @@ internal static class LogtalkTestAdapter
                 continue;
             }
 
-            bool quickCheckDisabled = text.StartsWith("- quick_check(iso", StringComparison.Ordinal);
-            int quickCheckStart =
+            var quickCheckDisabled = text.StartsWith("- quick_check(iso", StringComparison.Ordinal);
+            var quickCheckStart =
                 quickCheckDisabled ? 2
                 : text.StartsWith("quick_check(iso", StringComparison.Ordinal) ? 0
                 : -1;
             if (quickCheckStart >= 0)
             {
-                string quickCheckHead = text[quickCheckStart..].Trim();
+                var quickCheckHead = text[quickCheckStart..].Trim();
                 if (!quickCheckHead.EndsWith('.'))
                 {
                     throw new InvalidDataException($"{relativePath}: quick-check declaration has no full stop: {quickCheckHead}");
@@ -135,10 +135,10 @@ internal static class LogtalkTestAdapter
                 continue;
             }
 
-            bool disabled =
+            var disabled =
                 text.StartsWith("- test(iso", StringComparison.Ordinal)
                 || (directiveFixture && text.StartsWith("- test(", StringComparison.Ordinal));
-            int testStart =
+            var testStart =
                 disabled ? 2
                 : text.StartsWith("test(iso", StringComparison.Ordinal) ? 0
                 : directiveFixture && text.StartsWith("test(", StringComparison.Ordinal) ? 0
@@ -149,14 +149,14 @@ internal static class LogtalkTestAdapter
                 continue;
             }
 
-            string declaration = text[testStart..];
-            int neck = FindTopLevel(declaration, ":-");
+            var declaration = text[testStart..];
+            var neck = FindTopLevel(declaration, ":-");
             if (neck < 0)
             {
                 throw new InvalidDataException($"{relativePath}: test declaration has no clause body: {declaration}");
             }
 
-            string head = declaration[..neck].Trim();
+            var head = declaration[..neck].Trim();
             if (!head.StartsWith("test(", StringComparison.Ordinal) || !head.EndsWith(')'))
             {
                 throw new InvalidDataException($"{relativePath}: malformed test head: {head}");
@@ -170,13 +170,13 @@ internal static class LogtalkTestAdapter
                 );
             }
 
-            string id = arguments[0];
+            var id = arguments[0];
             if (!id.StartsWith("iso_", StringComparison.Ordinal) && !directiveFixture)
             {
                 continue;
             }
 
-            string body = declaration[(neck + 2)..].Trim();
+            var body = declaration[(neck + 2)..].Trim();
             if (!body.EndsWith('.'))
             {
                 throw new InvalidDataException($"{relativePath}: test body has no terminating full stop: {id}");
@@ -212,7 +212,7 @@ internal static class LogtalkTestAdapter
     /// <summary>Whether a pinned unprefixed fixture directly tests one standardized directive.</summary>
     internal static bool IsIsoDirectiveFixture(string relativePath)
     {
-        string normalized = relativePath.Replace('\\', '/');
+        var normalized = relativePath.Replace('\\', '/');
         return normalized
             is "directives/discontiguous_1/tests.lgt"
                 or "directives/ensure_loaded_1/tests.lgt"
@@ -229,11 +229,11 @@ internal static class LogtalkTestAdapter
     internal static bool TryReadSupportProgram(string source, out string program)
     {
         var support = new List<string>();
-        int conditionalDepth = 0;
+        var conditionalDepth = 0;
 
-        foreach (string clause in SplitClauses(source))
+        foreach (var clause in SplitClauses(source))
         {
-            string text = TrimLeadingTrivia(clause);
+            var text = TrimLeadingTrivia(clause);
             if (text.Length == 0)
             {
                 continue;
@@ -333,7 +333,7 @@ internal static class LogtalkTestAdapter
                 || text.StartsWith(":-", StringComparison.Ordinal)
                 || text.Contains("^^", StringComparison.Ordinal)
                 || text.Contains("::", StringComparison.Ordinal)
-                || !TryTranslateSupportClause(text, out string translated)
+                || !TryTranslateSupportClause(text, out var translated)
             )
             {
                 program = string.Empty;
@@ -381,7 +381,7 @@ internal static class LogtalkTestAdapter
 
     private static bool TryUnwrapFindallBackendGoal(string source, out string goal)
     {
-        string body = source.Trim();
+        var body = source.Trim();
         const string prefix = "findall(";
         if (
             !body.StartsWith(prefix, StringComparison.Ordinal)
@@ -394,7 +394,7 @@ internal static class LogtalkTestAdapter
         }
 
         List<string> arguments = SplitTopLevel(body[prefix.Length..^1], ',');
-        if (arguments.Count != 3 || !TryUnwrapBackendBody(arguments[1], out string generator))
+        if (arguments.Count != 3 || !TryUnwrapBackendBody(arguments[1], out var generator))
         {
             goal = string.Empty;
             return false;
@@ -408,7 +408,7 @@ internal static class LogtalkTestAdapter
     {
         var state = new ScanState();
 
-        for (int index = opening; index < source.Length; index++)
+        for (var index = opening; index < source.Length; index++)
         {
             Advance(source, ref index, state);
             if (index > opening && state.Parentheses == 0)
@@ -424,21 +424,21 @@ internal static class LogtalkTestAdapter
     {
         if (
             source.Contains("::", StringComparison.Ordinal)
-            || !TryTranslateLgtunitHelpers(source, out string helpersTranslated, out bool foundHelper)
+            || !TryTranslateLgtunitHelpers(source, out var helpersTranslated, out var foundHelper)
         )
         {
             goal = string.Empty;
             return false;
         }
 
-        char[] translated = helpersTranslated.ToCharArray();
+        var translated = helpersTranslated.ToCharArray();
         var state = new ScanState();
-        bool foundBackendEscape = false;
+        var foundBackendEscape = false;
 
-        for (int index = 0; index < helpersTranslated.Length; index++)
+        for (var index = 0; index < helpersTranslated.Length; index++)
         {
-            bool shielded = state.LineComment || state.BlockComment || state.Quote != '\0';
-            int current = index;
+            var shielded = state.LineComment || state.BlockComment || state.Quote != '\0';
+            var current = index;
             Advance(helpersTranslated, ref index, state);
 
             if (shielded || current != index)
@@ -465,13 +465,13 @@ internal static class LogtalkTestAdapter
     {
         var result = new StringBuilder(source.Length);
         var state = new ScanState();
-        int copyStart = 0;
+        var copyStart = 0;
         found = false;
 
-        for (int index = 0; index < source.Length; index++)
+        for (var index = 0; index < source.Length; index++)
         {
-            bool shielded = state.LineComment || state.BlockComment || state.Quote != '\0';
-            int current = index;
+            var shielded = state.LineComment || state.BlockComment || state.Quote != '\0';
+            var current = index;
             Advance(source, ref index, state);
 
             if (shielded || current != index)
@@ -499,33 +499,31 @@ internal static class LogtalkTestAdapter
                 continue;
             }
 
-            int functorStart = current;
-            bool dispatchedAssertion = source.AsSpan(current).StartsWith("^^assertion(", StringComparison.Ordinal);
-            bool dispatchedTextInput = source.AsSpan(current).StartsWith("^^set_text_input(", StringComparison.Ordinal);
-            bool dispatchedTextOutput = source.AsSpan(current).StartsWith("^^set_text_output(", StringComparison.Ordinal);
-            bool dispatchedTextOutputAssertion = source
+            var functorStart = current;
+            var dispatchedAssertion = source.AsSpan(current).StartsWith("^^assertion(", StringComparison.Ordinal);
+            var dispatchedTextInput = source.AsSpan(current).StartsWith("^^set_text_input(", StringComparison.Ordinal);
+            var dispatchedTextOutput = source.AsSpan(current).StartsWith("^^set_text_output(", StringComparison.Ordinal);
+            var dispatchedTextOutputAssertion = source
                 .AsSpan(current)
                 .StartsWith("^^text_output_assertion(", StringComparison.Ordinal);
-            bool dispatchedTextOutputContents = source
+            var dispatchedTextOutputContents = source
                 .AsSpan(current)
                 .StartsWith("^^text_output_contents(", StringComparison.Ordinal);
-            bool dispatchedTextInputAssertion = source
+            var dispatchedTextInputAssertion = source
                 .AsSpan(current)
                 .StartsWith("^^text_input_assertion(", StringComparison.Ordinal);
-            bool dispatchedCheckTextOutput = source.AsSpan(current).StartsWith("^^check_text_output(", StringComparison.Ordinal);
-            bool dispatchedFilePath = source.AsSpan(current).StartsWith("^^file_path(", StringComparison.Ordinal);
-            bool dispatchedCreateTextFile = source.AsSpan(current).StartsWith("^^create_text_file(", StringComparison.Ordinal);
-            bool dispatchedCreateBinaryFile = source
-                .AsSpan(current)
-                .StartsWith("^^create_binary_file(", StringComparison.Ordinal);
-            bool dispatchedClosedInputStream = source
+            var dispatchedCheckTextOutput = source.AsSpan(current).StartsWith("^^check_text_output(", StringComparison.Ordinal);
+            var dispatchedFilePath = source.AsSpan(current).StartsWith("^^file_path(", StringComparison.Ordinal);
+            var dispatchedCreateTextFile = source.AsSpan(current).StartsWith("^^create_text_file(", StringComparison.Ordinal);
+            var dispatchedCreateBinaryFile = source.AsSpan(current).StartsWith("^^create_binary_file(", StringComparison.Ordinal);
+            var dispatchedClosedInputStream = source
                 .AsSpan(current)
                 .StartsWith("^^closed_input_stream(", StringComparison.Ordinal);
-            bool dispatchedClosedOutputStream = source
+            var dispatchedClosedOutputStream = source
                 .AsSpan(current)
                 .StartsWith("^^closed_output_stream(", StringComparison.Ordinal);
-            bool dispatchedSetBinaryOutput = source.AsSpan(current).StartsWith("^^set_binary_output(", StringComparison.Ordinal);
-            bool dispatchedBinaryOutputAssertion = source
+            var dispatchedSetBinaryOutput = source.AsSpan(current).StartsWith("^^set_binary_output(", StringComparison.Ordinal);
+            var dispatchedBinaryOutputAssertion = source
                 .AsSpan(current)
                 .StartsWith("^^binary_output_assertion(", StringComparison.Ordinal);
             if (
@@ -570,7 +568,7 @@ internal static class LogtalkTestAdapter
                 functorStart += 2;
             }
 
-            string? functor =
+            var functor =
                 IsFunctorCallAt(source, functorStart, "assertion") ? "assertion"
                 : IsFunctorCallAt(source, functorStart, "variant") ? "variant"
                 : IsFunctorCallAt(source, functorStart, "set_text_input") ? "set_text_input"
@@ -592,19 +590,19 @@ internal static class LogtalkTestAdapter
                 continue;
             }
 
-            int opening = functorStart + functor.Length;
-            int closing = FindMatchingParenthesis(source, opening);
+            var opening = functorStart + functor.Length;
+            var closing = FindMatchingParenthesis(source, opening);
             if (closing < 0)
             {
                 translated = string.Empty;
                 return false;
             }
 
-            string arguments = source[(opening + 1)..closing];
+            var arguments = source[(opening + 1)..closing];
             string replacement;
             if (functor == "assertion")
             {
-                if (!TryTranslateLgtunitHelpers(arguments, out string assertion, out _))
+                if (!TryTranslateLgtunitHelpers(arguments, out var assertion, out _))
                 {
                     translated = string.Empty;
                     return false;
@@ -621,14 +619,14 @@ internal static class LogtalkTestAdapter
                     return false;
                 }
 
-                string left = variantArguments[0];
-                string right = variantArguments[1];
+                var left = variantArguments[0];
+                var right = variantArguments[1];
                 replacement = $"(subsumes_term(({left}), ({right})), subsumes_term(({right}), ({left})))";
             }
             else
             {
                 List<string> hostArguments = SplitTopLevel(arguments, ',');
-                bool supportedArity = functor switch
+                var supportedArity = functor switch
                 {
                     "set_text_input" => hostArguments.Count is 1 or 2,
                     "set_text_output" or "text_output_contents" => hostArguments.Count is 1 or 2,
@@ -644,7 +642,7 @@ internal static class LogtalkTestAdapter
                     return false;
                 }
 
-                string hostFunctor = functor switch
+                var hostFunctor = functor switch
                 {
                     "set_text_input" => "$logtalk_set_text_input",
                     "set_text_output" => "$logtalk_set_text_output",
@@ -695,7 +693,7 @@ internal static class LogtalkTestAdapter
     {
         var state = new ScanState();
 
-        for (int index = opening; index < source.Length; index++)
+        for (var index = opening; index < source.Length; index++)
         {
             Advance(source, ref index, state);
             if (index > opening && state.Parentheses == 0)
@@ -709,7 +707,7 @@ internal static class LogtalkTestAdapter
 
     private static bool TryTranslateSupportClause(string clause, out string translated)
     {
-        int neck = FindTopLevel(clause, ":-");
+        var neck = FindTopLevel(clause, ":-");
         if (neck < 0)
         {
             if (clause.Contains('{') || clause.Contains('}'))
@@ -722,7 +720,7 @@ internal static class LogtalkTestAdapter
             return true;
         }
 
-        string body = clause[(neck + 2)..].Trim();
+        var body = clause[(neck + 2)..].Trim();
         if (!body.EndsWith('.'))
         {
             translated = string.Empty;
@@ -736,7 +734,7 @@ internal static class LogtalkTestAdapter
             return true;
         }
 
-        if (!TryUnwrapBackendBody(body, out string backendGoal))
+        if (!TryUnwrapBackendBody(body, out var backendGoal))
         {
             translated = string.Empty;
             return false;
@@ -748,33 +746,33 @@ internal static class LogtalkTestAdapter
 
     private static bool IsDispatchedLifecycleHook(string clause)
     {
-        int neck = FindTopLevel(clause, ":-");
+        var neck = FindTopLevel(clause, ":-");
         if (neck < 0)
         {
             return false;
         }
 
-        string head = clause[..neck].Trim();
+        var head = clause[..neck].Trim();
         return head is "setup" or "cleanup"
             && (clause.Contains("^^", StringComparison.Ordinal) || clause.Contains("::", StringComparison.Ordinal));
     }
 
     private static bool TryUnwrapBackendBody(string source, out string goal)
     {
-        string body = source.Trim();
+        var body = source.Trim();
         List<string> parts = SplitTopLevel(body, ',');
         var goals = new List<string>(parts.Count);
 
-        foreach (string part in parts)
+        foreach (var part in parts)
         {
-            string wrapper = part.Trim();
+            var wrapper = part.Trim();
             if (wrapper.Length < 3 || wrapper[0] != '{' || wrapper[^1] != '}')
             {
                 goal = string.Empty;
                 return false;
             }
 
-            string backendGoal = wrapper[1..^1].Trim();
+            var backendGoal = wrapper[1..^1].Trim();
             if (backendGoal.Length == 0)
             {
                 goal = string.Empty;
@@ -794,25 +792,25 @@ internal static class LogtalkTestAdapter
     /// </summary>
     internal static string TranslateAssertion(string assertion)
     {
-        if (TryUnwrapBackendBody(assertion, out string backendAssertion))
+        if (TryUnwrapBackendBody(assertion, out var backendAssertion))
         {
             assertion = backendAssertion;
         }
 
-        int approximateEquality = FindTopLevel(assertion, "=~=");
+        var approximateEquality = FindTopLevel(assertion, "=~=");
         if (approximateEquality < 0)
         {
             return assertion;
         }
 
-        string left = assertion[..approximateEquality].Trim();
-        string right = assertion[(approximateEquality + 3)..].Trim();
+        var left = assertion[..approximateEquality].Trim();
+        var right = assertion[(approximateEquality + 3)..].Trim();
         if (left.Length == 0 || right.Length == 0 || FindTopLevel(right, "=~=") >= 0)
         {
             throw new InvalidDataException($"Malformed lgtunit approximate-equality assertion: {assertion}");
         }
 
-        string difference = $"abs(({left}) - ({right}))";
+        var difference = $"abs(({left}) - ({right}))";
         return $"(({difference} < 0.0000000001) -> true ; ({difference} < (0.00001 * max(abs({left}), abs({right})))))";
     }
 
@@ -829,7 +827,7 @@ internal static class LogtalkTestAdapter
     /// <summary>Wraps each accepted lgtunit error term in the ISO <c>error/2</c> ball shape.</summary>
     internal static string TranslateErrorAlternatives(string errors)
     {
-        string list = errors.Trim();
+        var list = errors.Trim();
         if (list.Length < 2 || list[0] != '[' || list[^1] != ']')
         {
             throw new InvalidDataException($"Malformed lgtunit errors expectation: {errors}");
@@ -850,10 +848,10 @@ internal static class LogtalkTestAdapter
     private static List<string> SplitClauses(string source)
     {
         var clauses = new List<string>();
-        int start = 0;
+        var start = 0;
         var state = new ScanState();
 
-        for (int index = 0; index < source.Length; index++)
+        for (var index = 0; index < source.Length; index++)
         {
             if (Advance(source, ref index, state))
             {
@@ -872,7 +870,7 @@ internal static class LogtalkTestAdapter
 
     private static bool TryReadDirectiveArgument(string directive, string name, out string argument)
     {
-        string prefix = $":- {name}(";
+        var prefix = $":- {name}(";
         if (!directive.StartsWith(prefix, StringComparison.Ordinal) || !directive.EndsWith(").", StringComparison.Ordinal))
         {
             argument = string.Empty;
@@ -899,7 +897,7 @@ internal static class LogtalkTestAdapter
     {
         var state = new ScanState();
 
-        for (int index = 0; index <= source.Length - token.Length; index++)
+        for (var index = 0; index <= source.Length - token.Length; index++)
         {
             if (Advance(source, ref index, state))
             {
@@ -918,10 +916,10 @@ internal static class LogtalkTestAdapter
     private static List<string> SplitTopLevel(string source, char separator)
     {
         var parts = new List<string>();
-        int start = 0;
+        var start = 0;
         var state = new ScanState();
 
-        for (int index = 0; index < source.Length; index++)
+        for (var index = 0; index < source.Length; index++)
         {
             if (Advance(source, ref index, state))
             {
@@ -945,8 +943,8 @@ internal static class LogtalkTestAdapter
     /// </summary>
     private static bool Advance(string source, ref int index, ScanState state)
     {
-        char current = source[index];
-        char next = index + 1 < source.Length ? source[index + 1] : '\0';
+        var current = source[index];
+        var next = index + 1 < source.Length ? source[index + 1] : '\0';
 
         if (state.LineComment)
         {
@@ -1047,7 +1045,7 @@ internal static class LogtalkTestAdapter
 
     private static void SkipCharacterCodePayload(string source, ref int apostrophe)
     {
-        int payload = apostrophe + 1;
+        var payload = apostrophe + 1;
         if (payload >= source.Length)
         {
             return;
@@ -1059,7 +1057,7 @@ internal static class LogtalkTestAdapter
             return;
         }
 
-        int escaped = payload + 1;
+        var escaped = payload + 1;
         if (escaped >= source.Length)
         {
             apostrophe = payload;
@@ -1068,7 +1066,7 @@ internal static class LogtalkTestAdapter
 
         if (source[escaped] is 'x' or 'o')
         {
-            int closing = source.IndexOf('\\', escaped + 1);
+            var closing = source.IndexOf('\\', escaped + 1);
             apostrophe = closing < 0 ? escaped : closing;
             return;
         }
@@ -1084,7 +1082,7 @@ internal static class LogtalkTestAdapter
 
     private static string TrimLeadingTrivia(string source)
     {
-        int index = 0;
+        var index = 0;
 
         while (index < source.Length)
         {
@@ -1095,14 +1093,14 @@ internal static class LogtalkTestAdapter
 
             if (index < source.Length && source[index] == '%')
             {
-                int newline = source.IndexOf('\n', index + 1);
+                var newline = source.IndexOf('\n', index + 1);
                 index = newline < 0 ? source.Length : newline + 1;
                 continue;
             }
 
             if (index + 1 < source.Length && source[index] == '/' && source[index + 1] == '*')
             {
-                int closing = source.IndexOf("*/", index + 2, StringComparison.Ordinal);
+                var closing = source.IndexOf("*/", index + 2, StringComparison.Ordinal);
                 index = closing < 0 ? source.Length : closing + 2;
                 continue;
             }

@@ -9,7 +9,7 @@ internal static class PrologTestHost
     /// <summary>Consults and runs <paramref name="source"/>, asserting that it compiles and succeeds.</summary>
     internal static string Run(string source)
     {
-        (RunResult result, string output, IReadOnlyList<Diagnostic> diagnostics) = Execute(source);
+        (RunResult result, var output, IReadOnlyList<Diagnostic> diagnostics) = Execute(source);
 
         Assert.Empty(diagnostics);
         Assert.Equal(RunResult.Success, result);

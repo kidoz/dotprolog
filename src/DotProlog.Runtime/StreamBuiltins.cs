@@ -116,7 +116,7 @@ internal static class StreamBuiltins
             {
                 resolved = machine.Streams.ByAlias(machine.Symbols.AtomName(cell.Index));
             }
-            else if (TryStreamHandle(machine, cell, out int id))
+            else if (TryStreamHandle(machine, cell, out var id))
             {
                 resolved = machine.Streams.ById(id);
             }
@@ -245,7 +245,7 @@ internal static class StreamBuiltins
             throw PrologErrors.Domain(machine, "source_sink", file);
         }
 
-        string modeName = machine.Symbols.AtomName(mode.Index);
+        var modeName = machine.Symbols.AtomName(mode.Index);
         if (modeName is not ("read" or "write" or "append"))
         {
             throw PrologErrors.Domain(machine, "io_mode", mode);
@@ -264,7 +264,7 @@ internal static class StreamBuiltins
             throw PrologErrors.Permission(machine, "open", "source_sink", alias);
         }
 
-        string path = machine.Symbols.AtomName(file.Index);
+        var path = machine.Symbols.AtomName(file.Index);
 
         PrologStream stream;
         try
@@ -315,7 +315,7 @@ internal static class StreamBuiltins
 
             Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(option.Index).Index);
             Cell value = machine.Dereference(machine.HeapAt(option.Index + 1));
-            string name = machine.Symbols.AtomName(functor.NameAtom);
+            var name = machine.Symbols.AtomName(functor.NameAtom);
 
             if (value.Tag == CellTag.Reference)
             {
@@ -327,24 +327,18 @@ internal static class StreamBuiltins
                 throw PrologErrors.Domain(machine, "stream_option", option);
             }
 
-            string atom = machine.Symbols.AtomName(value.Index);
-            switch (name)
+            var atom = machine.Symbols.AtomName(value.Index);
+            result = name switch
             {
-                case "alias":
-                    result = result with { Alias = atom };
-                    break;
-                case "type" when atom is "text" or "binary":
-                    result = result with { Type = atom };
-                    break;
-                case "reposition" when atom is "true" or "false":
-                    result = result with { Reposition = atom == "true" };
-                    break;
-                case "eof_action" when TryEofAction(atom, out PrologStream.EofAction eofAction):
-                    result = result with { EofAction = eofAction };
-                    break;
-                default:
-                    throw PrologErrors.Domain(machine, "stream_option", option);
-            }
+                "alias" => result with { Alias = atom },
+                "type" when atom is "text" or "binary" => result with { Type = atom },
+                "reposition" when atom is "true" or "false" => result with { Reposition = atom == "true" },
+                "eof_action" when TryEofAction(atom, out PrologStream.EofAction eofAction) => result with
+                {
+                    EofAction = eofAction,
+                },
+                _ => throw PrologErrors.Domain(machine, "stream_option", option),
+            };
         }
 
         return result;
@@ -357,7 +351,7 @@ internal static class StreamBuiltins
         ValidateExplicitStreamInstantiation(machine, 0);
         List<Cell>? optionElements = options < 0 ? null : RequireProperOptionList(machine, InspectOptionList(machine, options));
         ValidateExplicitStreamDomain(machine, 0);
-        bool force = optionElements is not null && ReadCloseOptions(machine, optionElements);
+        var force = optionElements is not null && ReadCloseOptions(machine, optionElements);
         PrologStream stream = ResolveEither(machine, 0);
 
         try
@@ -374,7 +368,7 @@ internal static class StreamBuiltins
 
     private static bool ReadCloseOptions(Machine machine, List<Cell> options)
     {
-        bool force = false;
+        var force = false;
 
         foreach (Cell element in options)
         {
@@ -396,8 +390,8 @@ internal static class StreamBuiltins
                 throw PrologErrors.Instantiation(machine);
             }
 
-            string name = machine.Symbols.AtomName(functor.NameAtom);
-            string atom = value.Tag == CellTag.Atom ? machine.Symbols.AtomName(value.Index) : string.Empty;
+            var name = machine.Symbols.AtomName(functor.NameAtom);
+            var atom = value.Tag == CellTag.Atom ? machine.Symbols.AtomName(value.Index) : string.Empty;
             if (name != "force" || atom is not ("true" or "false"))
             {
                 throw PrologErrors.Domain(machine, "close_option", option);
@@ -435,7 +429,7 @@ internal static class StreamBuiltins
         PrologStream? stream = cell.Tag switch
         {
             CellTag.Atom => machine.Streams.ByAlias(machine.Symbols.AtomName(cell.Index)),
-            CellTag.Structure when TryStreamHandle(machine, cell, out int id) => machine.Streams.ById(id),
+            CellTag.Structure when TryStreamHandle(machine, cell, out var id) => machine.Streams.ById(id),
             CellTag.Structure => throw PrologErrors.Domain(machine, "stream_or_alias", cell),
             _ => throw PrologErrors.Domain(machine, "stream_or_alias", cell),
         };
@@ -448,7 +442,7 @@ internal static class StreamBuiltins
         Cell pattern = machine.Argument(0);
         if (pattern.Tag != CellTag.Reference)
         {
-            if (!TryStreamHandle(machine, pattern, out int id) || machine.Streams.ById(id) is null)
+            if (!TryStreamHandle(machine, pattern, out var id) || machine.Streams.ById(id) is null)
             {
                 throw PrologErrors.Domain(machine, "stream", pattern);
             }
@@ -482,7 +476,7 @@ internal static class StreamBuiltins
             throw PrologErrors.Domain(machine, "stream", pattern);
         }
 
-        for (int id = (int)state; id < machine.Streams.Count; id++)
+        for (var id = (int)state; id < machine.Streams.Count; id++)
         {
             PrologStream? stream = machine.Streams.ById(id);
             if (stream is null)
@@ -514,11 +508,11 @@ internal static class StreamBuiltins
         PrologStream? selected = ResolvePropertyStream(machine, streamPattern);
         ValidateProperty(machine, propertyPattern);
 
-        int limit = machine.Streams.Count * StreamPropertyCount;
-        for (int encoded = (int)state; encoded < limit; encoded++)
+        var limit = machine.Streams.Count * StreamPropertyCount;
+        for (var encoded = (int)state; encoded < limit; encoded++)
         {
-            int id = encoded / StreamPropertyCount;
-            int property = encoded % StreamPropertyCount;
+            var id = encoded / StreamPropertyCount;
+            var property = encoded % StreamPropertyCount;
             PrologStream? stream = machine.Streams.ById(id);
 
             if (stream is null || (selected is not null && !ReferenceEquals(selected, stream)))
@@ -537,7 +531,7 @@ internal static class StreamBuiltins
 
             if (streamPattern.Tag == CellTag.Reference)
             {
-                int pair = machine.Symbols.InternFunctor("-", 2);
+                var pair = machine.Symbols.InternFunctor("-", 2);
                 pattern = machine.CreateStructure(pair, [streamPattern, propertyPattern]);
                 candidate = machine.CreateStructure(pair, [candidateStream, candidateProperty]);
             }
@@ -575,7 +569,7 @@ internal static class StreamBuiltins
             return machine.Streams.ByAlias(machine.Symbols.AtomName(stream.Index)) ?? throw Existence(machine, "stream", stream);
         }
 
-        if (!TryStreamHandle(machine, stream, out int id))
+        if (!TryStreamHandle(machine, stream, out var id))
         {
             throw PrologErrors.Domain(machine, "stream", stream);
         }
@@ -620,7 +614,7 @@ internal static class StreamBuiltins
         }
 
         Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(property.Index).Index);
-        string name = machine.Symbols.AtomName(functor.NameAtom);
+        var name = machine.Symbols.AtomName(functor.NameAtom);
         if (
             functor.Arity != 1
             || name
@@ -688,7 +682,7 @@ internal static class StreamBuiltins
             case 7 when stream.IsInput:
                 candidate = UnaryProperty(machine, "end_of_stream", EndStateName(ObserveEnd(machine, stream)));
                 return true;
-            case 8 when TryGetPosition(machine, stream, out long position):
+            case 8 when TryGetPosition(machine, stream, out var position):
                 candidate = PositionProperty(machine, position);
                 return true;
             default:
@@ -811,7 +805,7 @@ internal static class StreamBuiltins
     {
         foreach (ReadOption option in options)
         {
-            bool applied = option.Kind switch
+            var applied = option.Kind switch
             {
                 ReadOptionKind.VariableNames => machine.Unify(option.Target, names),
                 ReadOptionKind.Variables => machine.Unify(option.Target, variables),
@@ -843,7 +837,7 @@ internal static class StreamBuiltins
         Cell character = machine.Argument(target);
         if (character.Tag != CellTag.Reference)
         {
-            string? atom = character.Tag == CellTag.Atom ? machine.Symbols.AtomName(character.Index) : null;
+            var atom = character.Tag == CellTag.Atom ? machine.Symbols.AtomName(character.Index) : null;
             if (atom is null || (atom.Length != 1 && atom != "end_of_file"))
             {
                 throw PrologErrors.Type(machine, "in_character", character);
@@ -857,7 +851,7 @@ internal static class StreamBuiltins
         // Whatever a term read left behind has to be consumed before the reader itself is touched.
         if (source.Buffer.Length > 0)
         {
-            char buffered = source.Buffer[0];
+            var buffered = source.Buffer[0];
             if (consume)
             {
                 source.Buffer = source.Buffer[1..];
@@ -867,7 +861,7 @@ internal static class StreamBuiltins
             return machine.Unify(character, Character(machine, buffered));
         }
 
-        int next = GuardIo(machine, () => consume ? reader.Read() : reader.Peek());
+        var next = GuardIo(machine, () => consume ? reader.Read() : reader.Peek());
         if (consume)
         {
             source.RecordInput(next >= 0);
@@ -886,7 +880,7 @@ internal static class StreamBuiltins
         ValidateExplicitStreamInstantiation(machine, stream);
         Cell code = machine.Argument(target);
 
-        if (code.Tag != CellTag.Reference && code.Tag != CellTag.Integer)
+        if (code.Tag is not CellTag.Reference and not CellTag.Integer)
         {
             throw PrologErrors.Type(machine, "integer", code);
         }
@@ -931,7 +925,7 @@ internal static class StreamBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        string text =
+        var text =
             character.Tag == CellTag.Atom
                 ? machine.Symbols.AtomName(character.Index)
                 : throw PrologErrors.Type(machine, "character", character);
@@ -992,7 +986,7 @@ internal static class StreamBuiltins
         }
         else
         {
-            long position = GuardIo(machine, () => input.Position);
+            var position = GuardIo(machine, () => input.Position);
             next = GuardIo(machine, input.ReadByte);
             GuardIo(machine, () => input.Position = position);
         }
@@ -1053,7 +1047,7 @@ internal static class StreamBuiltins
         }
 
         ValidateExplicitStreamDomain(machine, 0);
-        if (!TryReadPosition(machine, positionTerm, out long position))
+        if (!TryReadPosition(machine, positionTerm, out var position))
         {
             throw PrologErrors.Domain(machine, "stream_position", positionTerm);
         }
@@ -1086,7 +1080,7 @@ internal static class StreamBuiltins
             return false;
         }
 
-        for (int index = 1; index <= 4; index++)
+        for (var index = 1; index <= 4; index++)
         {
             Cell field = machine.Dereference(machine.HeapAt(term.Index + index));
             if (field.Tag != CellTag.Integer || field.Integer < 0)
@@ -1166,13 +1160,13 @@ internal static class StreamBuiltins
                 throw PrologErrors.Instantiation(machine);
             }
 
-            string atom = value.Tag == CellTag.Atom ? machine.Symbols.AtomName(value.Index) : string.Empty;
+            var atom = value.Tag == CellTag.Atom ? machine.Symbols.AtomName(value.Index) : string.Empty;
             if (atom is not ("true" or "false"))
             {
                 throw PrologErrors.Domain(machine, "write_option", option);
             }
 
-            bool enabled = atom == "true";
+            var enabled = atom == "true";
             selected = machine.Symbols.AtomName(functor.NameAtom) switch
             {
                 "quoted" => selected with { Quoted = enabled },
@@ -1294,8 +1288,8 @@ internal static class StreamBuiltins
             machine.Program.RuntimeCompiler ?? throw new PrologException("Reading a term needs a compiler to parse it.");
 
         using var reader = new StringReader(machine.Symbols.AtomName(text.Index));
-        string buffer = string.Empty;
-        bool read = compiler.TryReadTerm(
+        var buffer = string.Empty;
+        var read = compiler.TryReadTerm(
             machine,
             reader,
             ref buffer,

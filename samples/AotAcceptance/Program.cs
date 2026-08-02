@@ -34,10 +34,10 @@ internal static class Program
 
     private static int Main(string[] args)
     {
-        string path = args.Length > 0 ? args[0] : Path.Combine(AppContext.BaseDirectory, "acceptance.pl");
+        var path = args.Length > 0 ? args[0] : Path.Combine(AppContext.BaseDirectory, "acceptance.pl");
         var engine = new PrologEngine();
         IPricingModule pricing = PricingModule.Create(engine);
-        string maxAritySource = $"f({string.Join(",", Enumerable.Repeat("a", 256))})";
+        var maxAritySource = $"f({string.Join(",", Enumerable.Repeat("a", 256))})";
 
         if (!ExerciseSystemErrors() || pricing.Discount(100.0, 10) != 90.0)
         {
@@ -50,7 +50,7 @@ internal static class Program
         }
 
         // Everything from here on is decided at run time, inside a fully native executable.
-        string script = $$"""
+        var script = $$"""
             :- op(650, xfx, native_quoted).
             :- initialization(main).
 

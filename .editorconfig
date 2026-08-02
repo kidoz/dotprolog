@@ -23,6 +23,25 @@ dotnet_style_qualification_for_property = false:warning
 dotnet_style_qualification_for_method = false:warning
 dotnet_style_qualification_for_event = false:warning
 
+# The initializer already states the type, so repeating it on the left adds no information. This is
+# a readability choice only: var and an explicit type compile to the same IL.
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+
+# Prefer the current language forms where they say the same thing more directly.
+csharp_style_prefer_pattern_matching = true:suggestion
+csharp_style_prefer_not_pattern = true:suggestion
+csharp_style_prefer_switch_expression = true:suggestion
+csharp_style_prefer_range_operator = true:suggestion
+csharp_style_prefer_index_operator = true:suggestion
+csharp_prefer_simple_using_statement = true:suggestion
+csharp_style_inlined_variable_declaration = true:suggestion
+dotnet_style_prefer_collection_expression = true:suggestion
+dotnet_style_object_initializer = true:suggestion
+dotnet_style_coalesce_expression = true:suggestion
+dotnet_style_null_propagation = true:suggestion
+
 # Prolog's own type names are 'atom', 'integer', and 'float'. Renaming CellTag.Integer or
 # Cell.Float to satisfy CA1720 would make the engine harder to read, not easier.
 dotnet_diagnostic.CA1720.severity = none

@@ -12,7 +12,7 @@ public sealed class StreamPositionTests : IDisposable
     [Fact]
     public void RestoresTextPositionsAcrossTermParserLookahead()
     {
-        string path = Path("terms.pl");
+        var path = Path("terms.pl");
         File.WriteAllText(path, "one. two.");
 
         Assert.Equal(
@@ -37,7 +37,7 @@ public sealed class StreamPositionTests : IDisposable
     [Fact]
     public void RestoresTextPositionsAcrossCrLfNormalization()
     {
-        string path = Path("lines.pl");
+        var path = Path("lines.pl");
         File.WriteAllText(path, "one.\r\ntwo.");
 
         Assert.Equal(
@@ -59,7 +59,7 @@ public sealed class StreamPositionTests : IDisposable
     [Fact]
     public void RestoresLogicalUnicodeCharacterPositions()
     {
-        string path = Path("unicode.txt");
+        var path = Path("unicode.txt");
         File.WriteAllText(path, "αβγ");
 
         Assert.Equal(
@@ -81,7 +81,7 @@ public sealed class StreamPositionTests : IDisposable
     [Fact]
     public void RestoringBinaryInputResetsEndOfStream()
     {
-        string path = Path("input.bin");
+        var path = Path("input.bin");
         File.WriteAllBytes(path, [10, 20]);
 
         Assert.Equal(
@@ -106,7 +106,7 @@ public sealed class StreamPositionTests : IDisposable
     [Fact]
     public void RestoresBinaryOutputPositions()
     {
-        string path = Path("output.bin");
+        var path = Path("output.bin");
 
         Assert.Equal(
             "[1,9,3]\n",
@@ -130,7 +130,7 @@ public sealed class StreamPositionTests : IDisposable
     [Fact]
     public void RestoresTextOutputPositions()
     {
-        string path = Path("output.txt");
+        var path = Path("output.txt");
 
         Assert.Equal(
             "azc\n",
@@ -155,7 +155,7 @@ public sealed class StreamPositionTests : IDisposable
     [Fact]
     public void RightmostRepositionOptionWins()
     {
-        string path = Path("rightmost.txt");
+        var path = Path("rightmost.txt");
 
         Assert.Equal(
             "false\n",
@@ -173,7 +173,7 @@ public sealed class StreamPositionTests : IDisposable
     [Fact]
     public void NonRepositionableFilesStillReportButCannotRestorePositions()
     {
-        string path = Path("disabled.txt");
+        var path = Path("disabled.txt");
 
         Assert.Equal(
             "permission_error(reposition,stream,fixed)\n",
@@ -210,7 +210,7 @@ public sealed class StreamPositionTests : IDisposable
     [InlineData("reposition(_)", "instantiation_error")]
     public void ReportsRepositionOptionErrors(string option, string expected)
     {
-        string path = Path("option.txt");
+        var path = Path("option.txt");
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch(open('{path}', write, _, [{option}]), error(E, _), write(E))"));
     }
 }

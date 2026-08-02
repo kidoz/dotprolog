@@ -41,7 +41,7 @@ internal sealed class Lexer
     /// <summary>Reads the next token, or an <see cref="TokenKind.Eof"/> token at end of input.</summary>
     internal Token Next()
     {
-        bool layout = false;
+        var layout = false;
         int start;
         char c;
 
@@ -118,19 +118,19 @@ internal sealed class Lexer
 
         if (c == '\'')
         {
-            string name = ReadQuoted('\'', out _);
+            var name = ReadQuoted('\'', out _);
             return new Token(TokenKind.Atom, name, SpanFrom(start), layout, Quoted: true);
         }
 
         if (c == '"')
         {
-            string value = ReadQuoted('"', out _);
+            var value = ReadQuoted('"', out _);
             return new Token(TokenKind.String, value, SpanFrom(start), layout);
         }
 
         if (c == '`')
         {
-            string name = ReadQuoted('`', out _);
+            var name = ReadQuoted('`', out _);
             return new Token(TokenKind.Atom, name, SpanFrom(start), layout, Quoted: true);
         }
 
@@ -141,7 +141,7 @@ internal sealed class Lexer
                 Advance();
             }
 
-            string symbol = ConvertedText(start, _position - start);
+            var symbol = ConvertedText(start, _position - start);
 
             // A lone '.' followed by layout or end of input terminates a clause.
             if (symbol == "." && (_position >= _text.Length || IsLayout(InputAt(_position)) || InputAt(_position) == '%'))
@@ -173,7 +173,7 @@ internal sealed class Lexer
             return '\0';
         }
 
-        char input = _text[position];
+        var input = _text[position];
         if (input is '\'' or '"' or '`')
         {
             return input;
@@ -194,7 +194,7 @@ internal sealed class Lexer
             (Text: _text, Start: start, Conversions: _conversions),
             static (output, state) =>
             {
-                for (int index = 0; index < output.Length; index++)
+                for (var index = 0; index < output.Length; index++)
                 {
                     output[index] = state.Conversions.Convert(state.Text[state.Start + index]);
                 }
@@ -204,7 +204,7 @@ internal sealed class Lexer
 
     private void Advance(int count = 1)
     {
-        for (int index = 0; index < count && _position < _text.Length; index++)
+        for (var index = 0; index < count && _position < _text.Length; index++)
         {
             if (_text[_position] == '\n')
             {
@@ -218,10 +218,10 @@ internal sealed class Lexer
 
     private bool SkipLayout()
     {
-        int before = _position;
+        var before = _position;
         while (_position < _text.Length)
         {
-            char c = InputAt(_position);
+            var c = InputAt(_position);
             if (c == '\n')
             {
                 Advance();
@@ -239,7 +239,7 @@ internal sealed class Lexer
             }
             else if (c == '/' && Peek(1) == '*')
             {
-                int commentStart = _position;
+                var commentStart = _position;
                 Advance(2);
                 while (_position < _text.Length && !(InputAt(_position) == '*' && Peek(1) == '/'))
                 {
@@ -298,15 +298,15 @@ internal sealed class Lexer
 
         if (InputAt(_position) == '0' && Peek(1) is 'x' or 'o' or 'b')
         {
-            char marker = Peek(1);
-            int radix = marker switch
+            var marker = Peek(1);
+            var radix = marker switch
             {
                 'x' => 16,
                 'o' => 8,
                 _ => 2,
             };
             Advance(2);
-            int digitsStart = _position;
+            var digitsStart = _position;
             while (_position < _text.Length && IsRadixDigit(InputAt(_position), radix))
             {
                 Advance();
@@ -319,13 +319,13 @@ internal sealed class Lexer
             }
 
             BigInteger radixValue = 0;
-            foreach (char digit in ConvertedText(digitsStart, _position - digitsStart))
+            foreach (var digit in ConvertedText(digitsStart, _position - digitsStart))
             {
                 radixValue =
                     (radixValue * radix) + (char.IsAsciiDigit(digit) ? digit - '0' : char.ToLowerInvariant(digit) - 'a' + 10);
             }
 
-            bool overflow = radixValue > long.MaxValue;
+            var overflow = radixValue > long.MaxValue;
             return new Token(
                 TokenKind.Integer,
                 ConvertedText(start, _position - start),
@@ -341,7 +341,7 @@ internal sealed class Lexer
             Advance();
         }
 
-        bool isFloat = false;
+        var isFloat = false;
         if (_position < _text.Length && InputAt(_position) == '.' && char.IsAsciiDigit(Peek(1)))
         {
             isFloat = true;
@@ -354,7 +354,7 @@ internal sealed class Lexer
 
         if (isFloat && _position < _text.Length && (InputAt(_position) is 'e' or 'E'))
         {
-            int exponentOffset = Peek(1) is '+' or '-' ? 2 : 1;
+            var exponentOffset = Peek(1) is '+' or '-' ? 2 : 1;
             if (char.IsAsciiDigit(Peek(exponentOffset)))
             {
                 isFloat = true;
@@ -366,16 +366,16 @@ internal sealed class Lexer
             }
         }
 
-        string literal = ConvertedText(start, _position - start);
+        var literal = ConvertedText(start, _position - start);
         SourceSpan span = SpanFrom(start);
 
         if (isFloat)
         {
-            double value = double.Parse(literal, CultureInfo.InvariantCulture);
+            var value = double.Parse(literal, CultureInfo.InvariantCulture);
             return new Token(TokenKind.Float, literal, span, layout, Float: value, FloatOverflow: double.IsInfinity(value));
         }
 
-        if (!long.TryParse(literal, NumberStyles.None, CultureInfo.InvariantCulture, out long integer))
+        if (!long.TryParse(literal, NumberStyles.None, CultureInfo.InvariantCulture, out var integer))
         {
             return new Token(TokenKind.Integer, literal, span, layout, IntegerOverflow: true);
         }
@@ -393,14 +393,14 @@ internal sealed class Lexer
 
     private string ReadQuoted(char quote, out bool terminated)
     {
-        int start = _position;
+        var start = _position;
         Advance();
         var builder = new StringBuilder();
         terminated = false;
 
         while (_position < _text.Length)
         {
-            char c = _text[_position];
+            var c = _text[_position];
             if (c == quote)
             {
                 if (RawPeek(1) == quote)
@@ -450,7 +450,7 @@ internal sealed class Lexer
 
     private void ReadEscape(StringBuilder builder)
     {
-        int start = _position;
+        var start = _position;
         Advance();
         if (_position >= _text.Length)
         {
@@ -458,7 +458,7 @@ internal sealed class Lexer
             return;
         }
 
-        char c = _text[_position];
+        var c = _text[_position];
         Advance();
 
         switch (c)
@@ -524,12 +524,12 @@ internal sealed class Lexer
 
     private void ReadNumericEscape(StringBuilder builder, int start, int radix, string description, int? firstDigit = null)
     {
-        int digitsStart = _position;
-        int value = firstDigit ?? 0;
-        bool overflow = false;
+        var digitsStart = _position;
+        var value = firstDigit ?? 0;
+        var overflow = false;
         while (_position < _text.Length && IsEscapeDigit(_text[_position], radix))
         {
-            int digit = EscapeDigitValue(_text[_position]);
+            var digit = EscapeDigitValue(_text[_position]);
             if (value > (char.MaxValue - digit) / radix)
             {
                 overflow = true;

@@ -17,7 +17,7 @@ public sealed class ChoicePointProtectionTests
         // The minimal shape: p/1 leaves a choice point referencing mid/1's frame, q/1 is reached
         // by last-call optimisation so the frame is deallocated, and out/1 — a user predicate,
         // because builtins allocate no frame — must not clobber it before backtracking.
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             p(a). p(b).
             q(a). q(b).
@@ -38,7 +38,7 @@ public sealed class ChoicePointProtectionTests
     [Fact]
     public void ForallRunsACompoundActionForEverySolution()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             p(a). p(b).
             q(a). q(b).
@@ -53,7 +53,7 @@ public sealed class ChoicePointProtectionTests
     [Fact]
     public void FindallCollectsThroughInClauseDisjunctionAndNegation()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             parent(tom, bob). parent(bob, ann).
 
@@ -72,7 +72,7 @@ public sealed class ChoicePointProtectionTests
         // person/1 ends in a disjunction, so its frame is deallocated while the disjunction's
         // choice point is live; the negation's choice point then records the lowered stack top,
         // and the leaf/1 report must not clobber the frame before the remaining redos.
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             parent(tom, bob). parent(bob, ann).
 

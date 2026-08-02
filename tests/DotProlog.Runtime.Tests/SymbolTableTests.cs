@@ -9,8 +9,8 @@ public sealed class SymbolTableTests
     {
         var symbols = new SymbolTable();
 
-        int first = symbols.InternAtom("append");
-        int second = symbols.InternAtom("append");
+        var first = symbols.InternAtom("append");
+        var second = symbols.InternAtom("append");
 
         Assert.Equal(first, second);
         Assert.Equal("append", symbols.AtomName(first));
@@ -22,8 +22,8 @@ public sealed class SymbolTableTests
     {
         var symbols = new SymbolTable();
 
-        int binary = symbols.InternFunctor("p", 2);
-        int ternary = symbols.InternFunctor("p", 3);
+        var binary = symbols.InternFunctor("p", 2);
+        var ternary = symbols.InternFunctor("p", 3);
 
         Assert.NotEqual(binary, ternary);
         Assert.Equal(2, symbols.ArityOf(binary));

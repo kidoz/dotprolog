@@ -38,8 +38,8 @@ internal static class ControlPredicates
     /// </remarks>
     internal static void Install(BytecodeProgram program)
     {
-        int catchFunctor = program.Symbols.InternFunctor("catch", 3);
-        int entry = program.CodeLength;
+        var catchFunctor = program.Symbols.InternFunctor("catch", 3);
+        var entry = program.CodeLength;
 
         program.Emit(OpCode.Allocate, 4);
         program.Emit(OpCode.GetVariable, 0, 0);
@@ -47,11 +47,11 @@ internal static class ControlPredicates
         program.Emit(OpCode.GetVariable, 2, 2);
         program.Emit(OpCode.MarkBarrier, FrameIndexSlot);
 
-        int recoveryOperand = program.Emit(OpCode.PushCatch, CatcherSlot, 0) + 2;
+        var recoveryOperand = program.Emit(OpCode.PushCatch, CatcherSlot, 0) + 2;
 
         program.Emit(OpCode.PutValue, 0, 0);
         program.Emit(OpCode.MetaCall);
-        int reactivateOperand = program.Emit(OpCode.PopCatch, FrameIndexSlot, 0) + 2;
+        var reactivateOperand = program.Emit(OpCode.PopCatch, FrameIndexSlot, 0) + 2;
         program.Emit(OpCode.Deallocate);
         program.Emit(OpCode.Proceed);
 

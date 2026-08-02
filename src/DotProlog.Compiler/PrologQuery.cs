@@ -62,7 +62,7 @@ public sealed class PrologQuery
         if (_variableNames.Length > 0)
         {
             Cell holder = machine.Dereference(machine.QueryBindings);
-            for (int i = 0; i < _variableNames.Length; i++)
+            for (var i = 0; i < _variableNames.Length; i++)
             {
                 bindings[_variableNames[i]] = PrologValue.FromTerm(machine, machine.HeapAt(holder.Index + 1 + i));
             }

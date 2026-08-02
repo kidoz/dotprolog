@@ -12,7 +12,7 @@ public sealed class MaxArityRepresentationTests : IDisposable
     [Fact]
     public void RuntimeTermInputAcceptsMaximumSupportedArity()
     {
-        string source = Compound(255);
+        var source = Compound(255);
 
         Assert.Equal(
             "yes",
@@ -25,7 +25,7 @@ public sealed class MaxArityRepresentationTests : IDisposable
     [InlineData(true)]
     public void RuntimeTermInputRaisesCatchableMaxArityRepresentationError(bool nested)
     {
-        string source = nested ? $"g({Compound(256)})" : Compound(256);
+        var source = nested ? $"g({Compound(256)})" : Compound(256);
 
         Assert.Equal(
             "yes",
@@ -38,7 +38,7 @@ public sealed class MaxArityRepresentationTests : IDisposable
     [Fact]
     public void MaxArityErrorConsumesOnlyTheRejectedStreamTerm()
     {
-        string path = Path("max-arity.pl");
+        var path = Path("max-arity.pl");
         File.WriteAllText(path, $"{Compound(256)}. next.");
 
         Assert.Equal(

@@ -12,7 +12,7 @@ public sealed class BinaryStreamTests : IDisposable
     [Fact]
     public void WritesPeeksAndReadsEveryByteRange()
     {
-        string path = Path("bytes.bin");
+        var path = Path("bytes.bin");
 
         Assert.Equal(
             "[0,1,127,128,128,255,-1]\n",
@@ -35,7 +35,7 @@ public sealed class BinaryStreamTests : IDisposable
     [Fact]
     public void BinaryAppendPreservesExistingBytes()
     {
-        string path = Path("append.bin");
+        var path = Path("append.bin");
 
         Assert.Equal(
             "[10,20]\n",
@@ -55,7 +55,7 @@ public sealed class BinaryStreamTests : IDisposable
     [Fact]
     public void OneArgumentByteOperationsUseBinaryCurrentStreams()
     {
-        string path = Path("current.bin");
+        var path = Path("current.bin");
 
         Assert.Equal(
             "65-66\n",
@@ -76,7 +76,7 @@ public sealed class BinaryStreamTests : IDisposable
     [Fact]
     public void OneArgumentTextOutputRejectsABinaryCurrentStream()
     {
-        string path = Path("current-text-error.bin");
+        var path = Path("current-text-error.bin");
 
         Assert.Equal(
             "yes\n",
@@ -93,7 +93,7 @@ public sealed class BinaryStreamTests : IDisposable
     [Fact]
     public void ReportsBinaryPropertiesAndEndStates()
     {
-        string path = Path("properties.bin");
+        var path = Path("properties.bin");
 
         Assert.Equal(
             "yes\n",
@@ -122,7 +122,7 @@ public sealed class BinaryStreamTests : IDisposable
     [Fact]
     public void OpenTypeUsesTheRightmostOption()
     {
-        string path = Path("rightmost.bin");
+        var path = Path("rightmost.bin");
 
         Assert.Equal(
             "binary\n",
@@ -142,8 +142,8 @@ public sealed class BinaryStreamTests : IDisposable
     [InlineData("put_code(binary_out, 65)", "permission_error(output,binary_stream,binary_out)")]
     public void TextOutputRejectsBinaryStreams(string operation, string expected)
     {
-        string path = Path("wrong-output.bin");
-        string goal =
+        var path = Path("wrong-output.bin");
+        var goal =
             $"open('{path}', write, _, [type(binary), alias(binary_out)]), "
             + $"catch({operation}, error(E, _), write(E)), close(binary_out)";
 
@@ -156,9 +156,9 @@ public sealed class BinaryStreamTests : IDisposable
     [InlineData("peek_char(binary_in, _)", "permission_error(input,binary_stream,binary_in)")]
     public void TextInputRejectsBinaryStreams(string operation, string expected)
     {
-        string path = Path("wrong-input.bin");
+        var path = Path("wrong-input.bin");
         File.WriteAllBytes(path, [65]);
-        string goal =
+        var goal =
             $"open('{path}', read, _, [type(binary), alias(binary_in)]), "
             + $"catch({operation}, error(E, _), write(E)), close(binary_in)";
 
@@ -178,9 +178,9 @@ public sealed class BinaryStreamTests : IDisposable
     [InlineData("get_byte(bytes, 256)", "type_error(in_byte,256)")]
     public void ReportsInputByteErrors(string operation, string expected)
     {
-        string path = Path("input-errors.bin");
+        var path = Path("input-errors.bin");
         File.WriteAllBytes(path, [0]);
-        string goal =
+        var goal =
             $"open('{path}', read, _, [type(binary), alias(bytes)]), "
             + $"catch({operation}, error(E, _), write(E)), close(bytes)";
 
@@ -194,8 +194,8 @@ public sealed class BinaryStreamTests : IDisposable
     [InlineData("put_byte(bytes, 256)", "type_error(byte,256)")]
     public void ReportsOutputByteErrors(string operation, string expected)
     {
-        string path = Path("output-errors.bin");
-        string goal =
+        var path = Path("output-errors.bin");
+        var goal =
             $"open('{path}', write, _, [type(binary), alias(bytes)]), "
             + $"catch({operation}, error(E, _), write(E)), close(bytes)";
 
@@ -217,7 +217,7 @@ public sealed class BinaryStreamTests : IDisposable
     [InlineData("type(_)", "instantiation_error")]
     public void ReportsBinaryOpenOptionErrors(string option, string expected)
     {
-        string path = Path("option-errors.bin");
+        var path = Path("option-errors.bin");
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch(open('{path}', write, _, [{option}]), error(E, _), write(E))"));
     }
 }
