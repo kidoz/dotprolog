@@ -16,18 +16,23 @@ internal static class PrologLayoutLinter
         Validate(options);
         var lines = new SourceLines(source);
 
-        AnalyzeLines(source, lines, options, fileName, diagnostics);
+        // Every rule that reads raw characters shares one classification of the source, so none of
+        // them can disagree with the others about what is code, quoted text, or a comment.
+        SourceRegion[] regions = ClassifyRegions(source);
+
+        AnalyzeLines(source, lines, regions, options, fileName, diagnostics);
         if (options.RequireSpaceAfterComma)
         {
-            AnalyzeCommas(source, lines, fileName, diagnostics);
+            AnalyzeCommas(source, lines, regions, fileName, diagnostics);
         }
 
-        AnalyzeClauses(source, clauses, lines, options, fileName, diagnostics);
+        AnalyzeClauses(source, clauses, lines, regions, options, fileName, diagnostics);
     }
 
     private static void AnalyzeLines(
         string source,
         SourceLines lines,
+        SourceRegion[] regions,
         PrologLintOptions options,
         string? fileName,
         List<Diagnostic> diagnostics
@@ -76,7 +81,9 @@ internal static class PrologLayoutLinter
 
         for (int offset = 0; offset < source.Length; offset++)
         {
-            if (source[offset] == '\t')
+            // A tab inside quoted text is the atom's own value, so no edit to the layout can remove
+            // it. One in a comment is still layout a reader sees, and stays reportable.
+            if (source[offset] == '\t' && regions[offset] != SourceRegion.Quoted)
             {
                 diagnostics.Add(
                     Warning(LintDiagnosticIds.TabCharacter, "Use spaces instead of tabs.", lines.Span(offset, 1), fileName)
@@ -85,80 +92,23 @@ internal static class PrologLayoutLinter
         }
     }
 
-    private static void AnalyzeCommas(string source, SourceLines lines, string? fileName, List<Diagnostic> diagnostics)
+    private static void AnalyzeCommas(
+        string source,
+        SourceLines lines,
+        SourceRegion[] regions,
+        string? fileName,
+        List<Diagnostic> diagnostics
+    )
     {
-        char quote = '\0';
-        bool lineComment = false;
-        bool blockComment = false;
-
         for (int offset = 0; offset < source.Length; offset++)
         {
-            char current = source[offset];
+            if (regions[offset] != SourceRegion.Code || source[offset] != ',')
+            {
+                continue;
+            }
+
             char next = offset + 1 < source.Length ? source[offset + 1] : '\0';
-
-            if (lineComment)
-            {
-                lineComment = current != '\n';
-                continue;
-            }
-
-            if (blockComment)
-            {
-                if (current == '*' && next == '/')
-                {
-                    blockComment = false;
-                    offset++;
-                }
-
-                continue;
-            }
-
-            if (quote != '\0')
-            {
-                if (current == '\\')
-                {
-                    offset++;
-                }
-                else if (current == quote && next == quote)
-                {
-                    offset++;
-                }
-                else if (current == quote)
-                {
-                    quote = '\0';
-                }
-
-                continue;
-            }
-
-            if (current == '%')
-            {
-                lineComment = true;
-                continue;
-            }
-
-            if (current == '/' && next == '*')
-            {
-                blockComment = true;
-                offset++;
-                continue;
-            }
-
-            // 0'c is a character-code literal, so its quote opens nothing. Reading it as a delimiter
-            // would shield every comma up to the next quote in the file, silently reporting nothing.
-            if (current == '\'' && IsCharacterCodeQuote(source, offset))
-            {
-                offset = CharacterCodeEnd(source, offset);
-                continue;
-            }
-
-            if (current is '\'' or '"' or '`')
-            {
-                quote = current;
-                continue;
-            }
-
-            if (current == ',' && !char.IsWhiteSpace(next))
+            if (!char.IsWhiteSpace(next))
             {
                 diagnostics.Add(
                     Warning(
@@ -176,6 +126,7 @@ internal static class PrologLayoutLinter
         string source,
         IReadOnlyList<SyntaxTerm> clauses,
         SourceLines lines,
+        SourceRegion[] regions,
         PrologLintOptions options,
         string? fileName,
         List<Diagnostic> diagnostics
@@ -217,7 +168,7 @@ internal static class PrologLayoutLinter
 
             if (options.IndentSize is int indentSize)
             {
-                AnalyzeIndentation(source, lines, startLine, endLine, indentSize, fileName, diagnostics);
+                AnalyzeIndentation(source, lines, regions, startLine, endLine, indentSize, fileName, diagnostics);
             }
 
             if (
@@ -251,6 +202,7 @@ internal static class PrologLayoutLinter
     private static void AnalyzeIndentation(
         string source,
         SourceLines lines,
+        SourceRegion[] regions,
         int startLine,
         int endLine,
         int indentSize,
@@ -268,6 +220,14 @@ internal static class PrologLayoutLinter
             }
 
             if (content == line.End)
+            {
+                continue;
+            }
+
+            // Only a continuation of the clause itself has indentation to get wrong. A line that
+            // continues a multi-line quoted token carries that token's own text, where the leading
+            // characters are its value; a comment is not a continuation at all.
+            if (regions[content] != SourceRegion.Code)
             {
                 continue;
             }
@@ -345,6 +305,91 @@ internal static class PrologLayoutLinter
     }
 
     /// <summary>
+    /// Classifies every character as code, quoted text, or a comment, in one pass that mirrors the
+    /// reader's lexical rules. Rules that read raw characters consult this rather than each keeping
+    /// their own idea of what is shielded.
+    /// </summary>
+    private static SourceRegion[] ClassifyRegions(ReadOnlySpan<char> source)
+    {
+        var regions = new SourceRegion[source.Length];
+
+        for (int offset = 0; offset < source.Length; offset++)
+        {
+            char current = source[offset];
+            char next = offset + 1 < source.Length ? source[offset + 1] : '\0';
+
+            // Each shielded token decides only where it ends; one fill and one advance serve them
+            // all, so no branch can leave the scan pointing at a character it already consumed.
+            (int end, SourceRegion region) = (current, next) switch
+            {
+                ('%', _) => (LineCommentEnd(source, offset), SourceRegion.Comment),
+                ('/', '*') => (BlockCommentEnd(source, offset), SourceRegion.Comment),
+                ('\'', _) when IsCharacterCodeQuote(source, offset) => (CharacterCodeEnd(source, offset), SourceRegion.Quoted),
+                ('\'' or '"' or '`', _) => (QuotedTokenEnd(source, offset), SourceRegion.Quoted),
+                _ => (-1, SourceRegion.Code),
+            };
+
+            if (end < offset)
+            {
+                continue;
+            }
+
+            Array.Fill(regions, region, offset, end - offset + 1);
+            offset = end;
+        }
+
+        return regions;
+    }
+
+    /// <summary>The last character of a line comment, excluding the newline that ends it, which stays
+    /// code so the line-length and trailing-whitespace rules still see it.</summary>
+    private static int LineCommentEnd(ReadOnlySpan<char> source, int start)
+    {
+        int newline = source[start..].IndexOf('\n');
+        return newline < 0 ? source.Length - 1 : start + newline - 1;
+    }
+
+    /// <summary>The last character of a block comment. These do not nest, and an unterminated one
+    /// runs to the end of the source.</summary>
+    private static int BlockCommentEnd(ReadOnlySpan<char> source, int start)
+    {
+        int close = source[(start + 2)..].IndexOf("*/", StringComparison.Ordinal);
+        return close < 0 ? source.Length - 1 : start + close + 3;
+    }
+
+    /// <summary>The closing delimiter of the quoted token opened at <paramref name="start"/>.</summary>
+    private static int QuotedTokenEnd(ReadOnlySpan<char> source, int start)
+    {
+        char quote = source[start];
+        for (int offset = start + 1; offset < source.Length; offset++)
+        {
+            // A backslash escapes the next character, including the newline of a line continuation.
+            if (source[offset] == '\\')
+            {
+                offset++;
+                continue;
+            }
+
+            if (source[offset] != quote)
+            {
+                continue;
+            }
+
+            // A doubled delimiter denotes the character itself and leaves the token open.
+            if (offset + 1 < source.Length && source[offset + 1] == quote)
+            {
+                offset++;
+                continue;
+            }
+
+            return offset;
+        }
+
+        // Unterminated: the reader reports it, and classification runs to the end of the source.
+        return source.Length - 1;
+    }
+
+    /// <summary>
     /// Whether the quote at <paramref name="quoteOffset"/> belongs to a <c>0'c</c> character-code
     /// literal rather than opening a quoted token.
     /// </summary>
@@ -353,7 +398,7 @@ internal static class PrologLayoutLinter
     /// <c>10'a'</c> and <c>x0'a'</c> are a number or a name followed by a quoted atom. There is no
     /// general <c>Base'Digits</c> radix form to consider, only <c>0x</c>, <c>0o</c>, and <c>0b</c>.
     /// </remarks>
-    private static bool IsCharacterCodeQuote(string source, int quoteOffset)
+    private static bool IsCharacterCodeQuote(ReadOnlySpan<char> source, int quoteOffset)
     {
         if (quoteOffset == 0 || source[quoteOffset - 1] != '0')
         {
@@ -366,7 +411,7 @@ internal static class PrologLayoutLinter
 
     /// <summary>The offset of the last character of the character-code literal whose quote is at
     /// <paramref name="quoteOffset"/>, mirroring the escape and doubled-quote forms the lexer reads.</summary>
-    private static int CharacterCodeEnd(string source, int quoteOffset)
+    private static int CharacterCodeEnd(ReadOnlySpan<char> source, int quoteOffset)
     {
         int body = quoteOffset + 1;
         if (body >= source.Length)
@@ -403,6 +448,19 @@ internal static class PrologLayoutLinter
 
     private static Diagnostic Warning(string id, string message, SourceSpan span, string? fileName) =>
         new(id, DiagnosticSeverity.Warning, message, span, fileName);
+
+    /// <summary>Which lexical region a source character belongs to.</summary>
+    private enum SourceRegion : byte
+    {
+        /// <summary>Ordinary program text, where layout rules apply.</summary>
+        Code,
+
+        /// <summary>A quoted token or a character-code literal, whose characters are its value.</summary>
+        Quoted,
+
+        /// <summary>A line or block comment, excluding the newline that ends a line comment.</summary>
+        Comment,
+    }
 
     private readonly record struct SourceLine(int Number, int Start, int Length)
     {

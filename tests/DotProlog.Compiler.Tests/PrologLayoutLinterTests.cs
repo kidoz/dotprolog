@@ -123,6 +123,65 @@ public sealed class PrologLayoutLinterTests
         Assert.Equal(5, diagnostic.Span.Start);
     }
 
+    [Fact]
+    public void IndentationIgnoresLinesContinuingAQuotedToken()
+    {
+        // A backslash continues the quoted token onto the next line, so line two is the atom's own
+        // text. No indentation would satisfy the rule without changing the value the program reads.
+        const string source = "message('line one\\\nline two').\n";
+
+        Assert.DoesNotContain(
+            Lint(source, PrologLintOptions.Covington),
+            diagnostic => diagnostic.Id == LintDiagnosticIds.InconsistentIndentation
+        );
+    }
+
+    [Fact]
+    public void IndentationIgnoresCommentLinesInsideAClause()
+    {
+        // A comment is not a clause continuation, so the indentation rule has nothing to say here.
+        const string source = "rule :-\n    first,\n% explanation at column one\n    second.\n";
+
+        Assert.DoesNotContain(
+            Lint(source, PrologLintOptions.Covington),
+            diagnostic => diagnostic.Id == LintDiagnosticIds.InconsistentIndentation
+        );
+    }
+
+    [Fact]
+    public void IndentationStillReportsMisalignedCodeContinuations()
+    {
+        const string source = "rule :-\n  first,\n    second.\n";
+
+        Diagnostic diagnostic = Assert.Single(
+            Lint(source, PrologLintOptions.Covington),
+            diagnostic => diagnostic.Id == LintDiagnosticIds.InconsistentIndentation
+        );
+
+        Assert.Equal(2, diagnostic.Span.Line);
+    }
+
+    [Fact]
+    public void TabsInQuotedTextAreTheirTokensValueRatherThanLayout()
+    {
+        // The reader rejects a raw tab inside a quoted atom, so the reachable case is a character
+        // code whose payload is the tab itself. Reporting it would ask for an unmakeable edit.
+        const string source = "q(0'\t).\n";
+
+        Assert.DoesNotContain(
+            Lint(source, PrologLintOptions.Covington),
+            diagnostic => diagnostic.Id == LintDiagnosticIds.TabCharacter
+        );
+    }
+
+    [Fact]
+    public void TabsInCommentsRemainReportable()
+    {
+        const string source = "q(a).  % comment\twith tab\n";
+
+        Assert.Contains(Lint(source, PrologLintOptions.Covington), diagnostic => diagnostic.Id == LintDiagnosticIds.TabCharacter);
+    }
+
     [Theory]
     [InlineData("first. second.\n", 7, 8)]
     [InlineData("rule :- body.\n", 8, 9)]
