@@ -241,7 +241,7 @@ public sealed class GrammarTests
     [Theory]
     [InlineData("phrase([a|_], [a])", "instantiation_error")]
     [InlineData("phrase([a|tail], [a])", "type_error(list,[a|tail])")]
-    [InlineData("phrase([], not_a_list)", "type_error(terminal_sequence,not_a_list)")]
+    [InlineData("phrase([], not_a_list)", "type_error(list,not_a_list)")]
     public void PhraseReportsGrammarBodyAndPhraseTwoListErrors(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
 

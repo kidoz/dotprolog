@@ -238,7 +238,7 @@ public static class CoreBuiltins
     }
 
     /// <summary>
-    /// Accepts a proper or partial terminal sequence and uses the Part 3 type name for any other tail.
+    /// Accepts a proper or partial terminal sequence and reports an ISO list type error for any other tail.
     /// </summary>
     private static bool ValidateTerminalSequence(Machine machine)
     {
@@ -248,7 +248,7 @@ public static class CoreBuiltins
 
         return TermList.IsEmpty(machine, tail) || tail.Tag == CellTag.Reference
             ? true
-            : throw PrologErrors.Type(machine, "terminal_sequence", sequence);
+            : throw PrologErrors.Type(machine, "list", sequence);
     }
 
     /// <summary>
