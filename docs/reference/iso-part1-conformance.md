@@ -46,7 +46,7 @@ predefined-predicate and evaluable-functor inventory is also pinned by
 | 5.5.5 directives | Standard directives retain their preparation-time meaning and validation | R/I/C/A |
 | 5.5.6 side effects | Stream, flag, database, and process effects occur at the specified execution point | R/D/I/C/A |
 | 5.5.7 control extensions | Part 1 controls retain their cut and backtracking semantics; soft cut is rejected as a Part 1 control in strict source | R/D/I/C/A |
-| 5.5.8 flag extensions | Exactly the nine Part 1 flags enumerate; extension settings are not exposed as ISO flags | R/D/I/A |
+| 5.5.8 flag extensions | Only the nine Part 1 flags and the Part 2 `colon_sets_calling_context` flag enumerate; extension settings are not exposed as ISO flags | R/D/I/A |
 | 5.5.9 predicate extensions | User predicates may use arbitrary names, while predefined extensions are excluded by strict mode | R/C/A |
 | 5.5.10 evaluable extensions | Only Part 1 evaluable functors are admitted by strict arithmetic evaluation | R/D/I/C/A |
 | 5.5.11 reserved atoms | Error, option, mode, and flag atoms keep their standardized meanings | R/D/I/A |

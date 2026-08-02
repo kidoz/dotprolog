@@ -66,6 +66,8 @@ takes the standard spelling only.
 - Removing `:=`, infix `.`, and `$` from the strict initial operator table changes how strict
   source that used them reads. Such source was outside Part 1 to begin with; `Extended` is
   unchanged.
+- `current_prolog_flag/2` enumerates ten flags: the nine from Part 1 and the Part 2
+  `colon_sets_calling_context`. A program that counted the flag set has to count ten.
 - The complete applicable independent Part 1 corpus passes on every execution path. Parts 2 and 3
   rest on licensed traceability plus focused managed, generated-C#, and NativeAOT evidence, not on
   an independent suite. None of this is a claim of SWI-Prolog compatibility.

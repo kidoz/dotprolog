@@ -186,7 +186,7 @@ internal static class Program
                 % ISO flags own runtime state explicitly and continue to work after trimming.
                 current_prolog_flag(bounded, true),
                 findall(FlagName, current_prolog_flag(FlagName, _), FlagNames),
-                length(FlagNames, 9),
+                length(FlagNames, 10),
                 current_prolog_flag(max_integer, NativeMaxInteger),
                 catch(
                     set_prolog_flag(max_integer, NativeMaxInteger),

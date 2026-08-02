@@ -168,9 +168,10 @@ Writing them was worth it immediately: they found these real defects.
 - The control audit now covers goal modes for `once/1`, `call/1..8`, and `catch/3`, including
   recovery-goal validation and errors caught by the active catcher itself. A `call/8` result at
   arity 255 executes, while arity 256 raises `representation_error(max_arity)`.
-- The flag audit covers all nine ISO flags, each fixed flag's modification permission, and every
-  mutable value domain. Modules enumerate the same core set without exposing extension-specific
-  flags, and NativeAOT retains the same values and permissions.
+- The flag audit covers all nine Part 1 flags and the Part 2 `colon_sets_calling_context` flag,
+  each fixed flag's modification permission, and every mutable value domain. Modules enumerate the
+  same core set without exposing extension-specific flags, and NativeAOT retains the same values
+  and permissions.
 - Quoted atom spelling no longer suppresses the atom's operator definition. ISO prefix, infix, and
   postfix interpretation therefore applies equally to quoted default and dynamically declared
   operator names in compiled source and runtime term input.
