@@ -491,9 +491,12 @@ $ just check          # format-check, build, and test
 ## Releasing
 
 Packages are `DotProlog.*`: `DotProlog.Runtime`, `DotProlog.Syntax`, `DotProlog.Compiler`,
-`DotProlog.Testing`, `DotProlog.Tool`, `DotProlog.Sdk`, and `DotProlog.Templates`. Every
-assembly-bearing package carries Source Link and a symbol package, so a debugger can step from a
-package into the exact commit it was built from.
+`DotProlog.Testing`, `DotProlog.Tool`, `DotProlog.Sdk`, and `DotProlog.Templates`. `DotProlog.Tool`
+is a pointer package: the executable ships in the per-RID `DotProlog.Tool.linux-x64`,
+`DotProlog.Tool.osx-arm64`, and `DotProlog.Tool.win-x64` packages, with `DotProlog.Tool.any` as the
+portable fallback, so eleven IDs reach the feed in all. Every assembly-bearing package carries
+Source Link and a symbol package, so a debugger can step from a package into the exact commit it
+was built from.
 
 ```bash
 just pack        # every package into ./artifacts, with SHA256SUMS
@@ -502,17 +505,25 @@ just pack        # every package into ./artifacts, with SHA256SUMS
 `Prolog.NET`, which this project's brief originally proposed, is taken on NuGet by an unrelated
 WAM-based .NET Prolog. `DotProlog.*` is what shipped instead.
 
-Releasing is a tag. `.github/workflows/release.yml` runs on `v*`, re-runs every CI gate against the
-tagged commit, checks the tag agrees with `VersionPrefix`, publishes native binaries for Linux,
-Windows, and macOS, packs with checksums and an SBOM, opens a GitHub release whose notes are the
-changelog section for that version, and only then pushes to NuGet — from a separate job in a
-`release` environment, so a required reviewer can stand between the tag and the feed.
+Releasing is a tag. `.github/workflows/release.yml` runs on `v*`, re-runs the format, build, and
+test gates against the tagged commit on all three platforms, checks the tag agrees with
+`VersionPrefix`, publishes native binaries for Linux, Windows, and macOS, packs with checksums and
+an SBOM, opens a GitHub release whose notes are the changelog section for that version, and only
+then pushes to NuGet — from a separate job in a `release` environment, so a required reviewer can
+stand between the tag and the feed.
+
+The pinned independent ISO corpus is a CI-only step, run on one platform per push to `main`. Let CI
+go green on the commit you intend to tag rather than relying on the release run to cover it.
+
+Two things have to agree before tagging, and the workflow fails rather than guessing if they do
+not: the tag must match `VersionPrefix`, and the changelog must contain a heading for that exact
+version, because the release notes are extracted from it.
 
 ```bash
-# 1. Move the version's changelog heading from "unreleased" to today's date.
+# 1. Move the version's changelog heading from "unreleased" to today's date, and add its link ref.
 # 2. Set VersionPrefix in Directory.Build.props if the version is changing.
-# 3. Commit, then:
-git tag v0.2.0 && git push origin v0.2.0
+# 3. Commit and push, wait for CI, then:
+git tag v0.4.0 && git push origin v0.4.0
 ```
 
 The publication job authenticates by trusted publishing: it
