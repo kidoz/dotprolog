@@ -75,6 +75,12 @@ Warnings do not fail the command unless CI opts in:
 dotnet run --project src/DotProlog.Tool -- lint --warnings-as-errors path/to/program.pl
 ```
 
+Apply the optional Covington layout profile when the project wants a consistent source style:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint --profile covington path/to/program.pl
+```
+
 See [Source linting](linting.md) for the diagnostic and exit-code contract.
 
 ## Run your own program

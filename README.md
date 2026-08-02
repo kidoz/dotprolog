@@ -48,8 +48,9 @@ Analyze source without consulting it or executing directives:
 $ dotnet run --project src/DotProlog.Tool -- lint --warnings-as-errors path/to/program.pl
 ```
 
-The first stable linter diagnostics cover singleton variables and repeated underscore-prefixed
-singleton markers. See [Source linting](docs/linting.md) for rules and exit codes.
+The stable linter diagnostics cover singleton variables and repeated underscore-prefixed singleton
+markers. An opt-in `--profile covington` adds configurable source-layout checks. See
+[Source linting](docs/linting.md) for rules and exit codes.
 
 ## Calling Prolog from C#
 

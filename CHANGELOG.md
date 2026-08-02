@@ -13,6 +13,9 @@ All notable changes to DotProlog are recorded here. The format follows
   shared language modes; warnings remain advisory unless `--warnings-as-errors` is selected.
 - A reusable `PrologLinter` API in `DotProlog.Compiler`, package-consumer coverage for the installed
   tool, and source-linting documentation.
+- An opt-in `covington` lint profile for spaces, indentation, line and clause length, comma spacing,
+  clause and subgoal layout, and trailing whitespace. Numeric layout limits are configurable while
+  the default profile remains semantic-only.
 
 ## [0.3.0] — 2026-08-01
 
