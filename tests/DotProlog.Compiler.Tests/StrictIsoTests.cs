@@ -116,10 +116,15 @@ public sealed class StrictIsoTests
 
         LoadResult loaded = engine.ConsultText(
             """
-            :- module(meta_example, [answer/0]).
-            :- meta_predicate twice(0).
+            :- module(meta_example).
+            :- export(answer/0).
+            :- metapredicate(twice(:)).
+            :- end_module(meta_example).
+
+            :- body(meta_example).
             twice(Goal) :- call(Goal), call(Goal).
             answer :- twice(true).
+            :- end_body(meta_example).
             """
         );
 
@@ -136,15 +141,22 @@ public sealed class StrictIsoTests
         {
             var library = Path.Combine(directory, "library.pl");
             var main = Path.Combine(directory, "main.pl");
-            File.WriteAllText(library, ":- module(library, [answer/1]).\nanswer(42).\n");
+            File.WriteAllText(
+                library,
+                ":- module(library).\n:- export(answer/1).\n:- end_module(library).\n"
+                    + ":- body(library).\nanswer(42).\n:- end_body(library).\n"
+            );
             File.WriteAllText(
                 main,
-                ":- module(main, [result/1]).\n:- use_module(library, [answer/1]).\nresult(X) :- answer(X).\n"
+                ":- module(main).\n:- export(result/1).\n:- end_module(main).\n"
+                    + ":- body(main).\n:- import(library, answer/1).\nresult(X) :- answer(X).\n:- end_body(main).\n"
             );
 
             var engine = StrictEngine();
+            LoadResult libraryLoaded = engine.ConsultFile(library);
             LoadResult loaded = engine.ConsultFile(main);
 
+            Assert.True(libraryLoaded.Success, string.Join("; ", libraryLoaded.Diagnostics));
             Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
             Assert.Equal(RunResult.Success, engine.RunGoal("result(42)", out _));
         }
@@ -161,8 +173,13 @@ public sealed class StrictIsoTests
 
         LoadResult loaded = engine.ConsultText(
             """
-            :- module(example, [answer/1]).
+            :- module(example).
+            :- export(answer/1).
+            :- end_module(example).
+
+            :- body(example).
             answer(42).
+            :- end_body(example).
             """
         );
 

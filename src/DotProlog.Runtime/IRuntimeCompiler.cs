@@ -73,4 +73,18 @@ public interface IRuntimeCompiler
         out Cell variables,
         out Cell singletons
     );
+
+    /// <summary>Reads one term using an explicitly selected module reader context.</summary>
+    bool TryReadTerm(
+        Machine machine,
+        TextReader input,
+        ref string buffer,
+        OperatorTable operators,
+        CharacterConversionTable characterConversions,
+        PrologFlags flags,
+        out Cell term,
+        out Cell variableNames,
+        out Cell variables,
+        out Cell singletons
+    ) => TryReadTerm(machine, input, ref buffer, out term, out variableNames, out variables, out singletons);
 }

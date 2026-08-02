@@ -1,4 +1,5 @@
 using DotProlog.Syntax;
+using DotProlog.Runtime;
 
 namespace DotProlog.Compiler;
 
@@ -24,16 +25,29 @@ internal sealed class ModuleResolver
     private readonly ModuleTable _modules;
     private readonly string _module;
     private readonly HashSet<PredicateIndicator> _local;
+    private readonly BytecodeProgram? _program;
+    private readonly bool _isoContext;
 
     /// <summary>Creates a resolver for clauses being loaded into <paramref name="module"/>.</summary>
     /// <param name="modules">The program's module table.</param>
     /// <param name="module">The module being loaded into.</param>
     /// <param name="local">Every predicate the unit being loaded defines.</param>
-    internal ModuleResolver(ModuleTable modules, string module, HashSet<PredicateIndicator> local)
+    /// <param name="program">Program used to distinguish predefined global procedures from unknown local ones.</param>
+    /// <param name="isoContext">Whether the source is an ISO module body, including the default <c>user</c> module.</param>
+    internal ModuleResolver(
+        ModuleTable modules,
+        string module,
+        HashSet<PredicateIndicator> local,
+        BytecodeProgram? program = null,
+        bool isoContext = false
+    )
     {
         _modules = modules;
         _module = module;
         _local = local;
+        _program = program;
+        _isoContext = isoContext
+            || (modules.Catalog.TryGet(module, out ModuleDefinition? definition) && definition!.InterfacePrepared);
     }
 
     /// <summary>Whether this resolver has anything to do.</summary>
@@ -69,6 +83,53 @@ internal sealed class ModuleResolver
 
     private CompoundTerm ResolveCompound(CompoundTerm compound)
     {
+        if (_isoContext && compound is { Name: "predicate_property", Arity: 2 })
+        {
+            return new CompoundTerm(
+                "$predicate_property",
+                [new AtomTerm(_module, compound.Span), compound.Arguments[0], compound.Arguments[1]],
+                compound.Span
+            );
+        }
+
+        if (_isoContext && compound is { Name: "current_predicate", Arity: 1 })
+        {
+            return new CompoundTerm(
+                "$current_predicate",
+                [new AtomTerm(_module, compound.Span), compound.Arguments[0]],
+                compound.Span
+            );
+        }
+
+        string? contextual = _isoContext ? (compound.Name, compound.Arity) switch
+        {
+            ("op", 3) => "$op",
+            ("current_op", 3) => "$current_op",
+            ("char_conversion", 2) => "$char_conversion",
+            ("current_char_conversion", 2) => "$current_char_conversion",
+            ("set_prolog_flag", 2) => "$set_prolog_flag",
+            ("current_prolog_flag", 2) => "$current_prolog_flag",
+            ("asserta", 1) => "$asserta",
+            ("assertz", 1) => "$assertz",
+            ("retract", 1) => "$retract",
+            ("clause", 2) => "$clause",
+            ("abolish", 1) => "$abolish",
+            ("write", 1 or 2) => "$write",
+            ("writeq", 1 or 2) => "$writeq",
+            ("write_term", 2 or 3) => "$write_term",
+            ("read", 1 or 2) => "$read",
+            ("read_term", 2 or 3) => "$read_term",
+            _ => null,
+        } : null;
+        if (contextual is not null)
+        {
+            return new CompoundTerm(
+                contextual,
+                [new AtomTerm(_module, compound.Span), .. compound.Arguments],
+                compound.Span
+            );
+        }
+
         switch (compound)
         {
             // Control constructs are transparent: what matters is the goals inside them.
@@ -92,7 +153,7 @@ internal sealed class ModuleResolver
         }
 
         var indicator = new PredicateIndicator(compound.Name, compound.Arity);
-        var meta = _modules.MetaArgumentsOf(indicator);
+        var meta = _modules.MetaArgumentsOf(_module, indicator);
         IReadOnlyList<SyntaxTerm> arguments = meta is null ? compound.Arguments : ResolveMetaArguments(compound, meta);
 
         return Rename(compound.Name, compound.Arity) is { } renamed
@@ -157,13 +218,45 @@ internal sealed class ModuleResolver
 
         // What this unit defines wins over anything imported, which is what makes a module's own
         // helper reachable even when a name it imports would otherwise shadow it.
-        if (_local.Contains(indicator))
+        if (_local.Contains(indicator) || _modules.Defines(_module, indicator))
         {
             return ModuleTable.QualifiedName(_module, name);
         }
 
-        var from = _modules.ImportedFrom(_module, indicator);
-        return from is null ? null : ModuleTable.QualifiedName(from, name);
+        var from = _modules.DefiningModuleOf(_module, indicator);
+        if (from is not null)
+        {
+            return ModuleTable.QualifiedName(from, name);
+        }
+
+        if (
+            _module != ModuleTable.UserModule
+            && _modules.Catalog.TryGet(_module, out ModuleDefinition? definition)
+            && definition!.InterfacePrepared
+            && !IsGlobalProcedure(name, arity)
+        )
+        {
+            return ModuleTable.QualifiedName(_module, name);
+        }
+
+        return null;
+    }
+
+    private bool IsGlobalProcedure(string name, int arity)
+    {
+        if (_program is null)
+        {
+            return false;
+        }
+
+        if (name == "call" && arity is >= 1 and <= 8)
+        {
+            return true;
+        }
+
+        var functor = _program.Symbols.InternFunctor(name, arity);
+        return _program.Builtins.TryGetId(functor, out _)
+            || (_program.IsDefined(functor) && !_program.IsUserPredicate(functor));
     }
 
     /// <summary>Wraps a term as <c>Module:Term</c>, for something resolved when it is called.</summary>

@@ -8,7 +8,7 @@ namespace DotProlog.Runtime;
 /// <para>
 /// A stream is named by <c>'$stream'(N)</c> or by an alias atom. Reading a term needs a parser,
 /// which the runtime deliberately cannot reference, so it goes out through
-/// <see cref="IRuntimeCompiler.TryReadTerm"/> — the same seam <c>assertz/1</c> and <c>consult/1</c>
+/// <see cref="IRuntimeCompiler"/> — the same compiler seam <c>assertz/1</c> and <c>consult/1</c>
 /// already use.
 /// </para>
 /// <para>
@@ -38,6 +38,26 @@ internal static class StreamBuiltins
         registry.Register("read", 2, static machine => Read(machine, stream: 0, term: 1, options: -1));
         registry.Register("read_term", 2, static machine => Read(machine, stream: -1, term: 0, options: 1));
         registry.Register("read_term", 3, static machine => Read(machine, stream: 0, term: 1, options: 2));
+        registry.Register(
+            "$read",
+            2,
+            static machine => Read(machine, stream: -1, term: 1, options: -1, Context(machine, 0))
+        );
+        registry.Register(
+            "$read",
+            3,
+            static machine => Read(machine, stream: 1, term: 2, options: -1, Context(machine, 0))
+        );
+        registry.Register(
+            "$read_term",
+            3,
+            static machine => Read(machine, stream: -1, term: 1, options: 2, Context(machine, 0))
+        );
+        registry.Register(
+            "$read_term",
+            4,
+            static machine => Read(machine, stream: 1, term: 2, options: 3, Context(machine, 0))
+        );
 
         registry.Register("get_char", 1, static machine => GetChar(machine, stream: -1, target: 0, consume: true));
         registry.Register("get_char", 2, static machine => GetChar(machine, stream: 0, target: 1, consume: true));
@@ -75,6 +95,36 @@ internal static class StreamBuiltins
         registry.Register("write_canonical", 2, static machine => WriteTerm(machine, stream: 0, term: 1, true, true, false));
         registry.Register("write_term", 2, static machine => WriteTermOptions(machine, stream: -1, term: 0, options: 1));
         registry.Register("write_term", 3, static machine => WriteTermOptions(machine, stream: 0, term: 1, options: 2));
+        registry.Register(
+            "$write",
+            2,
+            static machine => WriteTerm(machine, stream: -1, term: 1, false, false, true, Context(machine, 0).Operators)
+        );
+        registry.Register(
+            "$write",
+            3,
+            static machine => WriteTerm(machine, stream: 1, term: 2, false, false, true, Context(machine, 0).Operators)
+        );
+        registry.Register(
+            "$writeq",
+            2,
+            static machine => WriteTerm(machine, stream: -1, term: 1, true, false, true, Context(machine, 0).Operators)
+        );
+        registry.Register(
+            "$writeq",
+            3,
+            static machine => WriteTerm(machine, stream: 1, term: 2, true, false, true, Context(machine, 0).Operators)
+        );
+        registry.Register(
+            "$write_term",
+            3,
+            static machine => WriteTermOptions(machine, stream: -1, term: 1, options: 2, Context(machine, 0).Operators)
+        );
+        registry.Register(
+            "$write_term",
+            4,
+            static machine => WriteTermOptions(machine, stream: 1, term: 2, options: 3, Context(machine, 0).Operators)
+        );
         registry.Register("flush_output", 0, static machine => Flush(machine, stream: -1));
         registry.Register("flush_output", 1, static machine => Flush(machine, stream: 0));
 
@@ -728,7 +778,7 @@ internal static class StreamBuiltins
             _ => "eof_code",
         };
 
-    private static bool Read(Machine machine, int stream, int term, int options)
+    private static bool Read(Machine machine, int stream, int term, int options, ModuleDefinition? context = null)
     {
         ValidateExplicitStreamInstantiation(machine, stream);
         InspectedOptionList? inspectedOptions = options < 0 ? null : InspectOptionList(machine, options);
@@ -748,15 +798,28 @@ internal static class StreamBuiltins
         Cell singletons;
         try
         {
-            read = compiler.TryReadTerm(
-                machine,
-                source.Reader!,
-                ref source.Buffer,
-                out value,
-                out names,
-                out variables,
-                out singletons
-            );
+            read = context is null
+                ? compiler.TryReadTerm(
+                    machine,
+                    source.Reader!,
+                    ref source.Buffer,
+                    out value,
+                    out names,
+                    out variables,
+                    out singletons
+                )
+                : compiler.TryReadTerm(
+                    machine,
+                    source.Reader!,
+                    ref source.Buffer,
+                    context.Operators,
+                    context.CharacterConversions,
+                    context.Flags,
+                    out value,
+                    out names,
+                    out variables,
+                    out singletons
+                );
         }
         catch (Exception error) when (IsIoFailure(error))
         {
@@ -1114,17 +1177,25 @@ internal static class StreamBuiltins
         return true;
     }
 
-    private static bool WriteTerm(Machine machine, int stream, int term, bool quoted, bool ignoreOperators, bool numberVariables)
+    private static bool WriteTerm(
+        Machine machine,
+        int stream,
+        int term,
+        bool quoted,
+        bool ignoreOperators,
+        bool numberVariables,
+        OperatorTable? operators = null
+    )
     {
         PrologStream target = Resolve(machine, stream, input: false);
         GuardIo(
             machine,
-            () => TermWriter.Write(machine, machine.Argument(term), target.Writer!, quoted, ignoreOperators, numberVariables)
+            () => TermWriter.Write(machine, machine.Argument(term), target.Writer!, quoted, ignoreOperators, numberVariables, operators)
         );
         return true;
     }
 
-    private static bool WriteTermOptions(Machine machine, int stream, int term, int options)
+    private static bool WriteTermOptions(Machine machine, int stream, int term, int options, OperatorTable? operators = null)
     {
         ValidateExplicitStreamInstantiation(machine, stream);
         List<Cell> optionElements = RequireProperOptionList(machine, InspectOptionList(machine, options));
@@ -1141,10 +1212,30 @@ internal static class StreamBuiltins
                     selected.Quoted,
                     selected.IgnoreOperators,
                     selected.NumberVariables,
-                    selected.VariableNames
+                    selected.VariableNames,
+                    operators
                 )
         );
         return true;
+    }
+
+    private static ModuleDefinition Context(Machine machine, int argument)
+    {
+        Cell module = machine.Argument(argument);
+        if (module.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        if (module.Tag != CellTag.Atom)
+        {
+            throw PrologErrors.Type(machine, "atom", module);
+        }
+
+        string name = machine.Symbols.AtomName(module.Index);
+        return machine.Program.Modules.TryGet(name, out ModuleDefinition? definition)
+            ? definition!
+            : throw PrologErrors.Existence(machine, "module", module);
     }
 
     private static WriteOptions ReadWriteOptions(Machine machine, List<Cell> options)

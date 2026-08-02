@@ -40,19 +40,21 @@ public static class TermWriter
     /// Whether to write every compound term in functional notation, as <c>write_canonical/1</c> does.
     /// </param>
     /// <param name="numberVariables">Whether <c>'$VAR'(N)</c> terms use ISO variable names.</param>
+    /// <param name="operators">Operator table to use, or the machine's table when omitted.</param>
     public static void Write(
         Machine machine,
         Cell term,
         TextWriter output,
         bool quoted = false,
         bool ignoreOperators = false,
-        bool numberVariables = false
+        bool numberVariables = false,
+        OperatorTable? operators = null
     )
     {
         ArgumentNullException.ThrowIfNull(machine);
         ArgumentNullException.ThrowIfNull(output);
 
-        WriteCore(machine, term, output, quoted, ignoreOperators, numberVariables, variableNames: null);
+        WriteCore(machine, term, output, quoted, ignoreOperators, numberVariables, variableNames: null, operators ?? machine.Operators);
     }
 
     /// <summary>Writes a term using the ISO <c>variable_names/1</c> write option.</summary>
@@ -63,14 +65,15 @@ public static class TermWriter
         bool quoted,
         bool ignoreOperators,
         bool numberVariables,
-        IReadOnlyList<NamedVariable> variableNames
+        IReadOnlyList<NamedVariable> variableNames,
+        OperatorTable? operators = null
     )
     {
         ArgumentNullException.ThrowIfNull(machine);
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(variableNames);
 
-        WriteCore(machine, term, output, quoted, ignoreOperators, numberVariables, variableNames);
+        WriteCore(machine, term, output, quoted, ignoreOperators, numberVariables, variableNames, operators ?? machine.Operators);
     }
 
     private static void WriteCore(
@@ -80,7 +83,8 @@ public static class TermWriter
         bool quoted,
         bool ignoreOperators,
         bool numberVariables,
-        IReadOnlyList<NamedVariable>? variableNames
+        IReadOnlyList<NamedVariable>? variableNames,
+        OperatorTable operators
     )
     {
         var writer = new Emitter(output);
@@ -119,6 +123,7 @@ public static class TermWriter
                         ignoreOperators,
                         numberVariables,
                         variableNames,
+                        operators,
                         work,
                         active
                     );
@@ -154,6 +159,7 @@ public static class TermWriter
         bool ignoreOperators,
         bool numberVariables,
         IReadOnlyList<NamedVariable>? variableNames,
+        OperatorTable operators,
         List<Item> work,
         HashSet<int> active
     )
@@ -172,7 +178,7 @@ public static class TermWriter
                 return;
 
             case CellTag.Atom:
-                WriteAtom(machine, cell.Index, item.MaxPriority, output, quoted, ignoreOperators);
+                WriteAtom(machine, operators, cell.Index, item.MaxPriority, output, quoted, ignoreOperators);
                 return;
 
             case CellTag.Integer:
@@ -230,7 +236,7 @@ public static class TermWriter
                 return;
             }
 
-            if (TryWriteOperator(machine, cell, functor, name, item.MaxPriority, output, quoted, work))
+            if (TryWriteOperator(machine, operators, cell, functor, name, item.MaxPriority, output, quoted, work))
             {
                 return;
             }
@@ -301,6 +307,7 @@ public static class TermWriter
     /// </summary>
     private static bool TryWriteOperator(
         Machine machine,
+        OperatorTable operators,
         Cell cell,
         Functor functor,
         string name,
@@ -310,8 +317,6 @@ public static class TermWriter
         List<Item> work
     )
     {
-        OperatorTable operators = machine.Operators;
-
         if (functor.Arity == 2 && operators.TryGetInfixOrPostfix(name, out PrologOperator infix) && infix.IsInfix)
         {
             var bracket = infix.Priority > maxPriority;
@@ -395,11 +400,19 @@ public static class TermWriter
     /// Writes an atom, bracketing it when it is an operator whose priority exceeds what the position
     /// allows — which is what makes <c>f((:-))</c> read back as the atom rather than as a syntax error.
     /// </summary>
-    private static void WriteAtom(Machine machine, int atomId, int maxPriority, Emitter output, bool quoted, bool ignoreOperators)
+    private static void WriteAtom(
+        Machine machine,
+        OperatorTable operators,
+        int atomId,
+        int maxPriority,
+        Emitter output,
+        bool quoted,
+        bool ignoreOperators
+    )
     {
         var name = machine.Symbols.AtomName(atomId);
 
-        if (!ignoreOperators && machine.Operators.MaxPriority(name) > maxPriority)
+        if (!ignoreOperators && operators.MaxPriority(name) > maxPriority)
         {
             output.Write("(");
             WriteAtomText(name, output, quoted);

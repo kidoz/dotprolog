@@ -413,4 +413,43 @@ public sealed class GeneratedFacadeTests
 
         Assert.Contains(Compiler.CompilerDiagnosticIds.StrictIsoViolation, exception.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void GeneratedStrictFacadePreservesIsoModuleContextMetadata()
+    {
+        ContractReadResult contract = ContractReader.Read(
+            """
+            :- clr_module('IsoContext').
+            :- clr_namespace('Generated.IsoContext').
+            :- clr_export(answer/1, det, [out(value, atom)]).
+            """,
+            "Generated.IsoContext",
+            "iso-context.dpli"
+        );
+        Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
+
+        const string prolog = """
+            :- module(contextual).
+            :- export(answer/1).
+            :- set_prolog_flag(double_quotes, chars).
+            :- end_module(contextual).
+
+            :- body(contextual).
+            item(one).
+            answer(Value) :- current_prolog_flag(double_quotes, chars), clause(item(Value), true).
+            :- end_body(contextual).
+            """;
+
+        var source = FacadeGenerator.Generate(
+            contract.Contract!,
+            prolog,
+            "iso-context.pl",
+            Runtime.PrologLanguageMode.StrictIso
+        );
+        Assembly assembly = CompileGenerated(source);
+        Type type = assembly.GetType("Generated.IsoContext.IsoContextModule")!;
+        object module = type.GetMethod("Create", BindingFlags.Public | BindingFlags.Static, Type.EmptyTypes)!.Invoke(null, null)!;
+
+        Assert.Equal("one", Call(module, type, "Answer"));
+    }
 }

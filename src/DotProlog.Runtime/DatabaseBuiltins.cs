@@ -38,6 +38,23 @@ internal static class DatabaseBuiltins
         );
         registry.Register("retractall", 1, RetractAll);
         registry.Register("abolish", 1, Abolish);
+        registry.Register("$assertz", 2, static machine => ContextualAssert(machine, atEnd: true));
+        registry.Register("$asserta", 2, static machine => ContextualAssert(machine, atEnd: false));
+        registry.RegisterNondeterministic(
+            "$retract",
+            2,
+            static machine => ContextualRetract(machine, machine.Program.Generation),
+            static (machine, generation) => Retract(machine, (int)generation, resumed: true)
+        );
+        registry.RegisterNondeterministic(
+            "$clause",
+            3,
+            static machine => ContextualClause(machine, machine.Program.Generation),
+            static (machine, state) => state < 0
+                ? StaticModuleClause(machine, checked((int)(-state - 1)))
+                : Clause(machine, (int)state, resumed: true)
+        );
+        registry.Register("$abolish", 2, ContextualAbolish);
 
         registry.Register(
             "consult",
@@ -98,6 +115,277 @@ internal static class DatabaseBuiltins
         }
 
         return true;
+    }
+
+    private static bool ContextualAssert(Machine machine, bool atEnd)
+    {
+        string module = Context(machine, 0);
+        Cell qualified = QualifyClause(machine, module, machine.Argument(1), "modify");
+        machine.SetArgument(0, qualified);
+        bool result = Assert(machine, atEnd);
+        RecordDynamic(machine, qualified);
+        return result;
+    }
+
+    private static bool ContextualRetract(Machine machine, int generation)
+    {
+        string module = Context(machine, 0);
+        machine.SetArgument(0, QualifyClause(machine, module, machine.Argument(1), "modify"));
+        return Retract(machine, generation, resumed: false);
+    }
+
+    private static bool ContextualClause(Machine machine, int generation)
+    {
+        string module = Context(machine, 0);
+        Cell head = QualifyHead(machine, module, machine.Argument(1), "access");
+        machine.SetArgument(0, head);
+        machine.SetArgument(1, machine.Argument(2));
+        if (TryStaticModulePredicate(machine, head, out ModulePredicateDefinition? predicate))
+        {
+            return StaticModuleClause(machine, predicate!, 0);
+        }
+
+        return Clause(machine, generation, resumed: false);
+    }
+
+    private static bool StaticModuleClause(Machine machine, int index) =>
+        TryStaticModulePredicate(machine, machine.Argument(0), out ModulePredicateDefinition? predicate)
+            && StaticModuleClause(machine, predicate!, index);
+
+    private static bool StaticModuleClause(Machine machine, ModulePredicateDefinition predicate, int index)
+    {
+        Cell body = machine.Argument(1);
+        if (body.Tag is not CellTag.Reference and not CellTag.Atom and not CellTag.Structure)
+        {
+            throw PrologErrors.Type(machine, "callable", body);
+        }
+
+        Cell pattern = machine.CreateStructure(RuleFunctor(machine), [machine.Argument(0), body]);
+        IReadOnlyList<ModuleClauseDefinition> clauses = predicate.StaticClauses;
+        for (; index < clauses.Count; index++)
+        {
+            ModuleClauseDefinition clause = clauses[index];
+            Cell candidate = machine.HeapAt(clause.Term.Materialize(machine) + clause.Root);
+            if (!machine.CanUnify(pattern, candidate))
+            {
+                continue;
+            }
+
+            if (index + 1 < clauses.Count)
+            {
+                machine.PushRetry(-(index + 2L));
+            }
+
+            return machine.Unify(pattern, candidate);
+        }
+
+        return false;
+    }
+
+    private static bool TryStaticModulePredicate(
+        Machine machine,
+        Cell head,
+        out ModulePredicateDefinition? predicate
+    )
+    {
+        predicate = null;
+        var functorId = FunctorOf(machine, head);
+        if (machine.Program.IsDynamic(functorId))
+        {
+            predicate = null;
+            return false;
+        }
+
+        Functor functor = machine.Symbols.GetFunctor(functorId);
+        string compiledName = machine.Symbols.AtomName(functor.NameAtom);
+        var separator = compiledName.LastIndexOf(':');
+        string module = separator > 0 ? compiledName[..separator] : "user";
+        string name = separator > 0 ? compiledName[(separator + 1)..] : compiledName;
+        return machine.Program.Modules.TryGet(module, out ModuleDefinition? definition)
+            && definition!.InterfacePrepared
+            && definition.TryPredicate(new ModulePredicateIndicator(name, functor.Arity), out predicate)
+            && predicate!.Defined;
+    }
+
+    private static bool ContextualAbolish(Machine machine)
+    {
+        string module = Context(machine, 0);
+        machine.SetArgument(0, QualifyIndicator(machine, module, machine.Argument(1), "modify"));
+        return Abolish(machine);
+    }
+
+    private static string Context(Machine machine, int argument)
+    {
+        Cell module = machine.Argument(argument);
+        if (module.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        if (module.Tag != CellTag.Atom)
+        {
+            throw PrologErrors.Type(machine, "atom", module);
+        }
+
+        string name = machine.Symbols.AtomName(module.Index);
+        if (!machine.Program.Modules.Contains(name))
+        {
+            throw PrologErrors.Existence(machine, "module", module);
+        }
+
+        return name;
+    }
+
+    private static Cell QualifyClause(Machine machine, string context, Cell clause, string operation)
+    {
+        clause = machine.Dereference(clause);
+        if (clause.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        var rule = machine.Symbols.InternFunctor(":-", 2);
+        if (clause.Tag == CellTag.Structure && machine.HeapAt(clause.Index).Index == rule)
+        {
+            Cell head = machine.Dereference(machine.HeapAt(clause.Index + 1));
+            Cell body = machine.HeapAt(clause.Index + 2);
+            return machine.CreateStructure(rule, [QualifyHead(machine, context, head, operation), body]);
+        }
+
+        return QualifyHead(machine, context, clause, operation);
+    }
+
+    private static Cell QualifyHead(Machine machine, string context, Cell head, string operation)
+    {
+        head = machine.Dereference(head);
+        var colon = machine.Symbols.InternFunctor(":", 2);
+        var explicitQualification = false;
+        while (head.Tag == CellTag.Structure && machine.HeapAt(head.Index).Index == colon)
+        {
+            explicitQualification = true;
+            Cell module = machine.Dereference(machine.HeapAt(head.Index + 1));
+            if (module.Tag == CellTag.Reference)
+            {
+                throw PrologErrors.Instantiation(machine);
+            }
+
+            if (module.Tag != CellTag.Atom)
+            {
+                throw PrologErrors.Type(machine, "atom", module);
+            }
+
+            context = machine.Symbols.AtomName(module.Index);
+            if (!machine.Program.Modules.Contains(context))
+            {
+                throw PrologErrors.Existence(machine, "module", module);
+            }
+
+            head = machine.Dereference(machine.HeapAt(head.Index + 2));
+        }
+
+        string name;
+        int arity;
+        Cell[] arguments;
+        if (head.Tag == CellTag.Atom)
+        {
+            name = machine.Symbols.AtomName(head.Index);
+            arity = 0;
+            arguments = [];
+        }
+        else if (head.Tag == CellTag.Structure)
+        {
+            Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(head.Index).Index);
+            name = machine.Symbols.AtomName(functor.NameAtom);
+            arity = functor.Arity;
+            arguments = new Cell[arity];
+            for (var index = 0; index < arity; index++)
+            {
+                arguments[index] = machine.HeapAt(head.Index + index + 1);
+            }
+        }
+        else
+        {
+            throw PrologErrors.Type(machine, "callable", head);
+        }
+
+        var indicator = new ModulePredicateIndicator(name, arity);
+        ModuleDefinition definition = machine.Program.Modules.Declare(context);
+        if (!explicitQualification && definition.Imports.ContainsKey(indicator))
+        {
+            throw PrologErrors.Permission(machine, operation, "implicit", PredicateIndicator(machine, indicator));
+        }
+
+        string qualifiedName = context == "user" ? name : $"{context}:{name}";
+        if (arity == 0)
+        {
+            return Cell.Atom(machine.Symbols.InternAtom(qualifiedName));
+        }
+
+        return machine.CreateStructure(machine.Symbols.InternFunctor(qualifiedName, arity), arguments);
+    }
+
+    private static Cell QualifyIndicator(Machine machine, string context, Cell value, string operation)
+    {
+        value = machine.Dereference(value);
+        var colon = machine.Symbols.InternFunctor(":", 2);
+        var explicitQualification = false;
+        if (value.Tag == CellTag.Structure && machine.HeapAt(value.Index).Index == colon)
+        {
+            explicitQualification = true;
+            Cell module = machine.Dereference(machine.HeapAt(value.Index + 1));
+            if (module.Tag == CellTag.Reference)
+            {
+                throw PrologErrors.Instantiation(machine);
+            }
+
+            if (module.Tag != CellTag.Atom)
+            {
+                throw PrologErrors.Type(machine, "atom", module);
+            }
+
+            context = machine.Symbols.AtomName(module.Index);
+            if (!machine.Program.Modules.Contains(context))
+            {
+                throw PrologErrors.Existence(machine, "module", module);
+            }
+
+            value = machine.Dereference(machine.HeapAt(value.Index + 2));
+        }
+
+        ValidatePredicateIndicator(machine, value, variablesAllowed: false, out Cell name, out Cell arity);
+        var indicator = new ModulePredicateIndicator(machine.Symbols.AtomName(name.Index), (int)arity.Integer);
+        ModuleDefinition definition = machine.Program.Modules.Declare(context);
+        if (!explicitQualification && definition.Imports.ContainsKey(indicator))
+        {
+            throw PrologErrors.Permission(machine, operation, "implicit", value);
+        }
+
+        string qualifiedName = context == "user" ? indicator.Name : $"{context}:{indicator.Name}";
+        return machine.CreateStructure(
+            machine.Symbols.InternFunctor("/", 2),
+            [Cell.Atom(machine.Symbols.InternAtom(qualifiedName)), arity]
+        );
+    }
+
+    private static Cell PredicateIndicator(Machine machine, ModulePredicateIndicator indicator) =>
+        machine.CreateStructure(
+            machine.Symbols.InternFunctor("/", 2),
+            [Cell.Atom(machine.Symbols.InternAtom(indicator.Name)), Cell.Integer60(indicator.Arity)]
+        );
+
+    private static void RecordDynamic(Machine machine, Cell clause)
+    {
+        Cell normalized = NormalizeClause(machine, clause);
+        var functorId = FunctorOf(machine, normalized);
+        Functor functor = machine.Symbols.GetFunctor(functorId);
+        string compiledName = machine.Symbols.AtomName(functor.NameAtom);
+        var separator = compiledName.LastIndexOf(':');
+        string module = separator > 0 ? compiledName[..separator] : "user";
+        string name = separator > 0 ? compiledName[(separator + 1)..] : compiledName;
+        ModulePredicateDefinition metadata = machine.Program.Modules.Declare(module)
+            .Predicate(new ModulePredicateIndicator(name, functor.Arity));
+        metadata.Defined = true;
+        metadata.Dynamic = true;
     }
 
     /// <summary>

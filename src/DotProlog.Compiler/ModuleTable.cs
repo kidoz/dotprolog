@@ -1,3 +1,4 @@
+using DotProlog.Runtime;
 using DotProlog.Syntax;
 
 namespace DotProlog.Compiler;
@@ -28,13 +29,15 @@ public sealed class ModuleTable
     private readonly Dictionary<string, HashSet<PredicateIndicator>> _exports = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<PredicateIndicator, string>> _imports = new(StringComparer.Ordinal);
     private readonly Dictionary<PredicateIndicator, int[]> _metaArguments = [];
+    private readonly Dictionary<(string Module, PredicateIndicator Predicate), int[]> _moduleMetaArguments = [];
     private readonly Dictionary<string, string> _loaded = new(StringComparer.Ordinal);
     private readonly HashSet<MultifileKey> _multifile = [];
     private readonly Dictionary<MultifileKey, List<(SyntaxTerm Head, SyntaxTerm? Body)>> _multifileClauses = [];
 
     /// <summary>Creates a table holding the meta-predicates every program starts with.</summary>
-    public ModuleTable()
+    public ModuleTable(ModuleCatalog? catalog = null)
     {
+        Catalog = catalog ?? new ModuleCatalog();
         // Which arguments of a predicate are goals, and how many arguments each will gain before it
         // is called. Zero means the argument is called as it stands; a positive number means it is a
         // closure that call/N will extend, so it has to carry its module with it rather than being
@@ -79,7 +82,11 @@ public sealed class ModuleTable
         DeclareMeta("predsort", 3, [(0, 3)]);
         DeclareMeta("phrase", 2, [(0, 2)]);
         DeclareMeta("phrase", 3, [(0, 2)]);
+        DeclareMeta("predicate_property", 2, [(0, HeadArgument)]);
     }
+
+    /// <summary>The runtime-visible catalog populated alongside compiler resolution tables.</summary>
+    public ModuleCatalog Catalog { get; }
 
     /// <summary>Records that <paramref name="module"/> exports <paramref name="exports"/>.</summary>
     public void Declare(string module, IEnumerable<PredicateIndicator> exports)
@@ -93,16 +100,38 @@ public sealed class ModuleTable
             _exports[module] = set;
         }
 
-        set.UnionWith(exports);
+        ModuleDefinition definition = Catalog.Declare(module);
+        foreach (PredicateIndicator export in exports)
+        {
+            set.Add(export);
+            definition.Predicate(ToRuntime(export)).Exported = true;
+        }
     }
 
     /// <summary>Whether <paramref name="module"/> exports <paramref name="predicate"/>.</summary>
     public bool Exports(string module, PredicateIndicator predicate) =>
-        _exports.TryGetValue(module, out HashSet<PredicateIndicator>? set) && set.Contains(predicate);
+        (_exports.TryGetValue(module, out HashSet<PredicateIndicator>? set) && set.Contains(predicate))
+        || (
+            Catalog.TryGet(module, out ModuleDefinition? definition)
+            && definition!.TryPredicate(ToRuntime(predicate), out ModulePredicateDefinition? metadata)
+            && metadata!.Exported
+        );
 
     /// <summary>What <paramref name="module"/> exports, or nothing if it declared no module.</summary>
-    public IReadOnlyCollection<PredicateIndicator> ExportsOf(string module) =>
-        _exports.TryGetValue(module, out HashSet<PredicateIndicator>? set) ? set : [];
+    public IReadOnlyCollection<PredicateIndicator> ExportsOf(string module)
+    {
+        HashSet<PredicateIndicator> exports = _exports.TryGetValue(module, out HashSet<PredicateIndicator>? declared)
+            ? [.. declared]
+            : [];
+        if (Catalog.TryGet(module, out ModuleDefinition? definition))
+        {
+            exports.UnionWith(
+                definition!.Predicates.Where(predicate => predicate.Exported).Select(predicate => ToCompiler(predicate.Indicator))
+            );
+        }
+
+        return exports;
+    }
 
     /// <summary>
     /// Records that <paramref name="importer"/> takes <paramref name="predicate"/> from
@@ -125,7 +154,14 @@ public sealed class ModuleTable
             return existing == from;
         }
 
+        if (Defines(importer, predicate))
+        {
+            conflictingModule = importer;
+            return false;
+        }
+
         map[predicate] = from;
+        _ = Catalog.Declare(importer).TryImport(ToRuntime(predicate), from, out _);
         conflictingModule = null;
         return true;
     }
@@ -135,7 +171,34 @@ public sealed class ModuleTable
         _imports.TryGetValue(importer, out Dictionary<PredicateIndicator, string>? map)
         && map.TryGetValue(predicate, out var from)
             ? from
-            : null;
+            : Catalog.TryGet(importer, out ModuleDefinition? definition)
+                && definition!.Imports.TryGetValue(ToRuntime(predicate), out string? catalogFrom)
+                    ? catalogFrom
+                    : null;
+
+    /// <summary>Follows reexports to the module that contains the procedure's clauses.</summary>
+    public string? DefiningModuleOf(string importer, PredicateIndicator predicate)
+    {
+        string? current = ImportedFrom(importer, predicate);
+        HashSet<string> visited = [];
+        while (current is not null && visited.Add(current))
+        {
+            if (Defines(current, predicate))
+            {
+                return current;
+            }
+
+            string? next = ImportedFrom(current, predicate);
+            if (next is null)
+            {
+                return current;
+            }
+
+            current = next;
+        }
+
+        return current;
+    }
 
     /// <summary>Declares which arguments of a predicate are goals.</summary>
     /// <param name="name">Predicate name.</param>
@@ -160,12 +223,97 @@ public sealed class ModuleTable
         _metaArguments[new PredicateIndicator(name, arity)] = positions;
     }
 
+    /// <summary>Declares an ISO module-local metapredicate template.</summary>
+    public void DeclareMeta(
+        string module,
+        string name,
+        int arity,
+        IReadOnlyList<(int Position, int Extra)> arguments,
+        string template
+    )
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentNullException.ThrowIfNull(template);
+
+        var indicator = new PredicateIndicator(name, arity);
+        var positions = new int[arity];
+        Array.Fill(positions, OrdinaryArgument);
+        foreach ((var position, var extra) in arguments)
+        {
+            if (position >= 0 && position < arity)
+            {
+                positions[position] = extra;
+            }
+        }
+
+        _moduleMetaArguments[(module, indicator)] = positions;
+        Catalog.Declare(module).Predicate(ToRuntime(indicator)).MetapredicateTemplate = template;
+    }
+
     /// <summary>
     /// For each argument of <paramref name="predicate"/>, how many arguments it will gain before
     /// being called, or -1 when it is not a goal. Null when the predicate is not a meta-predicate.
     /// </summary>
     public int[]? MetaArgumentsOf(PredicateIndicator predicate) =>
         _metaArguments.TryGetValue(predicate, out var positions) ? positions : null;
+
+    /// <summary>Returns the module-local, imported, or predefined metapredicate template.</summary>
+    public int[]? MetaArgumentsOf(string module, PredicateIndicator predicate)
+    {
+        if (_moduleMetaArguments.TryGetValue((module, predicate), out var local))
+        {
+            return local;
+        }
+
+        if (
+            Catalog.TryGet(module, out ModuleDefinition? localDefinition)
+            && localDefinition!.TryPredicate(ToRuntime(predicate), out ModulePredicateDefinition? localMetadata)
+            && localMetadata!.MetapredicateTemplate is string localTemplate
+        )
+        {
+            return RuntimeMetaArguments(localTemplate);
+        }
+
+        string? from = DefiningModuleOf(module, predicate);
+        if (from is not null && _moduleMetaArguments.TryGetValue((from, predicate), out var imported))
+        {
+            return imported;
+        }
+
+        if (
+            from is not null
+            && Catalog.TryGet(from, out ModuleDefinition? importedDefinition)
+            && importedDefinition!.TryPredicate(ToRuntime(predicate), out ModulePredicateDefinition? importedMetadata)
+            && importedMetadata!.MetapredicateTemplate is string importedTemplate
+        )
+        {
+            return RuntimeMetaArguments(importedTemplate);
+        }
+
+        return MetaArgumentsOf(predicate);
+    }
+
+    private static int[] RuntimeMetaArguments(string template) =>
+        [.. template.Select(mode => mode == ':' ? 0 : OrdinaryArgument)];
+
+    private static PredicateIndicator ToCompiler(ModulePredicateIndicator indicator) =>
+        new(indicator.Name, indicator.Arity);
+
+    /// <summary>Records a procedure defined by a module.</summary>
+    public void Define(string module, PredicateIndicator predicate) =>
+        Catalog.Declare(module).Predicate(ToRuntime(predicate)).Defined = true;
+
+    /// <summary>Whether a module contains or declares a local procedure.</summary>
+    public bool Defines(string module, PredicateIndicator predicate) =>
+        Catalog.TryGet(module, out ModuleDefinition? definition)
+        && definition!.TryPredicate(ToRuntime(predicate), out ModulePredicateDefinition? metadata)
+        && metadata!.Defined;
+
+    /// <summary>Marks a module procedure dynamic.</summary>
+    public void DeclareDynamic(string module, PredicateIndicator predicate) =>
+        Catalog.Declare(module).Predicate(ToRuntime(predicate)).Dynamic = true;
 
     /// <summary>
     /// Records that <paramref name="path"/> is being loaded, before it is, so that two files that
@@ -193,8 +341,11 @@ public sealed class ModuleTable
     }
 
     /// <summary>Declares a predicate to accept static clauses from more than one source unit.</summary>
-    public void DeclareMultifile(string module, PredicateIndicator predicate) =>
+    public void DeclareMultifile(string module, PredicateIndicator predicate)
+    {
         _multifile.Add(new MultifileKey(module, predicate));
+        Catalog.Declare(module).Predicate(ToRuntime(predicate)).Multifile = true;
+    }
 
     /// <summary>Whether a predicate is a persistent static multifile predicate.</summary>
     public bool IsMultifile(string module, PredicateIndicator predicate) =>
@@ -224,6 +375,9 @@ public sealed class ModuleTable
     /// <summary>The compiled name of <paramref name="predicate"/> inside <paramref name="module"/>.</summary>
     public static string QualifiedName(string module, string predicate) =>
         module == UserModule ? predicate : $"{module}:{predicate}";
+
+    private static ModulePredicateIndicator ToRuntime(PredicateIndicator predicate) =>
+        new(predicate.Name, predicate.Arity);
 
     private readonly record struct MultifileKey(string Module, PredicateIndicator Predicate);
 }

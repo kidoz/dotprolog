@@ -73,6 +73,37 @@ public sealed class OperatorTable
     /// </summary>
     public PrologOperator[] All() => _versions[^1];
 
+    /// <summary>Creates an independent table containing exactly the current definitions.</summary>
+    public OperatorTable Copy()
+    {
+        var copy = new OperatorTable(includeExtensions: false);
+        copy.ReplaceWith(this);
+        return copy;
+    }
+
+    /// <summary>Replaces every definition with the current definitions of another table.</summary>
+    public void ReplaceWith(OperatorTable source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        _prefix.Clear();
+        _infixOrPostfix.Clear();
+        _versions.Clear();
+        _versions.Add([]);
+        foreach (PrologOperator definition in source.All())
+        {
+            Define(definition.Priority, definition.Type, definition.Name);
+        }
+    }
+
+    /// <summary>Removes every operator definition.</summary>
+    public void Clear()
+    {
+        _prefix.Clear();
+        _infixOrPostfix.Clear();
+        _versions.Clear();
+        _versions.Add([]);
+    }
+
     /// <summary>Returns the immutable definitions held by a prior table version.</summary>
     internal ReadOnlySpan<PrologOperator> Entries(int version) => _versions[version];
 

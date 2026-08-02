@@ -56,4 +56,7 @@ public static class CompilerDiagnosticIds
 
     /// <summary>User code names an implementation-specific feature while strict ISO mode is active.</summary>
     public const string StrictIsoViolation = "DPL1018";
+
+    /// <summary>An ISO module interface or body is malformed or occurs out of order.</summary>
+    public const string InvalidIsoModuleText = "DPL1019";
 }

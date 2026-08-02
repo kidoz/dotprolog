@@ -527,4 +527,654 @@ public sealed class ModuleTests : IDisposable
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidModuleDeclaration);
     }
+
+    [Theory]
+    [InlineData(PrologLanguageMode.Extended)]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    public void IsoInterfacesAndBodiesPrepareImportsBeforeExecution(PrologLanguageMode mode)
+    {
+        const string source = """
+            :- module(values).
+            :- export(value/1).
+            :- end_module(values).
+
+            :- module(client).
+            :- export(run/0).
+            :- end_module(client).
+
+            :- body(values).
+            value(ok).
+            :- end_body(values).
+
+            :- body(client).
+            :- import(values, value/1).
+            run :- value(X), write(X).
+            :- initialization(run).
+            :- end_body(client).
+            """;
+
+        var output = new StringWriter();
+        var engine = new PrologEngine(mode) { Output = output, Input = TextReader.Null };
+
+        LoadResult loaded = engine.ConsultText(source, "iso-modules.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("ok", output.ToString());
+    }
+
+    [Fact]
+    public void IsoModuleMarkersMustBePairedAndOrdered()
+    {
+        const string source = """
+            :- body(missing).
+            p.
+            :- end_body(other).
+            """;
+
+        var engine = new PrologEngine { Output = TextWriter.Null };
+        LoadResult loaded = engine.ConsultText(source, "bad-iso-modules.pl");
+
+        Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidIsoModuleText);
+    }
+
+    [Fact]
+    public void AnIsoBodyRequiresItsPreviouslyLoadedInterface()
+    {
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
+
+        LoadResult loaded = engine.ConsultText(
+            """
+            :- body(missing).
+            p.
+            :- end_body(missing).
+            """,
+            "missing-interface.pl"
+        );
+
+        Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidIsoModuleText);
+    }
+
+    [Fact]
+    public void AnInterfaceAndItsBodyMayBePreparedFromSeparateModuleTexts()
+    {
+        var output = new StringWriter();
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+
+        LoadResult interfaceLoaded = engine.ConsultText(
+            """
+            :- module(separate).
+            :- export(value/1).
+            :- end_module(separate).
+            """,
+            "separate-interface.pl"
+        );
+        LoadResult bodyLoaded = engine.ConsultText(
+            """
+            :- body(separate).
+            value(ok).
+            :- initialization((value(X), write(X))).
+            :- end_body(separate).
+            """,
+            "separate-body.pl"
+        );
+
+        Assert.Empty(interfaceLoaded.Diagnostics);
+        Assert.Empty(bodyLoaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("ok", output.ToString());
+    }
+
+    [Fact]
+    public void AModuleBodyCanBeEmbeddedInTheUserBodyWithoutLeakingReaderState()
+    {
+        const string source = """
+            :- module(nested).
+            :- export(value/1).
+            :- op(500, xfx, likes).
+            :- end_module(nested).
+
+            :- body(user).
+            before(user).
+            :- body(nested).
+            value(alice likes bob).
+            :- end_body(nested).
+            after(user).
+            :- initialization((before(B), after(A), nested:value(V), write(B-A-V))).
+            :- end_body(user).
+            """;
+
+        var output = new StringWriter();
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+
+        LoadResult loaded = engine.ConsultText(source, "nested-user-body.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("user-user-likes(alice,bob)", output.ToString());
+    }
+
+    [Fact]
+    public void UnbracketedModuleTextBelongsToUserAndInterfacesMayFollowOtherBodies()
+    {
+        const string source = """
+            before(user).
+
+            :- module(first).
+            :- export(one/0).
+            :- end_module(first).
+            :- body(first).
+            one.
+            :- end_body(first).
+
+            :- module(second).
+            :- export(two/0).
+            :- end_module(second).
+            :- body(second).
+            two.
+            :- end_body(second).
+
+            after(user).
+            :- initialization((before(B), after(A), first:one, second:two, write(B-A))).
+            """;
+
+        var output = new StringWriter();
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+
+        LoadResult loaded = engine.ConsultText(source, "mixed-module-text.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("user-user", output.ToString());
+    }
+
+    [Fact]
+    public void MetapredicateDeclarationsExportTheirDefinedProcedures()
+    {
+        const string source = """
+            :- module(runner).
+            :- metapredicate(run(:)).
+            :- end_module(runner).
+
+            :- module(client).
+            :- export(go/0).
+            :- end_module(client).
+
+            :- body(runner).
+            run(Goal) :- call(Goal).
+            :- end_body(runner).
+
+            :- body(client).
+            :- import(runner, run/1).
+            local :- write(ok).
+            go :- run(local).
+            :- initialization(go).
+            :- end_body(client).
+            """;
+
+        var output = new StringWriter();
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+
+        LoadResult loaded = engine.ConsultText(source, "metapredicate-export.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("ok", output.ToString());
+    }
+
+    [Theory]
+    [InlineData("true/0")]
+    [InlineData("!/0")]
+    public void AnIsoInterfaceCannotExportAPredefinedProcedure(string indicator)
+    {
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
+        LoadResult loaded = engine.ConsultText(
+            $"""
+            :- module(invalid).
+            :- export({indicator}).
+            :- end_module(invalid).
+            """,
+            "invalid-export.pl"
+        );
+
+        Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidIsoModuleText);
+    }
+
+    [Theory]
+    [InlineData(":- op(1300, xfx, bad).")]
+    [InlineData(":- char_conversion(ab, c).")]
+    [InlineData(":- set_prolog_flag(bounded, false).")]
+    [InlineData(":- metapredicate(once(:)).")]
+    public void AnIsoInterfaceRejectsInvalidDeclarations(string declaration)
+    {
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
+        LoadResult loaded = engine.ConsultText(
+            $"""
+            :- module(invalid).
+            {declaration}
+            :- end_module(invalid).
+            """,
+            "invalid-interface.pl"
+        );
+
+        Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidIsoModuleText);
+    }
+
+    [Fact]
+    public void AnIsoBodyRejectsQualifiedAndPredefinedClauseHeads()
+    {
+        const string source = """
+            :- module(invalid).
+            :- end_module(invalid).
+            :- body(invalid).
+            invalid:p.
+            true.
+            :- end_body(invalid).
+            """;
+
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
+        LoadResult loaded = engine.ConsultText(source, "invalid-body-heads.pl");
+
+        Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidIsoModuleText);
+    }
+
+    [Fact]
+    public void IsoModuleReflectionUsesTheCallingModulesVisibleDatabase()
+    {
+        const string source = """
+            :- module(values).
+            :- export(item/1).
+            :- end_module(values).
+
+            :- module(client).
+            :- export(run/0).
+            :- end_module(client).
+
+            :- body(values).
+            :- dynamic(item/1).
+            item(one).
+            hidden(local).
+            :- end_body(values).
+
+            :- body(client).
+            :- import(values, item/1).
+            run :-
+                findall(P, predicate_property(item(_), P), Properties),
+                write(Properties), nl,
+                findall(PI, current_predicate(PI), Predicates),
+                write(Predicates), nl,
+                findall(M, current_module(M), Modules),
+                write(Modules).
+            :- initialization(run).
+            :- end_body(client).
+            """;
+
+        var output = new StringWriter();
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+
+        LoadResult loaded = engine.ConsultText(source, "iso-reflection.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal(
+            "[dynamic,public,exported,imported_from(values),defined_in(values)]\n[run/0,item/1]\n[user,values,client]",
+            output.ToString()
+        );
+    }
+
+    [Fact]
+    public void CurrentModuleRequiresAnAtomWhenBound() =>
+        Assert.Equal(
+            "type_error(atom,42)",
+            PrologTestHost.RunGoal("catch(current_module(42), error(E, _), write(E))")
+        );
+
+    [Fact]
+    public void IsoInterfacesGiveEachModuleItsOwnReaderAndFlagState()
+    {
+        const string source = """
+            :- module(words).
+            :- export(show/0).
+            :- op(500, xfx, likes).
+            :- set_prolog_flag(double_quotes, chars).
+            :- end_module(words).
+
+            :- module(codes).
+            :- export(show_codes/0).
+            :- end_module(codes).
+
+            :- body(words).
+            relation(alice likes bob).
+            text("ab").
+            show :-
+                relation(R), text(T),
+                current_op(500, xfx, likes),
+                current_prolog_flag(double_quotes, Q),
+                read_term(Input, []),
+                write(R-T-Q-Input), nl.
+            :- initialization(show).
+            :- end_body(words).
+
+            :- body(codes).
+            text_codes("ab").
+            show_codes :-
+                text_codes(T),
+                ( current_op(_, _, likes) -> O = leaked ; O = no_likes ),
+                current_prolog_flag(double_quotes, Q),
+                words:current_prolog_flag(double_quotes, WQ),
+                write(T-O-Q-WQ).
+            :- initialization(show_codes).
+            :- end_body(codes).
+            """;
+
+        var output = new StringWriter();
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso)
+        {
+            Output = output,
+            Input = new StringReader("alice likes bob."),
+        };
+
+        LoadResult loaded = engine.ConsultText(source, "iso-reader-state.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("alice likes bob-[a,b]-chars-(alice likes bob)\n[97,98]-no_likes-codes-chars", output.ToString());
+        Assert.False(engine.Program.Operators.IsOperator("likes"));
+        Assert.Equal(DoubleQuotesMode.Codes, engine.Program.Flags.DoubleQuotes);
+    }
+
+    [Fact]
+    public void QualifyingWithANonexistentModuleRaisesThePartTwoExistenceError() =>
+        Assert.Equal(
+            "existence_error(module,missing)",
+            PrologTestHost.RunGoal("catch(missing:true, error(E, _), write_canonical(E))")
+        );
+
+    [Fact]
+    public void IsoDatabaseOperationsUseTheirCallingModuleAndRejectImplicitImports()
+    {
+        const string source = """
+            :- module(store).
+            :- export(item/1).
+            :- export(put/1).
+            :- export(all/1).
+            :- end_module(store).
+
+            :- module(client).
+            :- export(run/0).
+            :- end_module(client).
+
+            :- body(store).
+            :- dynamic(item/1).
+            put(X) :- assertz(item(X)).
+            all(L) :- findall(X, item(X), L).
+            :- end_body(store).
+
+            :- body(client).
+            :- import(store).
+            run :-
+                put(one),
+                store:assertz(item(two)),
+                all(L), write(L), nl,
+                catch(assertz(item(three)), error(permission_error(modify, implicit, PI), _), write(PI)), nl,
+                catch(clause(item(_), _), error(permission_error(access, implicit, PI2), _), write(PI2)).
+            :- initialization(run).
+            :- end_body(client).
+            """;
+
+        var output = new StringWriter();
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+
+        LoadResult loaded = engine.ConsultText(source, "iso-database.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("[one,two]\nitem/1\nitem/1", output.ToString());
+    }
+
+    [Fact]
+    public void ClauseInspectsStaticProceduresInTheirDefiningModule()
+    {
+        const string source = """
+            :- module(facts).
+            :- export(item/1).
+            :- end_module(facts).
+
+            :- module(client).
+            :- export(run/0).
+            :- end_module(client).
+
+            :- body(facts).
+            item(one).
+            item(X) :- X = two.
+            hidden(secret).
+            :- end_body(facts).
+
+            :- body(client).
+            :- import(facts, item/1).
+            run :-
+                findall(X, (clause(facts:item(X), B), call(B)), Clauses), write(Clauses), nl,
+                facts:clause(hidden(X), B2), write(X-B2), nl,
+                catch(clause(item(_), _), error(permission_error(access, implicit, PI), _), write(PI)).
+            :- initialization(run).
+            :- end_body(client).
+            """;
+
+        var output = new StringWriter();
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+
+        LoadResult loaded = engine.ConsultText(source, "iso-static-clause.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("[one,two]\nsecret-true\nitem/1", output.ToString());
+    }
+
+    [Fact]
+    public void DynamicModuleClausesRetainTheirUnqualifiedSourceBodies()
+    {
+        const string source = """
+            :- module(store).
+            :- export(item/1).
+            :- end_module(store).
+
+            :- body(store).
+            :- dynamic(item/1).
+            local(one).
+            item(X) :- local(X).
+            :- initialization((
+                clause(item(X), B), B = local(X), call(B), write(X), nl,
+                retract((item(Y) :- local(Y))),
+                ( item(_) -> write(present) ; write(removed) )
+            )).
+            :- end_body(store).
+            """;
+
+        var output = new StringWriter();
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+
+        LoadResult loaded = engine.ConsultText(source, "iso-dynamic-clause.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("one\nremoved", output.ToString());
+    }
+
+    [Fact]
+    public void IsoMetapredicateArgumentsUseStaticAndExplicitCallingContexts()
+    {
+        const string source = """
+            :- module(runner).
+            :- export(run/1).
+            :- metapredicate(run(:)).
+            :- end_module(runner).
+
+            :- module(client).
+            :- export(go/0).
+            :- end_module(client).
+
+            :- body(runner).
+            run(Goal) :- call(Goal).
+            local :- write(runner).
+            :- end_body(runner).
+
+            :- body(client).
+            :- import(runner, run/1).
+            local :- write(client).
+            go :-
+                run(local),
+                runner:run(local),
+                predicate_property(run(_), metapredicate(Template)),
+                write(Template).
+            :- initialization(go).
+            :- end_body(client).
+            """;
+
+        var output = new StringWriter();
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+
+        LoadResult loaded = engine.ConsultText(source, "iso-meta.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("clientrunnerrun(:)", output.ToString());
+    }
+
+    [Fact]
+    public void ExplicitQualificationSetsTheContextOfBuiltInMetaPredicatesAndControls()
+    {
+        const string source = """
+            :- module(first).
+            :- export(run/0).
+            :- end_module(first).
+
+            :- module(second).
+            :- export(local/1).
+            :- end_module(second).
+
+            :- body(first).
+            local(first).
+            run :-
+                second:findall(X, local(X), L), write(L),
+                second:(local(Y), once(local(Y))), write(Y),
+                second:(\+ local(missing)).
+            :- initialization(run).
+            :- end_body(first).
+
+            :- body(second).
+            local(second).
+            :- end_body(second).
+            """;
+
+        var output = new StringWriter();
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+
+        LoadResult loaded = engine.ConsultText(source, "iso-explicit-context.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("[second]second", output.ToString());
+    }
+
+    [Fact]
+    public void AnUnknownProcedureInAnIsoBodyCarriesItsModuleInTheError()
+    {
+        const string source = """
+            :- module(contextual).
+            :- export(run/0).
+            :- end_module(contextual).
+
+            :- body(contextual).
+            run :- catch(missing, error(existence_error(procedure, contextual:missing/0), _), write(ok)).
+            :- initialization(run).
+            :- end_body(contextual).
+            """;
+
+        var output = new StringWriter();
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+
+        LoadResult loaded = engine.ConsultText(source, "iso-unknown.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("ok", output.ToString());
+    }
+
+    [Theory]
+    [InlineData(":- module(compatibility, []).")]
+    [InlineData(":- use_module(compatibility).")]
+    [InlineData(":- meta_predicate(run(0)).")]
+    public void StrictIsoRejectsCompatibilityModuleDirectives(string source)
+    {
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
+
+        LoadResult loaded = engine.ConsultText(source, "compatibility.pl");
+
+        Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.StrictIsoViolation);
+    }
+
+    [Fact]
+    public void IsoReexportsPreserveTheImportingAndDefiningModules()
+    {
+        const string source = """
+            :- module(base).
+            :- export(value/1).
+            :- end_module(base).
+
+            :- module(facade).
+            :- reexport(base).
+            :- end_module(facade).
+
+            :- module(client).
+            :- export(run/0).
+            :- end_module(client).
+
+            :- body(base).
+            value(ok).
+            :- end_body(base).
+
+            :- body(facade).
+            :- end_body(facade).
+
+            :- body(client).
+            :- import(facade).
+            run :-
+                value(X), write(X),
+                predicate_property(value(_), imported_from(facade)),
+                predicate_property(value(_), defined_in(base)),
+                current_predicate(facade:value/1),
+                write(done).
+            :- initialization(run).
+            :- end_body(client).
+            """;
+
+        var output = new StringWriter();
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+
+        LoadResult loaded = engine.ConsultText(source, "iso-reexport.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("okdone", output.ToString());
+    }
+
+    [Fact]
+    public void CompilerResolutionUsesModuleMetadataInstalledByGeneratedCode()
+    {
+        var catalog = new ModuleCatalog();
+        var runtimeIndicator = new ModulePredicateIndicator("apply", 1);
+        ModulePredicateDefinition generated = catalog.Declare("generated").Predicate(runtimeIndicator);
+        generated.Exported = true;
+        generated.Defined = true;
+        generated.MetapredicateTemplate = ":";
+        Assert.True(catalog.Declare("runtime").TryImport(runtimeIndicator, "generated", out _));
+
+        var modules = new ModuleTable(catalog);
+        var compilerIndicator = new PredicateIndicator("apply", 1);
+
+        Assert.True(modules.Exports("generated", compilerIndicator));
+        Assert.Contains(compilerIndicator, modules.ExportsOf("generated"));
+        Assert.Equal("generated", modules.ImportedFrom("runtime", compilerIndicator));
+        Assert.Equal([0], Assert.IsType<int[]>(modules.MetaArgumentsOf("runtime", compilerIndicator)));
+    }
 }

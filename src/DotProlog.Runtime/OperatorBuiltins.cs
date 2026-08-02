@@ -16,17 +16,26 @@ internal static class OperatorBuiltins
     {
         registry.Register("op", 3, Define);
         registry.RegisterNondeterministic("current_op", 3, CurrentFirst, CurrentRetry);
+        registry.Register("$op", 4, static machine => Define(machine, Context(machine, 0).Operators, 1));
+        registry.RegisterNondeterministic(
+            "$current_op",
+            4,
+            static machine => CurrentFirst(machine, Context(machine, 0).Operators, 1),
+            static (machine, state) => Current(machine, Context(machine, 0).Operators, 1, (int)(state >> 32), (int)state)
+        );
     }
 
     /// <summary>
     /// Applies <c>op(Priority, Type, Name)</c>, raising the ISO error for each way the arguments can
     /// be wrong. Name may be one atom or a list of them.
     /// </summary>
-    internal static bool Define(Machine machine)
+    internal static bool Define(Machine machine) => Define(machine, machine.Operators, 0);
+
+    private static bool Define(Machine machine, OperatorTable operators, int offset)
     {
-        Cell priority = machine.Argument(0);
-        Cell type = machine.Argument(1);
-        Cell names = machine.Argument(2);
+        Cell priority = machine.Argument(offset);
+        Cell type = machine.Argument(offset + 1);
+        Cell names = machine.Argument(offset + 2);
 
         if (priority.Tag == CellTag.Reference || type.Tag == CellTag.Reference || names.Tag == CellTag.Reference)
         {
@@ -91,7 +100,7 @@ internal static class OperatorBuiltins
             }
 
             var text = machine.Symbols.AtomName(name.Index);
-            OperatorDefinitionConflict conflict = machine.Operators.DefinitionConflict((int)priority.Integer, specifier, text);
+            OperatorDefinitionConflict conflict = operators.DefinitionConflict((int)priority.Integer, specifier, text);
             if (conflict != OperatorDefinitionConflict.None)
             {
                 var operation = conflict == OperatorDefinitionConflict.Create ? "create" : "modify";
@@ -105,7 +114,7 @@ internal static class OperatorBuiltins
         // earlier names installed.
         foreach ((_, var text) in definitions)
         {
-            machine.Operators.Define((int)priority.Integer, specifier, text);
+            operators.Define((int)priority.Integer, specifier, text);
         }
 
         return true;
@@ -117,15 +126,21 @@ internal static class OperatorBuiltins
     /// <param name="machine">The machine.</param>
     private static bool CurrentFirst(Machine machine)
     {
-        ValidateCurrentArguments(machine);
-        return Current(machine, machine.Operators.Version, 0);
+        return CurrentFirst(machine, machine.Operators, 0);
     }
 
-    private static bool CurrentRetry(Machine machine, long state) => Current(machine, (int)(state >> 32), (int)state);
-
-    private static bool Current(Machine machine, int version, int start)
+    private static bool CurrentFirst(Machine machine, OperatorTable operators, int offset)
     {
-        ReadOnlySpan<PrologOperator> entries = machine.Operators.Entries(version);
+        ValidateCurrentArguments(machine, offset);
+        return Current(machine, operators, offset, operators.Version, 0);
+    }
+
+    private static bool CurrentRetry(Machine machine, long state) =>
+        Current(machine, machine.Operators, 0, (int)(state >> 32), (int)state);
+
+    private static bool Current(Machine machine, OperatorTable operators, int offset, int version, int start)
+    {
+        ReadOnlySpan<PrologOperator> entries = operators.Entries(version);
         for (var index = start; index < entries.Length; index++)
         {
             PrologOperator entry = entries[index];
@@ -134,9 +149,9 @@ internal static class OperatorBuiltins
             Cell name = Cell.Atom(machine.Symbols.InternAtom(entry.Name));
 
             if (
-                !machine.CanUnify(machine.Argument(0), priority)
-                || !machine.CanUnify(machine.Argument(1), specifier)
-                || !machine.CanUnify(machine.Argument(2), name)
+                !machine.CanUnify(machine.Argument(offset), priority)
+                || !machine.CanUnify(machine.Argument(offset + 1), specifier)
+                || !machine.CanUnify(machine.Argument(offset + 2), name)
             )
             {
                 continue;
@@ -147,9 +162,9 @@ internal static class OperatorBuiltins
                 machine.PushRetry(((long)version << 32) | (uint)(index + 1));
             }
 
-            return machine.Unify(machine.Argument(0), priority)
-                && machine.Unify(machine.Argument(1), specifier)
-                && machine.Unify(machine.Argument(2), name);
+            return machine.Unify(machine.Argument(offset), priority)
+                && machine.Unify(machine.Argument(offset + 1), specifier)
+                && machine.Unify(machine.Argument(offset + 2), name);
         }
 
         return false;
@@ -167,15 +182,15 @@ internal static class OperatorBuiltins
             _ => "yf",
         };
 
-    private static void ValidateCurrentArguments(Machine machine)
+    private static void ValidateCurrentArguments(Machine machine, int offset)
     {
-        Cell priority = machine.Argument(0);
+        Cell priority = machine.Argument(offset);
         if (priority.Tag != CellTag.Reference && (priority.Tag != CellTag.Integer || priority.Integer is < 0 or > 1200))
         {
             throw PrologErrors.Domain(machine, "operator_priority", priority);
         }
 
-        Cell specifier = machine.Argument(1);
+        Cell specifier = machine.Argument(offset + 1);
         if (
             specifier.Tag != CellTag.Reference
             && (specifier.Tag != CellTag.Atom || !IsSpecifier(machine.Symbols.AtomName(specifier.Index)))
@@ -184,7 +199,7 @@ internal static class OperatorBuiltins
             throw PrologErrors.Domain(machine, "operator_specifier", specifier);
         }
 
-        Cell name = machine.Argument(2);
+        Cell name = machine.Argument(offset + 2);
         if (name.Tag is not (CellTag.Reference or CellTag.Atom))
         {
             throw PrologErrors.Type(machine, "atom", name);
@@ -192,4 +207,23 @@ internal static class OperatorBuiltins
     }
 
     private static bool IsSpecifier(string name) => name is "xfx" or "xfy" or "yfx" or "fy" or "fx" or "xf" or "yf";
+
+    private static ModuleDefinition Context(Machine machine, int argument)
+    {
+        Cell module = machine.Argument(argument);
+        if (module.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        if (module.Tag != CellTag.Atom)
+        {
+            throw PrologErrors.Type(machine, "atom", module);
+        }
+
+        string name = machine.Symbols.AtomName(module.Index);
+        return machine.Program.Modules.TryGet(name, out ModuleDefinition? definition)
+            ? definition!
+            : throw PrologErrors.Existence(machine, "module", module);
+    }
 }

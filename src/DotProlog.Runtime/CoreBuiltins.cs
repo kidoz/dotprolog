@@ -154,6 +154,7 @@ public static class CoreBuiltins
         SortBuiltins.Register(registry);
         FormatBuiltins.Register(registry);
         DatabaseBuiltins.Register(registry);
+        ModuleBuiltins.Register(registry);
         PrologFlagBuiltins.Register(registry);
         CharacterConversionBuiltins.Register(registry);
         ControlPredicates.Install(program);
@@ -290,13 +291,30 @@ public static class CoreBuiltins
         }
 
         var prefix = machine.Symbols.AtomName(module.Index);
+        if (!machine.Program.Modules.Contains(prefix))
+        {
+            throw PrologErrors.Existence(machine, "module", module);
+        }
 
         if (goal.Tag == CellTag.Atom)
         {
-            var qualified = machine.Symbols.InternFunctor($"{prefix}:{machine.Symbols.AtomName(goal.Index)}", 0);
+            string atomGoalName = machine.Symbols.AtomName(goal.Index);
+            if (atomGoalName is "!" or "true" or "fail" or "false")
+            {
+                return machine.Unify(machine.Argument(2), goal);
+            }
+
+            var qualified = machine.Symbols.InternFunctor($"{prefix}:{atomGoalName}", 0);
+            var plain = machine.Symbols.InternFunctor(atomGoalName, 0);
+            bool isoContext = machine.Program.Modules.TryGet(prefix, out ModuleDefinition? atomDefinition)
+                && atomDefinition!.InterfacePrepared;
             return machine.Unify(
                 machine.Argument(2),
-                machine.Program.IsDefined(qualified) ? Cell.Atom(machine.Symbols.GetFunctor(qualified).NameAtom) : goal
+                machine.Program.IsDefined(qualified)
+                    || machine.Program.IsDynamic(qualified)
+                    || (isoContext && !machine.Program.IsDefined(plain) && !machine.Program.Builtins.TryGetId(plain, out _))
+                    ? Cell.Atom(machine.Symbols.GetFunctor(qualified).NameAtom)
+                    : goal
             );
         }
 
@@ -306,9 +324,94 @@ public static class CoreBuiltins
         }
 
         Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(goal.Index).Index);
-        var target = machine.Symbols.InternFunctor($"{prefix}:{machine.Symbols.AtomName(functor.NameAtom)}", functor.Arity);
+        string goalName = machine.Symbols.AtomName(functor.NameAtom);
+        if (goalName is "," or ";" or "->" or "*->" && functor.Arity == 2)
+        {
+            return machine.Unify(
+                machine.Argument(2),
+                machine.CreateStructure(
+                    machine.Symbols.InternFunctor(goalName, 2),
+                    [
+                        WithCallingContext(machine, module, machine.HeapAt(goal.Index + 1), colon),
+                        WithCallingContext(machine, module, machine.HeapAt(goal.Index + 2), colon),
+                    ]
+                )
+            );
+        }
 
-        if (!machine.Program.IsDefined(target) && !machine.Program.IsDynamic(target))
+        if (goalName == "\\+" && functor.Arity == 1)
+        {
+            return machine.Unify(
+                machine.Argument(2),
+                machine.CreateStructure(
+                    machine.Symbols.InternFunctor("\\+", 1),
+                    [WithCallingContext(machine, module, machine.HeapAt(goal.Index + 1), colon)]
+                )
+            );
+        }
+
+        if (goalName == "^" && functor.Arity == 2)
+        {
+            return machine.Unify(
+                machine.Argument(2),
+                machine.CreateStructure(
+                    machine.Symbols.InternFunctor("^", 2),
+                    [
+                        machine.HeapAt(goal.Index + 1),
+                        WithCallingContext(machine, module, machine.HeapAt(goal.Index + 2), colon),
+                    ]
+                )
+            );
+        }
+
+        string? contextual = (goalName, functor.Arity) switch
+        {
+            ("predicate_property", 2) => "$predicate_property",
+            ("current_predicate", 1) => "$current_predicate",
+            ("op", 3) => "$op",
+            ("current_op", 3) => "$current_op",
+            ("char_conversion", 2) => "$char_conversion",
+            ("current_char_conversion", 2) => "$current_char_conversion",
+            ("set_prolog_flag", 2) => "$set_prolog_flag",
+            ("current_prolog_flag", 2) => "$current_prolog_flag",
+            ("asserta", 1) => "$asserta",
+            ("assertz", 1) => "$assertz",
+            ("retract", 1) => "$retract",
+            ("clause", 2) => "$clause",
+            ("abolish", 1) => "$abolish",
+            ("write", 1 or 2) => "$write",
+            ("writeq", 1 or 2) => "$writeq",
+            ("write_term", 2 or 3) => "$write_term",
+            ("read", 1 or 2) => "$read",
+            ("read_term", 2 or 3) => "$read_term",
+            _ => null,
+        };
+        if (contextual is not null)
+        {
+            var contextualArguments = new Cell[functor.Arity + 1];
+            contextualArguments[0] = module;
+            for (var index = 0; index < functor.Arity; index++)
+            {
+                contextualArguments[index + 1] = machine.HeapAt(goal.Index + 1 + index);
+            }
+
+            Cell contextualGoal = machine.CreateStructure(
+                machine.Symbols.InternFunctor(contextual, contextualArguments.Length),
+                contextualArguments
+            );
+            return machine.Unify(machine.Argument(2), contextualGoal);
+        }
+
+        var target = machine.Symbols.InternFunctor($"{prefix}:{goalName}", functor.Arity);
+
+        var plainTarget = machine.Symbols.InternFunctor(goalName, functor.Arity);
+        bool strictModuleContext = machine.Program.Modules.TryGet(prefix, out ModuleDefinition? targetModule)
+            && targetModule!.InterfacePrepared;
+        if (
+            !machine.Program.IsDefined(target)
+            && !machine.Program.IsDynamic(target)
+            && (!strictModuleContext || machine.Program.IsDefined(plainTarget) || machine.Program.Builtins.TryGetId(plainTarget, out _))
+        )
         {
             return machine.Unify(machine.Argument(2), goal);
         }
@@ -319,7 +422,56 @@ public static class CoreBuiltins
             arguments[i] = machine.HeapAt(goal.Index + 1 + i);
         }
 
+        foreach (var position in MetaArgumentPositions(goalName, functor.Arity))
+        {
+            if (!IsQualified(machine, arguments[position], colon))
+            {
+                arguments[position] = WithCallingContext(machine, module, arguments[position], colon);
+            }
+        }
+
+        var indicator = new ModulePredicateIndicator(goalName, functor.Arity);
+        if (
+            machine.Program.Modules.TryGet(prefix, out ModuleDefinition? definition)
+            && definition!.TryPredicate(indicator, out ModulePredicateDefinition? metadata)
+            && metadata!.MetapredicateTemplate is string template
+        )
+        {
+            for (var index = 0; index < arguments.Length && index < template.Length; index++)
+            {
+                if (template[index] == ':' && !IsQualified(machine, arguments[index], colon))
+                {
+                    arguments[index] = machine.CreateStructure(colon, [module, arguments[index]]);
+                }
+            }
+        }
+
         return machine.Unify(machine.Argument(2), machine.CreateStructure(target, arguments));
+    }
+
+    private static Cell WithCallingContext(Machine machine, Cell module, Cell goal, int colonFunctor) =>
+        IsQualified(machine, goal, colonFunctor)
+            ? goal
+            : machine.CreateStructure(colonFunctor, [module, goal]);
+
+    private static ReadOnlySpan<int> MetaArgumentPositions(string name, int arity) =>
+        (name, arity) switch
+        {
+            ("findall", 3 or 4) or ("bagof", 3) or ("setof", 3) or ("aggregate_all", 3) => [1],
+            ("forall", 2) => [0, 1],
+            ("once", 1) or ("ignore", 1) or ("not", 1) => [0],
+            ("catch", 3) => [0, 2],
+            ("with_output_to", 2) => [1],
+            ("call", >= 1 and <= 8) => [0],
+            ("maplist", >= 2 and <= 5) or ("foldl", 4 or 5) or ("include", 3) or ("exclude", 3)
+                or ("partition", 4) or ("predsort", 3) or ("phrase", 2 or 3) => [0],
+            _ => [],
+        };
+
+    private static bool IsQualified(Machine machine, Cell term, int colonFunctor)
+    {
+        term = machine.Dereference(term);
+        return term.Tag == CellTag.Structure && machine.HeapAt(term.Index).Index == colonFunctor;
     }
 
     /// <summary>

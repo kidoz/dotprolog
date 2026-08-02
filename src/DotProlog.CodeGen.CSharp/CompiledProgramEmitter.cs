@@ -114,6 +114,7 @@ internal static class CompiledProgramEmitter
             CultureInfo.InvariantCulture,
             $"        var compiled = new global::DotProlog.Runtime.CompiledProgram(functors, builtins, constants, {model.Instructions.Count});"
         );
+        AppendModules(text, model);
         text.AppendLine();
 
         for (var i = 0; i < model.Instructions.Count; i++)
@@ -226,6 +227,97 @@ internal static class CompiledProgramEmitter
         }
 
         text.AppendLine("        ];");
+    }
+
+    private static void AppendModules(StringBuilder text, CompiledModel model)
+    {
+        for (var index = 0; index < model.Modules.Count; index++)
+        {
+            CompiledModule module = model.Modules[index];
+            string variable = $"module{index.ToString(CultureInfo.InvariantCulture)}";
+            text.AppendLine(
+                CultureInfo.InvariantCulture,
+                $"        global::DotProlog.Runtime.ModuleDefinition {variable} = runtime.Modules.Declare({SyntaxFacts.Literal(module.Name)});"
+            );
+            text.AppendLine(
+                CultureInfo.InvariantCulture,
+                $"        {variable}.InterfacePrepared = {module.InterfacePrepared.ToString().ToLowerInvariant()};"
+            );
+            text.AppendLine(CultureInfo.InvariantCulture, $"        {variable}.Operators.Clear();");
+            foreach (PrologOperator op in module.Operators)
+            {
+                text.AppendLine(
+                    CultureInfo.InvariantCulture,
+                    $"        {variable}.Operators.Define({op.Priority}, global::DotProlog.Runtime.OperatorType.{op.Type}, {SyntaxFacts.Literal(op.Name)});"
+                );
+            }
+
+            text.AppendLine(CultureInfo.InvariantCulture, $"        {variable}.CharacterConversions.Clear();");
+            foreach ((var input, var output) in module.CharacterConversions)
+            {
+                text.AppendLine(
+                    CultureInfo.InvariantCulture,
+                    $"        {variable}.CharacterConversions.Set((char){(int)input}, (char){(int)output});"
+                );
+            }
+
+            text.AppendLine(
+                CultureInfo.InvariantCulture,
+                $"        {variable}.Flags.SetCharConversion({module.CharConversion.ToString().ToLowerInvariant()});"
+            );
+            text.AppendLine(
+                CultureInfo.InvariantCulture,
+                $"        {variable}.Flags.SetDebug({module.Debug.ToString().ToLowerInvariant()});"
+            );
+            text.AppendLine(
+                CultureInfo.InvariantCulture,
+                $"        {variable}.Flags.SetDoubleQuotes(global::DotProlog.Runtime.DoubleQuotesMode.{module.DoubleQuotes});"
+            );
+            text.AppendLine(
+                CultureInfo.InvariantCulture,
+                $"        {variable}.Flags.SetUnknown(global::DotProlog.Runtime.UnknownProcedureAction.{module.Unknown});"
+            );
+
+            for (var predicateIndex = 0; predicateIndex < module.Predicates.Count; predicateIndex++)
+            {
+                CompiledModulePredicate predicate = module.Predicates[predicateIndex];
+                string predicateVariable = $"{variable}Predicate{predicateIndex.ToString(CultureInfo.InvariantCulture)}";
+                text.AppendLine(
+                    CultureInfo.InvariantCulture,
+                    $"        global::DotProlog.Runtime.ModulePredicateDefinition {predicateVariable} = {variable}.Predicate(new global::DotProlog.Runtime.ModulePredicateIndicator({SyntaxFacts.Literal(predicate.Name)}, {predicate.Arity}));"
+                );
+                text.AppendLine(CultureInfo.InvariantCulture, $"        {predicateVariable}.Defined = {predicate.Defined.ToString().ToLowerInvariant()};");
+                text.AppendLine(CultureInfo.InvariantCulture, $"        {predicateVariable}.Exported = {predicate.Exported.ToString().ToLowerInvariant()};");
+                text.AppendLine(CultureInfo.InvariantCulture, $"        {predicateVariable}.Dynamic = {predicate.Dynamic.ToString().ToLowerInvariant()};");
+                text.AppendLine(CultureInfo.InvariantCulture, $"        {predicateVariable}.Multifile = {predicate.Multifile.ToString().ToLowerInvariant()};");
+                if (predicate.MetapredicateTemplate is not null)
+                {
+                    text.AppendLine(
+                        CultureInfo.InvariantCulture,
+                        $"        {predicateVariable}.MetapredicateTemplate = {SyntaxFacts.Literal(predicate.MetapredicateTemplate)};"
+                    );
+                }
+
+                foreach (CompiledModuleClause clause in predicate.StaticClauses)
+                {
+                    var cells = string.Join(", ", clause.Term.Select(cell => TermCell(cell, "compiled")));
+                    text.AppendLine(
+                        CultureInfo.InvariantCulture,
+                        $"        {predicateVariable}.AddStaticClause([{cells}], {clause.Root});"
+                    );
+                }
+            }
+
+            foreach (CompiledModuleImport import in module.Imports)
+            {
+                text.AppendLine(
+                    CultureInfo.InvariantCulture,
+                    $"        _ = {variable}.TryImport(new global::DotProlog.Runtime.ModulePredicateIndicator({SyntaxFacts.Literal(import.Name)}, {import.Arity}), {SyntaxFacts.Literal(import.From)}, out _);"
+                );
+            }
+
+            text.AppendLine();
+        }
     }
 
     private static void AppendBuiltins(StringBuilder text, CompiledModel model)
@@ -341,6 +433,34 @@ internal static class CompiledProgramEmitter
 
     private sealed record CompiledDynamicPredicate(int Functor, List<int> Aliases, List<CompiledDynamicClause> Clauses);
 
+    private sealed record CompiledModuleImport(string Name, int Arity, string From);
+
+    private sealed record CompiledModuleClause(int Root, List<CompiledTermCell> Term);
+
+    private sealed record CompiledModulePredicate(
+        string Name,
+        int Arity,
+        bool Defined,
+        bool Exported,
+        bool Dynamic,
+        bool Multifile,
+        string? MetapredicateTemplate,
+        List<CompiledModuleClause> StaticClauses
+    );
+
+    private sealed record CompiledModule(
+        string Name,
+        bool InterfacePrepared,
+        List<PrologOperator> Operators,
+        List<(char Input, char Output)> CharacterConversions,
+        bool CharConversion,
+        bool Debug,
+        DoubleQuotesMode DoubleQuotes,
+        UnknownProcedureAction Unknown,
+        List<CompiledModulePredicate> Predicates,
+        List<CompiledModuleImport> Imports
+    );
+
     private sealed class CompiledInstruction
     {
         internal required int Address { get; init; }
@@ -362,6 +482,7 @@ internal static class CompiledProgramEmitter
         internal List<int> Initialization { get; } = [];
         internal List<PreparationStep> Preparation { get; } = [];
         internal List<CompiledDynamicPredicate> DynamicPredicates { get; } = [];
+        internal List<CompiledModule> Modules { get; } = [];
 
         internal static CompiledModel Create(
             BytecodeProgram program,
@@ -377,7 +498,7 @@ internal static class CompiledProgramEmitter
             Dictionary<Cell, int> termConstants = [];
             var code = program.Code;
 
-            for (var address = codeStart; address < program.CodeLength; )
+            for (var address = codeStart; address < program.CodeLength;)
             {
                 var opCode = (OpCode)code[address];
                 var operands = OperandCount(opCode);
@@ -409,23 +530,23 @@ internal static class CompiledProgramEmitter
                         break;
 
                     case OpCode.CallBuiltin:
-                    {
-                        var display = program.Builtins.NameOf(instruction.First);
-                        var slash = display.LastIndexOf('/');
-                        var name = display[..slash];
-                        var arity = int.Parse(display.AsSpan(slash + 1), CultureInfo.InvariantCulture);
-                        var functorId = program.Symbols.InternFunctor(name, arity);
-                        var functor = AddFunctor(program, model, functors, functorId);
-                        if (!builtins.TryGetValue(instruction.First, out var reference))
                         {
-                            reference = model.Builtins.Count;
-                            builtins[instruction.First] = reference;
-                            model.Builtins.Add(functor);
-                        }
+                            var display = program.Builtins.NameOf(instruction.First);
+                            var slash = display.LastIndexOf('/');
+                            var name = display[..slash];
+                            var arity = int.Parse(display.AsSpan(slash + 1), CultureInfo.InvariantCulture);
+                            var functorId = program.Symbols.InternFunctor(name, arity);
+                            var functor = AddFunctor(program, model, functors, functorId);
+                            if (!builtins.TryGetValue(instruction.First, out var reference))
+                            {
+                                reference = model.Builtins.Count;
+                                builtins[instruction.First] = reference;
+                                model.Builtins.Add(functor);
+                            }
 
-                        instruction.FirstReference = reference;
-                        break;
-                    }
+                            instruction.FirstReference = reference;
+                            break;
+                        }
 
                     case OpCode.GetConstant:
                     case OpCode.UnifyConstant:
@@ -532,7 +653,94 @@ internal static class CompiledProgramEmitter
                 model.DynamicPredicates.Add(new CompiledDynamicPredicate(functor, aliases, clauses));
             }
 
+            foreach (ModuleDefinition module in program.Modules.Definitions)
+            {
+                List<CompiledModulePredicate> predicates = [];
+                foreach (ModulePredicateDefinition predicate in module.Predicates)
+                {
+                    string compiledName = module.Name == "user"
+                        ? predicate.Indicator.Name
+                        : $"{module.Name}:{predicate.Indicator.Name}";
+                    int functor = program.Symbols.InternFunctor(compiledName, predicate.Indicator.Arity);
+                    if (predicate.Defined && !program.IsUserPredicate(functor))
+                    {
+                        continue;
+                    }
+
+                    predicates.Add(
+                        new CompiledModulePredicate(
+                            predicate.Indicator.Name,
+                            predicate.Indicator.Arity,
+                            predicate.Defined,
+                            predicate.Exported,
+                            predicate.Dynamic,
+                            predicate.Multifile,
+                            predicate.MetapredicateTemplate,
+                            [.. predicate.StaticClauses.Select(clause => new CompiledModuleClause(
+                                clause.Root,
+                                DescribeTerm(program, model, functors, termConstants, clause.Term.Cells)
+                            ))]
+                        )
+                    );
+                }
+
+                List<CompiledModuleImport> imports =
+                [
+                    .. module.Imports.Select(import =>
+                        new CompiledModuleImport(import.Key.Name, import.Key.Arity, import.Value)
+                    ),
+                ];
+                if (module.Name == "user" && predicates.Count == 0 && imports.Count == 0)
+                {
+                    continue;
+                }
+
+                model.Modules.Add(
+                    new CompiledModule(
+                        module.Name,
+                        module.InterfacePrepared,
+                        [.. module.Operators.All()],
+                        [.. module.CharacterConversions.All()],
+                        module.Flags.CharConversion,
+                        module.Flags.Debug,
+                        module.Flags.DoubleQuotes,
+                        module.Flags.Unknown,
+                        predicates,
+                        imports
+                    )
+                );
+            }
+
             return model;
+        }
+
+        private static List<CompiledTermCell> DescribeTerm(
+            BytecodeProgram program,
+            CompiledModel model,
+            Dictionary<int, int> functors,
+            Dictionary<Cell, int> termConstants,
+            ReadOnlySpan<Cell> cells
+        )
+        {
+            List<CompiledTermCell> term = [];
+            foreach (Cell cell in cells)
+            {
+                var value = cell.Tag switch
+                {
+                    CellTag.Reference or CellTag.Structure => cell.Index,
+                    CellTag.Functor => AddFunctor(program, model, functors, cell.Index),
+                    CellTag.Atom or CellTag.Integer or CellTag.Float => AddTermConstant(
+                        program,
+                        model,
+                        termConstants,
+                        cell
+                    ),
+                    _ => throw new InvalidOperationException($"Static module term cell {cell.Tag} cannot be generated."),
+                };
+                term.Add(new CompiledTermCell(cell.Tag, value));
+            }
+
+            return term;
         }
 
         private static int AddTermConstant(

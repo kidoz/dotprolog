@@ -16,7 +16,7 @@ public sealed class PrologEngine : IRuntimeCompiler
 {
     private const int ControlGoalCacheLimit = 1024;
 
-    private readonly ModuleTable _modules = new();
+    private readonly ModuleTable _modules;
     private readonly List<int> _pendingDirectives = [];
     private readonly List<int> _pendingInitialization = [];
     private readonly HashSet<string> _loadedSourceFiles = new(PathComparer);
@@ -32,6 +32,7 @@ public sealed class PrologEngine : IRuntimeCompiler
     public PrologEngine(PrologLanguageMode languageMode)
     {
         Program = new BytecodeProgram(languageMode);
+        _modules = new ModuleTable(Program.Modules);
         CoreBuiltins.RegisterAll(Program);
         Machine = new Machine(Program);
         Program.RuntimeCompiler = this;
@@ -195,13 +196,21 @@ public sealed class PrologEngine : IRuntimeCompiler
     private ParseResult ReadProgramWithIncludes(string text, string? fileName)
     {
         HashSet<string> active = new(PathComparer);
+        var moduleReaderState = new IsoModuleReaderState(Program);
         var rootPath = ExistingFullPath(fileName);
         if (rootPath is not null)
         {
             active.Add(rootPath);
         }
 
-        return ReadSource(text, fileName);
+        try
+        {
+            return ReadSource(text, fileName);
+        }
+        finally
+        {
+            moduleReaderState.Complete();
+        }
 
         ParseResult ReadSource(string source, string? sourceName) =>
             TermReader.ReadProgram(
@@ -210,7 +219,8 @@ public sealed class PrologEngine : IRuntimeCompiler
                 Program.Operators,
                 Program.CharacterConversions,
                 Program.Flags,
-                clause => ExpandInclude(clause, sourceName)
+                clause => ExpandInclude(clause, sourceName),
+                moduleReaderState.AtBoundary
             );
 
         ParseResult? ExpandInclude(SyntaxTerm clause, string? includingFile)
@@ -270,6 +280,267 @@ public sealed class PrologEngine : IRuntimeCompiler
             finally
             {
                 active.Remove(path);
+            }
+        }
+    }
+
+    /// <summary>Switches the shared lexer state at ISO interface and body boundaries.</summary>
+    private sealed class IsoModuleReaderState
+    {
+        private readonly BytecodeProgram _program;
+        private readonly OperatorTable _rootOperators;
+        private readonly CharacterConversionTable _rootConversions;
+        private readonly PrologFlags _rootFlags;
+        private readonly Stack<string> _enclosingModules = [];
+        private readonly HashSet<string> _startedBodies = new(StringComparer.Ordinal);
+        private string? _activeModule;
+        private bool _implicitUserActive;
+        private bool _moduleText;
+        private bool _pendingImplicitUser;
+
+        internal IsoModuleReaderState(BytecodeProgram program)
+        {
+            _program = program;
+            _rootOperators = program.Operators.Copy();
+            _rootConversions = program.CharacterConversions.Copy();
+            _rootFlags = program.Flags.Copy();
+        }
+
+        internal void AtBoundary(SyntaxTerm clause)
+        {
+            if (clause is not CompoundTerm { Name: ":-", Arity: 1, Arguments: [CompoundTerm marker] })
+            {
+                ObserveImplicitUserTerm();
+                return;
+            }
+
+            if (marker.Name is "module" or "end_module" or "body" or "end_body" && marker.Arity == 1)
+            {
+                if (!_moduleText)
+                {
+                    _moduleText = true;
+                    MaterializePendingImplicitUserBody();
+                }
+            }
+
+            if (marker is { Name: "module" or "body", Arity: 1, Arguments: [AtomTerm startName] })
+            {
+                if (_implicitUserActive)
+                {
+                    CloseImplicitUserBody();
+                }
+
+                if (_activeModule is not null)
+                {
+                    if (marker.Name != "body" || _activeModule != ModuleTable.UserModule)
+                    {
+                        return;
+                    }
+
+                    if (_program.Modules.TryGet(_activeModule, out ModuleDefinition? enclosing))
+                    {
+                        enclosing!.SeedReaderState(
+                            _program.Operators,
+                            _program.CharacterConversions,
+                            _program.Flags
+                        );
+                    }
+
+                    _enclosingModules.Push(_activeModule);
+                }
+                else
+                {
+                    CaptureRoot();
+                }
+
+                ModuleDefinition startDefinition = _program.Modules.Declare(startName.Name);
+                if (marker.Name == "module")
+                {
+                    startDefinition.SeedReaderState(_rootOperators, _rootConversions, _rootFlags);
+                }
+                else
+                {
+                    if (startName.Name == ModuleTable.UserModule && _startedBodies.Add(startName.Name))
+                    {
+                        startDefinition.SeedReaderState(_rootOperators, _rootConversions, _rootFlags);
+                    }
+
+                    startDefinition.RecordPreparedBody();
+                }
+
+                Install(startDefinition);
+                _activeModule = startName.Name;
+                return;
+            }
+
+            if (
+                marker is { Name: "end_module" or "end_body", Arity: 1, Arguments: [AtomTerm endName] }
+                && _activeModule == endName.Name
+                && _program.Modules.TryGet(endName.Name, out ModuleDefinition? endDefinition)
+            )
+            {
+                endDefinition!.SeedReaderState(_program.Operators, _program.CharacterConversions, _program.Flags);
+                if (_enclosingModules.TryPop(out string? enclosingModule))
+                {
+                    ModuleDefinition enclosing = _program.Modules.Declare(enclosingModule);
+                    enclosing.RecordPreparedBody();
+                    Install(enclosing);
+                    _activeModule = enclosingModule;
+                }
+                else
+                {
+                    if (endName.Name == ModuleTable.UserModule)
+                    {
+                        CaptureRoot();
+                    }
+
+                    Restore();
+                    _activeModule = null;
+                }
+
+                return;
+            }
+
+            ObserveImplicitUserTerm();
+
+            ApplyFlagDirective(marker);
+        }
+
+        internal void Restore()
+        {
+            _program.Operators.ReplaceWith(_rootOperators);
+            _program.CharacterConversions.ReplaceWith(_rootConversions);
+            _program.Flags.ReplaceWith(_rootFlags);
+        }
+
+        internal void Complete()
+        {
+            if (_implicitUserActive)
+            {
+                CloseImplicitUserBody();
+            }
+
+            Restore();
+        }
+
+        private void Install(ModuleDefinition definition)
+        {
+            _program.Operators.ReplaceWith(definition.Operators);
+            _program.CharacterConversions.ReplaceWith(definition.CharacterConversions);
+            _program.Flags.ReplaceWith(definition.Flags);
+        }
+
+        private void CaptureRoot()
+        {
+            _rootOperators.ReplaceWith(_program.Operators);
+            _rootConversions.ReplaceWith(_program.CharacterConversions);
+            _rootFlags.ReplaceWith(_program.Flags);
+        }
+
+        private void StartImplicitUserBody()
+        {
+            CaptureRoot();
+            ModuleDefinition user = _program.Modules.Declare(ModuleTable.UserModule);
+            if (_startedBodies.Add(ModuleTable.UserModule))
+            {
+                user.SeedReaderState(_rootOperators, _rootConversions, _rootFlags);
+            }
+
+            user.RecordPreparedBody();
+            Install(user);
+            _activeModule = ModuleTable.UserModule;
+            _implicitUserActive = true;
+        }
+
+        private void ObserveImplicitUserTerm()
+        {
+            if (_activeModule is not null)
+            {
+                return;
+            }
+
+            if (_moduleText)
+            {
+                StartImplicitUserBody();
+            }
+            else
+            {
+                _pendingImplicitUser = true;
+            }
+        }
+
+        private void MaterializePendingImplicitUserBody()
+        {
+            if (!_pendingImplicitUser)
+            {
+                return;
+            }
+
+            ModuleDefinition user = _program.Modules.Declare(ModuleTable.UserModule);
+            user.SeedReaderState(_rootOperators, _rootConversions, _rootFlags);
+            user.RecordPreparedBody();
+            user.SeedReaderState(_program.Operators, _program.CharacterConversions, _program.Flags);
+            _startedBodies.Add(ModuleTable.UserModule);
+            CaptureRoot();
+            _pendingImplicitUser = false;
+        }
+
+        private void CloseImplicitUserBody()
+        {
+            ModuleDefinition user = _program.Modules.Declare(ModuleTable.UserModule);
+            user.SeedReaderState(_program.Operators, _program.CharacterConversions, _program.Flags);
+            CaptureRoot();
+            _activeModule = null;
+            _implicitUserActive = false;
+        }
+
+        private void ApplyFlagDirective(CompoundTerm goal)
+        {
+            if (
+                goal
+                is not
+                {
+                    Name: "set_prolog_flag",
+                    Arity: 2,
+                    Arguments: [AtomTerm flag, AtomTerm value],
+                }
+            )
+            {
+                return;
+            }
+
+            switch (flag.Name, value.Name)
+            {
+                case ("char_conversion", "on"):
+                    _program.Flags.SetCharConversion(true);
+                    break;
+                case ("char_conversion", "off"):
+                    _program.Flags.SetCharConversion(false);
+                    break;
+                case ("debug", "on"):
+                    _program.Flags.Debug = true;
+                    break;
+                case ("debug", "off"):
+                    _program.Flags.Debug = false;
+                    break;
+                case ("double_quotes", "codes"):
+                    _program.Flags.DoubleQuotes = DoubleQuotesMode.Codes;
+                    break;
+                case ("double_quotes", "chars"):
+                    _program.Flags.DoubleQuotes = DoubleQuotesMode.Chars;
+                    break;
+                case ("double_quotes", "atom"):
+                    _program.Flags.DoubleQuotes = DoubleQuotesMode.Atom;
+                    break;
+                case ("unknown", "error"):
+                    _program.Flags.Unknown = UnknownProcedureAction.Error;
+                    break;
+                case ("unknown", "warning"):
+                    _program.Flags.Unknown = UnknownProcedureAction.Warning;
+                    break;
+                case ("unknown", "fail"):
+                    _program.Flags.Unknown = UnknownProcedureAction.Fail;
+                    break;
             }
         }
     }
@@ -610,24 +881,24 @@ public sealed class PrologEngine : IRuntimeCompiler
                     break;
 
                 case CellTag.Structure:
-                {
-                    // A rational control term cannot be reified into finite syntax; reject it with
-                    // a catchable error rather than looping here or overflowing in the reifier.
-                    if (!active.Add(cell.Index))
                     {
-                        throw PrologErrors.Representation(machine, "cyclic_term");
-                    }
+                        // A rational control term cannot be reified into finite syntax; reject it with
+                        // a catchable error rather than looping here or overflowing in the reifier.
+                        if (!active.Add(cell.Index))
+                        {
+                            throw PrologErrors.Representation(machine, "cyclic_term");
+                        }
 
-                    var functorId = machine.HeapAt(cell.Index).Index;
-                    key.Append('s').Append(functorId).Append('(');
-                    work.Add((cell, true));
-                    for (var i = machine.Symbols.ArityOf(functorId); i >= 1; i--)
-                    {
-                        work.Add((machine.HeapAt(cell.Index + i), false));
-                    }
+                        var functorId = machine.HeapAt(cell.Index).Index;
+                        key.Append('s').Append(functorId).Append('(');
+                        work.Add((cell, true));
+                        for (var i = machine.Symbols.ArityOf(functorId); i >= 1; i--)
+                        {
+                            work.Add((machine.HeapAt(cell.Index + i), false));
+                        }
 
-                    break;
-                }
+                        break;
+                    }
 
                 default:
                     key.Append(cell.ToString()).Append(',');
@@ -715,6 +986,26 @@ public sealed class PrologEngine : IRuntimeCompiler
             body = rule.Arguments[1];
         }
 
+        string compiledHeadName = head switch
+        {
+            AtomTerm atom => atom.Name,
+            CompoundTerm compound => compound.Name,
+            _ => string.Empty,
+        };
+        var moduleSeparator = compiledHeadName.LastIndexOf(':');
+        if (moduleSeparator > 0)
+        {
+            string module = compiledHeadName[..moduleSeparator];
+            string sourceName = compiledHeadName[(moduleSeparator + 1)..];
+            int arity = head is CompoundTerm compound ? compound.Arity : 0;
+            var indicator = new PredicateIndicator(sourceName, arity);
+            _modules.Define(module, indicator);
+            if (body is not null)
+            {
+                body = new ModuleResolver(_modules, module, [indicator], Program).ResolveGoal(body);
+            }
+        }
+
         functorId = head switch
         {
             AtomTerm atom => Program.Symbols.InternFunctor(atom.Name, 0),
@@ -793,17 +1084,46 @@ public sealed class PrologEngine : IRuntimeCompiler
         out Cell variableNames,
         out Cell variables,
         out Cell singletons
+    ) =>
+        TryReadTerm(
+            machine,
+            input,
+            ref buffer,
+            Program.Operators,
+            Program.CharacterConversions,
+            Program.Flags,
+            out term,
+            out variableNames,
+            out variables,
+            out singletons
+        );
+
+    /// <inheritdoc />
+    public bool TryReadTerm(
+        Machine machine,
+        TextReader input,
+        ref string buffer,
+        OperatorTable operators,
+        CharacterConversionTable characterConversions,
+        PrologFlags flags,
+        out Cell term,
+        out Cell variableNames,
+        out Cell variables,
+        out Cell singletons
     )
     {
         ArgumentNullException.ThrowIfNull(machine);
         ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(operators);
+        ArgumentNullException.ThrowIfNull(characterConversions);
+        ArgumentNullException.ThrowIfNull(flags);
 
         term = default;
         variableNames = Cell.Atom(machine.Symbols.EmptyList);
         variables = Cell.Atom(machine.Symbols.EmptyList);
         singletons = Cell.Atom(machine.Symbols.EmptyList);
 
-        var end = ClauseScanner.FindClauseEnd(buffer, Program.CharacterConversions, Program.Flags);
+        var end = ClauseScanner.FindClauseEnd(buffer, characterConversions, flags);
         while (end < 0)
         {
             var chunk = ReadLinePreservingTerminator(input);
@@ -812,20 +1132,20 @@ public sealed class PrologEngine : IRuntimeCompiler
                 // What is left at end of input is either nothing, which is end_of_file, or a clause
                 // missing its terminator. Reading the incomplete text as if it were whole would
                 // quietly return a prefix of what the file says.
-                var blank = ClauseScanner.IsBlank(buffer, Program.CharacterConversions, Program.Flags);
+                var blank = ClauseScanner.IsBlank(buffer, characterConversions, flags);
                 buffer = string.Empty;
 
                 return blank ? false : throw SyntaxError(machine, "unexpected_end_of_file");
             }
 
             buffer += chunk;
-            end = ClauseScanner.FindClauseEnd(buffer, Program.CharacterConversions, Program.Flags);
+            end = ClauseScanner.FindClauseEnd(buffer, characterConversions, flags);
         }
 
         var text = buffer[..end];
         buffer = buffer[end..];
 
-        ParseResult parsed = ReadTerm(text);
+        ParseResult parsed = TermReader.ReadTerm(text, operators: operators, characterConversions: characterConversions, flags: flags);
         if (!parsed.Success || parsed.Clauses.Count == 0)
         {
             var error = parsed.Diagnostics.Count > 0 ? parsed.Diagnostics[0].Id : "cannot_start_term";
@@ -842,7 +1162,7 @@ public sealed class PrologEngine : IRuntimeCompiler
         List<Cell> variableOrder = [];
         term = TermReifier.ToHeap(
             machine,
-            TermNormalizer.Normalize(parsed.Clauses[0], Program.Flags.DoubleQuotes),
+            TermNormalizer.Normalize(parsed.Clauses[0], flags.DoubleQuotes),
             namedVariables,
             variableOrder
         );

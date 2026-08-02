@@ -40,6 +40,39 @@ public sealed class CharacterConversionTable
     /// <summary>Returns the immutable entries held by a prior mapping version.</summary>
     internal ReadOnlySpan<Entry> Entries(int version) => _versions[version];
 
+    /// <summary>Creates an independent table containing the current mappings.</summary>
+    public CharacterConversionTable Copy()
+    {
+        var copy = new CharacterConversionTable();
+        copy.ReplaceWith(this);
+        return copy;
+    }
+
+    /// <summary>Replaces every mapping with the mappings from another table.</summary>
+    public void ReplaceWith(CharacterConversionTable source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        _mappings.Clear();
+        _versions.Clear();
+        _versions.Add([]);
+        foreach (Entry entry in source._versions[^1])
+        {
+            Set(entry.Input, entry.Output);
+        }
+    }
+
+    /// <summary>Every current non-identity mapping in character order.</summary>
+    public IReadOnlyList<(char Input, char Output)> All() =>
+        [.. _versions[^1].Select(entry => (entry.Input, entry.Output))];
+
+    /// <summary>Removes every character conversion.</summary>
+    public void Clear()
+    {
+        _mappings.Clear();
+        _versions.Clear();
+        _versions.Add([]);
+    }
+
     /// <summary>One non-identity input-to-output mapping.</summary>
     internal readonly record struct Entry(char Input, char Output);
 }

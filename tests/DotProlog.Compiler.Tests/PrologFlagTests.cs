@@ -11,7 +11,7 @@ public sealed class PrologFlagTests
         Assert.Equal(
             "[bounded-true,max_integer-576460752303423487,min_integer- -576460752303423488,"
                 + "integer_rounding_function-toward_zero,max_arity-255,char_conversion-off,debug-off,"
-                + "double_quotes-codes,unknown-error]\n",
+                + "double_quotes-codes,unknown-error,colon_sets_calling_context-true]\n",
             PrologTestHost.RunGoal("findall(F-V, current_prolog_flag(F, V), Flags), write(Flags), nl")
         );
     }
@@ -33,7 +33,8 @@ public sealed class PrologFlagTests
     public void ModulesSeeOnlyTheSameIsoFlagSet()
     {
         Assert.Equal(
-            "[bounded,max_integer,min_integer,integer_rounding_function,max_arity,char_conversion,debug,double_quotes,unknown]\n",
+            "[bounded,max_integer,min_integer,integer_rounding_function,max_arity,char_conversion,debug,double_quotes,unknown,"
+                + "colon_sets_calling_context]\n",
             PrologTestHost.Run(
                 """
                 :- module(flag_scope, [flag_names/1]).

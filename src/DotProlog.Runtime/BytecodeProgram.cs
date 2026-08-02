@@ -117,6 +117,9 @@ public sealed class BytecodeProgram
     /// <summary>The ISO input-character mappings owned by this program.</summary>
     public CharacterConversionTable CharacterConversions { get; } = new();
 
+    /// <summary>The ISO module interfaces, visibility rules, and predicate properties.</summary>
+    public ModuleCatalog Modules { get; } = new();
+
     /// <summary>
     /// The operators in force. Reading and writing share one table, so an <c>op/3</c> run at any
     /// point changes how later text is both parsed and printed.
@@ -208,7 +211,20 @@ public sealed class BytecodeProgram
         }
 
         Functor functor = Symbols.GetFunctor(functorId);
-        if (IsoLanguageProfile.IsStandardPredicate(Symbols.AtomName(functor.NameAtom), functor.Arity))
+        string name = Symbols.AtomName(functor.NameAtom);
+        if (
+            IsoLanguageProfile.IsStandardPredicate(name, functor.Arity)
+            || (name == "$predicate_property" && functor.Arity == 3)
+            || (name == "$current_predicate" && functor.Arity == 2)
+            || ((name is "$op" or "$current_op") && functor.Arity == 4)
+            || ((name is "$char_conversion" or "$current_char_conversion" or "$set_prolog_flag" or "$current_prolog_flag") && functor.Arity == 3)
+            || ((name is "$asserta" or "$assertz" or "$retract" or "$abolish") && functor.Arity == 2)
+            || (name == "$clause" && functor.Arity == 3)
+            || ((name is "$write" or "$writeq") && functor.Arity is 2 or 3)
+            || (name == "$write_term" && functor.Arity is 3 or 4)
+            || (name == "$read" && functor.Arity is 2 or 3)
+            || (name == "$read_term" && functor.Arity is 3 or 4)
+        )
         {
             return false;
         }

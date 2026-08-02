@@ -41,23 +41,47 @@ public static class PrologErrors
         return Binary(machine, "domain_error", domain, culprit);
     }
 
+    /// <summary>An object does not exist: <c>existence_error(ObjectType, Culprit)</c>.</summary>
+    public static PrologException Existence(Machine machine, string objectType, Cell culprit)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+        return Binary(machine, "existence_error", objectType, culprit);
+    }
+
     /// <summary>A predicate has no definition: <c>existence_error(procedure, Name/Arity)</c>.</summary>
     public static PrologException UndefinedProcedure(Machine machine, int functorId)
     {
         ArgumentNullException.ThrowIfNull(machine);
 
         Functor functor = machine.Symbols.GetFunctor(functorId);
+        string compiledName = machine.Symbols.AtomName(functor.NameAtom);
+        var separator = compiledName.LastIndexOf(':');
         Cell indicator = machine.CreateStructure(
             machine.Symbols.InternFunctor("/", 2),
-            [Cell.Atom(functor.NameAtom), Cell.Integer60(functor.Arity)]
+            [
+                Cell.Atom(machine.Symbols.InternAtom(separator > 0 ? compiledName[(separator + 1)..] : compiledName)),
+                Cell.Integer60(functor.Arity),
+            ]
         );
+
+        if (separator > 0)
+        {
+            indicator = machine.CreateStructure(
+                machine.Symbols.InternFunctor(":", 2),
+                [Cell.Atom(machine.Symbols.InternAtom(compiledName[..separator])), indicator]
+            );
+        }
 
         Cell formal = machine.CreateStructure(
             machine.Symbols.InternFunctor("existence_error", 2),
             [Cell.Atom(machine.Symbols.InternAtom("procedure")), indicator]
         );
 
-        return Build(machine, formal, $"existence_error(procedure, {machine.Symbols.DescribeFunctor(functorId)})");
+        return Build(
+            machine,
+            formal,
+            $"existence_error(procedure, {TermWriter.ToDisplayString(machine, indicator, quoted: true)})"
+        );
     }
 
     /// <summary>An operation is not allowed: <c>permission_error(Operation, Type, Name/Arity)</c>.</summary>

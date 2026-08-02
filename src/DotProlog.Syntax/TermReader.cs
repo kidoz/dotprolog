@@ -54,13 +54,18 @@ public sealed class TermReader
     /// <c>include/1</c>, whose included operator and character-conversion declarations must affect
     /// the remainder of the including source.
     /// </param>
+    /// <param name="clauseBoundary">
+    /// Optional state transition run after a clause is parsed and before its reader directives or
+    /// the first token of the next clause. ISO module interfaces and bodies use this seam.
+    /// </param>
     public static ParseResult ReadProgram(
         string text,
         string? fileName = null,
         OperatorTable? operators = null,
         CharacterConversionTable? characterConversions = null,
         PrologFlags? flags = null,
-        Func<SyntaxTerm, ParseResult?>? directiveExpansion = null
+        Func<SyntaxTerm, ParseResult?>? directiveExpansion = null,
+        Action<SyntaxTerm>? clauseBoundary = null
     )
     {
         ArgumentNullException.ThrowIfNull(text);
@@ -76,6 +81,7 @@ public sealed class TermReader
             {
                 // Reader-state and source-expansion directives take effect while the full stop is
                 // still current, before Advance lexes the first token of the following clause.
+                clauseBoundary?.Invoke(clause);
                 reader.ApplyCharacterConversionDirective(clause);
                 reader.ApplyOperatorDirective(clause);
 
@@ -258,11 +264,11 @@ public sealed class TermReader
             _flags is not null
             && goal
                 is CompoundTerm
-                {
-                    Name: "set_prolog_flag",
-                    Arity: 2,
-                    Arguments: [AtomTerm { Name: "char_conversion" }, AtomTerm value],
-                }
+            {
+                Name: "set_prolog_flag",
+                Arity: 2,
+                Arguments: [AtomTerm { Name: "char_conversion" }, AtomTerm value],
+            }
             && value.Name is "on" or "off"
         )
         {
@@ -366,34 +372,34 @@ public sealed class TermReader
                 return ParseAtomOrOperator(maxPriority, out priority);
 
             case TokenKind.Punctuation when token.Text == "(":
-            {
-                Advance();
-                SyntaxTerm? inner = ParseTerm(MaxTermPriority, out _);
-                return inner is null || !Expect(")") ? null : inner;
-            }
+                {
+                    Advance();
+                    SyntaxTerm? inner = ParseTerm(MaxTermPriority, out _);
+                    return inner is null || !Expect(")") ? null : inner;
+                }
 
             case TokenKind.Punctuation when token.Text == "[":
                 return ParseList();
 
             case TokenKind.Punctuation when token.Text == "{":
-            {
-                Advance();
-                if (_current.IsPunctuation("}"))
                 {
-                    SourceSpan braceSpan = token.Span.To(_current.Span);
                     Advance();
-                    return new AtomTerm("{}", braceSpan);
-                }
+                    if (_current.IsPunctuation("}"))
+                    {
+                        SourceSpan braceSpan = token.Span.To(_current.Span);
+                        Advance();
+                        return new AtomTerm("{}", braceSpan);
+                    }
 
-                SyntaxTerm? inner = ParseTerm(MaxTermPriority, out _);
-                if (inner is null)
-                {
-                    return null;
-                }
+                    SyntaxTerm? inner = ParseTerm(MaxTermPriority, out _);
+                    if (inner is null)
+                    {
+                        return null;
+                    }
 
-                SourceSpan span = token.Span.To(_current.Span);
-                return Expect("}") ? new CompoundTerm("{}", [inner], span) : null;
-            }
+                    SourceSpan span = token.Span.To(_current.Span);
+                    return Expect("}") ? new CompoundTerm("{}", [inner], span) : null;
+                }
 
             default:
                 Report(DiagnosticIds.UnexpectedToken, $"Expected a term but found {Describe(token)}.", token.Span);

@@ -77,7 +77,23 @@ internal static class CompiledConformanceSourceGenerator
     internal static string GenerateStrictIsoSmoke()
     {
         var compiled = CompiledProgramEmitter.Generate(
-            [("strict-native.pl", "answer(42).\nnamed_write :- write_term(f(X), [variable_names(['X'=X])]).")],
+            [
+                (
+                    "strict-native.pl",
+                    """
+                    :- module(strict_native).
+                    :- export([answer/1, named_write/0, module_clause/1, cross_back/0]).
+                    :- end_module(strict_native).
+                    :- body(strict_native).
+                    answer(42).
+                    named_write :- write_term(f(X), [variable_names(['X'=X])]).
+                    local(ok).
+                    module_clause(X) :- clause(local(X), true).
+                    cross_back :- runtime_native:probe(42).
+                    :- end_body(strict_native).
+                    """
+                ),
+            ],
             "__StrictCompiled",
             [],
             DotProlog.Runtime.PrologLanguageMode.StrictIso,
@@ -129,20 +145,44 @@ internal static class CompiledConformanceSourceGenerator
                         return 2;
                     }
 
+                    if (!host.Prove(
+                        host.Bind("module_clause", 1),
+                        global::DotProlog.Runtime.PrologInput.Atom("ok")))
+                    {
+                        return 3;
+                    }
+
+                    global::DotProlog.Compiler.LoadResult runtimeModule = engine.ConsultText(
+                        ":- module(runtime_native).\n"
+                            + ":- export(probe/1).\n"
+                            + ":- end_module(runtime_native).\n"
+                            + ":- body(runtime_native).\n"
+                            + ":- import(strict_native, answer/1).\n"
+                            + "probe(X) :- answer(X).\n"
+                            + ":- end_body(runtime_native).\n",
+                        "runtime-native-module.pl");
+                    if (!runtimeModule.Success
+                        || engine.RunGoal("runtime_native:probe(42)", out _)
+                            != global::DotProlog.Runtime.RunResult.Success
+                        || !host.Prove(host.Bind("cross_back", 0)))
+                    {
+                        return 4;
+                    }
+
                     global::DotProlog.Compiler.LoadResult rejected =
                         engine.ConsultText("bad :- member(a, [a]).", "strict-runtime.pl");
                     if (rejected.Success
                         || !rejected.Diagnostics.Any(diagnostic =>
                             diagnostic.Id == global::DotProlog.Compiler.CompilerDiagnosticIds.StrictIsoViolation))
                     {
-                        return 3;
+                        return 5;
                     }
 
                     global::DotProlog.Compiler.LoadResult operatorRejected =
                         engine.ConsultText("bad :- a := b.", "strict-operator-runtime.pl");
                     if (operatorRejected.Success)
                     {
-                        return 4;
+                        return 6;
                     }
 
                     global::System.Console.WriteLine("strict-iso-native: passed");
