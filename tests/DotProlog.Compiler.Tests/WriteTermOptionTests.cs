@@ -39,6 +39,30 @@ public sealed class WriteTermOptionTests : IDisposable
         );
     }
 
+    [Theory]
+    [InlineData("write_term(f(X, X, Y), [variable_names(['First'=X, 'Second'=Y])])", "f(First,First,Second)")]
+    [InlineData("write_term(f(X), [variable_names([first=X, second=X])])", "f(first)")]
+    [InlineData("write_term(f(X, Y), [variable_names([x=X])])", "f(x,_G")]
+    [InlineData("write_term(f(X), [quoted(true), variable_names(['Hello world'=X])])", "f(Hello world)")]
+    public void VariableNamesWritesMappedVariables(string goal, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        var actual = PrologTestHost.RunGoal(goal);
+
+        if (expected.EndsWith("_G", StringComparison.Ordinal))
+        {
+            Assert.StartsWith(expected, actual, StringComparison.Ordinal);
+            Assert.EndsWith(")", actual, StringComparison.Ordinal);
+            return;
+        }
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void RightmostVariableNamesOptionWins() =>
+        Assert.Equal("second", PrologTestHost.RunGoal("write_term(X, [variable_names([first=X]), variable_names([second=X])])"));
+
     [Fact]
     public void WriteTermThreeWritesToTheSelectedStream()
     {
@@ -59,10 +83,30 @@ public sealed class WriteTermOptionTests : IDisposable
     [InlineData("write_term(x, [quoted(on)])", "domain_error(write_option,quoted(on))")]
     [InlineData("write_term(x, [ignore_ops(1)])", "domain_error(write_option,ignore_ops(1))")]
     [InlineData("write_term(x, [numbervars(off)])", "domain_error(write_option,numbervars(off))")]
+    [InlineData("write_term(x, [unknown(_)])", "domain_error(write_option,unknown(_G")]
+    [InlineData("write_term(x, [variable_names(_)])", "instantiation_error")]
+    [InlineData("write_term(x, [variable_names([_])])", "instantiation_error")]
+    [InlineData("write_term(x, [variable_names([_=X])])", "instantiation_error")]
+    [InlineData("write_term(x, [variable_names([1=X])])", "domain_error(write_option,variable_names([1=_G")]
+    [InlineData("write_term(x, [variable_names([name])])", "domain_error(write_option,variable_names([name]))")]
+    [InlineData("write_term(x, [variable_names(not_a_list)])", "domain_error(write_option,variable_names(not_a_list))")]
+    [InlineData("write_term(x, [variable_names([name=x|tail])])", "domain_error(write_option,variable_names([name=x|tail]))")]
     [InlineData("write_term(user_input, x, [])", "permission_error(output,stream,user_input)")]
     [InlineData("write_term(_, x, [])", "instantiation_error")]
-    public void ReportsIsoWriteOptionAndStreamErrors(string goal, string expected) =>
-        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+    public void ReportsIsoWriteOptionAndStreamErrors(string goal, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        var actual = PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))");
+
+        if (expected.EndsWith("_G", StringComparison.Ordinal))
+        {
+            Assert.StartsWith(expected, actual, StringComparison.Ordinal);
+            Assert.EndsWith("))", actual, StringComparison.Ordinal);
+            return;
+        }
+
+        Assert.Equal(expected, actual);
+    }
 
     [Theory]
     [InlineData("write_term(_, x, atom)", "instantiation_error")]

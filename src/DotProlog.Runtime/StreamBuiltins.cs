@@ -317,6 +317,11 @@ internal static class StreamBuiltins
             Cell value = machine.Dereference(machine.HeapAt(option.Index + 1));
             var name = machine.Symbols.AtomName(functor.NameAtom);
 
+            if (name is not ("alias" or "type" or "reposition" or "eof_action"))
+            {
+                throw PrologErrors.Domain(machine, "stream_option", option);
+            }
+
             if (value.Tag == CellTag.Reference)
             {
                 throw PrologErrors.Instantiation(machine);
@@ -385,14 +390,19 @@ internal static class StreamBuiltins
 
             Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(option.Index).Index);
             Cell value = machine.Dereference(machine.HeapAt(option.Index + 1));
+            var name = machine.Symbols.AtomName(functor.NameAtom);
+            if (name != "force")
+            {
+                throw PrologErrors.Domain(machine, "close_option", option);
+            }
+
             if (value.Tag == CellTag.Reference)
             {
                 throw PrologErrors.Instantiation(machine);
             }
 
-            var name = machine.Symbols.AtomName(functor.NameAtom);
             var atom = value.Tag == CellTag.Atom ? machine.Symbols.AtomName(value.Index) : string.Empty;
-            if (name != "force" || atom is not ("true" or "false"))
+            if (atom is not ("true" or "false"))
             {
                 throw PrologErrors.Domain(machine, "close_option", option);
             }
@@ -1124,13 +1134,14 @@ internal static class StreamBuiltins
         GuardIo(
             machine,
             () =>
-                TermWriter.Write(
+                TermWriter.WriteWithVariableNames(
                     machine,
                     machine.Argument(term),
                     target.Writer!,
                     selected.Quoted,
                     selected.IgnoreOperators,
-                    selected.NumberVariables
+                    selected.NumberVariables,
+                    selected.VariableNames
                 )
         );
         return true;
@@ -1154,7 +1165,20 @@ internal static class StreamBuiltins
             }
 
             Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(option.Index).Index);
+            var name = machine.Symbols.AtomName(functor.NameAtom);
             Cell value = machine.Dereference(machine.HeapAt(option.Index + 1));
+
+            if (name == "variable_names")
+            {
+                selected = selected with { Names = ReadVariableNames(machine, option, value) };
+                continue;
+            }
+
+            if (name is not ("quoted" or "ignore_ops" or "numbervars"))
+            {
+                throw PrologErrors.Domain(machine, "write_option", option);
+            }
+
             if (value.Tag == CellTag.Reference)
             {
                 throw PrologErrors.Instantiation(machine);
@@ -1167,7 +1191,7 @@ internal static class StreamBuiltins
             }
 
             var enabled = atom == "true";
-            selected = machine.Symbols.AtomName(functor.NameAtom) switch
+            selected = name switch
             {
                 "quoted" => selected with { Quoted = enabled },
                 "ignore_ops" => selected with { IgnoreOperators = enabled },
@@ -1179,7 +1203,71 @@ internal static class StreamBuiltins
         return selected;
     }
 
-    private readonly record struct WriteOptions(bool Quoted = false, bool IgnoreOperators = false, bool NumberVariables = false);
+    private static List<TermWriter.NamedVariable> ReadVariableNames(Machine machine, Cell option, Cell names)
+    {
+        if (names.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        List<Cell> elements = [];
+        Cell tail = TermList.Read(machine, names, elements);
+        if (tail.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        if (!TermList.IsEmpty(machine, tail))
+        {
+            throw PrologErrors.Domain(machine, "write_option", option);
+        }
+
+        List<TermWriter.NamedVariable> result = [];
+        foreach (Cell element in elements)
+        {
+            Cell pair = machine.Dereference(element);
+            if (pair.Tag == CellTag.Reference)
+            {
+                throw PrologErrors.Instantiation(machine);
+            }
+
+            if (pair.Tag != CellTag.Structure)
+            {
+                throw PrologErrors.Domain(machine, "write_option", option);
+            }
+
+            Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(pair.Index).Index);
+            if (functor.Arity != 2 || machine.Symbols.AtomName(functor.NameAtom) != "=")
+            {
+                throw PrologErrors.Domain(machine, "write_option", option);
+            }
+
+            Cell name = machine.Dereference(machine.HeapAt(pair.Index + 1));
+            if (name.Tag == CellTag.Reference)
+            {
+                throw PrologErrors.Instantiation(machine);
+            }
+
+            if (name.Tag != CellTag.Atom)
+            {
+                throw PrologErrors.Domain(machine, "write_option", option);
+            }
+
+            result.Add(new TermWriter.NamedVariable(machine.Symbols.AtomName(name.Index), machine.HeapAt(pair.Index + 2)));
+        }
+
+        return result;
+    }
+
+    private readonly record struct WriteOptions(
+        bool Quoted = false,
+        bool IgnoreOperators = false,
+        bool NumberVariables = false,
+        List<TermWriter.NamedVariable>? Names = null
+    )
+    {
+        internal IReadOnlyList<TermWriter.NamedVariable> VariableNames => Names ?? [];
+    }
 
     private static bool WriteLine(Machine machine)
     {

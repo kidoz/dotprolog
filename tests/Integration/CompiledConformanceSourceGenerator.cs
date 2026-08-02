@@ -77,7 +77,7 @@ internal static class CompiledConformanceSourceGenerator
     internal static string GenerateStrictIsoSmoke()
     {
         var compiled = CompiledProgramEmitter.Generate(
-            [("strict-native.pl", "answer(42).")],
+            [("strict-native.pl", "answer(42).\nnamed_write :- write_term(f(X), [variable_names(['X'=X])]).")],
             "__StrictCompiled",
             [],
             DotProlog.Runtime.PrologLanguageMode.StrictIso,
@@ -97,13 +97,24 @@ internal static class CompiledConformanceSourceGenerator
             {
                 internal static int Run()
                 {
+                    var output = new global::System.IO.StringWriter(
+                        global::System.Globalization.CultureInfo.InvariantCulture);
                     var engine = new global::DotProlog.Compiler.PrologEngine(
-                        global::DotProlog.Runtime.PrologLanguageMode.StrictIso);
+                        global::DotProlog.Runtime.PrologLanguageMode.StrictIso)
+                    {
+                        Output = output,
+                    };
                     __StrictCompiled.Install(engine);
                     var host = new global::DotProlog.Runtime.PrologHost(engine.Machine);
                     if (!host.Prove(host.Bind("answer", 1), global::DotProlog.Runtime.PrologInput.Integer(42)))
                     {
                         return 1;
+                    }
+
+                    if (!host.Prove(host.Bind("named_write", 0))
+                        || output.ToString() != "f(X)")
+                    {
+                        return 2;
                     }
 
                     global::DotProlog.Compiler.LoadResult rejected =
@@ -112,7 +123,7 @@ internal static class CompiledConformanceSourceGenerator
                         || !rejected.Diagnostics.Any(diagnostic =>
                             diagnostic.Id == global::DotProlog.Compiler.CompilerDiagnosticIds.StrictIsoViolation))
                     {
-                        return 2;
+                        return 3;
                     }
 
                     global::System.Console.WriteLine("strict-iso-native: passed");

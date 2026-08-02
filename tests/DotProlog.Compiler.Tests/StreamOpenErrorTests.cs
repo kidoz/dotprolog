@@ -51,6 +51,18 @@ public sealed class StreamOpenErrorTests : IDisposable
         Assert.Empty(Directory.EnumerateFileSystemEntries(_directory));
     }
 
+    [Fact]
+    public void UnknownOpenOptionWithAVariableComponentIsADomainError()
+    {
+        Assert.Equal(
+            "yes",
+            PrologTestHost.RunGoal(
+                "catch(open(file, write, _, [unknown(_)]), " + "error(domain_error(stream_option, unknown(_)), _), write(yes))"
+            )
+        );
+        Assert.Empty(Directory.EnumerateFileSystemEntries(_directory));
+    }
+
     [Theory]
     [InlineData("read")]
     [InlineData("write")]

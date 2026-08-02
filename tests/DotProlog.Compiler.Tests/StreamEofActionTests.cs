@@ -169,6 +169,15 @@ public sealed class StreamEofActionTests : IDisposable
     public void ReportsCloseOptionErrors(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
 
+    [Fact]
+    public void UnknownCloseOptionWithAVariableComponentIsADomainError() =>
+        Assert.Equal(
+            "yes",
+            PrologTestHost.RunGoal(
+                "catch(close(user_output, [unknown(_)]), " + "error(domain_error(close_option, unknown(_)), _), write(yes))"
+            )
+        );
+
     [Theory]
     [InlineData("close(_, atom)", "instantiation_error")]
     [InlineData("close(no_such_stream, [_])", "instantiation_error")]

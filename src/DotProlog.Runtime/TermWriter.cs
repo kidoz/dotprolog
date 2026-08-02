@@ -52,6 +52,37 @@ public static class TermWriter
         ArgumentNullException.ThrowIfNull(machine);
         ArgumentNullException.ThrowIfNull(output);
 
+        WriteCore(machine, term, output, quoted, ignoreOperators, numberVariables, variableNames: null);
+    }
+
+    /// <summary>Writes a term using the ISO <c>variable_names/1</c> write option.</summary>
+    internal static void WriteWithVariableNames(
+        Machine machine,
+        Cell term,
+        TextWriter output,
+        bool quoted,
+        bool ignoreOperators,
+        bool numberVariables,
+        IReadOnlyList<NamedVariable> variableNames
+    )
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+        ArgumentNullException.ThrowIfNull(output);
+        ArgumentNullException.ThrowIfNull(variableNames);
+
+        WriteCore(machine, term, output, quoted, ignoreOperators, numberVariables, variableNames);
+    }
+
+    private static void WriteCore(
+        Machine machine,
+        Cell term,
+        TextWriter output,
+        bool quoted,
+        bool ignoreOperators,
+        bool numberVariables,
+        IReadOnlyList<NamedVariable>? variableNames
+    )
+    {
         var writer = new Emitter(output);
         List<Item> work = [Item.OfTerm(term, TopPriority)];
         HashSet<int> active = [];
@@ -80,7 +111,17 @@ public static class TermWriter
                     break;
 
                 default:
-                    WriteTerm(machine, item, output: writer, quoted, ignoreOperators, numberVariables, work, active);
+                    WriteTerm(
+                        machine,
+                        item,
+                        output: writer,
+                        quoted,
+                        ignoreOperators,
+                        numberVariables,
+                        variableNames,
+                        work,
+                        active
+                    );
                     break;
             }
         }
@@ -112,6 +153,7 @@ public static class TermWriter
         bool quoted,
         bool ignoreOperators,
         bool numberVariables,
+        IReadOnlyList<NamedVariable>? variableNames,
         List<Item> work,
         HashSet<int> active
     )
@@ -121,6 +163,11 @@ public static class TermWriter
         switch (cell.Tag)
         {
             case CellTag.Reference:
+                if (TryWriteNamedVariable(machine, cell, variableNames, output))
+                {
+                    return;
+                }
+
                 output.Write($"_G{cell.Index.ToString(CultureInfo.InvariantCulture)}");
                 return;
 
@@ -201,6 +248,30 @@ public static class TermWriter
                 work.Add(Item.OfText(","));
             }
         }
+    }
+
+    private static bool TryWriteNamedVariable(
+        Machine machine,
+        Cell variable,
+        IReadOnlyList<NamedVariable>? variableNames,
+        Emitter output
+    )
+    {
+        if (variableNames is null)
+        {
+            return false;
+        }
+
+        foreach (NamedVariable named in variableNames)
+        {
+            if (TermOrder.AreIdentical(machine, variable, named.Term))
+            {
+                output.Write(named.Name);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool TryWriteNumberVariable(Machine machine, Cell cell, Functor functor, Emitter output)
@@ -532,6 +603,8 @@ public static class TermWriter
         PrefixGuard,
         Leave,
     }
+
+    internal readonly record struct NamedVariable(string Name, Cell Term);
 
     private readonly record struct Item(ItemKind Kind, Cell Cell, string? Literal, int MaxPriority)
     {
