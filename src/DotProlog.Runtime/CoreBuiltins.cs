@@ -115,6 +115,12 @@ public static class CoreBuiltins
         );
         registry.Register("$validate_partial_list", 1, ValidatePartialList);
         registry.Register("$validate_proper_list", 1, ValidateProperList);
+        registry.Register("$validate_terminal_sequence", 1, ValidateTerminalSequence);
+        registry.Register(
+            "$grammar_soft_cut",
+            0,
+            static machine => machine.Program.LanguageMode != PrologLanguageMode.StrictIso
+        );
 
         // Records where a host query's variables live, so each solution can be read back. The engine
         // compiles '$bindings'(v(V1, ..., Vn)) as the first goal of a query it was handed.
@@ -229,6 +235,20 @@ public static class CoreBuiltins
     {
         _ = TermList.ReadProper(machine, machine.Argument(0));
         return true;
+    }
+
+    /// <summary>
+    /// Accepts a proper or partial terminal sequence and uses the Part 3 type name for any other tail.
+    /// </summary>
+    private static bool ValidateTerminalSequence(Machine machine)
+    {
+        Cell sequence = machine.Argument(0);
+        List<Cell> elements = [];
+        Cell tail = TermList.Read(machine, sequence, elements);
+
+        return TermList.IsEmpty(machine, tail) || tail.Tag == CellTag.Reference
+            ? true
+            : throw PrologErrors.Type(machine, "terminal_sequence", sequence);
     }
 
     /// <summary>

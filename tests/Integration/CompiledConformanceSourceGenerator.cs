@@ -222,6 +222,14 @@ internal static class CompiledConformanceSourceGenerator
                         return 5;
                     }
 
+                    // A grammar body assembled at run time goes through the library phrase/3
+                    // expander, including the Part 3 barred-alternative control construct.
+                    if (engine.RunGoal("Body = ([a] | [b]), phrase(Body, [b])", out _)
+                        != global::DotProlog.Runtime.RunResult.Success)
+                    {
+                        return 6;
+                    }
+
                     // A load unit that opts out governs only itself.
                     global::DotProlog.Compiler.LoadResult scoped =
                         engine.ConsultText(
@@ -233,7 +241,7 @@ internal static class CompiledConformanceSourceGenerator
                         || engine.RunGoal("current_prolog_flag(double_quotes, chars)", out _)
                             != global::DotProlog.Runtime.RunResult.Success)
                     {
-                        return 6;
+                        return 7;
                     }
 
                     // Generated code refuses an engine built in a different mode.
@@ -241,7 +249,7 @@ internal static class CompiledConformanceSourceGenerator
                     try
                     {
                         __ModernCompiled.Install(extended);
-                        return 7;
+                        return 8;
                     }
                     catch (global::DotProlog.Runtime.PrologException)
                     {

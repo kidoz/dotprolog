@@ -273,31 +273,57 @@ internal static class StandardLibrary
             '$read_from_atom'(Text, Term, Options).
 
         % --- Grammars ---------------------------------------------------------------
-        % A grammar rule is translated into an ordinary clause when it is loaded, so
-        % phrase/2,3 only has to supply the two list arguments. It walks the control
-        % constructs itself because a body built at run time was never translated.
+        % A grammar rule is translated into an ordinary clause when it is loaded. A body built at
+        % run time is first expanded into one ordinary goal and then meta-called once. Building the
+        % complete goal before calling it keeps grammar cuts transparent within that body, matching
+        % the scope of cuts emitted by the static translator.
 
-        phrase(Body, List) :- '$validate_partial_list'(List), phrase(Body, List, []).
+        phrase(Body, List) :- '$validate_terminal_sequence'(List), phrase(Body, List, []).
 
-        phrase(Body, List, Rest) :- '$phrase'(Body, List, Rest).
+        % Rest is unified only after the grammar body has completed. Keeping the body's
+        % output argument fresh makes phrase/3 steadfast when Rest is already instantiated.
+        phrase(Body, List, Rest) :-
+            '$phrase_goal'(Body, List, ActualRest, Goal),
+            call(Goal),
+            Rest = ActualRest.
 
-        '$phrase'(Body, _, _) :- var(Body), !, throw(error(instantiation_error, phrase/3)).
-        '$phrase'((A, B), S0, S) :- !, '$phrase'(A, S0, S1), '$phrase'(B, S1, S).
+        '$phrase_goal'(Body, _, _, _) :- var(Body), !, throw(error(instantiation_error, phrase/3)).
+        '$phrase_goal'((A, B), S0, S, (GA, GB)) :- !,
+            '$phrase_goal'(A, S0, S1, GA),
+            '$phrase_goal'(B, S1, S, GB).
         % An if-then-else is one construct, not a disjunction of two goals, so it is matched
         % before the plain (A ; B) clause can split it.
-        '$phrase'((C -> T ; E), S0, S) :- !,
-            ( '$phrase'(C, S0, S1) -> '$phrase'(T, S1, S) ; '$phrase'(E, S0, S) ).
-        '$phrase'((C *-> T ; E), S0, S) :- !,
-            ( '$phrase'(C, S0, S1) *-> '$phrase'(T, S1, S) ; '$phrase'(E, S0, S) ).
-        '$phrase'((A ; B), S0, S) :- !, ( '$phrase'(A, S0, S) ; '$phrase'(B, S0, S) ).
-        '$phrase'((A -> B), S0, S) :- !, ( '$phrase'(A, S0, S1) -> '$phrase'(B, S1, S) ).
-        '$phrase'((A *-> B), S0, S) :- !, ( '$phrase'(A, S0, S1) *-> '$phrase'(B, S1, S) ).
-        '$phrase'(\+ A, S0, S) :- !, \+ '$phrase'(A, S0, _), S = S0.
-        '$phrase'(!, S, S) :- !.
-        '$phrase'({Goal}, S, S) :- !, call(Goal).
-        '$phrase'([], S, S) :- !.
-        '$phrase'([H|T], S0, S) :- !, '$validate_proper_list'([H|T]), append([H|T], S, S0).
-        '$phrase'(Body, S0, S) :- '$add_args'(Body, [S0, S], Goal), call(Goal).
+        '$phrase_goal'((C -> T ; E), S0, S, (GC -> GT ; GE)) :- !,
+            '$phrase_goal'(C, S0, S1, GC),
+            '$phrase_goal'(T, S1, S, GT),
+            '$phrase_goal'(E, S0, S, GE).
+        '$phrase_goal'((C *-> T ; E), S0, S, (GC *-> GT ; GE)) :- '$grammar_soft_cut', !,
+            '$phrase_goal'(C, S0, S1, GC),
+            '$phrase_goal'(T, S1, S, GT),
+            '$phrase_goal'(E, S0, S, GE).
+        '$phrase_goal'((A ; B), S0, S, (GA ; GB)) :- !,
+            '$phrase_goal'(A, S0, S, GA),
+            '$phrase_goal'(B, S0, S, GB).
+        '$phrase_goal'((A | B), S0, S, (GA ; GB)) :- !,
+            '$phrase_goal'(A, S0, S, GA),
+            '$phrase_goal'(B, S0, S, GB).
+        '$phrase_goal'((A -> B), S0, S, (GA -> GB)) :- !,
+            '$phrase_goal'(A, S0, S1, GA),
+            '$phrase_goal'(B, S1, S, GB).
+        '$phrase_goal'((A *-> B), S0, S, (GA *-> GB)) :- '$grammar_soft_cut', !,
+            '$phrase_goal'(A, S0, S1, GA),
+            '$phrase_goal'(B, S1, S, GB).
+        '$phrase_goal'(\+ A, S0, S, (\+ GA, S = S0)) :- !, '$phrase_goal'(A, S0, _, GA).
+        '$phrase_goal'(!, S0, S, (!, S0 = S)) :- !.
+        '$phrase_goal'({Goal}, S0, S, (Goal, S0 = S)) :- !.
+        '$phrase_goal'([], S0, S, S0 = S) :- !.
+        '$phrase_goal'([H|T], S0, S, S0 = Terminals) :- !,
+            '$validate_proper_list'([H|T]),
+            '$terminal_sequence'([H|T], S, Terminals).
+        '$phrase_goal'(Body, S0, S, Goal) :- '$add_args'(Body, [S0, S], Goal).
+
+        '$terminal_sequence'([], Tail, Tail).
+        '$terminal_sequence'([H|T], Tail, [H|R]) :- '$terminal_sequence'(T, Tail, R).
 
         % --- bagof/3 and setof/3 ---------------------------------------------------
         % Unlike findall/3 these fail when the goal has no solutions, and they group

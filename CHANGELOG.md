@@ -6,6 +6,14 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Runtime-built DCG bodies are expanded into one goal before execution, so `|` alternatives and
+  grammar or embedded cuts have the same behavior as statically translated grammar rules.
+- `phrase/3` is steadfast in its third argument, and strict mode treats a runtime-built soft cut as
+  an ordinary nonterminal just as it does in static grammar rules.
+- `phrase/2` reports the Part 3 `terminal_sequence` type for an invalid input sequence.
+
 ## [0.4.0] — 2026-08-02
 
 A linting release. `dotnet prolog lint` reads source and reports on it without consulting it or

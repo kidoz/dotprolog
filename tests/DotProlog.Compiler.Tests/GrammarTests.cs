@@ -22,6 +22,7 @@ public sealed class GrammarTests
         nothing --> [].
         two --> [a, b].
         either --> [a] ; [b].
+        barred --> [a] | [b].
         optional(X) --> ( [X] -> [] ; { X = none } ).
         not_x --> \+ [x], [_].
         greedy([H|T]) --> [H], !, greedy(T).
@@ -42,6 +43,8 @@ public sealed class GrammarTests
     [InlineData("phrase(two, [a, b])")]
     [InlineData("phrase(either, [a])")]
     [InlineData("phrase(either, [b])")]
+    [InlineData("phrase(barred, [a])")]
+    [InlineData("phrase(barred, [b])")]
     [InlineData("phrase(not_x, [y])")]
     public void Accepts(string goal) => Assert.Equal("yes", Run($"( {goal} -> write(yes) ; write(no) )"));
 
@@ -175,6 +178,34 @@ public sealed class GrammarTests
         Assert.Equal("yes", Run("Body = ([hello], name), ( phrase(Body, [hello, world]) -> write(yes) ; write(no) )"));
 
     [Fact]
+    public void PhraseWalksBarredAlternativesInABodyBuiltAtRunTime() =>
+        Assert.Equal("[[a],[b]]", Run("Body = ([a] | [b]), findall(Input, phrase(Body, Input), Inputs), write(Inputs)"));
+
+    [Fact]
+    public void RunTimeTerminalExpansionDoesNotDependOnAUserAppendPredicate() =>
+        Assert.Equal(
+            "yes",
+            PrologTestHost.Run(
+                """
+                append(_, _, broken).
+                :- initialization(( phrase([a], [a]) -> write(yes) ; write(no) )).
+                """
+            )
+        );
+
+    [Theory]
+    [InlineData("!", "grammar")]
+    [InlineData("{ ! }", "embedded")]
+    public void ARunTimeGrammarCutCommitsWithinTheExpandedBody(string cut, string expected) =>
+        Assert.Equal(
+            $"[{expected}]",
+            Run(
+                $"Body = (([a], {cut}, {{X = {expected}}}) ; ([a], {{X = fallback}})), "
+                    + "findall(X, phrase(Body, [a]), Xs), write(Xs)"
+            )
+        );
+
+    [Fact]
     public void PhraseTreatsARunTimeIfThenElseAsOneConstruct() =>
         // A disjunction reading would offer the else branch as a second solution.
         Assert.Equal("[then]", Run("findall(Y, phrase(({member(_, [1])} -> {Y = then} ; {Y = else}), [], []), L), write(L)"));
@@ -210,13 +241,23 @@ public sealed class GrammarTests
     [Theory]
     [InlineData("phrase([a|_], [a])", "instantiation_error")]
     [InlineData("phrase([a|tail], [a])", "type_error(list,[a|tail])")]
-    [InlineData("phrase([], not_a_list)", "type_error(list,not_a_list)")]
+    [InlineData("phrase([], not_a_list)", "type_error(terminal_sequence,not_a_list)")]
     public void PhraseReportsGrammarBodyAndPhraseTwoListErrors(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
 
     [Fact]
     public void PhraseThreeIsSteadfastInItsRemainder() =>
-        Assert.Equal("[[a,tail]]", Run("findall(Input, phrase([a], Input, [tail]), Inputs), write(Inputs)"));
+        Assert.Equal(
+            "no",
+            PrologTestHost.Run(
+                """
+                remainder_probe(_, Rest) :- ( Rest = wrong, ! ; Rest = [] ).
+                :- initialization((
+                    ( phrase(call(remainder_probe), [], []) -> write(yes) ; write(no) )
+                )).
+                """
+            )
+        );
 
     [Fact]
     public void GeneratedVariablesCannotCollideWithTheGrammarsOwn()

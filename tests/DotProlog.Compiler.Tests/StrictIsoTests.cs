@@ -228,6 +228,23 @@ public sealed class StrictIsoTests
     }
 
     [Fact]
+    public void StrictPartThreeTreatsRunTimeSoftCutAsANonTerminal()
+    {
+        var output = new StringWriter();
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output };
+        LoadResult loaded = engine.ConsultText(
+            """
+            '*->'(_, _, S, S).
+            :- initialization(( Body = (left *-> right), phrase(Body, []), write(yes) )).
+            """
+        );
+
+        Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("yes", output.ToString());
+    }
+
+    [Fact]
     public void StrictHostBindingRejectsAPredefinedExtension()
     {
         var engine = StrictEngine();
