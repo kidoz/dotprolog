@@ -16,18 +16,12 @@ internal static class CharacterConversionBuiltins
             "$current_char_conversion",
             3,
             static machine => CurrentCharConversionFirst(machine, Context(machine, 0).CharacterConversions, 1),
-            static (machine, state) => CurrentCharConversion(
-                machine,
-                Context(machine, 0).CharacterConversions,
-                1,
-                (int)(state >> 32),
-                (int)state
-            )
+            static (machine, state) =>
+                CurrentCharConversion(machine, Context(machine, 0).CharacterConversions, 1, (int)(state >> 32), (int)state)
         );
     }
 
-    private static bool CharConversion(Machine machine) =>
-        CharConversion(machine, machine.Program.CharacterConversions, 0);
+    private static bool CharConversion(Machine machine) => CharConversion(machine, machine.Program.CharacterConversions, 0);
 
     private static bool CharConversion(Machine machine, CharacterConversionTable conversions, int offset)
     {

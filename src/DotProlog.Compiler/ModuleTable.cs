@@ -171,10 +171,10 @@ public sealed class ModuleTable
         _imports.TryGetValue(importer, out Dictionary<PredicateIndicator, string>? map)
         && map.TryGetValue(predicate, out var from)
             ? from
-            : Catalog.TryGet(importer, out ModuleDefinition? definition)
-                && definition!.Imports.TryGetValue(ToRuntime(predicate), out string? catalogFrom)
-                    ? catalogFrom
-                    : null;
+        : Catalog.TryGet(importer, out ModuleDefinition? definition)
+        && definition!.Imports.TryGetValue(ToRuntime(predicate), out string? catalogFrom)
+            ? catalogFrom
+        : null;
 
     /// <summary>Follows reexports to the module that contains the procedure's clauses.</summary>
     public string? DefiningModuleOf(string importer, PredicateIndicator predicate)
@@ -298,8 +298,7 @@ public sealed class ModuleTable
     private static int[] RuntimeMetaArguments(string template) =>
         [.. template.Select(mode => mode == ':' ? 0 : OrdinaryArgument)];
 
-    private static PredicateIndicator ToCompiler(ModulePredicateIndicator indicator) =>
-        new(indicator.Name, indicator.Arity);
+    private static PredicateIndicator ToCompiler(ModulePredicateIndicator indicator) => new(indicator.Name, indicator.Arity);
 
     /// <summary>Records a procedure defined by a module.</summary>
     public void Define(string module, PredicateIndicator predicate) =>
@@ -376,8 +375,7 @@ public sealed class ModuleTable
     public static string QualifiedName(string module, string predicate) =>
         module == UserModule ? predicate : $"{module}:{predicate}";
 
-    private static ModulePredicateIndicator ToRuntime(PredicateIndicator predicate) =>
-        new(predicate.Name, predicate.Arity);
+    private static ModulePredicateIndicator ToRuntime(PredicateIndicator predicate) => new(predicate.Name, predicate.Arity);
 
     private readonly record struct MultifileKey(string Module, PredicateIndicator Predicate);
 }

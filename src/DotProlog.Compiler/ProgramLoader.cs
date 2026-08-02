@@ -182,13 +182,13 @@ public sealed class ProgramLoader
                 continue;
             }
 
-            SyntaxTerm resolvedDirective = forcedModule is not null
-                && goal is CompoundTerm { Name: "initialization", Arity: 1 } initializationGoal
-                ? initializationGoal with
-                {
-                    Arguments = [resolver.ResolveGoal(initializationGoal.Arguments[0])],
-                }
-                : resolver.ResolveGoal(goal);
+            SyntaxTerm resolvedDirective =
+                forcedModule is not null && goal is CompoundTerm { Name: "initialization", Arity: 1 } initializationGoal
+                    ? initializationGoal with
+                    {
+                        Arguments = [resolver.ResolveGoal(initializationGoal.Arguments[0])],
+                    }
+                    : resolver.ResolveGoal(goal);
             var address = CompileDirective(resolvedDirective, diagnostics, out var deferred, fileName, unitDefinitions);
             if (address < 0)
             {
@@ -296,7 +296,8 @@ public sealed class ProgramLoader
 
         var separator = compiledName.LastIndexOf(':');
         string name = separator >= 0 ? compiledName[(separator + 1)..] : compiledName;
-        ModulePredicateDefinition metadata = _modules.Catalog.Declare(module)
+        ModulePredicateDefinition metadata = _modules
+            .Catalog.Declare(module)
             .Predicate(new ModulePredicateIndicator(name, arity));
         metadata.AddStaticClause(term.Cells, root);
     }
@@ -329,7 +330,12 @@ public sealed class ProgramLoader
                         || marker.Arguments[0] is not AtomTerm name
                     )
                     {
-                        ReportInvalidIsoModuleText(diagnostics, "module/1 must start a named interface outside another interface or explicit body.", marker, fileName);
+                        ReportInvalidIsoModuleText(
+                            diagnostics,
+                            "module/1 must start a named interface outside another interface or explicit body.",
+                            marker,
+                            fileName
+                        );
                         continue;
                     }
 
@@ -340,7 +346,12 @@ public sealed class ProgramLoader
                         || (_modules.Catalog.TryGet(name.Name, out ModuleDefinition? existing) && existing!.InterfacePrepared)
                     )
                     {
-                        ReportInvalidIsoModuleText(diagnostics, $"The interface for module {name.Name} has already been prepared or follows its body.", marker, fileName);
+                        ReportInvalidIsoModuleText(
+                            diagnostics,
+                            $"The interface for module {name.Name} has already been prepared or follows its body.",
+                            marker,
+                            fileName
+                        );
                     }
 
                     currentInterface = new IsoInterface(name.Name, marker.Span);
@@ -357,7 +368,12 @@ public sealed class ProgramLoader
                         || name.Name != currentInterface.Module
                     )
                     {
-                        ReportInvalidIsoModuleText(diagnostics, "end_module/1 must match the open module interface.", marker, fileName);
+                        ReportInvalidIsoModuleText(
+                            diagnostics,
+                            "end_module/1 must match the open module interface.",
+                            marker,
+                            fileName
+                        );
                         continue;
                     }
 
@@ -380,16 +396,29 @@ public sealed class ProgramLoader
                         || marker.Arguments[0] is not AtomTerm name
                     )
                     {
-                        ReportInvalidIsoModuleText(diagnostics, "body/1 must start a named body outside an interface or body.", marker, fileName);
+                        ReportInvalidIsoModuleText(
+                            diagnostics,
+                            "body/1 must start a named body outside an interface or body.",
+                            marker,
+                            fileName
+                        );
                         continue;
                     }
 
                     if (
                         name.Name != ModuleTable.UserModule
-                        && (!_modules.Catalog.TryGet(name.Name, out ModuleDefinition? definition) || !definition!.InterfacePrepared)
+                        && (
+                            !_modules.Catalog.TryGet(name.Name, out ModuleDefinition? definition)
+                            || !definition!.InterfacePrepared
+                        )
                     )
                     {
-                        ReportInvalidIsoModuleText(diagnostics, $"Module {name.Name} has no prepared interface.", marker, fileName);
+                        ReportInvalidIsoModuleText(
+                            diagnostics,
+                            $"Module {name.Name} has no prepared interface.",
+                            marker,
+                            fileName
+                        );
                     }
 
                     if (currentBody is not null)
@@ -446,12 +475,22 @@ public sealed class ProgramLoader
 
         if (currentInterface is not null)
         {
-            ReportInvalidIsoModuleText(diagnostics, $"The interface for {currentInterface.Module} has no matching end_module/1.", currentInterface.Span, fileName);
+            ReportInvalidIsoModuleText(
+                diagnostics,
+                $"The interface for {currentInterface.Module} has no matching end_module/1.",
+                currentInterface.Span,
+                fileName
+            );
         }
 
         if (currentBody is not null && !currentBodyIsImplicitUser)
         {
-            ReportInvalidIsoModuleText(diagnostics, $"The body for {currentBody.Module} has no matching end_body/1.", currentBody.Span, fileName);
+            ReportInvalidIsoModuleText(
+                diagnostics,
+                $"The body for {currentBody.Module} has no matching end_body/1.",
+                currentBody.Span,
+                fileName
+            );
         }
 
         foreach (IsoInterface moduleInterface in interfaces)
@@ -524,7 +563,12 @@ public sealed class ProgramLoader
                         }
                         else
                         {
-                            ReportInvalidIsoModuleText(diagnostics, "reexport/1 expects a module atom or a list or sequence of module atoms.", item, fileName);
+                            ReportInvalidIsoModuleText(
+                                diagnostics,
+                                "reexport/1 expects a module atom or a list or sequence of module atoms.",
+                                item,
+                                fileName
+                            );
                         }
                     }
 
@@ -535,16 +579,22 @@ public sealed class ProgramLoader
                     break;
 
                 case CompoundTerm readerDirective
-                    when readerDirective is { Name: "op", Arity: 3 }
-                        or { Name: "char_conversion", Arity: 2 }
-                        or { Name: "set_prolog_flag", Arity: 2 }:
+                    when readerDirective
+                        is { Name: "op", Arity: 3 }
+                            or { Name: "char_conversion", Arity: 2 }
+                            or { Name: "set_prolog_flag", Arity: 2 }:
                     // These directives have already affected lexical preparation at their source
                     // position. Module-specific reader snapshots are installed by the reader seam.
                     ValidateIsoReaderDirective(readerDirective, diagnostics, fileName);
                     break;
 
                 default:
-                    ReportInvalidIsoModuleText(diagnostics, "This directive is not permitted in a module interface.", goal, fileName);
+                    ReportInvalidIsoModuleText(
+                        diagnostics,
+                        "This directive is not permitted in a module interface.",
+                        goal,
+                        fileName
+                    );
                     break;
             }
         }
@@ -567,7 +617,13 @@ public sealed class ProgramLoader
                 switch (candidate)
                 {
                     case AtomTerm atom:
-                        DefineIsoBodyPredicate(body.Module, new PredicateIndicator(atom.Name, 2), candidate, diagnostics, fileName);
+                        DefineIsoBodyPredicate(
+                            body.Module,
+                            new PredicateIndicator(atom.Name, 2),
+                            candidate,
+                            diagnostics,
+                            fileName
+                        );
                         break;
                     case CompoundTerm compound:
                         DefineIsoBodyPredicate(
@@ -604,7 +660,12 @@ public sealed class ProgramLoader
                 case AtomTerm atom:
                     if (IsPredefinedProcedure(new PredicateIndicator(atom.Name, 0)))
                     {
-                        ReportInvalidIsoModuleText(diagnostics, "A module clause cannot define a predefined procedure.", atom, fileName);
+                        ReportInvalidIsoModuleText(
+                            diagnostics,
+                            "A module clause cannot define a predefined procedure.",
+                            atom,
+                            fileName
+                        );
                         break;
                     }
 
@@ -684,7 +745,12 @@ public sealed class ProgramLoader
                         }
                         else
                         {
-                            ReportInvalidIsoModuleText(diagnostics, "import/1 expects a module atom or a list or sequence of module atoms.", item, fileName);
+                            ReportInvalidIsoModuleText(
+                                diagnostics,
+                                "import/1 expects a module atom or a list or sequence of module atoms.",
+                                item,
+                                fileName
+                            );
                         }
                     }
 
@@ -758,7 +824,12 @@ public sealed class ProgramLoader
 
             if (!_modules.TryImport(importer, indicator, source, out string? conflict))
             {
-                ReportInvalidIsoModuleText(diagnostics, $"{indicator} is already visible in {importer} from {conflict}.", item, fileName);
+                ReportInvalidIsoModuleText(
+                    diagnostics,
+                    $"{indicator} is already visible in {importer} from {conflict}.",
+                    item,
+                    fileName
+                );
             }
         }
     }
@@ -775,7 +846,12 @@ public sealed class ProgramLoader
         {
             if (!_modules.TryImport(importer, indicator, source, out string? conflict))
             {
-                ReportInvalidIsoModuleText(diagnostics, $"{indicator} is already visible in {importer} from {conflict}.", location, fileName);
+                ReportInvalidIsoModuleText(
+                    diagnostics,
+                    $"{indicator} is already visible in {importer} from {conflict}.",
+                    location,
+                    fileName
+                );
             }
         }
     }
@@ -815,7 +891,12 @@ public sealed class ProgramLoader
             {
                 if (specification.Arguments[index] is not AtomTerm mode || mode.Name is not (":" or "*"))
                 {
-                    ReportInvalidIsoModuleText(diagnostics, "ISO metapredicate modes are ':' or '*'.", specification.Arguments[index], fileName);
+                    ReportInvalidIsoModuleText(
+                        diagnostics,
+                        "ISO metapredicate modes are ':' or '*'.",
+                        specification.Arguments[index],
+                        fileName
+                    );
                     valid = false;
                     continue;
                 }
@@ -847,26 +928,16 @@ public sealed class ProgramLoader
         }
     }
 
-    private static void ValidateIsoReaderDirective(
-        CompoundTerm directive,
-        List<Diagnostic> diagnostics,
-        string? fileName
-    )
+    private static void ValidateIsoReaderDirective(CompoundTerm directive, List<Diagnostic> diagnostics, string? fileName)
     {
         bool valid = directive switch
         {
-            { Name: "op", Arguments: [IntegerTerm priority, AtomTerm type, var names] } =>
-                priority.Value is >= 0 and <= 1200
+            { Name: "op", Arguments: [IntegerTerm priority, AtomTerm type, var names] } => priority.Value is >= 0 and <= 1200
                 && type.Name is "xfx" or "xfy" or "yfx" or "fx" or "fy" or "xf" or "yf"
                 && OperatorNames(names).All(name => name is AtomTerm),
-            {
-                Name: "char_conversion",
-                Arguments: [AtomTerm input, AtomTerm output],
-            } => IsSingleCharacter(input) && IsSingleCharacter(output),
-            {
-                Name: "set_prolog_flag",
-                Arguments: [AtomTerm flag, AtomTerm value],
-            } => (flag.Name, value.Name) switch
+            { Name: "char_conversion", Arguments: [AtomTerm input, AtomTerm output] } => IsSingleCharacter(input)
+                && IsSingleCharacter(output),
+            { Name: "set_prolog_flag", Arguments: [AtomTerm flag, AtomTerm value] } => (flag.Name, value.Name) switch
             {
                 ("char_conversion", "on" or "off") => true,
                 ("debug", "on" or "off") => true,
@@ -917,8 +988,7 @@ public sealed class ProgramLoader
         }
 
         var functor = _program.Symbols.InternFunctor(indicator.Name, indicator.Arity);
-        return _program.Builtins.TryGetId(functor, out _)
-            || (_program.IsDefined(functor) && !_program.IsUserPredicate(functor));
+        return _program.Builtins.TryGetId(functor, out _) || (_program.IsDefined(functor) && !_program.IsUserPredicate(functor));
     }
 
     private static void ReportInvalidIsoModuleText(

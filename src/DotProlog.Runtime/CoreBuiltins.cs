@@ -116,11 +116,7 @@ public static class CoreBuiltins
         registry.Register("$validate_partial_list", 1, ValidatePartialList);
         registry.Register("$validate_proper_list", 1, ValidateProperList);
         registry.Register("$validate_terminal_sequence", 1, ValidateTerminalSequence);
-        registry.Register(
-            "$grammar_soft_cut",
-            0,
-            static machine => machine.Program.LanguageMode != PrologLanguageMode.StrictIso
-        );
+        registry.Register("$grammar_soft_cut", 0, static machine => machine.Program.LanguageMode != PrologLanguageMode.StrictIso);
 
         // Records where a host query's variables live, so each solution can be read back. The engine
         // compiles '$bindings'(v(V1, ..., Vn)) as the first goal of a query it was handed.
@@ -306,13 +302,13 @@ public static class CoreBuiltins
 
             var qualified = machine.Symbols.InternFunctor($"{prefix}:{atomGoalName}", 0);
             var plain = machine.Symbols.InternFunctor(atomGoalName, 0);
-            bool isoContext = machine.Program.Modules.TryGet(prefix, out ModuleDefinition? atomDefinition)
-                && atomDefinition!.InterfacePrepared;
+            bool isoContext =
+                machine.Program.Modules.TryGet(prefix, out ModuleDefinition? atomDefinition) && atomDefinition!.InterfacePrepared;
             return machine.Unify(
                 machine.Argument(2),
                 machine.Program.IsDefined(qualified)
-                    || machine.Program.IsDynamic(qualified)
-                    || (isoContext && !machine.Program.IsDefined(plain) && !machine.Program.Builtins.TryGetId(plain, out _))
+                || machine.Program.IsDynamic(qualified)
+                || (isoContext && !machine.Program.IsDefined(plain) && !machine.Program.Builtins.TryGetId(plain, out _))
                     ? Cell.Atom(machine.Symbols.GetFunctor(qualified).NameAtom)
                     : goal
             );
@@ -356,10 +352,7 @@ public static class CoreBuiltins
                 machine.Argument(2),
                 machine.CreateStructure(
                     machine.Symbols.InternFunctor("^", 2),
-                    [
-                        machine.HeapAt(goal.Index + 1),
-                        WithCallingContext(machine, module, machine.HeapAt(goal.Index + 2), colon),
-                    ]
+                    [machine.HeapAt(goal.Index + 1), WithCallingContext(machine, module, machine.HeapAt(goal.Index + 2), colon)]
                 )
             );
         }
@@ -405,12 +398,16 @@ public static class CoreBuiltins
         var target = machine.Symbols.InternFunctor($"{prefix}:{goalName}", functor.Arity);
 
         var plainTarget = machine.Symbols.InternFunctor(goalName, functor.Arity);
-        bool strictModuleContext = machine.Program.Modules.TryGet(prefix, out ModuleDefinition? targetModule)
-            && targetModule!.InterfacePrepared;
+        bool strictModuleContext =
+            machine.Program.Modules.TryGet(prefix, out ModuleDefinition? targetModule) && targetModule!.InterfacePrepared;
         if (
             !machine.Program.IsDefined(target)
             && !machine.Program.IsDynamic(target)
-            && (!strictModuleContext || machine.Program.IsDefined(plainTarget) || machine.Program.Builtins.TryGetId(plainTarget, out _))
+            && (
+                !strictModuleContext
+                || machine.Program.IsDefined(plainTarget)
+                || machine.Program.Builtins.TryGetId(plainTarget, out _)
+            )
         )
         {
             return machine.Unify(machine.Argument(2), goal);
@@ -450,9 +447,7 @@ public static class CoreBuiltins
     }
 
     private static Cell WithCallingContext(Machine machine, Cell module, Cell goal, int colonFunctor) =>
-        IsQualified(machine, goal, colonFunctor)
-            ? goal
-            : machine.CreateStructure(colonFunctor, [module, goal]);
+        IsQualified(machine, goal, colonFunctor) ? goal : machine.CreateStructure(colonFunctor, [module, goal]);
 
     private static ReadOnlySpan<int> MetaArgumentPositions(string name, int arity) =>
         (name, arity) switch
@@ -463,8 +458,19 @@ public static class CoreBuiltins
             ("catch", 3) => [0, 2],
             ("with_output_to", 2) => [1],
             ("call", >= 1 and <= 8) => [0],
-            ("maplist", >= 2 and <= 5) or ("foldl", 4 or 5) or ("include", 3) or ("exclude", 3)
-                or ("partition", 4) or ("predsort", 3) or ("phrase", 2 or 3) => [0],
+
+            ("maplist", >= 2 and <= 5)
+            or
+            ("foldl", 4 or 5)
+            or
+            ("include", 3)
+            or
+            ("exclude", 3)
+            or
+            ("partition", 4)
+            or
+            ("predsort", 3)
+            or ("phrase", 2 or 3) => [0],
             _ => [],
         };
 

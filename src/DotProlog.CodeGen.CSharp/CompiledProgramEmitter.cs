@@ -286,10 +286,22 @@ internal static class CompiledProgramEmitter
                     CultureInfo.InvariantCulture,
                     $"        global::DotProlog.Runtime.ModulePredicateDefinition {predicateVariable} = {variable}.Predicate(new global::DotProlog.Runtime.ModulePredicateIndicator({SyntaxFacts.Literal(predicate.Name)}, {predicate.Arity}));"
                 );
-                text.AppendLine(CultureInfo.InvariantCulture, $"        {predicateVariable}.Defined = {predicate.Defined.ToString().ToLowerInvariant()};");
-                text.AppendLine(CultureInfo.InvariantCulture, $"        {predicateVariable}.Exported = {predicate.Exported.ToString().ToLowerInvariant()};");
-                text.AppendLine(CultureInfo.InvariantCulture, $"        {predicateVariable}.Dynamic = {predicate.Dynamic.ToString().ToLowerInvariant()};");
-                text.AppendLine(CultureInfo.InvariantCulture, $"        {predicateVariable}.Multifile = {predicate.Multifile.ToString().ToLowerInvariant()};");
+                text.AppendLine(
+                    CultureInfo.InvariantCulture,
+                    $"        {predicateVariable}.Defined = {predicate.Defined.ToString().ToLowerInvariant()};"
+                );
+                text.AppendLine(
+                    CultureInfo.InvariantCulture,
+                    $"        {predicateVariable}.Exported = {predicate.Exported.ToString().ToLowerInvariant()};"
+                );
+                text.AppendLine(
+                    CultureInfo.InvariantCulture,
+                    $"        {predicateVariable}.Dynamic = {predicate.Dynamic.ToString().ToLowerInvariant()};"
+                );
+                text.AppendLine(
+                    CultureInfo.InvariantCulture,
+                    $"        {predicateVariable}.Multifile = {predicate.Multifile.ToString().ToLowerInvariant()};"
+                );
                 if (predicate.MetapredicateTemplate is not null)
                 {
                     text.AppendLine(
@@ -498,7 +510,7 @@ internal static class CompiledProgramEmitter
             Dictionary<Cell, int> termConstants = [];
             var code = program.Code;
 
-            for (var address = codeStart; address < program.CodeLength;)
+            for (var address = codeStart; address < program.CodeLength; )
             {
                 var opCode = (OpCode)code[address];
                 var operands = OperandCount(opCode);
@@ -530,23 +542,23 @@ internal static class CompiledProgramEmitter
                         break;
 
                     case OpCode.CallBuiltin:
+                    {
+                        var display = program.Builtins.NameOf(instruction.First);
+                        var slash = display.LastIndexOf('/');
+                        var name = display[..slash];
+                        var arity = int.Parse(display.AsSpan(slash + 1), CultureInfo.InvariantCulture);
+                        var functorId = program.Symbols.InternFunctor(name, arity);
+                        var functor = AddFunctor(program, model, functors, functorId);
+                        if (!builtins.TryGetValue(instruction.First, out var reference))
                         {
-                            var display = program.Builtins.NameOf(instruction.First);
-                            var slash = display.LastIndexOf('/');
-                            var name = display[..slash];
-                            var arity = int.Parse(display.AsSpan(slash + 1), CultureInfo.InvariantCulture);
-                            var functorId = program.Symbols.InternFunctor(name, arity);
-                            var functor = AddFunctor(program, model, functors, functorId);
-                            if (!builtins.TryGetValue(instruction.First, out var reference))
-                            {
-                                reference = model.Builtins.Count;
-                                builtins[instruction.First] = reference;
-                                model.Builtins.Add(functor);
-                            }
-
-                            instruction.FirstReference = reference;
-                            break;
+                            reference = model.Builtins.Count;
+                            builtins[instruction.First] = reference;
+                            model.Builtins.Add(functor);
                         }
+
+                        instruction.FirstReference = reference;
+                        break;
+                    }
 
                     case OpCode.GetConstant:
                     case OpCode.UnifyConstant:
@@ -658,9 +670,8 @@ internal static class CompiledProgramEmitter
                 List<CompiledModulePredicate> predicates = [];
                 foreach (ModulePredicateDefinition predicate in module.Predicates)
                 {
-                    string compiledName = module.Name == "user"
-                        ? predicate.Indicator.Name
-                        : $"{module.Name}:{predicate.Indicator.Name}";
+                    string compiledName =
+                        module.Name == "user" ? predicate.Indicator.Name : $"{module.Name}:{predicate.Indicator.Name}";
                     int functor = program.Symbols.InternFunctor(compiledName, predicate.Indicator.Arity);
                     if (predicate.Defined && !program.IsUserPredicate(functor))
                     {
@@ -676,19 +687,19 @@ internal static class CompiledProgramEmitter
                             predicate.Dynamic,
                             predicate.Multifile,
                             predicate.MetapredicateTemplate,
-                            [.. predicate.StaticClauses.Select(clause => new CompiledModuleClause(
-                                clause.Root,
-                                DescribeTerm(program, model, functors, termConstants, clause.Term.Cells)
-                            ))]
+                            [
+                                .. predicate.StaticClauses.Select(clause => new CompiledModuleClause(
+                                    clause.Root,
+                                    DescribeTerm(program, model, functors, termConstants, clause.Term.Cells)
+                                )),
+                            ]
                         )
                     );
                 }
 
                 List<CompiledModuleImport> imports =
                 [
-                    .. module.Imports.Select(import =>
-                        new CompiledModuleImport(import.Key.Name, import.Key.Arity, import.Value)
-                    ),
+                    .. module.Imports.Select(import => new CompiledModuleImport(import.Key.Name, import.Key.Arity, import.Value)),
                 ];
                 if (module.Name == "user" && predicates.Count == 0 && imports.Count == 0)
                 {
@@ -729,12 +740,7 @@ internal static class CompiledProgramEmitter
                 {
                     CellTag.Reference or CellTag.Structure => cell.Index,
                     CellTag.Functor => AddFunctor(program, model, functors, cell.Index),
-                    CellTag.Atom or CellTag.Integer or CellTag.Float => AddTermConstant(
-                        program,
-                        model,
-                        termConstants,
-                        cell
-                    ),
+                    CellTag.Atom or CellTag.Integer or CellTag.Float => AddTermConstant(program, model, termConstants, cell),
                     _ => throw new InvalidOperationException($"Static module term cell {cell.Tag} cannot be generated."),
                 };
                 term.Add(new CompiledTermCell(cell.Tag, value));

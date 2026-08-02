@@ -1,5 +1,5 @@
-using DotProlog.Syntax;
 using DotProlog.Runtime;
+using DotProlog.Syntax;
 
 namespace DotProlog.Compiler;
 
@@ -46,8 +46,8 @@ internal sealed class ModuleResolver
         _module = module;
         _local = local;
         _program = program;
-        _isoContext = isoContext
-            || (modules.Catalog.TryGet(module, out ModuleDefinition? definition) && definition!.InterfacePrepared);
+        _isoContext =
+            isoContext || (modules.Catalog.TryGet(module, out ModuleDefinition? definition) && definition!.InterfacePrepared);
     }
 
     /// <summary>Whether this resolver has anything to do.</summary>
@@ -101,33 +101,31 @@ internal sealed class ModuleResolver
             );
         }
 
-        string? contextual = _isoContext ? (compound.Name, compound.Arity) switch
-        {
-            ("op", 3) => "$op",
-            ("current_op", 3) => "$current_op",
-            ("char_conversion", 2) => "$char_conversion",
-            ("current_char_conversion", 2) => "$current_char_conversion",
-            ("set_prolog_flag", 2) => "$set_prolog_flag",
-            ("current_prolog_flag", 2) => "$current_prolog_flag",
-            ("asserta", 1) => "$asserta",
-            ("assertz", 1) => "$assertz",
-            ("retract", 1) => "$retract",
-            ("clause", 2) => "$clause",
-            ("abolish", 1) => "$abolish",
-            ("write", 1 or 2) => "$write",
-            ("writeq", 1 or 2) => "$writeq",
-            ("write_term", 2 or 3) => "$write_term",
-            ("read", 1 or 2) => "$read",
-            ("read_term", 2 or 3) => "$read_term",
-            _ => null,
-        } : null;
+        string? contextual = _isoContext
+            ? (compound.Name, compound.Arity) switch
+            {
+                ("op", 3) => "$op",
+                ("current_op", 3) => "$current_op",
+                ("char_conversion", 2) => "$char_conversion",
+                ("current_char_conversion", 2) => "$current_char_conversion",
+                ("set_prolog_flag", 2) => "$set_prolog_flag",
+                ("current_prolog_flag", 2) => "$current_prolog_flag",
+                ("asserta", 1) => "$asserta",
+                ("assertz", 1) => "$assertz",
+                ("retract", 1) => "$retract",
+                ("clause", 2) => "$clause",
+                ("abolish", 1) => "$abolish",
+                ("write", 1 or 2) => "$write",
+                ("writeq", 1 or 2) => "$writeq",
+                ("write_term", 2 or 3) => "$write_term",
+                ("read", 1 or 2) => "$read",
+                ("read_term", 2 or 3) => "$read_term",
+                _ => null,
+            }
+            : null;
         if (contextual is not null)
         {
-            return new CompoundTerm(
-                contextual,
-                [new AtomTerm(_module, compound.Span), .. compound.Arguments],
-                compound.Span
-            );
+            return new CompoundTerm(contextual, [new AtomTerm(_module, compound.Span), .. compound.Arguments], compound.Span);
         }
 
         switch (compound)
@@ -255,8 +253,7 @@ internal sealed class ModuleResolver
         }
 
         var functor = _program.Symbols.InternFunctor(name, arity);
-        return _program.Builtins.TryGetId(functor, out _)
-            || (_program.IsDefined(functor) && !_program.IsUserPredicate(functor));
+        return _program.Builtins.TryGetId(functor, out _) || (_program.IsDefined(functor) && !_program.IsUserPredicate(functor));
     }
 
     /// <summary>Wraps a term as <c>Module:Term</c>, for something resolved when it is called.</summary>

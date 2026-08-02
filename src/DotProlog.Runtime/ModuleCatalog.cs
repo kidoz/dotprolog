@@ -126,11 +126,7 @@ public sealed class ModuleDefinition
 }
 
 /// <summary>An independent snapshot of a module body's initial reader and flag state.</summary>
-public sealed record ModuleReaderState(
-    OperatorTable Operators,
-    CharacterConversionTable CharacterConversions,
-    PrologFlags Flags
-);
+public sealed record ModuleReaderState(OperatorTable Operators, CharacterConversionTable CharacterConversions, PrologFlags Flags);
 
 /// <summary>ISO properties known for one procedure defined by a module.</summary>
 public sealed class ModulePredicateDefinition

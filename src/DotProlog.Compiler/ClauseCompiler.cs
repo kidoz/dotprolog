@@ -127,11 +127,11 @@ internal sealed class ClauseCompiler
             switch (argument)
             {
                 case VariableTerm variable:
-                    {
-                        var isFirst = ResolveSlot(variable, out var slot);
-                        _program.Emit(isFirst ? OpCode.GetVariable : OpCode.GetValue, slot, i);
-                        break;
-                    }
+                {
+                    var isFirst = ResolveSlot(variable, out var slot);
+                    _program.Emit(isFirst ? OpCode.GetVariable : OpCode.GetValue, slot, i);
+                    break;
+                }
 
                 case CompoundTerm nested:
                     _program.Emit(OpCode.GetStructureArgument, FunctorOf(nested), i);
@@ -165,19 +165,19 @@ internal sealed class ClauseCompiler
             switch (argument)
             {
                 case VariableTerm variable:
-                    {
-                        var isFirst = ResolveSlot(variable, out var slot);
-                        _program.Emit(isFirst ? OpCode.UnifyVariable : OpCode.UnifyValue, slot);
-                        break;
-                    }
+                {
+                    var isFirst = ResolveSlot(variable, out var slot);
+                    _program.Emit(isFirst ? OpCode.UnifyVariable : OpCode.UnifyValue, slot);
+                    break;
+                }
 
                 case CompoundTerm nested:
-                    {
-                        var slot = AllocateTemporary();
-                        _program.Emit(OpCode.UnifyVariable, slot);
-                        deferred.Add((slot, nested));
-                        break;
-                    }
+                {
+                    var slot = AllocateTemporary();
+                    _program.Emit(OpCode.UnifyVariable, slot);
+                    deferred.Add((slot, nested));
+                    break;
+                }
 
                 default:
                     _program.Emit(OpCode.UnifyConstant, ConstantIndexOf(argument));
@@ -433,12 +433,12 @@ internal sealed class ClauseCompiler
             {
                 // An anonymous variable is never read back, so each occurrence can stay branch-local.
                 case VariableTerm { IsAnonymous: false } variable when !_slots.ContainsKey(variable.Name):
-                    {
-                        var slot = AllocateTemporary();
-                        _slots[variable.Name] = slot;
-                        _program.Emit(OpCode.InitVariable, slot);
-                        break;
-                    }
+                {
+                    var slot = AllocateTemporary();
+                    _slots[variable.Name] = slot;
+                    _program.Emit(OpCode.InitVariable, slot);
+                    break;
+                }
 
                 case CompoundTerm compound:
                     work.AddRange(compound.Arguments);
@@ -464,11 +464,11 @@ internal sealed class ClauseCompiler
         switch (goal)
         {
             case VariableTerm variable:
-                {
-                    var isFirst = ResolveSlot(variable, out var slot);
-                    _program.Emit(isFirst ? OpCode.PutVariable : OpCode.PutValue, slot, 0);
-                    break;
-                }
+            {
+                var isFirst = ResolveSlot(variable, out var slot);
+                _program.Emit(isFirst ? OpCode.PutVariable : OpCode.PutValue, slot, 0);
+                break;
+            }
 
             case CompoundTerm nested:
                 BuildStructure(nested, OpCode.PutStructureArgument, 0);
@@ -502,11 +502,11 @@ internal sealed class ClauseCompiler
             switch (argument)
             {
                 case VariableTerm variable:
-                    {
-                        var isFirst = ResolveSlot(variable, out var slot);
-                        _program.Emit(isFirst ? OpCode.PutVariable : OpCode.PutValue, slot, i);
-                        break;
-                    }
+                {
+                    var isFirst = ResolveSlot(variable, out var slot);
+                    _program.Emit(isFirst ? OpCode.PutVariable : OpCode.PutValue, slot, i);
+                    break;
+                }
 
                 case CompoundTerm nested:
                     BuildStructure(nested, OpCode.PutStructureArgument, i);
@@ -554,11 +554,11 @@ internal sealed class ClauseCompiler
             switch (term.Arguments[i])
             {
                 case VariableTerm variable:
-                    {
-                        var isFirst = ResolveSlot(variable, out var slot);
-                        _program.Emit(isFirst ? OpCode.UnifyVariable : OpCode.UnifyValue, slot);
-                        break;
-                    }
+                {
+                    var isFirst = ResolveSlot(variable, out var slot);
+                    _program.Emit(isFirst ? OpCode.UnifyVariable : OpCode.UnifyValue, slot);
+                    break;
+                }
 
                 default:
                     _program.Emit(OpCode.UnifyConstant, ConstantIndexOf(term.Arguments[i]));
@@ -594,7 +594,10 @@ internal sealed class ClauseCompiler
             || (name == "$predicate_property" && arity == 3)
             || (name == "$current_predicate" && arity == 2)
             || ((name is "$op" or "$current_op") && arity == 4)
-            || ((name is "$char_conversion" or "$current_char_conversion" or "$set_prolog_flag" or "$current_prolog_flag") && arity == 3)
+            || (
+                (name is "$char_conversion" or "$current_char_conversion" or "$set_prolog_flag" or "$current_prolog_flag")
+                && arity == 3
+            )
             || ((name is "$asserta" or "$assertz" or "$retract" or "$abolish") && arity == 2)
             || (name == "$clause" && arity == 3)
             || ((name is "$write" or "$writeq") && arity is 2 or 3)

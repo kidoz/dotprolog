@@ -440,12 +440,7 @@ public sealed class GeneratedFacadeTests
             :- end_body(contextual).
             """;
 
-        var source = FacadeGenerator.Generate(
-            contract.Contract!,
-            prolog,
-            "iso-context.pl",
-            Runtime.PrologLanguageMode.StrictIso
-        );
+        var source = FacadeGenerator.Generate(contract.Contract!, prolog, "iso-context.pl", Runtime.PrologLanguageMode.StrictIso);
         Assembly assembly = CompileGenerated(source);
         Type type = assembly.GetType("Generated.IsoContext.IsoContextModule")!;
         object module = type.GetMethod("Create", BindingFlags.Public | BindingFlags.Static, Type.EmptyTypes)!.Invoke(null, null)!;

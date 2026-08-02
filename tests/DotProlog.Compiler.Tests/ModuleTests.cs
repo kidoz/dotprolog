@@ -824,10 +824,7 @@ public sealed class ModuleTests : IDisposable
 
     [Fact]
     public void CurrentModuleRequiresAnAtomWhenBound() =>
-        Assert.Equal(
-            "type_error(atom,42)",
-            PrologTestHost.RunGoal("catch(current_module(42), error(E, _), write(E))")
-        );
+        Assert.Equal("type_error(atom,42)", PrologTestHost.RunGoal("catch(current_module(42), error(E, _), write(E))"));
 
     [Fact]
     public void IsoInterfacesGiveEachModuleItsOwnReaderAndFlagState()

@@ -38,26 +38,10 @@ internal static class StreamBuiltins
         registry.Register("read", 2, static machine => Read(machine, stream: 0, term: 1, options: -1));
         registry.Register("read_term", 2, static machine => Read(machine, stream: -1, term: 0, options: 1));
         registry.Register("read_term", 3, static machine => Read(machine, stream: 0, term: 1, options: 2));
-        registry.Register(
-            "$read",
-            2,
-            static machine => Read(machine, stream: -1, term: 1, options: -1, Context(machine, 0))
-        );
-        registry.Register(
-            "$read",
-            3,
-            static machine => Read(machine, stream: 1, term: 2, options: -1, Context(machine, 0))
-        );
-        registry.Register(
-            "$read_term",
-            3,
-            static machine => Read(machine, stream: -1, term: 1, options: 2, Context(machine, 0))
-        );
-        registry.Register(
-            "$read_term",
-            4,
-            static machine => Read(machine, stream: 1, term: 2, options: 3, Context(machine, 0))
-        );
+        registry.Register("$read", 2, static machine => Read(machine, stream: -1, term: 1, options: -1, Context(machine, 0)));
+        registry.Register("$read", 3, static machine => Read(machine, stream: 1, term: 2, options: -1, Context(machine, 0)));
+        registry.Register("$read_term", 3, static machine => Read(machine, stream: -1, term: 1, options: 2, Context(machine, 0)));
+        registry.Register("$read_term", 4, static machine => Read(machine, stream: 1, term: 2, options: 3, Context(machine, 0)));
 
         registry.Register("get_char", 1, static machine => GetChar(machine, stream: -1, target: 0, consume: true));
         registry.Register("get_char", 2, static machine => GetChar(machine, stream: 0, target: 1, consume: true));
@@ -1190,7 +1174,16 @@ internal static class StreamBuiltins
         PrologStream target = Resolve(machine, stream, input: false);
         GuardIo(
             machine,
-            () => TermWriter.Write(machine, machine.Argument(term), target.Writer!, quoted, ignoreOperators, numberVariables, operators)
+            () =>
+                TermWriter.Write(
+                    machine,
+                    machine.Argument(term),
+                    target.Writer!,
+                    quoted,
+                    ignoreOperators,
+                    numberVariables,
+                    operators
+                )
         );
         return true;
     }

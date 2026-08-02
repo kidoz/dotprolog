@@ -314,37 +314,37 @@ public sealed class Machine
                     break;
 
                 case OpCode.Call:
-                    {
-                        var functorId = code[_pc++];
-                        _argumentCount = code[_pc++];
-                        _continuation = _pc;
-                        _b0 = _b;
-                        proved = TryEntryPoint(functorId, out _pc);
-                        break;
-                    }
+                {
+                    var functorId = code[_pc++];
+                    _argumentCount = code[_pc++];
+                    _continuation = _pc;
+                    _b0 = _b;
+                    proved = TryEntryPoint(functorId, out _pc);
+                    break;
+                }
 
                 case OpCode.Execute:
-                    {
-                        var functorId = code[_pc++];
-                        _argumentCount = code[_pc++];
-                        _b0 = _b;
-                        proved = TryEntryPoint(functorId, out _pc);
-                        break;
-                    }
+                {
+                    var functorId = code[_pc++];
+                    _argumentCount = code[_pc++];
+                    _b0 = _b;
+                    proved = TryEntryPoint(functorId, out _pc);
+                    break;
+                }
 
                 case OpCode.CallBuiltin:
-                    {
-                        var builtinId = code[_pc++];
-                        _argumentCount = code[_pc++];
-                        _currentBuiltin = builtinId;
-                        proved = _program.Builtins.Implementation(builtinId)(this);
+                {
+                    var builtinId = code[_pc++];
+                    _argumentCount = code[_pc++];
+                    _currentBuiltin = builtinId;
+                    proved = _program.Builtins.Implementation(builtinId)(this);
 
-                        // assertz/1 and consult/1 append to the program, which can replace these arrays.
-                        // Addresses stay valid because the program is only ever appended to.
-                        code = _program.Code;
-                        constants = _program.Constants;
-                        break;
-                    }
+                    // assertz/1 and consult/1 append to the program, which can replace these arrays.
+                    // Addresses stay valid because the program is only ever appended to.
+                    code = _program.Code;
+                    constants = _program.Constants;
+                    break;
+                }
 
                 case OpCode.Proceed:
                     _pc = _continuation;
@@ -359,15 +359,15 @@ public sealed class Machine
                     break;
 
                 case OpCode.SoftCut:
+                {
+                    var barrier = (int)_stack[_e + FrameHeaderSize + code[_pc++]].Integer;
+                    if (barrier < _b)
                     {
-                        var barrier = (int)_stack[_e + FrameHeaderSize + code[_pc++]].Integer;
-                        if (barrier < _b)
-                        {
-                            _choicePoints[barrier].Alternative = BytecodeProgram.PopAndFailAddress;
-                        }
-
-                        break;
+                        _choicePoints[barrier].Alternative = BytecodeProgram.PopAndFailAddress;
                     }
+
+                    break;
+                }
 
                 case OpCode.MarkBarrier:
                     _stack[_e + FrameHeaderSize + code[_pc++]] = Cell.Integer60(_b);
@@ -378,15 +378,15 @@ public sealed class Machine
                     break;
 
                 case OpCode.TryBranch:
-                    {
-                        // A branch barrier needs no argument registers: each branch reloads its own.
-                        _stack[_e + FrameHeaderSize + code[_pc++]] = Cell.Integer60(_b);
-                        var savedArity = _argumentCount;
-                        _argumentCount = 0;
-                        PushChoicePoint(code[_pc++]);
-                        _argumentCount = savedArity;
-                        break;
-                    }
+                {
+                    // A branch barrier needs no argument registers: each branch reloads its own.
+                    _stack[_e + FrameHeaderSize + code[_pc++]] = Cell.Integer60(_b);
+                    var savedArity = _argumentCount;
+                    _argumentCount = 0;
+                    PushChoicePoint(code[_pc++]);
+                    _argumentCount = savedArity;
+                    break;
+                }
 
                 case OpCode.MetaCall:
                     proved = MetaCall();
@@ -403,127 +403,127 @@ public sealed class Machine
                     break;
 
                 case OpCode.NextStaticClause:
+                {
+                    // Reached through a choice point's alternative, so that choice point is still on top.
+                    ChoicePoint point = _choicePoints[_b - 1];
+                    BytecodeProgram.StaticClauseIndex table = _program.StaticIndex(point.IndexTable);
+                    var current = point.IndexNext;
+                    var following = ClauseIndexing.NextMatch(table.Keys, current + 1, point.IndexKey);
+
+                    if (following < 0)
                     {
-                        // Reached through a choice point's alternative, so that choice point is still on top.
-                        ChoicePoint point = _choicePoints[_b - 1];
-                        BytecodeProgram.StaticClauseIndex table = _program.StaticIndex(point.IndexTable);
-                        var current = point.IndexNext;
-                        var following = ClauseIndexing.NextMatch(table.Keys, current + 1, point.IndexKey);
-
-                        if (following < 0)
-                        {
-                            _b--;
-                            _savedTop = _choicePoints[_b].ArgumentBase;
-                        }
-                        else
-                        {
-                            _choicePoints[_b - 1].IndexNext = following;
-                        }
-
-                        _pc = table.Addresses[current];
-                        break;
+                        _b--;
+                        _savedTop = _choicePoints[_b].ArgumentBase;
+                    }
+                    else
+                    {
+                        _choicePoints[_b - 1].IndexNext = following;
                     }
 
+                    _pc = table.Addresses[current];
+                    break;
+                }
+
                 case OpCode.RedoBuiltin:
+                {
+                    // The choice point is still on top; pop it, then let the builtin offer another
+                    // solution and push a fresh choice point if it has more after that.
+                    ChoicePoint point = _choicePoints[_b - 1];
+                    _b--;
+                    _savedTop = _choicePoints[_b].ArgumentBase;
+                    _choicePoints[_b].NextClause = null;
+
+                    _currentBuiltin = point.BuiltinId;
+                    _pc = point.BuiltinResume;
+                    BuiltinCursor = point.NextClause;
+                    proved = _program.Builtins.Retry(point.BuiltinId)(this, point.BuiltinState);
+
+                    code = _program.Code;
+                    constants = _program.Constants;
+                    break;
+                }
+
+                case OpCode.NextClause:
+                {
+                    // Reached through a choice point's alternative, so that choice point is still on top.
+                    ChoicePoint point = _choicePoints[_b - 1];
+                    DynamicClause clause = point.NextClause!;
+                    DynamicClause? following = DynamicPredicate.FirstVisibleMatching(
+                        clause.Next,
+                        point.ClauseGeneration,
+                        point.IndexKey
+                    );
+
+                    if (following is null)
                     {
-                        // The choice point is still on top; pop it, then let the builtin offer another
-                        // solution and push a fresh choice point if it has more after that.
-                        ChoicePoint point = _choicePoints[_b - 1];
                         _b--;
                         _savedTop = _choicePoints[_b].ArgumentBase;
                         _choicePoints[_b].NextClause = null;
-
-                        _currentBuiltin = point.BuiltinId;
-                        _pc = point.BuiltinResume;
-                        BuiltinCursor = point.NextClause;
-                        proved = _program.Builtins.Retry(point.BuiltinId)(this, point.BuiltinState);
-
-                        code = _program.Code;
-                        constants = _program.Constants;
-                        break;
                     }
-
-                case OpCode.NextClause:
+                    else
                     {
-                        // Reached through a choice point's alternative, so that choice point is still on top.
-                        ChoicePoint point = _choicePoints[_b - 1];
-                        DynamicClause clause = point.NextClause!;
-                        DynamicClause? following = DynamicPredicate.FirstVisibleMatching(
-                            clause.Next,
-                            point.ClauseGeneration,
-                            point.IndexKey
-                        );
-
-                        if (following is null)
-                        {
-                            _b--;
-                            _savedTop = _choicePoints[_b].ArgumentBase;
-                            _choicePoints[_b].NextClause = null;
-                        }
-                        else
-                        {
-                            _choicePoints[_b - 1].NextClause = following;
-                        }
-
-                        _pc = clause.CodeAddress;
-                        break;
+                        _choicePoints[_b - 1].NextClause = following;
                     }
+
+                    _pc = clause.CodeAddress;
+                    break;
+                }
 
                 case OpCode.PushCatch:
-                    {
-                        var catcherSlot = code[_pc++];
-                        var recovery = code[_pc++];
-                        var savedArity = _argumentCount;
-                        _argumentCount = 0;
+                {
+                    var catcherSlot = code[_pc++];
+                    var recovery = code[_pc++];
+                    var savedArity = _argumentCount;
+                    _argumentCount = 0;
 
-                        // The frame fails through on ordinary backtracking; only a throw uses the recovery.
-                        PushChoicePoint(BytecodeProgram.PopAndFailAddress);
-                        _argumentCount = savedArity;
+                    // The frame fails through on ordinary backtracking; only a throw uses the recovery.
+                    PushChoicePoint(BytecodeProgram.PopAndFailAddress);
+                    _argumentCount = savedArity;
 
-                        ref ChoicePoint frame = ref _choicePoints[_b - 1];
-                        frame.CatchRecovery = recovery;
-                        frame.CatcherSlot = catcherSlot;
-                        frame.CatchActive = true;
-                        break;
-                    }
+                    ref ChoicePoint frame = ref _choicePoints[_b - 1];
+                    frame.CatchRecovery = recovery;
+                    frame.CatcherSlot = catcherSlot;
+                    frame.CatchActive = true;
+                    break;
+                }
 
                 case OpCode.PopCatch:
+                {
+                    var index = (int)_stack[_e + FrameHeaderSize + code[_pc++]].Integer;
+                    var reactivate = code[_pc++];
+
+                    if (index >= _b)
                     {
-                        var index = (int)_stack[_e + FrameHeaderSize + code[_pc++]].Integer;
-                        var reactivate = code[_pc++];
-
-                        if (index >= _b)
-                        {
-                            break;
-                        }
-
-                        if (index == _b - 1)
-                        {
-                            // The goal was deterministic, so the frame is simply gone.
-                            _b--;
-                            _savedTop = _choicePoints[_b].ArgumentBase;
-                            break;
-                        }
-
-                        // The goal left alternatives. Keep the frame for a redo, but out of scope until then.
-                        _choicePoints[index].CatchActive = false;
-                        var savedArity = _argumentCount;
-                        _argumentCount = 0;
-                        PushChoicePoint(reactivate);
-                        _argumentCount = savedArity;
                         break;
                     }
+
+                    if (index == _b - 1)
+                    {
+                        // The goal was deterministic, so the frame is simply gone.
+                        _b--;
+                        _savedTop = _choicePoints[_b].ArgumentBase;
+                        break;
+                    }
+
+                    // The goal left alternatives. Keep the frame for a redo, but out of scope until then.
+                    _choicePoints[index].CatchActive = false;
+                    var savedArity = _argumentCount;
+                    _argumentCount = 0;
+                    PushChoicePoint(reactivate);
+                    _argumentCount = savedArity;
+                    break;
+                }
 
                 case OpCode.ReactivateCatch:
+                {
+                    var index = (int)_stack[_e + FrameHeaderSize + code[_pc++]].Integer;
+                    if (index < _b)
                     {
-                        var index = (int)_stack[_e + FrameHeaderSize + code[_pc++]].Integer;
-                        if (index < _b)
-                        {
-                            _choicePoints[index].CatchActive = true;
-                        }
-
-                        break;
+                        _choicePoints[index].CatchActive = true;
                     }
+
+                    break;
+                }
 
                 case OpCode.TryMeElse:
                     PushChoicePoint(code[_pc++]);
@@ -539,127 +539,127 @@ public sealed class Machine
                     break;
 
                 case OpCode.GetVariable:
-                    {
-                        var slot = code[_pc++];
-                        _stack[_e + FrameHeaderSize + slot] = _x[code[_pc++]];
-                        break;
-                    }
+                {
+                    var slot = code[_pc++];
+                    _stack[_e + FrameHeaderSize + slot] = _x[code[_pc++]];
+                    break;
+                }
 
                 case OpCode.GetValue:
-                    {
-                        var slot = code[_pc++];
-                        proved = Unify(_stack[_e + FrameHeaderSize + slot], _x[code[_pc++]]);
-                        break;
-                    }
+                {
+                    var slot = code[_pc++];
+                    proved = Unify(_stack[_e + FrameHeaderSize + slot], _x[code[_pc++]]);
+                    break;
+                }
 
                 case OpCode.GetConstant:
-                    {
-                        Cell constant = constants[code[_pc++]];
-                        proved = UnifyConstantWith(_x[code[_pc++]], constant);
-                        break;
-                    }
+                {
+                    Cell constant = constants[code[_pc++]];
+                    proved = UnifyConstantWith(_x[code[_pc++]], constant);
+                    break;
+                }
 
                 case OpCode.GetStructureArgument:
-                    {
-                        var functorId = code[_pc++];
-                        proved = GetStructure(functorId, _x[code[_pc++]]);
-                        break;
-                    }
+                {
+                    var functorId = code[_pc++];
+                    proved = GetStructure(functorId, _x[code[_pc++]]);
+                    break;
+                }
 
                 case OpCode.GetStructureSlot:
-                    {
-                        var functorId = code[_pc++];
-                        proved = GetStructure(functorId, _stack[_e + FrameHeaderSize + code[_pc++]]);
-                        break;
-                    }
+                {
+                    var functorId = code[_pc++];
+                    proved = GetStructure(functorId, _stack[_e + FrameHeaderSize + code[_pc++]]);
+                    break;
+                }
 
                 case OpCode.UnifyVariable:
+                {
+                    var slot = code[_pc++];
+                    if (_writeMode)
                     {
-                        var slot = code[_pc++];
-                        if (_writeMode)
-                        {
-                            _stack[_e + FrameHeaderSize + slot] = NewVariable();
-                        }
-                        else
-                        {
-                            _stack[_e + FrameHeaderSize + slot] = _heap[_structureArgument++];
-                        }
-
-                        break;
+                        _stack[_e + FrameHeaderSize + slot] = NewVariable();
                     }
+                    else
+                    {
+                        _stack[_e + FrameHeaderSize + slot] = _heap[_structureArgument++];
+                    }
+
+                    break;
+                }
 
                 case OpCode.UnifyValue:
+                {
+                    var slot = code[_pc++];
+                    if (_writeMode)
                     {
-                        var slot = code[_pc++];
-                        if (_writeMode)
-                        {
-                            EnsureHeap(1);
-                            _heap[_h++] = _stack[_e + FrameHeaderSize + slot];
-                        }
-                        else
-                        {
-                            proved = Unify(_heap[_structureArgument++], _stack[_e + FrameHeaderSize + slot]);
-                        }
-
-                        break;
+                        EnsureHeap(1);
+                        _heap[_h++] = _stack[_e + FrameHeaderSize + slot];
                     }
+                    else
+                    {
+                        proved = Unify(_heap[_structureArgument++], _stack[_e + FrameHeaderSize + slot]);
+                    }
+
+                    break;
+                }
 
                 case OpCode.UnifyConstant:
+                {
+                    Cell constant = constants[code[_pc++]];
+                    if (_writeMode)
                     {
-                        Cell constant = constants[code[_pc++]];
-                        if (_writeMode)
-                        {
-                            EnsureHeap(1);
-                            _heap[_h++] = constant;
-                        }
-                        else
-                        {
-                            proved = UnifyConstantWith(_heap[_structureArgument++], constant);
-                        }
-
-                        break;
+                        EnsureHeap(1);
+                        _heap[_h++] = constant;
                     }
+                    else
+                    {
+                        proved = UnifyConstantWith(_heap[_structureArgument++], constant);
+                    }
+
+                    break;
+                }
 
                 case OpCode.PutVariable:
-                    {
-                        var slot = code[_pc++];
-                        Cell variable = NewVariable();
-                        _stack[_e + FrameHeaderSize + slot] = variable;
-                        _x[code[_pc++]] = variable;
-                        break;
-                    }
+                {
+                    var slot = code[_pc++];
+                    Cell variable = NewVariable();
+                    _stack[_e + FrameHeaderSize + slot] = variable;
+                    _x[code[_pc++]] = variable;
+                    break;
+                }
 
                 case OpCode.InitVariable:
                     _stack[_e + FrameHeaderSize + code[_pc++]] = NewVariable();
                     break;
 
                 case OpCode.PutValue:
-                    {
-                        var slot = code[_pc++];
-                        _x[code[_pc++]] = _stack[_e + FrameHeaderSize + slot];
-                        break;
-                    }
+                {
+                    var slot = code[_pc++];
+                    _x[code[_pc++]] = _stack[_e + FrameHeaderSize + slot];
+                    break;
+                }
 
                 case OpCode.PutConstant:
-                    {
-                        Cell constant = constants[code[_pc++]];
-                        _x[code[_pc++]] = constant;
-                        break;
-                    }
+                {
+                    Cell constant = constants[code[_pc++]];
+                    _x[code[_pc++]] = constant;
+                    break;
+                }
 
                 case OpCode.PutStructureArgument:
-                    {
-                        var functorId = code[_pc++];
-                        _x[code[_pc++]] = BeginStructure(functorId);
-                        break;
-                    }
+                {
+                    var functorId = code[_pc++];
+                    _x[code[_pc++]] = BeginStructure(functorId);
+                    break;
+                }
 
                 case OpCode.PutStructureSlot:
-                    {
-                        var functorId = code[_pc++];
-                        _stack[_e + FrameHeaderSize + code[_pc++]] = BeginStructure(functorId);
-                        break;
-                    }
+                {
+                    var functorId = code[_pc++];
+                    _stack[_e + FrameHeaderSize + code[_pc++]] = BeginStructure(functorId);
+                    break;
+                }
 
                 case OpCode.Fail:
                     proved = false;

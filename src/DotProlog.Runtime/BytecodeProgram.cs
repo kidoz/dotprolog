@@ -217,7 +217,10 @@ public sealed class BytecodeProgram
             || (name == "$predicate_property" && functor.Arity == 3)
             || (name == "$current_predicate" && functor.Arity == 2)
             || ((name is "$op" or "$current_op") && functor.Arity == 4)
-            || ((name is "$char_conversion" or "$current_char_conversion" or "$set_prolog_flag" or "$current_prolog_flag") && functor.Arity == 3)
+            || (
+                (name is "$char_conversion" or "$current_char_conversion" or "$set_prolog_flag" or "$current_prolog_flag")
+                && functor.Arity == 3
+            )
             || ((name is "$asserta" or "$assertz" or "$retract" or "$abolish") && functor.Arity == 2)
             || (name == "$clause" && functor.Arity == 3)
             || ((name is "$write" or "$writeq") && functor.Arity is 2 or 3)

@@ -20,11 +20,7 @@ internal static class PrologFlagBuiltins
             static machine => CurrentPrologFlag(machine, Context(machine, 0).Flags, 1, 0),
             static (machine, state) => CurrentPrologFlag(machine, Context(machine, 0).Flags, 1, state)
         );
-        registry.Register(
-            "$set_prolog_flag",
-            3,
-            static machine => SetPrologFlag(machine, Context(machine, 0).Flags, 1)
-        );
+        registry.Register("$set_prolog_flag", 3, static machine => SetPrologFlag(machine, Context(machine, 0).Flags, 1));
     }
 
     private static bool CurrentPrologFlag(Machine machine, long state) =>
@@ -84,7 +80,13 @@ internal static class PrologFlagBuiltins
         var name = machine.Symbols.AtomName(flag.Index);
         return name switch
         {
-            "char_conversion" => SetOnOff(machine, flags, name, value, static (target, enabled) => target.SetCharConversion(enabled)),
+            "char_conversion" => SetOnOff(
+                machine,
+                flags,
+                name,
+                value,
+                static (target, enabled) => target.SetCharConversion(enabled)
+            ),
             "debug" => SetOnOff(machine, flags, name, value, static (target, enabled) => target.Debug = enabled),
             "double_quotes" => SetDoubleQuotes(machine, flags, name, value),
             "unknown" => SetUnknown(machine, flags, name, value),
@@ -98,23 +100,12 @@ internal static class PrologFlagBuiltins
                 Cell.Atom(machine.Symbols.InternAtom("toward_zero"))
             ),
             "max_arity" => RejectReadOnly(machine, name, value, Cell.Integer60(Machine.ArgumentRegisterCount - 1)),
-            "colon_sets_calling_context" => RejectReadOnly(
-                machine,
-                name,
-                value,
-                Cell.Atom(machine.Symbols.InternAtom("true"))
-            ),
+            "colon_sets_calling_context" => RejectReadOnly(machine, name, value, Cell.Atom(machine.Symbols.InternAtom("true"))),
             _ => throw PrologErrors.Domain(machine, "prolog_flag", flag),
         };
     }
 
-    private static bool SetOnOff(
-        Machine machine,
-        PrologFlags flags,
-        string flag,
-        Cell value,
-        Action<PrologFlags, bool> update
-    )
+    private static bool SetOnOff(Machine machine, PrologFlags flags, string flag, Cell value, Action<PrologFlags, bool> update)
     {
         var atom = RequireValue(machine, flag, value, "on", "off");
         update(flags, atom == "on");

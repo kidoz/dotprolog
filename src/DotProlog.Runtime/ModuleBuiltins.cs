@@ -129,10 +129,7 @@ internal static class ModuleBuiltins
         for (var index = (int)state; index < visible.Count; index++)
         {
             ModulePredicateIndicator indicator = visible[index];
-            Cell candidate = machine.CreateStructure(
-                slash,
-                [Atom(machine, indicator.Name), Cell.Integer60(indicator.Arity)]
-            );
+            Cell candidate = machine.CreateStructure(slash, [Atom(machine, indicator.Name), Cell.Integer60(indicator.Arity)]);
             if (!machine.CanUnify(pattern, candidate))
             {
                 continue;
@@ -355,13 +352,11 @@ internal static class ModuleBuiltins
 
         List<Cell> properties = [];
         properties.Add(Atom(machine, machine.Program.IsDynamic(procedure.FunctorId) ? "dynamic" : "static"));
-        bool isoModule = machine.Program.Modules.TryGet(procedure.DefiningModule, out ModuleDefinition? definition)
+        bool isoModule =
+            machine.Program.Modules.TryGet(procedure.DefiningModule, out ModuleDefinition? definition)
             && definition!.InterfacePrepared;
         properties.Add(
-            Atom(
-                machine,
-                procedure.Metadata is { Exported: false } && !procedure.Builtin && !isoModule ? "private" : "public"
-            )
+            Atom(machine, procedure.Metadata is { Exported: false } && !procedure.Builtin && !isoModule ? "private" : "public")
         );
 
         if (procedure.Builtin)
@@ -400,10 +395,7 @@ internal static class ModuleBuiltins
         }
 
         properties.Add(
-            machine.CreateStructure(
-                machine.Symbols.InternFunctor("defined_in", 1),
-                [Atom(machine, procedure.DefiningModule)]
-            )
+            machine.CreateStructure(machine.Symbols.InternFunctor("defined_in", 1), [Atom(machine, procedure.DefiningModule)])
         );
         return properties;
     }

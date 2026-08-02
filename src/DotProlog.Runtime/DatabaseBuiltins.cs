@@ -50,9 +50,8 @@ internal static class DatabaseBuiltins
             "$clause",
             3,
             static machine => ContextualClause(machine, machine.Program.Generation),
-            static (machine, state) => state < 0
-                ? StaticModuleClause(machine, checked((int)(-state - 1)))
-                : Clause(machine, (int)state, resumed: true)
+            static (machine, state) =>
+                state < 0 ? StaticModuleClause(machine, checked((int)(-state - 1))) : Clause(machine, (int)state, resumed: true)
         );
         registry.Register("$abolish", 2, ContextualAbolish);
 
@@ -150,7 +149,7 @@ internal static class DatabaseBuiltins
 
     private static bool StaticModuleClause(Machine machine, int index) =>
         TryStaticModulePredicate(machine, machine.Argument(0), out ModulePredicateDefinition? predicate)
-            && StaticModuleClause(machine, predicate!, index);
+        && StaticModuleClause(machine, predicate!, index);
 
     private static bool StaticModuleClause(Machine machine, ModulePredicateDefinition predicate, int index)
     {
@@ -182,11 +181,7 @@ internal static class DatabaseBuiltins
         return false;
     }
 
-    private static bool TryStaticModulePredicate(
-        Machine machine,
-        Cell head,
-        out ModulePredicateDefinition? predicate
-    )
+    private static bool TryStaticModulePredicate(Machine machine, Cell head, out ModulePredicateDefinition? predicate)
     {
         predicate = null;
         var functorId = FunctorOf(machine, head);
@@ -382,7 +377,8 @@ internal static class DatabaseBuiltins
         var separator = compiledName.LastIndexOf(':');
         string module = separator > 0 ? compiledName[..separator] : "user";
         string name = separator > 0 ? compiledName[(separator + 1)..] : compiledName;
-        ModulePredicateDefinition metadata = machine.Program.Modules.Declare(module)
+        ModulePredicateDefinition metadata = machine
+            .Program.Modules.Declare(module)
             .Predicate(new ModulePredicateIndicator(name, functor.Arity));
         metadata.Defined = true;
         metadata.Dynamic = true;

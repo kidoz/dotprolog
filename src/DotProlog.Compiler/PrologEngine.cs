@@ -339,11 +339,7 @@ public sealed class PrologEngine : IRuntimeCompiler
 
                     if (_program.Modules.TryGet(_activeModule, out ModuleDefinition? enclosing))
                     {
-                        enclosing!.SeedReaderState(
-                            _program.Operators,
-                            _program.CharacterConversions,
-                            _program.Flags
-                        );
+                        enclosing!.SeedReaderState(_program.Operators, _program.CharacterConversions, _program.Flags);
                     }
 
                     _enclosingModules.Push(_activeModule);
@@ -496,15 +492,7 @@ public sealed class PrologEngine : IRuntimeCompiler
 
         private void ApplyFlagDirective(CompoundTerm goal)
         {
-            if (
-                goal
-                is not
-                {
-                    Name: "set_prolog_flag",
-                    Arity: 2,
-                    Arguments: [AtomTerm flag, AtomTerm value],
-                }
-            )
+            if (goal is not { Name: "set_prolog_flag", Arity: 2, Arguments: [AtomTerm flag, AtomTerm value] })
             {
                 return;
             }
@@ -881,24 +869,24 @@ public sealed class PrologEngine : IRuntimeCompiler
                     break;
 
                 case CellTag.Structure:
+                {
+                    // A rational control term cannot be reified into finite syntax; reject it with
+                    // a catchable error rather than looping here or overflowing in the reifier.
+                    if (!active.Add(cell.Index))
                     {
-                        // A rational control term cannot be reified into finite syntax; reject it with
-                        // a catchable error rather than looping here or overflowing in the reifier.
-                        if (!active.Add(cell.Index))
-                        {
-                            throw PrologErrors.Representation(machine, "cyclic_term");
-                        }
-
-                        var functorId = machine.HeapAt(cell.Index).Index;
-                        key.Append('s').Append(functorId).Append('(');
-                        work.Add((cell, true));
-                        for (var i = machine.Symbols.ArityOf(functorId); i >= 1; i--)
-                        {
-                            work.Add((machine.HeapAt(cell.Index + i), false));
-                        }
-
-                        break;
+                        throw PrologErrors.Representation(machine, "cyclic_term");
                     }
+
+                    var functorId = machine.HeapAt(cell.Index).Index;
+                    key.Append('s').Append(functorId).Append('(');
+                    work.Add((cell, true));
+                    for (var i = machine.Symbols.ArityOf(functorId); i >= 1; i--)
+                    {
+                        work.Add((machine.HeapAt(cell.Index + i), false));
+                    }
+
+                    break;
+                }
 
                 default:
                     key.Append(cell.ToString()).Append(',');
@@ -1145,7 +1133,12 @@ public sealed class PrologEngine : IRuntimeCompiler
         var text = buffer[..end];
         buffer = buffer[end..];
 
-        ParseResult parsed = TermReader.ReadTerm(text, operators: operators, characterConversions: characterConversions, flags: flags);
+        ParseResult parsed = TermReader.ReadTerm(
+            text,
+            operators: operators,
+            characterConversions: characterConversions,
+            flags: flags
+        );
         if (!parsed.Success || parsed.Clauses.Count == 0)
         {
             var error = parsed.Diagnostics.Count > 0 ? parsed.Diagnostics[0].Id : "cannot_start_term";

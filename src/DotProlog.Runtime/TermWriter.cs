@@ -54,7 +54,16 @@ public static class TermWriter
         ArgumentNullException.ThrowIfNull(machine);
         ArgumentNullException.ThrowIfNull(output);
 
-        WriteCore(machine, term, output, quoted, ignoreOperators, numberVariables, variableNames: null, operators ?? machine.Operators);
+        WriteCore(
+            machine,
+            term,
+            output,
+            quoted,
+            ignoreOperators,
+            numberVariables,
+            variableNames: null,
+            operators ?? machine.Operators
+        );
     }
 
     /// <summary>Writes a term using the ISO <c>variable_names/1</c> write option.</summary>

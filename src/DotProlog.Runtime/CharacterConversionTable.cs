@@ -62,8 +62,7 @@ public sealed class CharacterConversionTable
     }
 
     /// <summary>Every current non-identity mapping in character order.</summary>
-    public IReadOnlyList<(char Input, char Output)> All() =>
-        [.. _versions[^1].Select(entry => (entry.Input, entry.Output))];
+    public IReadOnlyList<(char Input, char Output)> All() => [.. _versions[^1].Select(entry => (entry.Input, entry.Output))];
 
     /// <summary>Removes every character conversion.</summary>
     public void Clear()

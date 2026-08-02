@@ -264,11 +264,11 @@ public sealed class TermReader
             _flags is not null
             && goal
                 is CompoundTerm
-            {
-                Name: "set_prolog_flag",
-                Arity: 2,
-                Arguments: [AtomTerm { Name: "char_conversion" }, AtomTerm value],
-            }
+                {
+                    Name: "set_prolog_flag",
+                    Arity: 2,
+                    Arguments: [AtomTerm { Name: "char_conversion" }, AtomTerm value],
+                }
             && value.Name is "on" or "off"
         )
         {
@@ -372,34 +372,34 @@ public sealed class TermReader
                 return ParseAtomOrOperator(maxPriority, out priority);
 
             case TokenKind.Punctuation when token.Text == "(":
-                {
-                    Advance();
-                    SyntaxTerm? inner = ParseTerm(MaxTermPriority, out _);
-                    return inner is null || !Expect(")") ? null : inner;
-                }
+            {
+                Advance();
+                SyntaxTerm? inner = ParseTerm(MaxTermPriority, out _);
+                return inner is null || !Expect(")") ? null : inner;
+            }
 
             case TokenKind.Punctuation when token.Text == "[":
                 return ParseList();
 
             case TokenKind.Punctuation when token.Text == "{":
+            {
+                Advance();
+                if (_current.IsPunctuation("}"))
                 {
+                    SourceSpan braceSpan = token.Span.To(_current.Span);
                     Advance();
-                    if (_current.IsPunctuation("}"))
-                    {
-                        SourceSpan braceSpan = token.Span.To(_current.Span);
-                        Advance();
-                        return new AtomTerm("{}", braceSpan);
-                    }
-
-                    SyntaxTerm? inner = ParseTerm(MaxTermPriority, out _);
-                    if (inner is null)
-                    {
-                        return null;
-                    }
-
-                    SourceSpan span = token.Span.To(_current.Span);
-                    return Expect("}") ? new CompoundTerm("{}", [inner], span) : null;
+                    return new AtomTerm("{}", braceSpan);
                 }
+
+                SyntaxTerm? inner = ParseTerm(MaxTermPriority, out _);
+                if (inner is null)
+                {
+                    return null;
+                }
+
+                SourceSpan span = token.Span.To(_current.Span);
+                return Expect("}") ? new CompoundTerm("{}", [inner], span) : null;
+            }
 
             default:
                 Report(DiagnosticIds.UnexpectedToken, $"Expected a term but found {Describe(token)}.", token.Span);
