@@ -70,6 +70,7 @@ public sealed class BytecodeProgram
         InitialDoubleQuotes = InitialDoubleQuotesOf(languageMode);
         Flags.DoubleQuotes = InitialDoubleQuotes;
         Symbols = new SymbolTable();
+        Operators = new OperatorTable(includeExtensions: languageMode != PrologLanguageMode.StrictIso);
         Builtins = new BuiltinRegistry(Symbols);
         Array.Fill(_entryPoints, Undefined);
         _code[TopLevelReturnAddress] = (int)OpCode.Stop;
@@ -120,7 +121,7 @@ public sealed class BytecodeProgram
     /// The operators in force. Reading and writing share one table, so an <c>op/3</c> run at any
     /// point changes how later text is both parsed and printed.
     /// </summary>
-    public OperatorTable Operators { get; } = new();
+    public OperatorTable Operators { get; }
 
     /// <summary>Number of instruction words emitted so far; also the address of the next emit.</summary>
     public int CodeLength { get; private set; }

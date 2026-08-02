@@ -15,8 +15,12 @@ public sealed class OperatorTable
 
     /// <summary>Creates a table containing the ISO default operators.</summary>
     public OperatorTable()
+        : this(includeExtensions: true) { }
+
+    /// <summary>Creates the ISO table and optionally adds DotProlog's predefined extensions.</summary>
+    internal OperatorTable(bool includeExtensions)
     {
-        DefineDefaults();
+        DefineDefaults(includeExtensions);
     }
 
     /// <summary>The immutable operator-table version current when this property is read.</summary>
@@ -125,26 +129,13 @@ public sealed class OperatorTable
         return OperatorDefinitionConflict.None;
     }
 
-    private void DefineDefaults()
+    private void DefineDefaults(bool includeExtensions)
     {
         Define(1200, OperatorType.Xfx, ":-");
         Define(1200, OperatorType.Xfx, "-->");
         Define(1200, OperatorType.Fx, ":-");
         Define(1200, OperatorType.Fx, "?-");
-        foreach (
-            var name in (string[])
-                [
-                    "dynamic",
-                    "discontiguous",
-                    "ensure_loaded",
-                    "include",
-                    "initialization",
-                    "meta_predicate",
-                    "module",
-                    "multifile",
-                    "use_module",
-                ]
-        )
+        foreach (var name in (string[])["meta_predicate", "module", "use_module"])
         {
             Define(1150, OperatorType.Fx, name);
         }
@@ -152,9 +143,11 @@ public sealed class OperatorTable
         Define(1100, OperatorType.Xfy, ";");
         Define(1105, OperatorType.Xfy, "|");
         Define(1050, OperatorType.Xfy, "->");
+        // Part 3 requires an additional grammar control to remain ordinary nonterminal syntax in a
+        // strict processor. ClauseCompiler and DcgTranslator decide whether this is executable
+        // soft cut or an ordinary nonterminal after the reader has built the term.
         Define(1050, OperatorType.Xfy, "*->");
         Define(1000, OperatorType.Xfy, ",");
-        Define(990, OperatorType.Xfx, ":=");
         Define(900, OperatorType.Fy, "\\+");
 
         foreach (
@@ -181,6 +174,18 @@ public sealed class OperatorTable
         Define(200, OperatorType.Fy, "-");
         Define(200, OperatorType.Fy, "+");
         Define(200, OperatorType.Fy, "\\");
+
+        if (!includeExtensions)
+        {
+            return;
+        }
+
+        foreach (var name in (string[])["dynamic", "discontiguous", "ensure_loaded", "include", "initialization", "multifile"])
+        {
+            Define(1150, OperatorType.Fx, name);
+        }
+
+        Define(990, OperatorType.Xfx, ":=");
         Define(100, OperatorType.Yfx, ".");
         Define(1, OperatorType.Fx, "$");
     }

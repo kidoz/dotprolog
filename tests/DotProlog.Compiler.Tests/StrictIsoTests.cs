@@ -82,6 +82,33 @@ public sealed class StrictIsoTests
         Assert.Contains("*->/2", diagnostic.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("p :- a := b.")]
+    [InlineData("p :- $ true.")]
+    [InlineData("p(X) :- X = (a '.' b).")]
+    public void StrictModeDoesNotPredefineExtendedOperators(string source)
+    {
+        var engine = StrictEngine();
+
+        LoadResult loaded = engine.ConsultText(source, "strict.pl");
+
+        Assert.False(loaded.Success);
+        Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.FileName == "strict.pl");
+    }
+
+    [Theory]
+    [InlineData("p :- a := b.")]
+    [InlineData("p :- $ true.")]
+    [InlineData("p(X) :- X = (a '.' b).")]
+    public void ExtendedModeKeepsItsPredefinedOperators(string source)
+    {
+        var engine = new PrologEngine();
+
+        LoadResult loaded = engine.ConsultText(source, "extended.pl");
+
+        Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
+    }
+
     [Fact]
     public void StrictModeAcceptsAStandardMetaPredicateDeclaration()
     {
