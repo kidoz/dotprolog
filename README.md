@@ -351,9 +351,10 @@ when their stream and value arguments are both invalid. Open, close, stream posi
 I/O likewise validate option shape, domains, and option semantics before stream lookup in the
 standard order. Host reader and writer failures remain recoverable through `catch/3` as
 `system_error`; closing an already-disposed host stream follows the same policy, with `force(true)`
-remaining best-effort. `write_term/2,3` supports the ISO `quoted`, `ignore_ops`, and `numbervars`
-options with exact boolean validation. `read_term/2,3` rejects malformed options before consuming
-the next term and reports bounded integer overflows as
+remaining best-effort. `write_term/2,3` supports the ISO `quoted`, `ignore_ops`, `numbervars`, and
+`variable_names` options. Boolean options are validated exactly, and `variable_names/1` uses the
+leftmost applicable name without binding its terms. `read_term/2,3` rejects malformed options
+before consuming the next term and reports bounded integer overflows as
 `representation_error(max_integer|min_integer)`. It also enforces the advertised `max_arity` of
 255 while reading, raising `representation_error(max_arity)` before constructing a larger compound.
 Oversized float literals raise `syntax_error(float_overflow)` instead of becoming IEEE infinity;

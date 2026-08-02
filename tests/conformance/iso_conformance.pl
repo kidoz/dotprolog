@@ -49,6 +49,12 @@ iso_case('8.2.2', (unify_with_occurs_check(X4, Y4), X4 == Y4), success).
 iso_case('8.2.2', (\+ unify_with_occurs_check(f(X5, X5), f(a, b)), var(X5)), success).
 iso_case('8.2.3', \+ (_X \= _Y), success).
 iso_case('8.2.3', (1 \= 2), success).
+iso_case('8.2.4', subsumes_term(a, a), success).
+iso_case('8.2.4', subsumes_term(f(_X, _Y), f(Z6, Z6)), success).
+iso_case('8.2.4', subsumes_term(f(Z7, Z7), f(_X, _Y)), failure).
+iso_case('8.2.4', subsumes_term(g(X6), g(f(X6))), failure).
+iso_case('8.2.4', subsumes_term(X7, f(X7)), failure).
+iso_case('8.2.4', (subsumes_term(X8, Y8), subsumes_term(Y8, f(X8))), success).
 
 % --- 8.3 Type testing --------------------------------------------------------
 iso_case('8.3.1', var(_), success).
@@ -76,6 +82,10 @@ iso_case('8.3.8', number(a), failure).
 iso_case('8.3.9', callable(a), success).
 iso_case('8.3.9', callable(f(a)), success).
 iso_case('8.3.9', callable(1), failure).
+iso_case('8.3.9', callable((1, 2)), success).
+iso_case('8.3.10', ground(3), success).
+iso_case('8.3.10', ground(a(1, _)), failure).
+iso_case('8.3.11', acyclic_term(a(1, _)), success).
 
 % --- 8.4 Term comparison -----------------------------------------------------
 iso_case('8.4.1', (1 == 1), success).
@@ -96,6 +106,16 @@ iso_case('8.4.2', compare(=, 1, 1), success).
 iso_case('8.4.2', compare(>, 2, 1), success).
 iso_case('8.4.2', compare(1, a, b), error(type_error(atom, 1))).
 iso_case('8.4.2', compare(foo, a, b), error(domain_error(order, foo))).
+iso_case('8.4.3', sort([b, a, b], [a, b]), success).
+iso_case('8.4.3', sort([], []), success).
+iso_case('8.4.3', sort([1, 1], [1, 1]), failure).
+iso_case('8.4.3', sort([1 | _], _), error(instantiation_error)).
+iso_case('8.4.3', sort(atom, _), error(type_error(list, atom))).
+iso_case('8.4.3', sort([], atom), error(type_error(list, atom))).
+iso_case('8.4.4', keysort([b-1, a-2], [a-2, b-1]), success).
+iso_case('8.4.4', keysort([a-1, a-2], [a-1, a-2]), success).
+iso_case('8.4.4', keysort([_], _), error(instantiation_error)).
+iso_case('8.4.4', keysort([not_a_pair], _), error(type_error(pair, not_a_pair))).
 
 % --- 8.5 Term creation and decomposition -------------------------------------
 iso_case('8.5.1', functor(foo(a, b, c), foo, 3), success).
@@ -140,6 +160,10 @@ iso_case('8.5.4', copy_term(_, _), success).
 iso_case('8.5.4', copy_term(a, a), success).
 iso_case('8.5.4', copy_term(a, b), failure).
 iso_case('8.5.4', (copy_term(f(X2, X2), f(A2, B2)), A2 == B2), success).
+iso_case('8.5.5', (term_variables(t, Vars1), Vars1 == []), success).
+iso_case('8.5.5', (term_variables(A3+B3*C3/B3-D3, Vars2), Vars2 == [A3, B3, C3, D3]), success).
+iso_case('8.5.5', term_variables(t, [_, _|a]), error(type_error(list, [_, _|a]))).
+iso_case('8.5.5', (term_variables(A4+B4+B4, [B4|Vars3]), A4 == B4, Vars3 == [B4]), success).
 
 % --- 8.6 Arithmetic evaluation -----------------------------------------------
 iso_case('8.6.1', (X3 is 3 + 11, X3 =:= 14), success).
@@ -193,6 +217,12 @@ iso_case('8.6.1', (float_integer_part(-1.25) =:= -1.0), success).
 iso_case('8.6.1', (float_fractional_part(-1.25) =:= -0.25), success).
 iso_case('8.6.1', (_ is float_integer_part(1)), error(type_error(float, 1))).
 iso_case('8.6.1', (_ is max_tagged_integer + 1), error(evaluation_error(int_overflow))).
+iso_case('9.1.1', (+3 =:= 3), success).
+iso_case('9.1.1', ((-7 div 3) =:= -3), success).
+iso_case('9.3.11', (_ is asin(2)), error(evaluation_error(undefined))).
+iso_case('9.3.12', (_ is acos(1.5)), error(evaluation_error(undefined))).
+iso_case('9.4.6', (xor(10, 12) =:= 6), success).
+iso_case('9.4.6', (_ is xor(1.0, 2)), error(type_error(integer, 1.0))).
 
 % --- 8.7 Arithmetic comparison -----------------------------------------------
 iso_case('8.7.1', (0 =:= 0.0), success).
@@ -232,7 +262,11 @@ iso_case('8.9.2', asserta(_), error(instantiation_error)).
 iso_case('8.9.3', retract(_), error(instantiation_error)).
 iso_case('8.9.3', retract(iso_absent(_)), failure).
 iso_case('8.9.3', retract(repeat_guard(_)), error(permission_error(modify, static_procedure, repeat_guard/1))).
-iso_case('8.9.3', retractall(repeat_guard(_)), error(permission_error(modify, static_procedure, repeat_guard/1))).
+iso_case('8.9.5', (assertz(iso_retractall(a)), retractall(iso_retractall(_)), \+ iso_retractall(_)), success).
+iso_case('8.9.5', retractall(iso_absent(_)), success).
+iso_case('8.9.5', retractall(_), error(instantiation_error)).
+iso_case('8.9.5', retractall(3), error(type_error(callable, 3))).
+iso_case('8.9.5', retractall(repeat_guard(_)), error(permission_error(modify, static_procedure, repeat_guard/1))).
 
 % --- 8.10 All solutions ------------------------------------------------------
 iso_case('8.10.1', findall(X5, member(X5, [1, 2]), [1, 2]), success).
@@ -290,6 +324,10 @@ iso_case('8.14.3', op(30, a, iso_bad), error(domain_error(operator_specifier, a)
 iso_case('8.14.3', op(1300, xfx, iso_bad), error(domain_error(operator_priority, 1300))).
 iso_case('8.14.3', op(30, xfy, 0), error(type_error(list, 0))).
 iso_case('8.14.3', op(30, xfx, ','), error(permission_error(modify, operator, ','))).
+iso_case('8.14.3', op(500, xfy, {}), error(permission_error(create, operator, {}))).
+iso_case('8.14.3', op(500, xfy, []), error(permission_error(create, operator, []))).
+iso_case('8.14.3', op(1000, xfy, '|'), error(permission_error(create, operator, '|'))).
+iso_case('8.14.3', op(1150, fx, '|'), error(permission_error(create, operator, '|'))).
 
 % --- 8.15 Logic and control --------------------------------------------------
 iso_case('8.15.1', \+ true, failure).
@@ -321,10 +359,12 @@ iso_case('8.15.3', call(fail), failure).
 iso_case('8.15.3', call(_), error(instantiation_error)).
 iso_case('8.15.3', call(4), error(type_error(callable, 4))).
 iso_case('8.15.3', call((fail, 4)), error(type_error(callable, (fail, 4)))).
-iso_case('8.15.3', call(_, a), error(instantiation_error)).
-iso_case('8.15.3', call(4, a), error(type_error(callable, 4))).
+iso_case('8.15.4', call(integer, 3), success).
+iso_case('8.15.4', (call(functor(F4, c), 0), F4 == c), success).
+iso_case('8.15.4', call(_, a), error(instantiation_error)).
+iso_case('8.15.4', call(4, a), error(type_error(callable, 4))).
 iso_case(
-    '8.15.3',
+    '8.15.4',
     (
         functor(Fact1, iso_call_limit, 255),
         assertz(Fact1),
@@ -335,12 +375,13 @@ iso_case(
     success
 ).
 iso_case(
-    '8.15.3',
+    '8.15.4',
     (functor(Oversized1, iso_call_limit, 249), call(Oversized1, a, b, c, d, e, f, g)),
     error(representation_error(max_arity))
 ).
 iso_case('8.15.3', iso_noncallable_body, error(type_error(callable, 4))).
 iso_case('8.15.3', iso_unreached_noncallable_body, failure).
+iso_case('8.15.5', false, failure).
 
 % --- 8.16 Atomic term processing ---------------------------------------------
 iso_case('8.16.1', atom_length(abcde, 5), success).
@@ -566,6 +607,16 @@ iso_case('7.10.5', writeq_codes('\n', [39, 92, 110, 39]), success).
 iso_case('7.10.5', writeq_codes('a\rb', [39, 97, 92, 114, 98, 39]), success).
 iso_case('7.10.5', writeq_codes('a b', [39, 97, 32, 98, 39]), success).
 iso_case('7.10.5', writeq_codes('', [39, 39]), success).
+iso_case(
+    '7.10.4',
+    (with_output_to(atom(Written1), write_term(f(X9, X9, Y9), [variable_names(['A'=X9, 'B'=Y9])])), Written1 == 'f(A,A,B)'),
+    success
+).
+iso_case(
+    '7.10.4',
+    (with_output_to(atom(Written2), write_term(X10, [variable_names([first=X10, second=X10])])), Written2 == first),
+    success
+).
 
 % --- 7.8 Control constructs ---------------------------------------------------
 iso_case('7.8.1', true, success).
@@ -586,6 +637,7 @@ iso_case('8.11.5', open(f, sideways, _), error(domain_error(io_mode, sideways)))
 iso_case('8.11.5', open(1, read, _), error(domain_error(source_sink, 1))).
 iso_case('8.11.5', open(f, read, bound), error(uninstantiation_error(bound))).
 iso_case('8.11.5', open(f, write, _, [type(other)]), error(domain_error(stream_option, type(other)))).
+iso_case('8.11.5', open(f, write, _, [unknown(_)]), error(domain_error(stream_option, unknown(_)))).
 iso_case('8.11.5', open(f, write, _, [type(1)]), error(domain_error(stream_option, type(1)))).
 iso_case('8.11.5', open(f, write, _, [type(_)]), error(instantiation_error)).
 iso_case('8.11.5', open(f, write, _, [reposition(other)]), error(domain_error(stream_option, reposition(other)))).
@@ -613,6 +665,7 @@ iso_case('8.11.6', close(user_output, [force(true)]), success).
 iso_case('8.11.6', close(user_output, _), error(instantiation_error)).
 iso_case('8.11.6', close(user_output, [force(_)]), error(instantiation_error)).
 iso_case('8.11.6', close(user_output, [force(other)]), error(domain_error(close_option, force(other)))).
+iso_case('8.11.6', close(user_output, [unknown(_)]), error(domain_error(close_option, unknown(_)))).
 iso_case('8.11.6', close(user_output, [force(1)]), error(domain_error(close_option, force(1)))).
 iso_case('8.11.6', close(user_output, atom), error(type_error(list, atom))).
 iso_case('8.11.6', close(_, atom), error(instantiation_error)).
@@ -746,6 +799,14 @@ iso_case('8.14.2', write_term(a, [nonsense(x)]), error(domain_error(write_option
 iso_case('8.14.2', write_term(a, [quoted(_)]), error(instantiation_error)).
 iso_case('8.14.2', write_term(a, [quoted(on)]), error(domain_error(write_option, quoted(on)))).
 iso_case('8.14.2', write_term(a, [numbervars(1)]), error(domain_error(write_option, numbervars(1)))).
+iso_case('8.14.2', write_term(a, [unknown(_)]), error(domain_error(write_option, unknown(_)))).
+iso_case('8.14.2', write_term(a, [variable_names(_)]), error(instantiation_error)).
+iso_case('8.14.2', write_term(a, [variable_names([_])]), error(instantiation_error)).
+iso_case(
+    '8.14.2',
+    write_term(a, [variable_names(not_a_list)]),
+    error(domain_error(write_option, variable_names(not_a_list)))
+).
 iso_case('8.14.2', write_term(user_input, a, []), error(permission_error(output, stream, user_input))).
 iso_case('8.14.2', write_term(_, a, []), error(instantiation_error)).
 iso_case('8.14.2', write_term(_, x, atom), error(instantiation_error)).
@@ -852,13 +913,9 @@ iso_case('8.16.7', number_chars(_, ['3', 'a']), error(syntax_error(illegal_numbe
 iso_case('8.16.7', number_chars(_, ['1', e, '2']), error(syntax_error(illegal_number))).
 iso_case('8.16.8', number_codes(_, [49, 101, 50]), error(syntax_error(illegal_number))).
 
-% --- Sorting: not in clause 8, but standard in every system --------------------
-iso_case('sort/2', sort([b, a, b], [a, b]), success).
-iso_case('sort/2', sort([], []), success).
+% --- Sorting extensions -------------------------------------------------------
 iso_case('msort/2', msort([b, a, b], [a, b, b]), success).
 iso_case('msort/2', msort([3, 2.5, 1, 0.5], [0.5, 2.5, 1, 3]), success).
-iso_case('keysort/2', keysort([b-1, a-2], [a-2, b-1]), success).
-iso_case('keysort/2', keysort([a-1, a-2], [a-1, a-2]), success).
 iso_case('sort/4', sort(0, @>=, [1, 2, 2], [2, 2, 1]), success).
 
 % --- Runner ------------------------------------------------------------------
@@ -893,5 +950,8 @@ ball_outcome(Ball, thrown(Ball)).
 
 % The context of an error is implementation defined, so only the formal part is
 % compared; anything else has to match exactly.
-matches(error(Formal), error(Actual)) :- !, Formal == Actual.
+matches(error(Formal), error(Actual)) :-
+    !,
+    subsumes_term(Formal, Actual),
+    subsumes_term(Actual, Formal).
 matches(Expected, Actual) :- Expected == Actual.

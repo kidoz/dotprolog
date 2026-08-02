@@ -67,6 +67,10 @@ The initial `char_conversion` flag is `off`.
 Character conversion applies to unquoted lexical input while quoted text, escapes, character-code
 literal payloads, and primitive character input remain unchanged.
 
+`write_term/2,3` implements the Corrigendum 3 `variable_names/1` option. Its value is a list of
+`Atom=Term` entries; the leftmost entry whose term is the variable being written supplies the
+output name. Inspecting the list neither unifies nor otherwise binds its terms.
+
 ## Procedures, errors, and streams
 
 The initial `unknown` flag is `error`, so calling an undefined procedure raises

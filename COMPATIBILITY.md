@@ -113,9 +113,13 @@ Writing them was worth it immediately: they found these real defects.
   input, output, EOF inspection, positioning, formatting, flushing, and closing. Implicit-current
   output predicates also enforce the same text/binary permissions as explicit-stream calls.
   Closing a disposed host stream follows the same rule, while `force(true)` suppresses the failure.
-- `write_term/3` now writes to an explicit stream, and the ISO `quoted/1`, `ignore_ops/1`, and
-  `numbervars/1` options are strict booleans with rightmost precedence. Numbered variables use the
-  portable `A` through `Z`, `A1`, `B1`, and later naming sequence.
+- `write_term/3` now writes to an explicit stream. The ISO `quoted/1`, `ignore_ops/1`, and
+  `numbervars/1` options are strict booleans with rightmost precedence, and Corrigendum 3's
+  `variable_names/1` writes the leftmost applicable name without binding option terms. Numbered
+  variables use the portable `A` through `Z`, `A1`, `B1`, and later naming sequence.
+- The licensed Corrigenda audit also exposed two older edge cases: `sort/2` and `keysort/2` now
+  validate their result lists and pair elements before unification, and `op/3` rejects every
+  prefix or postfix declaration of `|` rather than only declarations below priority 1001.
 - `read_term/2,3` now validates its complete option list before asking the stream for input.
   Unknown options, variable elements, and partial lists therefore raise their ISO errors without
   consuming the next term.
