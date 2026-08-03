@@ -2,15 +2,15 @@
 
 ## Supported versions
 
-The current release is 0.2.0, published on NuGet.org and as a GitHub release carrying the packages,
+The current release is 0.5.0, published on NuGet.org and as a GitHub release carrying the packages,
 native sample binaries, an SBOM, and checksums. 0.1.0 was released on GitHub only and never
 reached NuGet.org. The latest released minor version is the one that receives security fixes;
 older ones do not.
 
 | Version | Supported |
 |---|---|
-| 0.2.x | Latest release only |
-| 0.1.x | Unsupported |
+| 0.5.x | Latest release only |
+| 0.4.x and earlier | Unsupported |
 
 ## Reporting a vulnerability
 
@@ -42,5 +42,8 @@ What matters is when the engine does something the program did not ask for:
   consult files you do not trust.
 - A host that hands `user_input` or a writable stream to an untrusted program and is surprised by
   what the program does with it.
+- Reaching a module's unexported predicate by qualifying it as `Module:Goal`. ISO/IEC 13211-2
+  permits a processor to make such procedures inaccessible, and DotProlog deliberately does not:
+  a module is a namespace, not a protection boundary.
 
 DotProlog is not a sandbox. A Prolog program has whatever access the process running it has.
