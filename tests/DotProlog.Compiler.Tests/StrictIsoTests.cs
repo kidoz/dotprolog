@@ -262,6 +262,58 @@ public sealed class StrictIsoTests
     }
 
     [Fact]
+    public void StrictModeReadsEveryDoubleQuotesValue()
+    {
+        var engine = StrictEngine();
+        Assert.Equal(DoubleQuotesMode.Codes, engine.Program.InitialDoubleQuotes);
+
+        LoadResult loaded = engine.ConsultText(
+            """
+            entering("ab").
+            :- set_prolog_flag(double_quotes, chars).
+            characters("ab").
+            no_characters("").
+            :- set_prolog_flag(double_quotes, atom).
+            text("ab").
+            no_text("").
+            """
+        );
+
+        Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
+        Assert.Equal(RunResult.Success, engine.RunGoal("entering([0'a, 0'b])", out _));
+        Assert.Equal(RunResult.Success, engine.RunGoal("characters([a, b])", out _));
+        Assert.Equal(RunResult.Success, engine.RunGoal("no_characters([])", out _));
+        Assert.Equal(RunResult.Success, engine.RunGoal("text(ab)", out _));
+        Assert.Equal(RunResult.Success, engine.RunGoal("no_text('')", out _));
+
+        // The unit left atom in force, so this also pins the load-unit scoping.
+        Assert.Equal(RunResult.Success, engine.RunGoal("current_prolog_flag(double_quotes, codes)", out _));
+    }
+
+    [Fact]
+    public void StrictModeAcceptsOnlyTheThreeDoubleQuotesValues()
+    {
+        var engine = StrictEngine();
+
+        Assert.Equal(
+            RunResult.Success,
+            engine.RunGoal(
+                "set_prolog_flag(double_quotes, chars), set_prolog_flag(double_quotes, atom), "
+                    + "set_prolog_flag(double_quotes, codes)",
+                out _
+            )
+        );
+        Assert.Equal(
+            RunResult.Success,
+            engine.RunGoal(
+                "catch(set_prolog_flag(double_quotes, string), "
+                    + "error(domain_error(flag_value, double_quotes+string), _), true)",
+                out _
+            )
+        );
+    }
+
+    [Fact]
     public void StrictHostBindingRejectsAPredefinedExtension()
     {
         var engine = StrictEngine();
