@@ -60,7 +60,7 @@ predefined-predicate and evaluable-functor inventory is also pinned by
 | Cor.2 bar restrictions | `|` may only be an infix operator at priority 1001 or greater; `[]` and `{}` cannot be operators | R/D/I/A |
 | 6.3.5 list notation | Proper, partial, and improper lists preserve their `./2` abstract representation | R/D/I/C/A |
 | 6.3.6 curly notation | Empty and non-empty curly forms lower to the required atoms and compounds | R/D/I |
-| 6.3.7 double-quoted notation | `double_quotes` selects codes, characters, or the documented extension atom form | R/D/I/C/A |
+| 6.3.7 double-quoted notation | `double_quotes` selects the character-code list, one-char atom list, or atom form | R/D/I/C/A |
 | 6.4.1 layout | Spaces, newlines, line comments, bracketed comments, and token boundaries are recognized without changing terms | R/D/I |
 | 6.4.2 names | Alphanumeric, graphic, quoted, semicolon, and cut tokens follow the required lexical categories | R/D/I/A |
 | 6.4.2.1 quoted characters | Doubled delimiters, meta escapes, control escapes, and delimited numeric escapes round-trip | R/D/I/A |
