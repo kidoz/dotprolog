@@ -42,6 +42,9 @@ public sealed class GeneratePrologFacade : Task
     /// <summary>The language mode generated source is built against; see <c>DotPrologLanguageMode</c>.</summary>
     public string LanguageMode { get; set; } = "extended";
 
+    /// <summary>Initial flag overrides layered over the mode; see <c>DotPrologFlags</c>.</summary>
+    public string Flags { get; set; } = string.Empty;
+
     /// <summary>The generated C# files, to be added to <c>Compile</c>.</summary>
     [Output]
     public ITaskItem[] GeneratedFiles { get; private set; } = [];
@@ -69,6 +72,12 @@ public sealed class GeneratePrologFacade : Task
             return false;
         }
 
+        if (!PrologFlagOverrides.TryParse(Flags, out PrologFlagOverrides flagOverrides, out var flagsError))
+        {
+            Log.LogError($"DotPrologFlags is invalid: {flagsError}");
+            return false;
+        }
+
         Directory.CreateDirectory(OutputPath);
         List<ITaskItem> generated = [];
 
@@ -85,8 +94,8 @@ public sealed class GeneratePrologFacade : Task
             WriteIfChanged(
                 entryPoint,
                 GenerateTestHost
-                    ? EntryPointGenerator.GenerateTestHost(RootNamespace, sources, languageMode)
-                    : EntryPointGenerator.Generate(RootNamespace, sources, languageMode)
+                    ? EntryPointGenerator.GenerateTestHost(RootNamespace, sources, languageMode, flagOverrides)
+                    : EntryPointGenerator.Generate(RootNamespace, sources, languageMode, flagOverrides)
             );
             generated.Add(new TaskItem(entryPoint));
         }
@@ -125,7 +134,8 @@ public sealed class GeneratePrologFacade : Task
                 result.Contract!,
                 File.ReadAllText(sourcePath),
                 Path.GetFileName(sourcePath),
-                languageMode
+                languageMode,
+                flagOverrides
             );
 
             var target = Path.Combine(OutputPath, $"{result.Contract!.ClrTypeName}Module.g.cs");

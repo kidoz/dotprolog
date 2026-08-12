@@ -35,11 +35,21 @@ public static class FacadeGenerator
         string prologSource,
         string sourceName,
         PrologLanguageMode languageMode
+    ) => Generate(contract, prologSource, sourceName, languageMode, PrologFlagOverrides.None);
+
+    /// <summary>Generates a facade with <paramref name="flagOverrides"/> layered over the mode.</summary>
+    public static string Generate(
+        ModuleContract contract,
+        string prologSource,
+        string sourceName,
+        PrologLanguageMode languageMode,
+        PrologFlagOverrides flagOverrides
     )
     {
         ArgumentNullException.ThrowIfNull(contract);
         ArgumentNullException.ThrowIfNull(prologSource);
         ArgumentNullException.ThrowIfNull(sourceName);
+        ArgumentNullException.ThrowIfNull(flagOverrides);
 
         var text = new StringBuilder();
 
@@ -57,6 +67,7 @@ public static class FacadeGenerator
             "__CompiledModule",
             [],
             languageMode,
+            flagOverrides,
             out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics
         );
         if (diagnostics.Any(diagnostic => diagnostic.Severity == DotProlog.Syntax.DiagnosticSeverity.Error))
@@ -64,7 +75,7 @@ public static class FacadeGenerator
             throw new ArgumentException($"{sourceName} did not compile: {string.Join("; ", diagnostics)}", nameof(prologSource));
         }
 
-        AppendImplementation(text, contract, compiledProgram, languageMode);
+        AppendImplementation(text, contract, compiledProgram, languageMode, flagOverrides);
 
         return text.ToString();
     }
@@ -112,7 +123,8 @@ public static class FacadeGenerator
         StringBuilder text,
         ModuleContract contract,
         string compiledProgram,
-        PrologLanguageMode languageMode
+        PrologLanguageMode languageMode,
+        PrologFlagOverrides flagOverrides
     )
     {
         var type = $"{contract.ClrTypeName}Module";
@@ -156,7 +168,7 @@ public static class FacadeGenerator
         text.AppendLine("    {");
         text.AppendLine(
             CultureInfo.InvariantCulture,
-            $"        var engine = new global::DotProlog.Compiler.PrologEngine(global::DotProlog.Runtime.PrologLanguageMode.{languageMode});"
+            $"        var engine = new global::DotProlog.Compiler.PrologEngine({FlagOverridesSyntax.EngineArguments(languageMode, flagOverrides)});"
         );
         text.AppendLine("        return Create(engine);");
         text.AppendLine("    }");

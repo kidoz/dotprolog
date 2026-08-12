@@ -58,8 +58,11 @@ public sealed class BytecodeProgram
     public BytecodeProgram()
         : this(PrologLanguageMode.Extended) { }
 
-    /// <summary>Creates an empty program in <paramref name="languageMode"/>.</summary>
-    public BytecodeProgram(PrologLanguageMode languageMode)
+    /// <summary>
+    /// Creates an empty program in <paramref name="languageMode"/>, with
+    /// <paramref name="flagOverrides"/> layered over the mode's initial flag values.
+    /// </summary>
+    public BytecodeProgram(PrologLanguageMode languageMode, PrologFlagOverrides? flagOverrides = null)
     {
         if (Array.IndexOf(SupportedLanguageModes, languageMode) < 0)
         {
@@ -67,7 +70,7 @@ public sealed class BytecodeProgram
         }
 
         LanguageMode = languageMode;
-        InitialDoubleQuotes = InitialDoubleQuotesOf(languageMode);
+        InitialDoubleQuotes = flagOverrides?.DoubleQuotes ?? InitialDoubleQuotesOf(languageMode);
         Flags.DoubleQuotes = InitialDoubleQuotes;
         Symbols = new SymbolTable();
         Operators = new OperatorTable(includeExtensions: languageMode != PrologLanguageMode.StrictIso);

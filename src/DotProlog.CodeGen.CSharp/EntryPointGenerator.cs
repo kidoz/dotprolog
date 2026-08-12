@@ -32,16 +32,26 @@ public static class EntryPointGenerator
         string @namespace,
         IReadOnlyList<(string Name, string Text)> sources,
         PrologLanguageMode languageMode
+    ) => GenerateTestHost(@namespace, sources, languageMode, PrologFlagOverrides.None);
+
+    /// <summary>Generates a test host with <paramref name="flagOverrides"/> layered over the mode.</summary>
+    public static string GenerateTestHost(
+        string @namespace,
+        IReadOnlyList<(string Name, string Text)> sources,
+        PrologLanguageMode languageMode,
+        PrologFlagOverrides flagOverrides
     )
     {
         ArgumentNullException.ThrowIfNull(@namespace);
         ArgumentNullException.ThrowIfNull(sources);
+        ArgumentNullException.ThrowIfNull(flagOverrides);
 
         var compiledProgram = CompiledProgramEmitter.Generate(
             sources,
             "__CompiledTests",
             [],
             languageMode,
+            flagOverrides,
             out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics
         );
         if (diagnostics.Any(diagnostic => diagnostic.Severity == DotProlog.Syntax.DiagnosticSeverity.Error))
@@ -64,7 +74,7 @@ public static class EntryPointGenerator
         text.AppendLine("        // discovery it would repeat once per scan. The runner attaches per-test writers.");
         text.AppendLine(
             CultureInfo.InvariantCulture,
-            $"        var engine = new global::DotProlog.Compiler.PrologEngine(global::DotProlog.Runtime.PrologLanguageMode.{languageMode})"
+            $"        var engine = new global::DotProlog.Compiler.PrologEngine({FlagOverridesSyntax.EngineArguments(languageMode, flagOverrides)})"
         );
         text.AppendLine("        {");
         text.AppendLine("            Output = global::System.IO.TextWriter.Null,");
@@ -107,16 +117,26 @@ public static class EntryPointGenerator
         string @namespace,
         IReadOnlyList<(string Name, string Text)> sources,
         PrologLanguageMode languageMode
+    ) => Generate(@namespace, sources, languageMode, PrologFlagOverrides.None);
+
+    /// <summary>Generates an application entry point with <paramref name="flagOverrides"/> layered over the mode.</summary>
+    public static string Generate(
+        string @namespace,
+        IReadOnlyList<(string Name, string Text)> sources,
+        PrologLanguageMode languageMode,
+        PrologFlagOverrides flagOverrides
     )
     {
         ArgumentNullException.ThrowIfNull(@namespace);
         ArgumentNullException.ThrowIfNull(sources);
+        ArgumentNullException.ThrowIfNull(flagOverrides);
 
         var compiledProgram = CompiledProgramEmitter.Generate(
             sources,
             "__CompiledProgram",
             [],
             languageMode,
+            flagOverrides,
             out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics
         );
         if (diagnostics.Any(diagnostic => diagnostic.Severity == DotProlog.Syntax.DiagnosticSeverity.Error))
@@ -140,7 +160,7 @@ public static class EntryPointGenerator
         text.AppendLine("    {");
         text.AppendLine(
             CultureInfo.InvariantCulture,
-            $"        var engine = new global::DotProlog.Compiler.PrologEngine(global::DotProlog.Runtime.PrologLanguageMode.{languageMode});"
+            $"        var engine = new global::DotProlog.Compiler.PrologEngine({FlagOverridesSyntax.EngineArguments(languageMode, flagOverrides)});"
         );
         text.AppendLine("        int[] initialization = __CompiledProgram.Install(engine);");
         text.AppendLine("        try");

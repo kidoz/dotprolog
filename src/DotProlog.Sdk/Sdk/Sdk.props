@@ -31,5 +31,12 @@
             modern       extended, with double_quotes starting at chars
         -->
         <DotPrologLanguageMode Condition="'$(DotPrologLanguageMode)' == ''">extended</DotPrologLanguageMode>
+        <!--
+          Initial flag values layered over the mode, as semicolon-separated name=value pairs. The
+          mode stays the curated profile; an entry here moves one flag's starting value, e.g.
+          double_quotes=chars while staying in extended mode. Overridable today:
+            double_quotes=codes|chars|atom
+        -->
+        <DotPrologFlags Condition="'$(DotPrologFlags)' == ''"></DotPrologFlags>
     </PropertyGroup>
 </Project>

@@ -155,6 +155,60 @@ public sealed class ToolCommandTests : IDisposable
         Assert.Contains("missing language mode", error, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void RunHonorsAFlagOverride()
+    {
+        var path = Source("flag.pl", ":- initialization((current_prolog_flag(double_quotes, atom), writeln(ok))).\n");
+
+        (var exitCode, var output, var error) = Execute("run", "--flag", "double_quotes=atom", path);
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("ok\n", output);
+        Assert.Empty(error);
+    }
+
+    [Fact]
+    public void RunRejectsAnInvalidFlagOverride()
+    {
+        var path = Source("flag.pl", "value.\n");
+
+        (var exitCode, _, var error) = Execute("run", "--flag", "double_quotes=strings", path);
+
+        Assert.Equal(64, exitCode);
+        Assert.Contains("invalid flag override", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RunRejectsARepeatedFlagOverride()
+    {
+        var path = Source("flag.pl", "value.\n");
+
+        (var exitCode, _, var error) = Execute("run", "--flag", "double_quotes=atom", "--flag", "double_quotes=chars", path);
+
+        Assert.Equal(64, exitCode);
+        Assert.Contains("more than once", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MissingRunFlagValueIsAUsageError()
+    {
+        (var exitCode, _, var error) = Execute("run", "--flag");
+
+        Assert.Equal(64, exitCode);
+        Assert.Contains("missing flag override", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LintAcceptsAFlagOverride()
+    {
+        var path = Source("clean.pl", "same(X, X).\n");
+
+        (var exitCode, _, var error) = Execute("lint", "--flag", "double_quotes=chars", path);
+
+        Assert.Equal(0, exitCode);
+        Assert.Empty(error);
+    }
+
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 
     private string Source(string name, string contents)

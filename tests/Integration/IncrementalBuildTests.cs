@@ -123,6 +123,22 @@ public sealed class IncrementalBuildTests : IDisposable
             StringComparison.Ordinal
         );
 
+        // A flag override is likewise an incremental input on its own: no file timestamp changes
+        // between these builds, only the recorded property line. The override must reach the
+        // generated engine construction and the install guard.
+        (var flaggedExit, var flaggedLog) = await Build("-p:DotPrologFlags=double_quotes=atom");
+        Assert.True(flaggedExit == 0, $"The flagged build failed:\n{flaggedLog}");
+        var flaggedFacade = await File.ReadAllTextAsync(
+            Path.Combine(generatedPath, "PricingModule.g.cs"),
+            TestContext.Current.CancellationToken
+        );
+        Assert.Contains("DoubleQuotesMode.Atom", flaggedFacade, StringComparison.Ordinal);
+        Assert.Contains("requires double_quotes to start at atom", flaggedFacade, StringComparison.Ordinal);
+
+        (var badFlagExit, var badFlagLog) = await Build("-p:DotPrologFlags=double_quotes=strings");
+        Assert.True(badFlagExit != 0, "An invalid DotPrologFlags value was accepted.");
+        Assert.Contains("DotPrologFlags is invalid", badFlagLog, StringComparison.Ordinal);
+
         // The generated files live outside IntermediateOutputPath, so Clean needs its own proof.
         (var cleanExit, var cleanLog) = await Run(
             "dotnet",

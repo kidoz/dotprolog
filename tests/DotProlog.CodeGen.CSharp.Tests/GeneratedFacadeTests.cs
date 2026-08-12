@@ -447,4 +447,88 @@ public sealed class GeneratedFacadeTests
 
         Assert.Equal("one", Call(module, type, "Answer"));
     }
+
+    [Fact]
+    public void FacadeWithAFlagOverrideReadsAndRunsUnderTheOverride()
+    {
+        ContractReadResult contract = ContractReader.Read(
+            """
+            :- clr_module('Quoted').
+            :- clr_namespace('Generated.Quoted').
+            :- clr_export(text/1, semidet, [in(value, atom)]).
+            """,
+            "Generated.Quoted",
+            "quoted.dpli"
+        );
+        Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
+
+        var source = FacadeGenerator.Generate(
+            contract.Contract!,
+            "text(\"hello\").",
+            "quoted.pl",
+            Runtime.PrologLanguageMode.Extended,
+            new Runtime.PrologFlagOverrides { DoubleQuotes = Runtime.DoubleQuotesMode.Atom }
+        );
+
+        Assembly assembly = CompileGenerated(source);
+        Type type = assembly.GetType("Generated.Quoted.QuotedModule")!;
+        object module = type.GetMethod("Create", BindingFlags.Public | BindingFlags.Static, Type.EmptyTypes)!.Invoke(null, null)!;
+
+        // "hello" was read as one atom at build time, and Create() seeded the same override.
+        Assert.Equal(true, Call(module, type, "Text", "hello"));
+
+        TargetInvocationException mismatch = Assert.Throws<TargetInvocationException>(() =>
+            type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [new Compiler.PrologEngine()])
+        );
+        Assert.Contains("requires double_quotes to start at atom", mismatch.InnerException!.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InstallRestoresDoubleQuotesAfterDirectiveReplay()
+    {
+        ContractReadResult contract = ContractReader.Read(
+            """
+            :- clr_module('Replay').
+            :- clr_namespace('Generated.Replay').
+            :- clr_export(chars_text/1, semidet, [in(text, list(atom))]).
+            """,
+            "Generated.Replay",
+            "replay.dpli"
+        );
+        Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
+
+        var source = FacadeGenerator.Generate(
+            contract.Contract!,
+            """
+            :- set_prolog_flag(double_quotes, chars).
+            chars_text("ab").
+            """,
+            "replay.pl",
+            Runtime.PrologLanguageMode.Extended
+        );
+
+        Assembly assembly = CompileGenerated(source);
+        Type type = assembly.GetType("Generated.Replay.ReplayModule")!;
+        var engine = new Compiler.PrologEngine();
+        object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
+
+        // The source was one load unit: replaying its directive at install time must not leak the
+        // flag into the host engine, matching what consulting the same file would leave behind.
+        Assert.Equal(Runtime.DoubleQuotesMode.Codes, engine.Program.Flags.DoubleQuotes);
+        Assert.Equal(true, Call(module, type, "CharsText", (object)SplitInput));
+    }
+
+    [Fact]
+    public void EntryPointCarriesTheFlagOverrideIntoItsEngine()
+    {
+        var source = EntryPointGenerator.Generate(
+            "Generated.App",
+            [("app.pl", ":- initialization(true).")],
+            Runtime.PrologLanguageMode.Extended,
+            new Runtime.PrologFlagOverrides { DoubleQuotes = Runtime.DoubleQuotesMode.Chars }
+        );
+
+        Assert.Contains("DoubleQuotes = global::DotProlog.Runtime.DoubleQuotesMode.Chars", source, StringComparison.Ordinal);
+        Assert.Contains("requires double_quotes to start at chars", source, StringComparison.Ordinal);
+    }
 }

@@ -80,7 +80,7 @@
 
         <WriteLinesToFile
             File="$(DotPrologGeneratedPath).inputs"
-            Lines="language-mode=$(DotPrologLanguageMode);@(PrologCompile->'%(FullPath)');@(PrologContract->'%(FullPath)')"
+            Lines="language-mode=$(DotPrologLanguageMode);flags=$(DotPrologFlags);@(PrologCompile->'%(FullPath)');@(PrologContract->'%(FullPath)')"
             Overwrite="true"
             WriteOnlyWhenDifferent="true"
         />
@@ -112,6 +112,7 @@
             GenerateEntryPoint="$(_DotPrologGenerateEntryPoint)"
             GenerateTestHost="$(DotPrologTestProject)"
             LanguageMode="$(DotPrologLanguageMode)"
+            Flags="$(DotPrologFlags)"
         >
             <Output TaskParameter="GeneratedFiles" ItemName="DotPrologGeneratedCompile" />
         </GeneratePrologFacade>

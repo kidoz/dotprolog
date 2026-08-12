@@ -28,9 +28,18 @@ internal static class CompiledProgramEmitter
         IReadOnlyList<(string Name, int Arity)> hostBuiltins,
         PrologLanguageMode languageMode,
         out IReadOnlyList<Diagnostic> diagnostics
+    ) => Generate(sources, typeName, hostBuiltins, languageMode, PrologFlagOverrides.None, out diagnostics);
+
+    internal static string Generate(
+        IReadOnlyList<(string Name, string Text)> sources,
+        string typeName,
+        IReadOnlyList<(string Name, int Arity)> hostBuiltins,
+        PrologLanguageMode languageMode,
+        PrologFlagOverrides flagOverrides,
+        out IReadOnlyList<Diagnostic> diagnostics
     )
     {
-        var engine = new PrologEngine(languageMode)
+        var engine = new PrologEngine(languageMode, flagOverrides)
         {
             Output = TextWriter.Null,
             Error = TextWriter.Null,
@@ -69,7 +78,7 @@ internal static class CompiledProgramEmitter
         }
 
         var model = CompiledModel.Create(engine.Program, codeStart, initialization, preparation);
-        return Emit(model, typeName, languageMode);
+        return Emit(model, typeName, languageMode, engine.Program.InitialDoubleQuotes);
     }
 
     private static List<(int Functor, int Entry)> SnapshotPredicates(BytecodeProgram program, int codeStart)
@@ -87,7 +96,12 @@ internal static class CompiledProgramEmitter
         return predicates;
     }
 
-    private static string Emit(CompiledModel model, string typeName, PrologLanguageMode languageMode)
+    private static string Emit(
+        CompiledModel model,
+        string typeName,
+        PrologLanguageMode languageMode,
+        DoubleQuotesMode initialDoubleQuotes
+    )
     {
         var text = new StringBuilder();
         text.AppendLine(CultureInfo.InvariantCulture, $"private static class {typeName}");
@@ -103,6 +117,17 @@ internal static class CompiledProgramEmitter
         text.AppendLine(
             CultureInfo.InvariantCulture,
             $"            throw new global::DotProlog.Runtime.PrologException(\"Generated program requires {languageMode} language mode.\");"
+        );
+        text.AppendLine("        }");
+        text.AppendLine();
+        text.AppendLine(
+            CultureInfo.InvariantCulture,
+            $"        if (runtime.InitialDoubleQuotes != global::DotProlog.Runtime.DoubleQuotesMode.{initialDoubleQuotes})"
+        );
+        text.AppendLine("        {");
+        text.AppendLine(
+            CultureInfo.InvariantCulture,
+            $"            throw new global::DotProlog.Runtime.PrologException(\"Generated program requires double_quotes to start at {FlagName(initialDoubleQuotes)}.\");"
         );
         text.AppendLine("        }");
         text.AppendLine();
@@ -125,6 +150,16 @@ internal static class CompiledProgramEmitter
             );
         }
 
+        if (model.Preparation.Count > 0)
+        {
+            // The sources were read as load units, whose double_quotes changes do not outlive the
+            // unit. Replaying their directives here must not leak past Install either.
+            text.AppendLine();
+            text.AppendLine(
+                "        global::DotProlog.Runtime.DoubleQuotesMode enteringDoubleQuotes = runtime.Flags.DoubleQuotes;"
+            );
+        }
+
         foreach (PreparationStep step in model.Preparation)
         {
             text.AppendLine();
@@ -143,6 +178,12 @@ internal static class CompiledProgramEmitter
             text.AppendLine("        {");
             text.AppendLine("            engine.Output.Write(\"Warning: directive failed.\\n\");");
             text.AppendLine("        }");
+        }
+
+        if (model.Preparation.Count > 0)
+        {
+            text.AppendLine();
+            text.AppendLine("        runtime.Flags.SetDoubleQuotes(enteringDoubleQuotes);");
         }
 
         text.AppendLine();
@@ -213,6 +254,15 @@ internal static class CompiledProgramEmitter
         text.AppendLine("}");
         return text.ToString();
     }
+
+    /// <summary>The Prolog spelling of a <c>double_quotes</c> value, for diagnostics.</summary>
+    private static string FlagName(DoubleQuotesMode mode) =>
+        mode switch
+        {
+            DoubleQuotesMode.Chars => "chars",
+            DoubleQuotesMode.Atom => "atom",
+            _ => "codes",
+        };
 
     private static void AppendFunctors(StringBuilder text, CompiledModel model)
     {

@@ -28,10 +28,13 @@ public sealed class PrologEngine : IRuntimeCompiler
     public PrologEngine()
         : this(PrologLanguageMode.Extended) { }
 
-    /// <summary>Creates an engine using <paramref name="languageMode"/>.</summary>
-    public PrologEngine(PrologLanguageMode languageMode)
+    /// <summary>
+    /// Creates an engine using <paramref name="languageMode"/>, with
+    /// <paramref name="flagOverrides"/> layered over the mode's initial flag values.
+    /// </summary>
+    public PrologEngine(PrologLanguageMode languageMode, PrologFlagOverrides? flagOverrides = null)
     {
-        Program = new BytecodeProgram(languageMode);
+        Program = new BytecodeProgram(languageMode, flagOverrides);
         _modules = new ModuleTable(Program.Modules);
         CoreBuiltins.RegisterAll(Program);
         Machine = new Machine(Program);

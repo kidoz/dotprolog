@@ -42,32 +42,71 @@ internal static class Program
     private static int Run(ReadOnlySpan<string> args, TextWriter output, TextWriter error)
     {
         PrologLanguageMode languageMode = PrologLanguageMode.Extended;
-        if (args.Length > 1 && args[0] == "--mode")
+        List<string> flagEntries = [];
+        List<string> paths = [];
+
+        for (var index = 0; index < args.Length; index++)
         {
-            if (!PrologLanguageModes.TryParse(args[1], out languageMode))
+            var argument = args[index];
+            if (argument == "--mode")
             {
-                error.WriteLine($"error: unknown language mode: {args[1]}");
-                error.WriteLine($"       expected one of: {LanguageModeNames}");
+                if (index + 1 >= args.Length)
+                {
+                    error.WriteLine("error: missing language mode after --mode");
+                    error.WriteLine($"       expected one of: {LanguageModeNames}");
+                    return ExitUsage;
+                }
+
+                var selected = args[++index];
+                if (!PrologLanguageModes.TryParse(selected, out languageMode))
+                {
+                    error.WriteLine($"error: unknown language mode: {selected}");
+                    error.WriteLine($"       expected one of: {LanguageModeNames}");
+                    return ExitUsage;
+                }
+
+                continue;
+            }
+
+            if (argument == "--flag")
+            {
+                if (!TryReadFlagEntry(args, ref index, flagEntries, error))
+                {
+                    return ExitUsage;
+                }
+
+                continue;
+            }
+
+            if (argument.StartsWith('-'))
+            {
+                error.WriteLine($"error: unknown run option: {argument}");
+                WriteRunUsage(error);
                 return ExitUsage;
             }
 
-            args = args[2..];
+            paths.Add(argument);
         }
 
-        if (args.Length != 1)
+        if (paths.Count != 1)
         {
-            error.WriteLine($"Usage: dotnet prolog run [--mode {LanguageModeNames}] <file.pl>");
+            WriteRunUsage(error);
             return ExitUsage;
         }
 
-        var path = args[0];
+        if (!TryParseFlagEntries(flagEntries, error, out PrologFlagOverrides flagOverrides))
+        {
+            return ExitUsage;
+        }
+
+        var path = paths[0];
         if (!File.Exists(path))
         {
             error.WriteLine($"error: file not found: {path}");
             return ExitUsage;
         }
 
-        var engine = new PrologEngine(languageMode) { Output = output, Error = error };
+        var engine = new PrologEngine(languageMode, flagOverrides) { Output = output, Error = error };
 
         LoadResult loaded = engine.ConsultFile(path);
         foreach (Diagnostic diagnostic in loaded.Diagnostics)
@@ -108,6 +147,7 @@ internal static class Program
         int? indentSize = null;
         int? maxLineLength = null;
         int? maxClauseLines = null;
+        List<string> flagEntries = [];
         List<string> paths = [];
 
         for (var index = 0; index < args.Length; index++)
@@ -133,6 +173,16 @@ internal static class Program
                 {
                     error.WriteLine($"error: unknown language mode: {selected}");
                     error.WriteLine($"       expected one of: {LanguageModeNames}");
+                    return ExitUsage;
+                }
+
+                continue;
+            }
+
+            if (argument == "--flag")
+            {
+                if (!TryReadFlagEntry(args, ref index, flagEntries, error))
+                {
                     return ExitUsage;
                 }
 
@@ -216,6 +266,11 @@ internal static class Program
             return ExitUsage;
         }
 
+        if (!TryParseFlagEntries(flagEntries, error, out PrologFlagOverrides flagOverrides))
+        {
+            return ExitUsage;
+        }
+
         lintOptions = lintOptions with
         {
             IndentSize = indentSize ?? lintOptions.IndentSize,
@@ -247,7 +302,7 @@ internal static class Program
                 continue;
             }
 
-            var program = new BytecodeProgram(languageMode);
+            var program = new BytecodeProgram(languageMode, flagOverrides);
             ParseResult parsed = TermReader.ReadProgram(
                 source,
                 absolute,
@@ -284,6 +339,30 @@ internal static class Program
         return ExitUsage;
     }
 
+    private static bool TryReadFlagEntry(ReadOnlySpan<string> args, ref int index, List<string> flagEntries, TextWriter error)
+    {
+        if (index + 1 >= args.Length)
+        {
+            error.WriteLine("error: missing flag override after --flag");
+            error.WriteLine($"       expected: {PrologFlagOverrides.Entries}");
+            return false;
+        }
+
+        flagEntries.Add(args[++index]);
+        return true;
+    }
+
+    private static bool TryParseFlagEntries(List<string> flagEntries, TextWriter error, out PrologFlagOverrides flagOverrides)
+    {
+        if (PrologFlagOverrides.TryParse(string.Join(';', flagEntries), out flagOverrides, out var flagError))
+        {
+            return true;
+        }
+
+        error.WriteLine($"error: invalid flag override: {flagError}");
+        return false;
+    }
+
     private static bool TryReadPositiveLintInteger(
         ReadOnlySpan<string> args,
         ref int index,
@@ -315,9 +394,9 @@ internal static class Program
         output.WriteLine("dotnet prolog — run and analyze Prolog on .NET");
         output.WriteLine();
         output.WriteLine("Usage:");
-        output.WriteLine($"  dotnet prolog run [--mode {LanguageModeNames}] <file.pl>");
+        output.WriteLine($"  dotnet prolog run [--mode {LanguageModeNames}] [--flag name=value] <file.pl>");
         output.WriteLine("      consult a file and run its goals");
-        output.WriteLine($"  dotnet prolog lint [--mode {LanguageModeNames}] [--profile {LintProfileNames}]");
+        output.WriteLine($"  dotnet prolog lint [--mode {LanguageModeNames}] [--flag name=value] [--profile {LintProfileNames}]");
         output.WriteLine("      [--warnings-as-errors] <file.pl>...");
         output.WriteLine("      analyze source without consulting it or executing directives");
         output.WriteLine();
@@ -325,11 +404,21 @@ internal static class Program
         output.WriteLine("  extended     ISO plus the DotProlog extensions (default)");
         output.WriteLine("  strict-iso   only the standardized ISO/IEC 13211 surface");
         output.WriteLine("  modern       extended, with double_quotes starting at chars");
+        output.WriteLine();
+        output.WriteLine("Flag overrides (--flag, repeatable) layer an initial flag value over the mode:");
+        output.WriteLine($"  {PrologFlagOverrides.Entries}");
+    }
+
+    private static void WriteRunUsage(TextWriter output)
+    {
+        output.WriteLine($"Usage: dotnet prolog run [--mode {LanguageModeNames}] [--flag name=value] <file.pl>");
     }
 
     private static void WriteLintUsage(TextWriter output)
     {
-        output.WriteLine($"Usage: dotnet prolog lint [--mode {LanguageModeNames}] [--profile {LintProfileNames}]");
+        output.WriteLine(
+            $"Usage: dotnet prolog lint [--mode {LanguageModeNames}] [--flag name=value] [--profile {LintProfileNames}]"
+        );
         output.WriteLine("       [--indent-size N] [--max-line-length N] [--max-clause-lines N]");
         output.WriteLine("       [--warnings-as-errors] <file.pl>...");
     }
