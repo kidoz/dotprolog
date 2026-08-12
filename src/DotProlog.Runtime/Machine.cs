@@ -271,7 +271,9 @@ public sealed class Machine
 
     private RunResult Execute()
     {
-        // Cached for the dispatch loop; the program is not mutated while a goal is running.
+        // Cached for the dispatch loop. The program is append-only, so a stale array is safe for
+        // every address that existed when it was cached; each place that can append — builtins,
+        // meta-calls, and compiled predicates — refreshes the cache before a new address is read.
         var code = _program.Code;
         Cell[] constants = _program.Constants;
 
@@ -283,6 +285,12 @@ public sealed class Machine
             {
                 var execution = new CompiledExecution(this);
                 proved = _program.ExecuteCompiled(_pc, ref execution);
+
+                // Compiled code can consult, assert, or lower a meta-called control goal, all of
+                // which append to the program and can replace these arrays — and a lowered goal's
+                // entry lies beyond the old array's length.
+                code = _program.Code;
+                constants = _program.Constants;
 
                 if (proved)
                 {
