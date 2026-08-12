@@ -27,6 +27,53 @@ internal static class TermReifier
         return ToSyntaxCore(machine, term, variables);
     }
 
+    /// <summary>
+    /// Rebuilds a meta-called control goal as syntax, keeping only the control skeleton
+    /// structural. Every argument of a leaf goal — bound or unbound — becomes a shared variable
+    /// carried through an argument register, so the compiled goal operates on the caller's live
+    /// cells rather than rebuilt copies; <c>setarg/3</c> makes the difference observable. See
+    /// ADR 0045.
+    /// </summary>
+    internal static SyntaxTerm ToControlSyntax(Machine machine, Cell term, Dictionary<string, Cell> variables)
+    {
+        Cell cell = machine.Dereference(term);
+
+        if (cell.Tag != CellTag.Structure)
+        {
+            return ToSyntaxCore(machine, cell, variables);
+        }
+
+        Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(cell.Index).Index);
+        var name = machine.Symbols.AtomName(functor.NameAtom);
+        var control = (functor.Arity == 2 && name is "," or ";" or "->" or "*->") || (functor.Arity == 1 && name == "\\+");
+
+        var arguments = new SyntaxTerm[functor.Arity];
+        for (var i = 0; i < functor.Arity; i++)
+        {
+            Cell argument = machine.HeapAt(cell.Index + 1 + i);
+            arguments[i] = control ? ToControlSyntax(machine, argument, variables) : LeafArgument(machine, argument, variables);
+        }
+
+        return new CompoundTerm(name, arguments, SourceSpan.None);
+    }
+
+    // A structure argument keeps the caller's cell the same way an unbound variable does: it is
+    // named after its heap address and handed over through a register. Immediate cells have no
+    // identity to lose and stay literal.
+    private static SyntaxTerm LeafArgument(Machine machine, Cell term, Dictionary<string, Cell> variables)
+    {
+        Cell cell = machine.Dereference(term);
+
+        if (cell.Tag != CellTag.Structure)
+        {
+            return ToSyntaxCore(machine, cell, variables);
+        }
+
+        var name = string.Create(CultureInfo.InvariantCulture, $"_G{cell.Index}");
+        variables.TryAdd(name, cell);
+        return new VariableTerm(name, SourceSpan.None);
+    }
+
     private static SyntaxTerm ToSyntaxCore(Machine machine, Cell term, Dictionary<string, Cell>? variables)
     {
         Cell cell = machine.Dereference(term);

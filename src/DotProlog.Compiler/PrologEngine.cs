@@ -778,7 +778,7 @@ public sealed class PrologEngine : IRuntimeCompiler
         }
 
         var variables = new Dictionary<string, Cell>(StringComparer.Ordinal);
-        SyntaxTerm body = TermReifier.ToSyntax(machine, goal, variables);
+        SyntaxTerm body = TermReifier.ToControlSyntax(machine, goal, variables);
         var names = CollectVariableNames(body);
 
         if (names.Length >= Machine.ArgumentRegisterCount || names.Length > arguments.Length)
@@ -822,20 +822,28 @@ public sealed class PrologEngine : IRuntimeCompiler
     /// interned identity and variables numbered by first occurrence — and collects those variables
     /// in the same order <see cref="CollectVariableNames"/> reaches them in the reified goal.
     /// </summary>
+    private const byte ControlPosition = 0;
+    private const byte LeafPosition = 1;
+    private const byte LeavingPosition = 2;
+
+    // The key walks the goal exactly as TermReifier.ToControlSyntax does — depth-first, left to
+    // right, one ordinal per distinct cell address, structures in leaf positions abstracted the
+    // same way variables are — so the variable list stays aligned with the compiled head's
+    // first-occurrence argument order (ADR 0045).
     private static string ControlGoalKey(Machine machine, Cell goal, out List<Cell> variables)
     {
         var key = new System.Text.StringBuilder();
         Dictionary<int, int> ordinals = [];
         HashSet<int> active = [];
         variables = [];
-        List<(Cell Cell, bool Leaving)> work = [(goal, false)];
+        List<(Cell Cell, byte Position)> work = [(goal, ControlPosition)];
 
         while (work.Count > 0)
         {
-            (Cell source, var leaving) = work[^1];
+            (Cell source, var position) = work[^1];
             work.RemoveAt(work.Count - 1);
 
-            if (leaving)
+            if (position == LeavingPosition)
             {
                 active.Remove(source.Index);
                 key.Append(')');
@@ -846,14 +854,7 @@ public sealed class PrologEngine : IRuntimeCompiler
             switch (cell.Tag)
             {
                 case CellTag.Reference:
-                    if (!ordinals.TryGetValue(cell.Index, out var ordinal))
-                    {
-                        ordinal = variables.Count;
-                        ordinals[cell.Index] = ordinal;
-                        variables.Add(cell);
-                    }
-
-                    key.Append('V').Append(ordinal).Append(',');
+                    AppendOrdinal(key, cell, ordinals, variables);
                     break;
 
                 case CellTag.Atom:
@@ -870,19 +871,33 @@ public sealed class PrologEngine : IRuntimeCompiler
 
                 case CellTag.Structure:
                 {
-                    // A rational control term cannot be reified into finite syntax; reject it with
-                    // a catchable error rather than looping here or overflowing in the reifier.
+                    // A structure filling a leaf-goal argument travels through a register like a
+                    // variable, so it is abstracted rather than walked; a cyclic term there is
+                    // legal because it is never reified.
+                    if (position == LeafPosition)
+                    {
+                        AppendOrdinal(key, cell, ordinals, variables);
+                        break;
+                    }
+
+                    // A rational control skeleton cannot be reified into finite syntax; reject it
+                    // with a catchable error rather than looping here or overflowing later.
                     if (!active.Add(cell.Index))
                     {
                         throw PrologErrors.Representation(machine, "cyclic_term");
                     }
 
                     var functorId = machine.HeapAt(cell.Index).Index;
+                    Functor functor = machine.Symbols.GetFunctor(functorId);
+                    var name = machine.Symbols.AtomName(functor.NameAtom);
+                    var control =
+                        (functor.Arity == 2 && name is "," or ";" or "->" or "*->") || (functor.Arity == 1 && name == "\\+");
+
                     key.Append('s').Append(functorId).Append('(');
-                    work.Add((cell, true));
-                    for (var i = machine.Symbols.ArityOf(functorId); i >= 1; i--)
+                    work.Add((cell, LeavingPosition));
+                    for (var i = functor.Arity; i >= 1; i--)
                     {
-                        work.Add((machine.HeapAt(cell.Index + i), false));
+                        work.Add((machine.HeapAt(cell.Index + i), control ? ControlPosition : LeafPosition));
                     }
 
                     break;
@@ -895,6 +910,23 @@ public sealed class PrologEngine : IRuntimeCompiler
         }
 
         return key.ToString();
+    }
+
+    private static void AppendOrdinal(
+        System.Text.StringBuilder key,
+        Cell cell,
+        Dictionary<int, int> ordinals,
+        List<Cell> variables
+    )
+    {
+        if (!ordinals.TryGetValue(cell.Index, out var ordinal))
+        {
+            ordinal = variables.Count;
+            ordinals[cell.Index] = ordinal;
+            variables.Add(cell);
+        }
+
+        key.Append('V').Append(ordinal).Append(',');
     }
 
     /// <inheritdoc />
