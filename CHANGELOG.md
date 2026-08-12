@@ -15,7 +15,7 @@ All notable changes to DotProlog are recorded here. The format follows
 - A [SWI compatibility ledger](docs/reference/swi-compatibility.md) recording, feature by feature,
   which parts of the SWI-Prolog surface the extended modes implement, which are later roadmap
   phases, and which are out of charter.
-- A second SWI-aligned tranche: `del_assoc/4`, `transpose_pairs/2`, `ord_union/2`,
+- More SWI-aligned predicates: `del_assoc/4`, `transpose_pairs/2`, `ord_union/2`,
   `ord_intersection/2`, `aggregate/3,4` and `aggregate_all/4` for the simple specs, `variant/2`,
   `?=/2`, `char_type/2` and `code_type/2` for bound characters, `between/3` with an `inf` upper
   bound, and the `~r`/`~R` radix format directives.
@@ -38,6 +38,11 @@ All notable changes to DotProlog are recorded here. The format follows
   unification is a documented unchecked window; `StrictIso` keeps the ISO flag set unchanged.
 - A natural-language processing sample in `Modern` mode (`samples/NaturalLanguage`), and the
   DotProlog logo on the project landing pages.
+- `nb_current/2`, which fails for an unset name and enumerates the set variables when the name
+  is unbound; `ord_seteq/2` and `ord_symdiff/3`, completing `library(ordsets)`; and the witnessed
+  `max/2` and `min/2` aggregation specs across `aggregate/3,4` and `aggregate_all/3,4`, which
+  compare arithmetically, keep the first solution on a tie, and answer `max(Value, Witness)` /
+  `min(Value, Witness)`. All verified against SWI-Prolog by the differential corpus.
 - Project-level initial flag overrides: the `DotPrologFlags` property in a `.dplproj` (and the
   repeatable `--flag` option on `dotnet prolog run` and `lint`) layers an initial flag value over
   the language mode, e.g. `double_quotes=chars` while staying in `extended` mode. The mode remains
