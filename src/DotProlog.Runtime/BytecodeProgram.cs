@@ -92,8 +92,9 @@ public sealed class BytecodeProgram
     public DoubleQuotesMode InitialDoubleQuotes { get; }
 
     /// <summary>
-    /// The initial <c>double_quotes</c> value a mode carries. ISO/IEC 13211-1 fixes it at
-    /// <c>codes</c>, which is what every mode but <see cref="PrologLanguageMode.Modern"/> keeps.
+    /// The initial <c>double_quotes</c> value a mode carries. ISO/IEC 13211-1 leaves the initial
+    /// value implementation defined; DotProlog's documented choice is <c>codes</c>, which every
+    /// mode but <see cref="PrologLanguageMode.Modern"/> keeps.
     /// </summary>
     private static DoubleQuotesMode InitialDoubleQuotesOf(PrologLanguageMode languageMode) =>
         languageMode == PrologLanguageMode.Modern ? DoubleQuotesMode.Chars : DoubleQuotesMode.Codes;

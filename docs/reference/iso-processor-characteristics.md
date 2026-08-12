@@ -64,9 +64,10 @@ is classified by the explicit graphic, solo, layout, and meta-character tables. 
 collation is ordinal by UTF-16 code unit. The byte sequence associated with a character is its UTF-8
 encoding for a text file; binary streams do not perform character conversion.
 
-The initial `double_quotes` flag is `codes` in the `Extended` and `StrictIso` language modes, as
-ISO/IEC 13211-1 requires. The opt-in `Modern` mode starts it at `chars` instead; that mode is an
-extension and is outside the conformance claim. The value is scoped to the load unit: a
+ISO/IEC 13211-1 leaves the initial `double_quotes` value implementation defined (7.11.2.5), and
+this page is where DotProlog defines it: `codes` in the `Extended` and `StrictIso` language modes,
+matching the ISO-oriented systems. The opt-in `Modern` mode starts it at `chars`, another value
+from the flag's ISO domain. The value is scoped to the load unit: a
 `set_prolog_flag(double_quotes, _)` directive governs the rest of the file that issued it, and the
 entering value is restored when that file finishes loading.
 
