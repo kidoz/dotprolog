@@ -38,6 +38,47 @@ internal static class StandardLibrary
         once(G) :- call(G), !.
         ignore(G) :- ( call(G) -> true ; true ).
 
+        % --- Cleanup goals -----------------------------------------------------------
+        % setup_call_cleanup/3 runs Cleanup exactly once when Goal's outcome is decided:
+        % a deterministic success (including the redo that exhausts the alternatives),
+        % failure, or a thrown ball. A surrounding cut that discards Goal's pending
+        % alternatives does not reach the deferred cleanup — write once(Goal) when
+        % commit semantics are wanted. The SWI rules this follows: once(Setup) runs
+        % first; a ball from Goal outranks anything Cleanup throws; Cleanup's failure
+        % is ignored while its ball propagates when nothing else is pending.
+
+        setup_call_cleanup(Setup, Goal, Cleanup) :-
+            once(Setup),
+            catch('$call_cleanup'(Goal, Cleanup), Ball, '$cleanup_recover'(Cleanup, Ball)).
+
+        call_cleanup(Goal, Cleanup) :-
+            setup_call_cleanup(true, Goal, Cleanup).
+
+        % Equal depths around the meta-call mean a deterministic exit: the cut then
+        % discards the failure clause so cleanup cannot run a second time.
+        '$call_cleanup'(Goal, Cleanup) :-
+            '$choice_points'(B0),
+            call(Goal),
+            '$choice_points'(B1),
+            (   B1 =:= B0
+            ->  !,
+                '$cleanup_once'(Cleanup)
+            ;   true
+            ).
+        '$call_cleanup'(_, Cleanup) :-
+            '$cleanup_once'(Cleanup),
+            fail.
+
+        % A ball the cleanup threw after already running is marked, so the recovery
+        % can rethrow it without running the cleanup again.
+        '$cleanup_once'(Cleanup) :-
+            catch(ignore(Cleanup), Ball, throw('$cleanup_ball'(Ball))).
+
+        '$cleanup_recover'(_, '$cleanup_ball'(Ball)) :- !, throw(Ball).
+        '$cleanup_recover'(Cleanup, Ball) :-
+            catch(ignore(Cleanup), _, true),
+            throw(Ball).
+
         % --- Lists -----------------------------------------------------------------
 
         append([], L, L).

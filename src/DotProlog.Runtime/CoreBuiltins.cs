@@ -141,6 +141,13 @@ public static class CoreBuiltins
         // The one piece call/2..8 needs from the runtime: everything else about them is Prolog.
         registry.Register("$add_args", 3, AddArguments);
 
+        // The one piece setup_call_cleanup/3 needs: whether a meta-call left alternatives behind.
+        registry.Register(
+            "$choice_points",
+            1,
+            static machine => machine.Unify(machine.Argument(0), Cell.Integer60(machine.ChoicePointDepth))
+        );
+
         // Resolves Module:Goal to the predicate a module system compiled it to.
         registry.Register("$qualify", 3, Qualify);
 
@@ -457,6 +464,8 @@ public static class CoreBuiltins
             ("aggregate_all", 4) or ("aggregate", 4) => [2],
             ("forall", 2) => [0, 1],
             ("once", 1) or ("ignore", 1) or ("not", 1) => [0],
+            ("setup_call_cleanup", 3) => [0, 1, 2],
+            ("call_cleanup", 2) => [0, 1],
             ("catch", 3) => [0, 2],
             ("with_output_to", 2) => [1],
             ("call", >= 1 and <= 8) => [0],

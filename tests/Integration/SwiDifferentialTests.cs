@@ -48,7 +48,14 @@ public sealed class SwiDifferentialTests
         "current_output(S), write(a), tab(S, 2), write(b)",
         "nb_setval(k, f(1, a)), nb_getval(k, V), write(V)",
         "b_setval(k, 1), ( b_setval(k, 2), fail ; b_getval(k, V) ), write(V)",
-        "nb_setval(k, base), ( b_setval(k, temp), fail ; true ), nb_getval(k, V), write(V)"
+        "nb_setval(k, base), ( b_setval(k, temp), fail ; true ), nb_getval(k, V), write(V)",
+        "setup_call_cleanup(true, write(g), write(c)), write(k)",
+        "( setup_call_cleanup(true, fail, write(c)) -> true ; write(f) )",
+        "catch(setup_call_cleanup(true, throw(a), throw(b)), E, true), write(E)",
+        "catch(setup_call_cleanup(true, true, throw(c)), E, true), write(E)",
+        "findall(X, setup_call_cleanup(true, member(X, [1, 2]), write(c)), L), write(L)",
+        "setup_call_cleanup(true, once(member(X, [1, 2])), write(c)), write(X)",
+        "( setup_call_cleanup(fail, true, write(never)) -> true ; write(setup_failed) )"
     );
 
     // The corpus stays runnable on DotProlog alone, so a corpus typo or a regression in the

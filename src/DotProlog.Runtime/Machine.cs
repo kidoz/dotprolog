@@ -702,6 +702,12 @@ public sealed class Machine
     /// <summary>The current trail position, for a builtin that wants to undo a trial unification.</summary>
     public int TrailMark => _tr;
 
+    /// <summary>
+    /// The choice-point stack depth. Comparing depths around a meta-call is how the library's
+    /// <c>setup_call_cleanup/3</c> recognizes a deterministic exit.
+    /// </summary>
+    internal int ChoicePointDepth => _b;
+
     /// <summary>Undoes every binding trailed since <paramref name="mark"/>.</summary>
     public void UndoTo(int mark) => UndoTrail(mark);
 

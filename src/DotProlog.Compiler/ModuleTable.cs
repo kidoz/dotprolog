@@ -53,6 +53,8 @@ public sealed class ModuleTable
         DeclareMeta("forall", 2, [(0, 0), (1, 0)]);
         DeclareMeta("once", 1, [(0, 0)]);
         DeclareMeta("ignore", 1, [(0, 0)]);
+        DeclareMeta("setup_call_cleanup", 3, [(0, 0), (1, 0), (2, 0)]);
+        DeclareMeta("call_cleanup", 2, [(0, 0), (1, 0)]);
         DeclareMeta("not", 1, [(0, 0)]);
         DeclareMeta("catch", 3, [(0, 0), (2, 0)]);
         DeclareMeta("with_output_to", 2, [(1, 0)]);
