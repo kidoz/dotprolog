@@ -316,6 +316,285 @@ internal static class StandardLibrary
         '$sink'(chars(C), Text) :- !, atom_chars(Text, C).
         '$sink'(Sink, _) :- throw(error(domain_error(output_sink, Sink), with_output_to/2)).
 
+        % --- Formatted output -------------------------------------------------------
+        % format/1,2,3 wrap the native '$format' engine so that ~@ can run its goal,
+        % which a native builtin cannot: each goal runs here, once, with its output
+        % captured, and the directive is rewritten to ~a over the captured atom. The
+        % scan mirrors the engine's argument consumption so later directives keep
+        % their arguments; text without a ~@ passes through unchanged.
+
+        format(Text) :- format(Text, []).
+
+        format(Text, Arguments) :-
+            '$format_expand'(Text, Arguments, Text2, Arguments2, Status),
+            '$format_emit'(Status, Text2, Arguments2).
+
+        '$format_emit'(ok, Text, Args) :- '$format'(Text, Args).
+        '$format_emit'(stopped(fail), Text, Args) :- '$format_prefix_emit'(Text, Args), fail.
+        '$format_emit'(stopped(throw(Ball)), Text, Args) :- '$format_prefix_emit'(Text, Args), throw(Ball).
+
+        % An empty prefix writes nothing: the empty code list would otherwise be
+        % read back as the atom [].
+        '$format_prefix_emit'(Text, Args) :- ( Text == [] -> true ; '$format'(Text, Args) ).
+
+        format(Sink, Text, Arguments) :-
+            '$format_expand'(Text, Arguments, Text2, Arguments2, Status),
+            (   Status == ok
+            ->  '$format'(Sink, Text2, Arguments2)
+            ;   '$format_capture_sink'(Sink)
+            ->  '$format_stop'(Status)
+            ;   ( Text2 == [] -> true ; '$format'(Sink, Text2, Arguments2) ),
+                '$format_stop'(Status)
+            ).
+
+        '$format_capture_sink'(Sink) :-
+            nonvar(Sink),
+            ( Sink = atom(_) ; Sink = codes(_) ; Sink = chars(_) ).
+
+        '$format_stop'(stopped(fail)) :- fail.
+        '$format_stop'(stopped(throw(Ball))) :- throw(Ball).
+
+        '$format_expand'(Text, Arguments, Text2, Arguments2, Status) :-
+            (   '$format_codes'(Text, Codes),
+                memberchk(0'@, Codes)
+            ->  ( is_list(Arguments) -> Args = Arguments ; Args = [Arguments] ),
+                '$format_scan'(Codes, Args, [], [], Text2, Arguments2, Status)
+            ;   Text2 = Text,
+                Arguments2 = Arguments,
+                Status = ok
+            ).
+
+        '$format_codes'(Text, Codes) :-
+            (   atom(Text) -> atom_codes(Text, Codes)
+            ;   is_list(Text) -> '$format_list_codes'(Text, Codes)
+            ;   fail
+            ).
+
+        '$format_list_codes'([], []).
+        '$format_list_codes'([H|T], [C|Cs]) :-
+            ( integer(H) -> C = H ; atom(H), char_code(H, C) ),
+            '$format_list_codes'(T, Cs).
+
+        % The rewritten text and consumed arguments accumulate in reverse, so a
+        % ~@ goal that fails or throws can still hand back the prefix scanned
+        % before it: SWI streams directives, and the text before the goal has
+        % already been emitted when the goal stops the format.
+        '$format_scan'([], Args, RevOut, RevArgs, Out, OutArgs, ok) :-
+            reverse(RevOut, Out),
+            '$format_close_args'(RevArgs, Args, OutArgs).
+        '$format_scan'([0'~|T], Args, RevOut, RevArgs, Out, OutArgs, Status) :- !,
+            '$format_after'(T, Args, [0'~|RevOut], RevArgs, Out, OutArgs, Status).
+        '$format_scan'([C|T], Args, RevOut, RevArgs, Out, OutArgs, Status) :-
+            '$format_scan'(T, Args, [C|RevOut], RevArgs, Out, OutArgs, Status).
+
+        '$format_close_args'([], Tail, Tail).
+        '$format_close_args'([A|R], Tail, Args) :- '$format_close_args'(R, [A|Tail], Args).
+
+        % The optional prefix before the directive character: a backquoted fill
+        % character (code 96 spelled numerically — a backquote literal would read
+        % as a backquoted atom), a * count taken from the arguments, or digits.
+        '$format_after'(Codes, Args, RevOut, RevArgs, Out, OutArgs, Status) :-
+            (   Codes = [96, F|T]
+            ->  '$format_apply'(T, Args, [F, 96|RevOut], RevArgs, Out, OutArgs, Status)
+            ;   Codes = [0'*|T]
+            ->  (   Args = [N|Args1]
+                ->  '$format_apply'(T, Args1, [0'*|RevOut], [N|RevArgs], Out, OutArgs, Status)
+                ;   '$format_apply'(T, Args, [0'*|RevOut], RevArgs, Out, OutArgs, Status)
+                )
+            ;   '$format_take_digits'(Codes, T, RevOut, RevOut1)
+            ->  '$format_apply'(T, Args, RevOut1, RevArgs, Out, OutArgs, Status)
+            ;   '$format_apply'(Codes, Args, RevOut, RevArgs, Out, OutArgs, Status)
+            ).
+
+        '$format_take_digits'([C|T], Rest, RevOut, RevOutFinal) :-
+            C >= 0'0, C =< 0'9,
+            (   '$format_take_digits'(T, Rest, [C|RevOut], RevOutFinal)
+            ->  true
+            ;   Rest = T, RevOutFinal = [C|RevOut]
+            ).
+
+        '$format_apply'([], Args, RevOut, RevArgs, Out, OutArgs, ok) :-
+            reverse(RevOut, Out),
+            '$format_close_args'(RevArgs, Args, OutArgs).
+        '$format_apply'([0'@|T], [Goal|Args], RevOut, RevArgs, Out, OutArgs, Status) :- !,
+            (   catch(with_output_to(atom(Captured), once(Goal)), Ball, true)
+            ->  (   var(Ball)
+                ->  '$format_scan'(T, Args, [0'a|RevOut], [Captured|RevArgs], Out, OutArgs, Status)
+                ;   '$format_stopped'(RevOut, RevArgs, Out, OutArgs), Status = stopped(throw(Ball))
+                )
+            ;   '$format_stopped'(RevOut, RevArgs, Out, OutArgs), Status = stopped(fail)
+            ).
+        '$format_apply'([0'W|T], Args, RevOut, RevArgs, Out, OutArgs, Status) :- !,
+            (   Args = [A, B|Args1]
+            ->  '$format_scan'(T, Args1, [0'W|RevOut], [B, A|RevArgs], Out, OutArgs, Status)
+            ;   '$format_scan'(T, Args, [0'W|RevOut], RevArgs, Out, OutArgs, Status)
+            ).
+        '$format_apply'([D|T], Args, RevOut, RevArgs, Out, OutArgs, Status) :-
+            (   '$format_one_arg'(D),
+                Args = [A|Args1]
+            ->  '$format_scan'(T, Args1, [D|RevOut], [A|RevArgs], Out, OutArgs, Status)
+            ;   '$format_scan'(T, Args, [D|RevOut], RevArgs, Out, OutArgs, Status)
+            ).
+
+        % Everything scanned before the directive's own '~' becomes the prefix.
+        '$format_stopped'(RevOut, RevArgs, Out, OutArgs) :-
+            '$format_strip_directive'(RevOut, RevPrefix),
+            reverse(RevPrefix, Out),
+            '$format_close_args'(RevArgs, [], OutArgs).
+
+        '$format_strip_directive'([0'~|Rest], Rest) :- !.
+        '$format_strip_directive'([_|T], Rest) :- '$format_strip_directive'(T, Rest).
+
+        '$format_one_arg'(0'w).
+        '$format_one_arg'(0'p).
+        '$format_one_arg'(0'q).
+        '$format_one_arg'(0'a).
+        '$format_one_arg'(0'd).
+        '$format_one_arg'(0'D).
+        '$format_one_arg'(0'e).
+        '$format_one_arg'(0'f).
+        '$format_one_arg'(0'g).
+        '$format_one_arg'(0'r).
+        '$format_one_arg'(0'R).
+        '$format_one_arg'(0's).
+        '$format_one_arg'(0'c).
+        '$format_one_arg'(0'i).
+
+        % --- Clause pretty-printing (portray_clause/1,2) ------------------------------
+        % SWI's listing layout: the head, ' :-', one goal per line four spaces in,
+        % and control blocks bracketed with (   / ;   / ->  / ) at the enclosing
+        % indent. Named variables print as A, B, ...; singletons as underscore.
+
+        portray_clause(Clause) :-
+            '$portray_names'(Clause, Names),
+            '$portray_clause'('$portray_current', Clause, Names).
+
+        portray_clause(Stream, Clause) :-
+            '$portray_names'(Clause, Names),
+            '$portray_clause'(Stream, Clause, Names).
+
+        % The layout writes through these so portray_clause/1 reaches the current
+        % output — which may be a with_output_to capture with no addressable
+        % handle — while portray_clause/2 targets its explicit stream.
+        '$portray_write'('$portray_current', Text) :- !, write(Text).
+        '$portray_write'(S, Text) :- write(S, Text).
+
+        '$portray_nl'('$portray_current') :- !, nl.
+        '$portray_nl'(S) :- nl(S).
+
+        '$portray_tab'('$portray_current', N) :- !, tab(N).
+        '$portray_tab'(S, N) :- tab(S, N).
+
+        '$portray_clause'(S, Clause, Names) :-
+            (   nonvar(Clause), Clause = (Head :- Body)
+            ->  (   Body == true
+                ->  '$portray_goal'(S, Head, Names)
+                ;   '$portray_goal'(S, Head, Names),
+                    '$portray_write'(S, ' :-'), '$portray_nl'(S), '$portray_tab'(S, 4),
+                    '$portray_body'(S, Body, 4, Names)
+                )
+            ;   '$portray_goal'(S, Clause, Names)
+            ),
+            '$portray_write'(S, '.'), '$portray_nl'(S).
+
+        % The cursor is already at the goal column when a body is written.
+        '$portray_body'(S, Goal, Col, Names) :-
+            (   var(Goal)
+            ->  '$portray_goal'(S, Goal, Names)
+            ;   Goal = (A, B)
+            ->  '$portray_body'(S, A, Col, Names),
+                '$portray_write'(S, ','), '$portray_nl'(S), '$portray_tab'(S, Col),
+                '$portray_body'(S, B, Col, Names)
+            ;   Goal = (_ ; _)
+            ->  '$portray_block'(S, Goal, Col, Names)
+            ;   Goal = (_ -> _)
+            ->  '$portray_block'(S, Goal, Col, Names)
+            ;   Goal = (_ *-> _)
+            ->  '$portray_block'(S, Goal, Col, Names)
+            ;   Goal = (\+ A)
+            ->  '$portray_write'(S, '\\+ '),
+                '$portray_body'(S, A, Col, Names)
+            ;   '$portray_goal'(S, Goal, Names)
+            ).
+
+        '$portray_block'(S, Goal, Col, Names) :-
+            Inner is Col + 4,
+            '$portray_write'(S, '(   '),
+            '$portray_branches'(S, Goal, Col, Inner, Names),
+            '$portray_nl'(S), '$portray_tab'(S, Col), '$portray_write'(S, ')').
+
+        % A right-nested ;-chain becomes sibling branches at one indent, so an
+        % else-if ladder stays flat the way SWI lists it.
+        '$portray_branches'(S, Goal, Col, Inner, Names) :-
+            (   nonvar(Goal), Goal = (A ; B)
+            ->  '$portray_branch'(S, A, Col, Inner, Names),
+                '$portray_nl'(S), '$portray_tab'(S, Col), '$portray_write'(S, ';   '),
+                '$portray_branches'(S, B, Col, Inner, Names)
+            ;   '$portray_branch'(S, Goal, Col, Inner, Names)
+            ).
+
+        '$portray_branch'(S, Goal, Col, Inner, Names) :-
+            (   nonvar(Goal), Goal = (C -> T)
+            ->  '$portray_body'(S, C, Inner, Names),
+                '$portray_nl'(S), '$portray_tab'(S, Col), '$portray_write'(S, '->  '),
+                '$portray_body'(S, T, Inner, Names)
+            ;   nonvar(Goal), Goal = (C *-> T)
+            ->  '$portray_body'(S, C, Inner, Names),
+                '$portray_nl'(S), '$portray_tab'(S, Col), '$portray_write'(S, '*-> '),
+                '$portray_body'(S, T, Inner, Names)
+            ;   '$portray_body'(S, Goal, Inner, Names)
+            ).
+
+        '$portray_goal'('$portray_current', Goal, Names) :- !,
+            write_term(Goal, [quoted(true), numbervars(true), spacing(next_argument), variable_names(Names)]).
+        '$portray_goal'(S, Goal, Names) :-
+            write_term(S, Goal, [quoted(true), numbervars(true), spacing(next_argument), variable_names(Names)]).
+
+        % Variable names by first appearance: A, B, ... with a numeric suffix past
+        % Z; a variable occurring once prints as plain underscore.
+        '$portray_names'(Term, Names) :-
+            '$portray_occurrences'(Term, [], Occurrences),
+            term_variables(Term, Variables),
+            '$portray_name_each'(Variables, 0, Occurrences, Names).
+
+        '$portray_occurrences'(Term, Acc0, Acc) :-
+            (   var(Term) -> Acc = [Term|Acc0]
+            ;   compound(Term)
+            ->  Term =.. [_|Arguments],
+                '$portray_occurrences_list'(Arguments, Acc0, Acc)
+            ;   Acc = Acc0
+            ).
+
+        '$portray_occurrences_list'([], Acc, Acc).
+        '$portray_occurrences_list'([A|As], Acc0, Acc) :-
+            '$portray_occurrences'(A, Acc0, Acc1),
+            '$portray_occurrences_list'(As, Acc1, Acc).
+
+        '$portray_name_each'([], _, _, []).
+        '$portray_name_each'([V|Vs], N, Occurrences, [Name = V|Names]) :-
+            '$portray_count'(Occurrences, V, Count),
+            (   Count =:= 1
+            ->  Name = '_', N1 = N
+            ;   '$portray_letter'(N, Name), N1 is N + 1
+            ),
+            '$portray_name_each'(Vs, N1, Occurrences, Names).
+
+        '$portray_count'([], _, 0).
+        '$portray_count'([O|Os], V, Count) :-
+            '$portray_count'(Os, V, Count0),
+            ( O == V -> Count is Count0 + 1 ; Count = Count0 ).
+
+        '$portray_letter'(N, Name) :-
+            Letter is 0'A + N mod 26,
+            Index is N // 26,
+            char_code(L, Letter),
+            (   Index =:= 0
+            ->  Name = L
+            ;   number_codes(Index, Digits),
+                atom_codes(Suffix, Digits),
+                atom_concat(L, Suffix, Name)
+            ).
+
         % Reading and writing a term as an atom, which is what with_output_to/2 and
         % read_term_from_atom/3 make possible without a file anywhere in sight.
         term_to_atom(Term, Atom) :-
@@ -522,6 +801,9 @@ internal static class StandardLibrary
 
         % --- Aggregation -----------------------------------------------------------
 
+        aggregate_all(Template, _, _) :-
+            var(Template),
+            instantiation_error(Template).
         aggregate_all(count, Goal, Count) :-
             findall(x, Goal, Xs),
             length(Xs, Count).
@@ -563,9 +845,22 @@ internal static class StandardLibrary
             Pairs \== [],
             '$aggregate_min_pair'(Pairs, Min, Witness).
 
+        % A compound template such as r(sum(X), count) aggregates each argument,
+        % which must itself be a spec; the result keeps the template's shape. An
+        % invalid template raises the error SWI raises, even before the goal runs.
+        aggregate_all(Template, Goal, Result) :-
+            '$aggregate_template_args'(Template, Name, Specs),
+            '$aggregate_tuple'(Specs, Tuple),
+            findall(Tuple, Goal, Tuples),
+            '$aggregate_columns'(Specs, Tuples, Results),
+            Result =.. [Name|Results].
+
         % aggregate/3 is aggregate_all/3 with bagof/3 underneath: the goal's free
         % variables group the solutions, one aggregate per group on backtracking,
         % and no solutions at all is failure rather than a zero.
+        aggregate(Template, _, _) :-
+            var(Template),
+            instantiation_error(Template).
         aggregate(count, Goal, Count) :- bagof(x, Goal, Xs), length(Xs, Count).
         aggregate(count(T), Goal, Count) :- bagof(T, Goal, Xs), length(Xs, Count).
         aggregate(bag(T), Goal, Bag) :- bagof(T, Goal, Bag).
@@ -579,10 +874,19 @@ internal static class StandardLibrary
         aggregate(min(E, W), Goal, min(Min, Witness)) :-
             bagof(E-W, Goal, Pairs),
             '$aggregate_min_pair'(Pairs, Min, Witness).
+        aggregate(Template, Goal, Result) :-
+            '$aggregate_template_args'(Template, Name, Specs),
+            '$aggregate_tuple'(Specs, Tuple),
+            bagof(Tuple, Goal, Tuples),
+            '$aggregate_columns'(Specs, Tuples, Results),
+            Result =.. [Name|Results].
 
         % The /4 forms count each distinct discriminator-template pair once. The
         % aggregate/4 family groups by free variables through setof/3; the
         % aggregate_all/4 family deduplicates with sort/2 over all solutions.
+        aggregate(Template, _, _, _) :-
+            var(Template),
+            instantiation_error(Template).
         aggregate(count, D, Goal, Count) :- setof(D, Goal, Ds), length(Ds, Count).
         aggregate(count(T), D, Goal, Count) :- setof(D-T, Goal, Ps), length(Ps, Count).
         aggregate(bag(T), D, Goal, Bag) :- setof(D-T, Goal, Ps), pairs_values(Ps, Bag).
@@ -610,7 +914,17 @@ internal static class StandardLibrary
             setof(D-(E-W), Goal, Ps),
             pairs_values(Ps, Pairs),
             '$aggregate_min_pair'(Pairs, Min, Witness).
+        aggregate(Template, D, Goal, Result) :-
+            '$aggregate_template_args'(Template, Name, Specs),
+            '$aggregate_tuple'(Specs, Tuple),
+            setof(D-Tuple, Goal, Ps),
+            pairs_values(Ps, Tuples),
+            '$aggregate_columns'(Specs, Tuples, Results),
+            Result =.. [Name|Results].
 
+        aggregate_all(Template, _, _, _) :-
+            var(Template),
+            instantiation_error(Template).
         aggregate_all(count, D, Goal, Count) :-
             findall(D, Goal, Ds0),
             sort(Ds0, Ds),
@@ -656,6 +970,87 @@ internal static class StandardLibrary
             Ps0 \== [],
             sort(Ps0, Ps),
             pairs_values(Ps, Pairs),
+            '$aggregate_min_pair'(Pairs, Min, Witness).
+        aggregate_all(Template, D, Goal, Result) :-
+            '$aggregate_template_args'(Template, Name, Specs),
+            '$aggregate_tuple'(Specs, Tuple),
+            findall(D-Tuple, Goal, Ps0),
+            sort(Ps0, Ps),
+            pairs_values(Ps, Tuples),
+            '$aggregate_columns'(Specs, Tuples, Results),
+            Result =.. [Name|Results].
+
+        % Decomposes a compound template into its spec arguments, failing for the
+        % simple and witnessed specs (their own clauses handle those) and raising
+        % instantiation, domain, or type errors for anything else, as SWI does.
+        '$aggregate_template_args'(Template, Name, Specs) :-
+            (   var(Template) -> instantiation_error(Template)
+            ;   '$aggregate_spec'(Template) -> fail
+            ;   compound(Template)
+            ->  Template =.. [Name|Specs],
+                '$aggregate_specs_check'(Specs)
+            ;   atom(Template) -> domain_error(aggregate_template, Template)
+            ;   type_error(aggregate_template, Template)
+            ).
+
+        '$aggregate_spec'(count).
+        '$aggregate_spec'(count(_)).
+        '$aggregate_spec'(sum(_)).
+        '$aggregate_spec'(max(_)).
+        '$aggregate_spec'(min(_)).
+        '$aggregate_spec'(bag(_)).
+        '$aggregate_spec'(set(_)).
+        '$aggregate_spec'(max(_, _)).
+        '$aggregate_spec'(min(_, _)).
+
+        '$aggregate_specs_check'([]).
+        '$aggregate_specs_check'([Spec|Specs]) :-
+            (   var(Spec) -> instantiation_error(Spec)
+            ;   '$aggregate_spec'(Spec) -> true
+            ;   callable(Spec) -> domain_error(aggregate_template, Spec)
+            ;   type_error(aggregate_template, Spec)
+            ),
+            '$aggregate_specs_check'(Specs).
+
+        % What one solution records for each spec: the counted marker, the summed
+        % expression, or the value-witness pair.
+        '$aggregate_tuple'([], []).
+        '$aggregate_tuple'([Spec|Specs], [E|Es]) :-
+            '$aggregate_spec_expression'(Spec, E),
+            '$aggregate_tuple'(Specs, Es).
+
+        '$aggregate_spec_expression'(count, x).
+        '$aggregate_spec_expression'(count(E), E).
+        '$aggregate_spec_expression'(sum(E), E).
+        '$aggregate_spec_expression'(max(E), E).
+        '$aggregate_spec_expression'(min(E), E).
+        '$aggregate_spec_expression'(bag(E), E).
+        '$aggregate_spec_expression'(set(E), E).
+        '$aggregate_spec_expression'(max(E, W), E-W).
+        '$aggregate_spec_expression'(min(E, W), E-W).
+
+        '$aggregate_columns'([], _, []).
+        '$aggregate_columns'([Spec|Specs], Tuples, [Result|Results]) :-
+            '$aggregate_heads'(Tuples, Column, Rests),
+            '$aggregate_one'(Spec, Column, Result),
+            '$aggregate_columns'(Specs, Rests, Results).
+
+        '$aggregate_heads'([], [], []).
+        '$aggregate_heads'([[X|Xs]|Tuples], [X|Column], [Xs|Rests]) :-
+            '$aggregate_heads'(Tuples, Column, Rests).
+
+        '$aggregate_one'(count, Values, Count) :- length(Values, Count).
+        '$aggregate_one'(count(_), Values, Count) :- length(Values, Count).
+        '$aggregate_one'(sum(_), Values, Sum) :- sum_list(Values, Sum).
+        '$aggregate_one'(max(_), Values, Max) :- Values \== [], max_list(Values, Max).
+        '$aggregate_one'(min(_), Values, Min) :- Values \== [], min_list(Values, Min).
+        '$aggregate_one'(bag(_), Values, Values).
+        '$aggregate_one'(set(_), Values, Set) :- sort(Values, Set).
+        '$aggregate_one'(max(_, _), Pairs, max(Max, Witness)) :-
+            Pairs \== [],
+            '$aggregate_max_pair'(Pairs, Max, Witness).
+        '$aggregate_one'(min(_, _), Pairs, min(Min, Witness)) :-
+            Pairs \== [],
             '$aggregate_min_pair'(Pairs, Min, Witness).
 
         '$aggregate_max_pair'([E-W|Pairs], Max, Witness) :-
@@ -1079,5 +1474,77 @@ internal static class StandardLibrary
         '$assoc_del_min'(t(K0, V0, _, L, R), K, V, Assoc) :-
             '$assoc_del_min'(L, K, V, NewLeft),
             '$assoc_rebalance'(K0, V0, NewLeft, R, Assoc).
+
+        del_min_assoc(Assoc, Key, Value, Rest) :- '$assoc_del_min'(Assoc, Key, Value, Rest).
+
+        del_max_assoc(Assoc, Key, Value, Rest) :- '$assoc_del_max'(Assoc, Key, Value, Rest).
+
+        '$assoc_del_max'(t(K, V, _, L, t), K, V, L) :- !.
+        '$assoc_del_max'(t(K0, V0, _, L, R), K, V, Assoc) :-
+            '$assoc_del_max'(R, K, V, NewRight),
+            '$assoc_rebalance'(K0, V0, L, NewRight, Assoc).
+
+        % gen_assoc/3 enumerates pairs on backtracking in ascending key order; a
+        % bound key reads directly instead of enumerating, the way SWI's does.
+        gen_assoc(Key, Assoc, Value) :-
+            (   ground(Key)
+            ->  get_assoc(Key, Assoc, Value)
+            ;   '$gen_assoc'(Assoc, Key, Value)
+            ).
+
+        '$gen_assoc'(t(K, V, _, L, R), Key, Value) :-
+            (   '$gen_assoc'(L, Key, Value)
+            ;   Key = K, Value = V
+            ;   '$gen_assoc'(R, Key, Value)
+            ).
+
+        % get_assoc/5 replaces one key's value. The shape is untouched, so no
+        % rebalancing and the stored heights carry over.
+        get_assoc(Key, t(K, V, H, L, R), Value0, Assoc, Value) :-
+            compare(O, Key, K),
+            '$get_assoc5_step'(O, Key, K, V, H, L, R, Value0, Assoc, Value).
+
+        '$get_assoc5_step'('=', _, K, V, H, L, R, V, t(K, Value, H, L, R), Value).
+        '$get_assoc5_step'('<', Key, K, V, H, L, R, Value0, t(K, V, H, NewLeft, R), Value) :-
+            get_assoc(Key, L, Value0, NewLeft, Value).
+        '$get_assoc5_step'('>', Key, K, V, H, L, R, Value0, t(K, V, H, L, NewRight), Value) :-
+            get_assoc(Key, R, Value0, NewRight, Value).
+
+        map_assoc(_, t).
+        map_assoc(Goal, t(_, V, _, L, R)) :-
+            map_assoc(Goal, L),
+            call(Goal, V),
+            map_assoc(Goal, R).
+
+        map_assoc(_, t, t).
+        map_assoc(Goal, t(K, V, H, L, R), t(K, V2, H, L2, R2)) :-
+            map_assoc(Goal, L, L2),
+            call(Goal, V, V2),
+            map_assoc(Goal, R, R2).
+
+        % is_assoc/1 validates the AVL shape: stored heights consistent, every
+        % balance factor within one, and the in-order keys strictly ascending.
+        is_assoc(Assoc) :-
+            nonvar(Assoc),
+            '$is_assoc_shape'(Assoc, _),
+            assoc_to_keys(Assoc, Keys),
+            '$assoc_keys_ascending'(Keys).
+
+        '$is_assoc_shape'(Tree, _) :- var(Tree), !, fail.
+        '$is_assoc_shape'(t, 0).
+        '$is_assoc_shape'(t(_, _, H, L, R), H) :-
+            integer(H),
+            '$is_assoc_shape'(L, HL),
+            '$is_assoc_shape'(R, HR),
+            Difference is HL - HR,
+            Difference >= -1,
+            Difference =< 1,
+            ( HL >= HR -> H =:= HL + 1 ; H =:= HR + 1 ).
+
+        '$assoc_keys_ascending'([]).
+        '$assoc_keys_ascending'([_]).
+        '$assoc_keys_ascending'([K1, K2|Keys]) :-
+            K1 @< K2,
+            '$assoc_keys_ascending'([K2|Keys]).
         """;
 }

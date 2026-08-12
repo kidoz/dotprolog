@@ -115,4 +115,65 @@ public sealed class FormatTests
         Assert.Equal(RunResult.Success, result);
         Assert.Equal(expected, output);
     }
+
+    // ~@ runs its goal once and splices the goal's output in place; the goal's
+    // failure fails the whole format, and its ball propagates.
+    [Theory]
+    [InlineData("format(\"a~@b\", [write(mid)])", "amidb")]
+    [InlineData("format(\"~@~@\", [write(1), write(2)])", "12")]
+    [InlineData("format(\"~w~@~w\", [l, write(m), r])", "lmr")]
+    [InlineData("format(\"~@\", [member(X, [1, 2])]), format(\"~w\", [X])", "1")]
+    [InlineData("format(atom(A), \"x~@y\", [write(q)]), write(A)", "xqy")]
+    public void FormatAtRunsTheGoalInPlace(string goal, string expected) => Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    // SWI streams directives, so the text before the failing goal has already been written.
+    [Fact]
+    public void FormatAtGoalFailureFailsTheFormatAfterItsPrefix() =>
+        Assert.Equal("xno", PrologTestHost.RunGoal("( format(\"x~@\", [fail]) -> write(yes) ; write(no) )"));
+
+    [Fact]
+    public void FormatAtGoalBallPropagates() =>
+        Assert.Equal("caught(ball)", PrologTestHost.RunGoal("catch(format(\"~@\", [throw(ball)]), B, write(caught(B)))"));
+
+    // ~W writes its first argument under its second argument's write_term options.
+    [Theory]
+    [InlineData("format(\"~W\", [f('A b'), []])", "f(A b)")]
+    [InlineData("format(\"~W\", [f('A b'), [quoted(true)]])", "f('A b')")]
+    [InlineData("format(\"~W\", [[1, 2], [spacing(next_argument)]])", "[1, 2]")]
+    [InlineData("format(\"~W\", [1 + 2, [ignore_ops(true)]])", "+(1,2)")]
+    [InlineData("format(\"~W\", ['$VAR'(0), [numbervars(true)]])", "A")]
+    public void FormatWWritesUnderOptions(string goal, string expected) => Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Fact]
+    public void FormatWRejectsABadOption() =>
+        Assert.Equal(
+            "domain_error(write_option,bogus(true))",
+            PrologTestHost.RunGoal("catch(format(\"~W\", [x, [bogus(true)]]), error(E, _), true), write(E)")
+        );
+
+    // portray_clause/1,2 emit SWI's listing layout; the outputs are byte-identical
+    // to SWI-Prolog 10 for every case here.
+    [Theory]
+    [InlineData("portray_clause(foo)", "foo.\n")]
+    [InlineData("portray_clause((p :- true))", "p.\n")]
+    [InlineData("portray_clause(f('A b', [1, 2]))", "f('A b', [1, 2]).\n")]
+    [InlineData("portray_clause((a = b))", "a=b.\n")]
+    [InlineData("portray_clause((foo(V, W) :- bar(V), baz(W)))", "foo(A, B) :-\n    bar(A),\n    baz(B).\n")]
+    [InlineData("portray_clause((p(Q) :- q(Q)))", "p(A) :-\n    q(A).\n")]
+    [InlineData("portray_clause(p(Q))", "p(_).\n")]
+    [InlineData("portray_clause((p :- (a ; b)))", "p :-\n    (   a\n    ;   b\n    ).\n")]
+    [InlineData("portray_clause((p :- (a -> b ; c)))", "p :-\n    (   a\n    ->  b\n    ;   c\n    ).\n")]
+    [InlineData("portray_clause((p :- q, (a, b ; c)))", "p :-\n    q,\n    (   a,\n        b\n    ;   c\n    ).\n")]
+    [InlineData(
+        "portray_clause((p :- (a -> b ; c -> d ; e)))",
+        "p :-\n    (   a\n    ->  b\n    ;   c\n    ->  d\n    ;   e\n    ).\n"
+    )]
+    [InlineData("portray_clause((p :- \\+ q(Z), r(Z)))", "p :-\n    \\+ q(A),\n    r(A).\n")]
+    [InlineData("portray_clause((p :- (a ; b), c))", "p :-\n    (   a\n    ;   b\n    ),\n    c.\n")]
+    public void PortrayClauseEmitsSwiListingLayout(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Fact]
+    public void PortrayClauseWritesToAnExplicitStream() =>
+        Assert.Equal("ok.\n", PrologTestHost.RunGoal("current_output(S), portray_clause(S, ok)"));
 }

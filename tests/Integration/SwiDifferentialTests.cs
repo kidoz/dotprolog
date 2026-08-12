@@ -69,7 +69,26 @@ public sealed class SwiDifferentialTests
         "aggregate_all(max(X, W), member(W-X, [a-1, b-3, c-2]), M), write(M)",
         "aggregate_all(min(X, W), member(W-X, [a-1, b-3, c-2]), M), write(M)",
         "nb_setval(diff_key, 42), ( nb_current(diff_key, V) -> write(V) ; write(unset) )",
-        "( nb_current(diff_never_set, _) -> write(set) ; write(unset) )"
+        "( nb_current(diff_never_set, _) -> write(set) ; write(unset) )",
+        "list_to_assoc([b-2, a-1, c-3], A), findall(K-V, gen_assoc(K, A, V), L), write(L)",
+        "list_to_assoc([b-2, a-1], A), get_assoc(b, A, Old, A2, 9), assoc_to_list(A2, L), write(Old-L)",
+        "list_to_assoc([b-2, a-1, c-3], A), del_min_assoc(A, K, V, A2), assoc_to_list(A2, L), write(K-V-L)",
+        "list_to_assoc([b-2, a-1, c-3], A), del_max_assoc(A, K, V, A2), assoc_to_list(A2, L), write(K-V-L)",
+        "( is_assoc(t) -> write(yes) ; write(no) ), ( is_assoc(foo) -> write(yes) ; write(no) )",
+        "aggregate_all(r(sum(X), count), member(X, [1, 2, 3]), R), write(R)",
+        "aggregate_all(p(max(X, W), count), member(W-X, [a-1, b-2]), R), write(R)",
+        "aggregate_all(p(count, bag(X)), (member(X, [1]), fail), R), write(R)",
+        "catch(aggregate_all(k(sum(_), foo), true, _), error(E, _), write(E))",
+        "format(\"a~@b\", [write(mid)])",
+        "( format(\"x~@\", [fail]) -> write(yes) ; write(no) )",
+        "format(\"~W\", [f('A b'), [quoted(true)]])",
+        "findall(C, char_type(C, digit(3)), L), write(L)",
+        "findall(C, char_type(C, upper(a)), L), write(L)",
+        "aggregate_all(count, char_type(_, digit(_)), N), write(N)",
+        "with_output_to(atom(A), portray_clause((foo(V, W) :- bar(V), baz(W)))), write(A)",
+        "with_output_to(atom(A), portray_clause((p :- (a -> b ; c)))), write(A)",
+        "with_output_to(atom(A), portray_clause((p :- q, (a, b ; c)))), write(A)",
+        "with_output_to(atom(A), portray_clause(f('A b', [1, 2]))), write(A)"
     );
 
     // The corpus stays runnable on DotProlog alone, so a corpus typo or a regression in the

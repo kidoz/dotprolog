@@ -1206,7 +1206,8 @@ internal static class StreamBuiltins
                     selected.IgnoreOperators,
                     selected.NumberVariables,
                     selected.VariableNames,
-                    operators
+                    operators,
+                    selected.SpacingNextArgument
                 )
         );
         return true;
@@ -1255,6 +1256,23 @@ internal static class StreamBuiltins
             if (name == "variable_names")
             {
                 selected = selected with { Names = ReadVariableNames(machine, option, value) };
+                continue;
+            }
+
+            if (name == "spacing")
+            {
+                if (value.Tag == CellTag.Reference)
+                {
+                    throw PrologErrors.Instantiation(machine);
+                }
+
+                var mode = value.Tag == CellTag.Atom ? machine.Symbols.AtomName(value.Index) : string.Empty;
+                if (mode is not ("standard" or "next_argument"))
+                {
+                    throw PrologErrors.Domain(machine, "write_option", option);
+                }
+
+                selected = selected with { SpacingNextArgument = mode == "next_argument" };
                 continue;
             }
 
@@ -1347,10 +1365,45 @@ internal static class StreamBuiltins
         bool Quoted = false,
         bool IgnoreOperators = false,
         bool NumberVariables = false,
+        bool SpacingNextArgument = false,
         List<TermWriter.NamedVariable>? Names = null
     )
     {
         internal IReadOnlyList<TermWriter.NamedVariable> VariableNames => Names ?? [];
+    }
+
+    /// <summary>
+    /// Renders a term to text under a <c>write_term/2</c> option list, for <c>format/2,3</c>'s
+    /// <c>~W</c> directive. The option list is validated exactly as <c>write_term/2</c> validates it.
+    /// </summary>
+    internal static string RenderTermWithOptions(Machine machine, Cell term, Cell options)
+    {
+        List<Cell> elements = [];
+        Cell tail = TermList.Read(machine, machine.Dereference(options), elements);
+        if (tail.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        if (!TermList.IsEmpty(machine, tail))
+        {
+            throw PrologErrors.Type(machine, "list", machine.Dereference(options));
+        }
+
+        WriteOptions selected = ReadWriteOptions(machine, elements);
+        using var writer = new StringWriter(System.Globalization.CultureInfo.InvariantCulture);
+        TermWriter.WriteWithVariableNames(
+            machine,
+            term,
+            writer,
+            selected.Quoted,
+            selected.IgnoreOperators,
+            selected.NumberVariables,
+            selected.VariableNames,
+            operators: null,
+            selected.SpacingNextArgument
+        );
+        return writer.ToString();
     }
 
     private static bool WriteLine(Machine machine)

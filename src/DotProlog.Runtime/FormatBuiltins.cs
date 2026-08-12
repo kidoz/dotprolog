@@ -24,21 +24,10 @@ internal static class FormatBuiltins
 {
     internal static void Register(BuiltinRegistry registry)
     {
+        // The public format/1,2,3 are library wrappers that expand ~@ — a goal a native builtin
+        // cannot run — before handing the text to this native engine.
         registry.Register(
-            "format",
-            1,
-            static machine =>
-            {
-                StreamBuiltins.WriteCurrentText(
-                    machine,
-                    Render(machine, machine.Argument(0), Cell.Atom(machine.Symbols.EmptyList))
-                );
-                return true;
-            }
-        );
-
-        registry.Register(
-            "format",
+            "$format",
             2,
             static machine =>
             {
@@ -47,7 +36,7 @@ internal static class FormatBuiltins
             }
         );
 
-        registry.Register("format", 3, Format3);
+        registry.Register("$format", 3, Format3);
 
         registry.Register(
             "tab",
@@ -210,6 +199,14 @@ internal static class FormatBuiltins
             case 's':
                 output.Append(TextBuiltins.TextOfList(machine, Next(machine, given, ref next, arguments)));
                 break;
+
+            case 'W':
+            {
+                Cell term = Next(machine, given, ref next, arguments);
+                Cell options = Next(machine, given, ref next, arguments);
+                output.Append(StreamBuiltins.RenderTermWithOptions(machine, term, options));
+                break;
+            }
 
             case 'c':
             {

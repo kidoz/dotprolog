@@ -38,8 +38,18 @@ internal static class TextBuiltins
         registry.RegisterNondeterministic("atom_concat", 3, static machine => AtomConcat(machine, 0), AtomConcat);
         registry.RegisterNondeterministic("sub_atom", 5, static machine => SubAtom(machine, 0), SubAtom);
 
-        registry.Register("char_type", 2, static machine => CharType(machine, code: false));
-        registry.Register("code_type", 2, static machine => CharType(machine, code: true));
+        registry.RegisterNondeterministic(
+            "char_type",
+            2,
+            static machine => CharType(machine, code: false, fromCode: 0),
+            static (machine, state) => CharType(machine, code: false, (int)state)
+        );
+        registry.RegisterNondeterministic(
+            "code_type",
+            2,
+            static machine => CharType(machine, code: true, fromCode: 0),
+            static (machine, state) => CharType(machine, code: true, (int)state)
+        );
     }
 
     /// <summary>
@@ -49,12 +59,12 @@ internal static class TextBuiltins
     /// <c>char_type/2</c>, a code for <c>code_type/2</c> — except <c>digit/1</c> and <c>code/1</c>,
     /// whose companions are integers for both.
     /// </summary>
-    private static bool CharType(Machine machine, bool code)
+    private static bool CharType(Machine machine, bool code, int fromCode)
     {
         Cell value = machine.Argument(0);
         if (value.Tag == CellTag.Reference)
         {
-            throw PrologErrors.Instantiation(machine);
+            return EnumerateCharType(machine, code, fromCode);
         }
 
         char character;
@@ -90,71 +100,193 @@ internal static class TextBuiltins
 
         if (type.Tag == CellTag.Atom)
         {
-            return machine.Symbols.AtomName(type.Index) switch
-            {
-                "alnum" => char.IsLetterOrDigit(character),
-                "alpha" => char.IsLetter(character),
-                "csym" => char.IsLetterOrDigit(character) || character == '_',
-                "csymf" => char.IsLetter(character) || character == '_',
-                "ascii" => character < 128,
-                "white" => character is ' ' or '\t',
-                "space" => char.IsWhiteSpace(character),
-                "cntrl" => char.IsControl(character),
-                "graph" => !char.IsControl(character) && !char.IsWhiteSpace(character),
-                "print" => !char.IsControl(character),
-                "punct" => !char.IsControl(character) && !char.IsWhiteSpace(character) && !char.IsLetterOrDigit(character),
-                "upper" => char.IsUpper(character),
-                "lower" => char.IsLower(character),
-                "end_of_line" => character is '\n' or '\r',
-                "newline" => character == '\n',
-                "period" => character is '.' or '!' or '?',
-                "quote" => character is '\'' or '"' or '`',
-                _ => throw PrologErrors.Domain(machine, "char_type", type),
-            };
+            var name = machine.Symbols.AtomName(type.Index);
+            return IsNamedType(name) ? NamedTypeApplies(name, character) : throw PrologErrors.Domain(machine, "char_type", type);
         }
 
+        var (parametricName, companion) = ParametricType(machine, type);
+        return TryCompanion(machine, parametricName, character, code, out Cell companionValue)
+            && machine.Unify(companion, companionValue);
+    }
+
+    /// <summary>
+    /// Enumerates every character (or code) of a bound type on backtracking, in code order. The
+    /// retry state is the next candidate code, so assignments between solutions cannot skew it.
+    /// </summary>
+    private static bool EnumerateCharType(Machine machine, bool code, int fromCode)
+    {
+        Cell type = machine.Argument(1);
+        if (type.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        string? namedType = null;
+        var parametricName = string.Empty;
+        Cell companion = default;
+        if (type.Tag == CellTag.Atom)
+        {
+            namedType = machine.Symbols.AtomName(type.Index);
+            if (!IsNamedType(namedType))
+            {
+                throw PrologErrors.Domain(machine, "char_type", type);
+            }
+        }
+        else
+        {
+            (parametricName, companion) = ParametricType(machine, type);
+        }
+
+        for (var candidate = fromCode; candidate <= char.MaxValue; candidate++)
+        {
+            var character = (char)candidate;
+            Cell companionValue = default;
+            var applies = namedType is not null
+                ? NamedTypeApplies(namedType, character)
+                : TryCompanion(machine, parametricName, character, code, out companionValue);
+            if (!applies)
+            {
+                continue;
+            }
+
+            if (namedType is null && !machine.CanUnify(companion, companionValue))
+            {
+                continue;
+            }
+
+            if (candidate < char.MaxValue)
+            {
+                machine.PushRetry(candidate + 1);
+            }
+
+            Cell characterCell = code ? Cell.Integer60(candidate) : Cell.Atom(machine.Symbols.InternAtom(character.ToString()));
+            return machine.Unify(machine.Argument(0), characterCell)
+                && (namedType is not null || machine.Unify(companion, companionValue));
+        }
+
+        return false;
+    }
+
+    private static (string Name, Cell Companion) ParametricType(Machine machine, Cell type)
+    {
         if (type.Tag != CellTag.Structure)
         {
             throw PrologErrors.Domain(machine, "char_type", type);
         }
 
         Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(type.Index).Index);
-        if (functor.Arity != 1)
+        var name = machine.Symbols.AtomName(functor.NameAtom);
+        if (functor.Arity != 1 || name is not ("digit" or "code" or "to_lower" or "to_upper" or "upper" or "lower"))
         {
             throw PrologErrors.Domain(machine, "char_type", type);
         }
 
-        Cell companion = machine.HeapAt(type.Index + 1);
-        switch (machine.Symbols.AtomName(functor.NameAtom))
+        return (name, machine.HeapAt(type.Index + 1));
+    }
+
+    private static bool IsNamedType(string name) =>
+        name
+            is "alnum"
+                or "alpha"
+                or "csym"
+                or "csymf"
+                or "ascii"
+                or "white"
+                or "space"
+                or "cntrl"
+                or "graph"
+                or "print"
+                or "punct"
+                or "upper"
+                or "lower"
+                or "end_of_line"
+                or "newline"
+                or "period"
+                or "quote";
+
+    private static bool NamedTypeApplies(string name, char character) =>
+        name switch
+        {
+            "alnum" => char.IsLetterOrDigit(character),
+            "alpha" => char.IsLetter(character),
+            "csym" => char.IsLetterOrDigit(character) || character == '_',
+            "csymf" => char.IsLetter(character) || character == '_',
+            "ascii" => character < 128,
+            "white" => character is ' ' or '\t',
+            "space" => char.IsWhiteSpace(character),
+            "cntrl" => char.IsControl(character),
+            "graph" => !char.IsControl(character) && !char.IsWhiteSpace(character),
+            "print" => !char.IsControl(character),
+            "punct" => !char.IsControl(character) && !char.IsWhiteSpace(character) && !char.IsLetterOrDigit(character),
+            "upper" => char.IsUpper(character),
+            "lower" => char.IsLower(character),
+            "end_of_line" => character is '\n' or '\r',
+            "newline" => character == '\n',
+            "period" => character is '.' or '!' or '?',
+            "quote" => character is '\'' or '"' or '`',
+            _ => false,
+        };
+
+    /// <summary>
+    /// Whether a parametric type applies to <paramref name="character"/>, and the companion value
+    /// it answers when it does. SWI reads to_upper(U) as "Char is U converted to uppercase", so
+    /// the companion answered for a bound Char is the lowercase, and to_lower answers the
+    /// uppercase — verified against SWI-Prolog 10 rather than the intuitive reading.
+    /// </summary>
+    private static bool TryCompanion(Machine machine, string name, char character, bool code, out Cell companionValue)
+    {
+        switch (name)
         {
             case "digit":
-                return char.IsAsciiDigit(character) && machine.Unify(companion, Cell.Integer60(character - '0'));
+                if (!char.IsAsciiDigit(character))
+                {
+                    companionValue = default;
+                    return false;
+                }
+
+                companionValue = Cell.Integer60(character - '0');
+                return true;
 
             case "code":
-                return machine.Unify(companion, Cell.Integer60(character));
+                companionValue = Cell.Integer60(character);
+                return true;
 
-            // SWI reads to_upper(U) as "Char is U converted to uppercase", so the companion it
-            // answers for a bound Char is the lowercase, and to_lower answers the uppercase.
-            // Verified against SWI-Prolog 10 rather than the intuitive reading.
             case "to_lower":
-                return UnifyCompanion(machine, companion, char.ToUpperInvariant(character), code);
+                companionValue = CompanionCell(machine, char.ToUpperInvariant(character), code);
+                return true;
 
             case "to_upper":
-                return UnifyCompanion(machine, companion, char.ToLowerInvariant(character), code);
+                companionValue = CompanionCell(machine, char.ToLowerInvariant(character), code);
+                return true;
 
             case "upper":
-                return char.IsUpper(character) && UnifyCompanion(machine, companion, char.ToLowerInvariant(character), code);
+                if (!char.IsUpper(character))
+                {
+                    companionValue = default;
+                    return false;
+                }
+
+                companionValue = CompanionCell(machine, char.ToLowerInvariant(character), code);
+                return true;
 
             case "lower":
-                return char.IsLower(character) && UnifyCompanion(machine, companion, char.ToUpperInvariant(character), code);
+                if (!char.IsLower(character))
+                {
+                    companionValue = default;
+                    return false;
+                }
+
+                companionValue = CompanionCell(machine, char.ToUpperInvariant(character), code);
+                return true;
 
             default:
-                throw PrologErrors.Domain(machine, "char_type", type);
+                companionValue = default;
+                return false;
         }
     }
 
-    private static bool UnifyCompanion(Machine machine, Cell companion, char character, bool code) =>
-        machine.Unify(companion, code ? Cell.Integer60(character) : Cell.Atom(machine.Symbols.InternAtom(character.ToString())));
+    private static Cell CompanionCell(Machine machine, char character, bool code) =>
+        code ? Cell.Integer60(character) : Cell.Atom(machine.Symbols.InternAtom(character.ToString()));
 
     /// <summary>The text of an atomic term: an atom's name, or a number written as the writer writes it.</summary>
     internal static bool TryText(Machine machine, Cell cell, out string text)

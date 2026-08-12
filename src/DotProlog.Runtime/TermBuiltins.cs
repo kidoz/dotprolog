@@ -64,6 +64,7 @@ internal static class TermBuiltins
         registry.Register("setarg", 3, static machine => SetArg(machine, backtrackable: true));
         registry.Register("nb_setarg", 3, static machine => SetArg(machine, backtrackable: false));
         registry.Register("copy_term", 2, CopyTerm);
+        registry.Register("term_size", 2, TermSize);
         registry.Register("term_variables", 2, TermVariables);
 
         var emptyList = symbols.EmptyList;
@@ -84,6 +85,25 @@ internal static class TermBuiltins
         var root = buffer.Copy(machine, machine.Argument(0));
         var origin = buffer.Materialize(machine);
         return machine.Unify(machine.Argument(1), machine.HeapAt(origin + root));
+    }
+
+    /// <summary>
+    /// <c>term_size(+Term, -Cells)</c>: the number of cells a detached copy of the term occupies —
+    /// the same copy <c>findall/3</c> and <c>nb_setval/2</c> take, never materialized. A shared
+    /// subterm therefore counts once per occurrence, and a cyclic term raises
+    /// <c>representation_error(cyclic_term)</c>; both are documented in the SWI ledger.
+    /// </summary>
+    private static bool TermSize(Machine machine)
+    {
+        Cell size = machine.Argument(1);
+        if (size.Tag is not (CellTag.Reference or CellTag.Integer))
+        {
+            throw PrologErrors.Type(machine, "integer", size);
+        }
+
+        var buffer = new TermBuffer();
+        buffer.Copy(machine, machine.Argument(0));
+        return machine.Unify(size, Cell.Integer60(buffer.Count));
     }
 
     /// <summary>

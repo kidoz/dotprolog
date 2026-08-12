@@ -75,14 +75,25 @@ public static class TermWriter
         bool ignoreOperators,
         bool numberVariables,
         IReadOnlyList<NamedVariable> variableNames,
-        OperatorTable? operators = null
+        OperatorTable? operators = null,
+        bool spacingNextArgument = false
     )
     {
         ArgumentNullException.ThrowIfNull(machine);
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(variableNames);
 
-        WriteCore(machine, term, output, quoted, ignoreOperators, numberVariables, variableNames, operators ?? machine.Operators);
+        WriteCore(
+            machine,
+            term,
+            output,
+            quoted,
+            ignoreOperators,
+            numberVariables,
+            variableNames,
+            operators ?? machine.Operators,
+            spacingNextArgument
+        );
     }
 
     private static void WriteCore(
@@ -93,12 +104,17 @@ public static class TermWriter
         bool ignoreOperators,
         bool numberVariables,
         IReadOnlyList<NamedVariable>? variableNames,
-        OperatorTable operators
+        OperatorTable operators,
+        bool spacingNextArgument = false
     )
     {
         var writer = new Emitter(output);
         List<Item> work = [Item.OfTerm(term, TopPriority)];
         HashSet<int> active = [];
+
+        // SWI's spacing(next_argument) write option: a space after the commas separating
+        // compound arguments and list elements, which is the listing layout portray_clause emits.
+        var argumentComma = spacingNextArgument ? ", " : ",";
 
         while (work.Count > 0)
         {
@@ -112,7 +128,7 @@ public static class TermWriter
                     break;
 
                 case ItemKind.ListTail:
-                    WriteListTail(machine, item.Cell, work, active);
+                    WriteListTail(machine, item.Cell, work, active, argumentComma);
                     break;
 
                 case ItemKind.PrefixGuard:
@@ -134,7 +150,8 @@ public static class TermWriter
                         variableNames,
                         operators,
                         work,
-                        active
+                        active,
+                        argumentComma
                     );
                     break;
             }
@@ -170,7 +187,8 @@ public static class TermWriter
         IReadOnlyList<NamedVariable>? variableNames,
         OperatorTable operators,
         List<Item> work,
-        HashSet<int> active
+        HashSet<int> active,
+        string argumentComma = ","
     )
     {
         Cell cell = machine.Dereference(item.Cell);
@@ -260,7 +278,7 @@ public static class TermWriter
             work.Add(Item.OfTerm(machine.HeapAt(cell.Index + i), ArgumentPriority));
             if (i > 1)
             {
-                work.Add(Item.OfText(","));
+                work.Add(Item.OfText(argumentComma));
             }
         }
     }
@@ -374,7 +392,13 @@ public static class TermWriter
         return false;
     }
 
-    private static void WriteListTail(Machine machine, Cell cell, List<Item> work, HashSet<int> active)
+    private static void WriteListTail(
+        Machine machine,
+        Cell cell,
+        List<Item> work,
+        HashSet<int> active,
+        string argumentComma = ","
+    )
     {
         cell = machine.Dereference(cell);
 
@@ -396,7 +420,7 @@ public static class TermWriter
             work.Add(Item.OfLeave(cell.Index));
             work.Add(Item.OfListTail(machine.HeapAt(cell.Index + 2)));
             work.Add(Item.OfTerm(machine.HeapAt(cell.Index + 1), ArgumentPriority));
-            work.Add(Item.OfText(","));
+            work.Add(Item.OfText(argumentComma));
             return;
         }
 

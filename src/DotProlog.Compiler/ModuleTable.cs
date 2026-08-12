@@ -82,6 +82,8 @@ public sealed class ModuleTable
         DeclareMeta("foldl", 4, [(0, 3)]);
         DeclareMeta("foldl", 5, [(0, 4)]);
         DeclareMeta("foldl", 6, [(0, 5)]);
+        DeclareMeta("map_assoc", 2, [(0, 1)]);
+        DeclareMeta("map_assoc", 3, [(0, 2)]);
         DeclareMeta("include", 3, [(0, 1)]);
         DeclareMeta("exclude", 3, [(0, 1)]);
         DeclareMeta("partition", 4, [(0, 1)]);

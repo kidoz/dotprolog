@@ -385,9 +385,110 @@ public sealed class SwiLibraryTests
 
     [Theory]
     [InlineData("catch(char_type(a, bogus), error(E, _), true), write(E)", "domain_error(char_type,bogus)")]
-    [InlineData("catch(char_type(_, alpha), error(E, _), true), write(E)", "instantiation_error")]
+    [InlineData("catch(char_type(_, _), error(E, _), true), write(E)", "instantiation_error")]
+    [InlineData("catch(char_type(_, bogus), error(E, _), true), write(E)", "domain_error(char_type,bogus)")]
     [InlineData("catch(char_type(ab, alpha), error(E, _), true), write(E)", "type_error(character,ab)")]
     [InlineData("catch(code_type(a, alpha), error(E, _), true), write(E)", "type_error(integer,a)")]
     public void CharTypeValidatesItsArguments(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    // An unbound character enumerates the type's members in code order, as SWI enumerates.
+    [Theory]
+    [InlineData("findall(C, char_type(C, digit(3)), L), write(L)", "[3]")]
+    [InlineData("findall(C, char_type(C, digit(_)), L), length(L, N), write(N)", "10")]
+    [InlineData("findall(C, char_type(C, upper(a)), L), write(L)", "[A]")]
+    [InlineData("findall(C, char_type(C, lower('A')), L), write(L)", "[a]")]
+    [InlineData("findall(K, code_type(K, digit(7)), L), write(L)", "[55]")]
+    [InlineData("once(char_type(C, alpha)), write(C)", "A")]
+    [InlineData("once(code_type(K, digit(0))), write(K)", "48")]
+    [InlineData("findall(C, char_type(C, period), L), write(L)", "[!,.,?]")]
+    [InlineData("aggregate_all(count, char_type(_, quote), N), write(N)", "3")]
+    public void CharTypeEnumeratesAnUnboundCharacter(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Theory]
+    [InlineData("list_to_assoc([b-2, a-1, c-3], A), findall(K-V, gen_assoc(K, A, V), L), write(L)", "[a-1,b-2,c-3]")]
+    [InlineData("list_to_assoc([b-2, a-1], A), gen_assoc(b, A, V), write(V)", "2")]
+    [InlineData("( list_to_assoc([a-1], A), gen_assoc(z, A, _) -> write(yes) ; write(no) )", "no")]
+    [InlineData("list_to_assoc([b-2, a-1], A), get_assoc(b, A, Old, A2, 9), assoc_to_list(A2, L), write(Old-L)", "2-[a-1,b-9]")]
+    [InlineData("( list_to_assoc([a-1], A), get_assoc(z, A, _, _, 9) -> write(yes) ; write(no) )", "no")]
+    [InlineData(
+        "list_to_assoc([b-2, a-1, c-3], A), del_min_assoc(A, K, V, A2), assoc_to_list(A2, L), write(K-V-L)",
+        "a-1-[b-2,c-3]"
+    )]
+    [InlineData(
+        "list_to_assoc([b-2, a-1, c-3], A), del_max_assoc(A, K, V, A2), assoc_to_list(A2, L), write(K-V-L)",
+        "c-3-[a-1,b-2]"
+    )]
+    [InlineData("( empty_assoc(A), del_min_assoc(A, _, _, _) -> write(yes) ; write(no) )", "no")]
+    [InlineData("( list_to_assoc([a-1, b-2], A), is_assoc(A) -> write(yes) ; write(no) )", "yes")]
+    [InlineData("( is_assoc(t) -> write(yes) ; write(no) )", "yes")]
+    [InlineData("( is_assoc(foo) -> write(yes) ; write(no) )", "no")]
+    [InlineData("( is_assoc(t(a, 1, 9, t, t)) -> write(yes) ; write(no) )", "no")]
+    [InlineData("( is_assoc(t(b, 1, 1, t(a, 2, 1, t, t), t)) -> write(yes) ; write(no) )", "no")]
+    public void AssocCompletionMatchesSwi(string goal, string expected) => Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Fact]
+    public void MapAssocTestsAndTransformsValuesInOrder() =>
+        Assert.Equal(
+            "yes [a-2,b-4,c-6]",
+            PrologTestHost.Run(
+                """
+                positive(V) :- V > 0.
+                double(V0, V) :- V is V0 * 2.
+                :- initialization((
+                    list_to_assoc([b-2, a-1, c-3], A),
+                    ( map_assoc(positive, A) -> write(yes) ; write(no) ),
+                    map_assoc(double, A, D),
+                    assoc_to_list(D, L),
+                    write(' '), write(L)
+                )).
+                """
+            )
+        );
+
+    // A compound template aggregates each spec argument and keeps the template's
+    // shape; an invalid template raises the error SWI raises.
+    [Theory]
+    [InlineData("aggregate_all(r(sum(X), count), member(X, [1, 2, 3]), R), write(R)", "r(6,3)")]
+    [InlineData("aggregate_all(p(max(X, W), count), member(W-X, [a-1, b-2]), R), write(R)", "p(max(2,b),2)")]
+    [InlineData("aggregate_all(p(count, bag(X)), (member(X, [1]), fail), R), write(R)", "p(0,[])")]
+    [InlineData("( aggregate_all(p(max(_), count), fail, _) -> write(yes) ; write(no) )", "no")]
+    [InlineData("aggregate(r(sum(X), count), member(g-X, [g-1, g-2]), R), write(R)", "r(3,2)")]
+    [InlineData("aggregate_all(r(sum(X), count), D, member(D-X, [a-1, a-1, b-2]), R), write(R)", "r(3,2)")]
+    [InlineData("aggregate(r(set(X), min(X)), D, member(D-X, [k-2, k-1]), R), write(R)", "r([1,2],1)")]
+    public void CompoundAggregationTemplatesKeepTheirShape(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Theory]
+    [InlineData("catch(aggregate_all(k(sum(_), 7), true, _), error(E, _), true), write(E)", "type_error(aggregate_template,7)")]
+    [InlineData(
+        "catch(aggregate_all(k(sum(_), foo), true, _), error(E, _), true), write(E)",
+        "domain_error(aggregate_template,foo)"
+    )]
+    [InlineData("catch(aggregate_all(k(g(1)), true, _), error(E, _), true), write(E)", "domain_error(aggregate_template,g(1))")]
+    [InlineData("catch(aggregate_all(foo, true, _), error(E, _), true), write(E)", "domain_error(aggregate_template,foo)")]
+    [InlineData("catch(aggregate_all(_, true, _), error(E, _), true), write(E)", "instantiation_error")]
+    [InlineData("catch(aggregate_all(k(sum(_), _), true, _), error(E, _), true), write(E)", "instantiation_error")]
+    public void InvalidAggregationTemplatesRaiseTheSwiError(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    // term_size/2 counts the cells of a detached copy: one for an atomic root, functor plus
+    // arguments per structure occurrence (so a shared subterm counts each time it appears),
+    // and a root slot plus a variable cell for a bare variable.
+    [Theory]
+    [InlineData("term_size(abc, S), write(S)", "1")]
+    [InlineData("term_size(f(a, b), S), write(S)", "4")]
+    [InlineData("T = f(1, 2), term_size(g(T, T), S), write(S)", "10")]
+    [InlineData("term_size([1, 2], S), write(S)", "7")]
+    [InlineData("term_size(_, S), write(S)", "2")]
+    public void TermSizeCountsDetachedCopyCells(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Fact]
+    public void TermSizeRejectsACyclicTerm() =>
+        Assert.Equal(
+            "representation_error(cyclic_term)",
+            PrologTestHost.RunGoal("X = f(X), catch(term_size(X, _), error(E, _), true), write(E)")
+        );
 }
