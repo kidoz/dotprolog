@@ -61,6 +61,8 @@ internal static class TermBuiltins
     {
         registry.Register("functor", 3, Functor3);
         registry.Register("arg", 3, Arg3);
+        registry.Register("setarg", 3, static machine => SetArg(machine, backtrackable: true));
+        registry.Register("nb_setarg", 3, static machine => SetArg(machine, backtrackable: false));
         registry.Register("copy_term", 2, CopyTerm);
         registry.Register("term_variables", 2, TermVariables);
 
@@ -367,6 +369,48 @@ internal static class TermBuiltins
         }
 
         return machine.Unify(machine.Argument(2), machine.HeapAt(term.Index + (int)index.Integer));
+    }
+
+    /// <summary>
+    /// <c>setarg(+Arg, +Term, +Value)</c> and <c>nb_setarg(+Arg, +Term, +Value)</c>: destructive
+    /// assignment of a structure argument slot, undone on backtracking for the first form. The
+    /// non-backtrackable form accepts atomic values only — an atom, integer, or float survives
+    /// heap truncation, which is what makes the assignment able to outlive backtracking at all.
+    /// </summary>
+    private static bool SetArg(Machine machine, bool backtrackable)
+    {
+        Cell index = machine.Argument(0);
+        Cell term = machine.Argument(1);
+        Cell value = machine.Argument(2);
+
+        if (index.Tag == CellTag.Reference || term.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        if (index.Tag != CellTag.Integer)
+        {
+            throw PrologErrors.Type(machine, "integer", index);
+        }
+
+        if (term.Tag != CellTag.Structure)
+        {
+            throw PrologErrors.Type(machine, "compound", term);
+        }
+
+        if (!backtrackable && value.Tag is not (CellTag.Atom or CellTag.Integer or CellTag.Float))
+        {
+            throw PrologErrors.Type(machine, "atomic", value);
+        }
+
+        var arity = machine.Symbols.ArityOf(machine.HeapAt(term.Index).Index);
+        if (index.Integer < 1 || index.Integer > arity)
+        {
+            return false;
+        }
+
+        machine.SetArgument(term.Index + (int)index.Integer, value, backtrackable);
+        return true;
     }
 
     private static bool Univ(Machine machine, int emptyList)

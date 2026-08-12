@@ -34,6 +34,9 @@ public sealed class Machine
     private GlobalUndo[] _globalUndo = new GlobalUndo[8];
     private int _globalUndoTop;
 
+    private ValueUndo[] _valueUndo = new ValueUndo[8];
+    private int _valueUndoTop;
+
     private Cell[] _stack = new Cell[1 << 14];
     private int _stackTop;
     private int _e = -1;
@@ -1817,15 +1820,37 @@ public sealed class Machine
 
     private void UndoTrail(int mark)
     {
-        while (_tr > mark)
+        if (_valueUndoTop == 0)
         {
-            var address = _trail[--_tr];
-            _heap[address] = Cell.Reference(address);
+            while (_tr > mark)
+            {
+                var address = _trail[--_tr];
+                _heap[address] = Cell.Reference(address);
+            }
+        }
+        else
+        {
+            // A binding and a setarg/3 can target the same heap address, so their restores must
+            // interleave in exact reverse chronology. A value-undo entry's mark is the trail
+            // position just above its own sentinel: it fires when the unwind reaches that
+            // position, before the sentinel itself pops.
+            while (_tr > mark)
+            {
+                while (_valueUndoTop > 0 && _valueUndo[_valueUndoTop - 1].TrailMark == _tr)
+                {
+                    ref ValueUndo assignment = ref _valueUndo[--_valueUndoTop];
+                    _heap[assignment.Address] = assignment.Previous;
+                }
+
+                var address = _trail[--_tr];
+                _heap[address] = Cell.Reference(address);
+            }
         }
 
         // A backtrackable global assignment is undone when the trail unwinds below its sentinel
-        // entry. Tentative-unification undos always target a mark at or above every recorded
-        // assignment, so they can never fire one.
+        // entry. Dictionary state is disjoint from the heap, so its order against the loops above
+        // does not matter. Tentative-unification undos always target a mark at or above every
+        // recorded assignment, so they can never fire one.
         while (_globalUndoTop > 0 && _globalUndo[_globalUndoTop - 1].TrailMark > mark)
         {
             ref GlobalUndo undo = ref _globalUndo[--_globalUndoTop];
@@ -1838,6 +1863,45 @@ public sealed class Machine
                 _globals.Remove(undo.KeyAtom);
             }
         }
+    }
+
+    /// <summary>
+    /// Destructively assigns the heap cell at <paramref name="address"/>, a structure argument
+    /// slot. A backtrackable assignment records the previous cell on the value-undo stack behind
+    /// its own sentinel trail entry — unless the slot is younger than every choice point, in
+    /// which case backtracking discards it with the heap and nothing needs recording.
+    /// </summary>
+    internal void SetArgument(int address, Cell value, bool backtrackable)
+    {
+        if (backtrackable && _b > 0 && address < _choicePoints[_b - 1].HeapTop)
+        {
+            Cell sentinel = NewVariable();
+            if (_tr == _trail.Length)
+            {
+                Array.Resize(ref _trail, _trail.Length * 2);
+            }
+
+            _trail[_tr++] = sentinel.Index;
+
+            if (_valueUndoTop == _valueUndo.Length)
+            {
+                Array.Resize(ref _valueUndo, _valueUndo.Length * 2);
+            }
+
+            ref ValueUndo undo = ref _valueUndo[_valueUndoTop++];
+            undo.TrailMark = _tr;
+            undo.Address = address;
+            undo.Previous = _heap[address];
+        }
+
+        _heap[address] = value;
+    }
+
+    private struct ValueUndo
+    {
+        public int TrailMark;
+        public int Address;
+        public Cell Previous;
     }
 
     /// <summary>
