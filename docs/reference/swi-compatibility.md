@@ -34,7 +34,7 @@ a corpus of ledger goals against SWI-Prolog itself and asserts the outputs agree
 | Soft cut `*->/2` | Supported |
 | Last-call optimization | Supported |
 | Clause indexing | First-argument indexing in the bytecode VM; SWI-style multi-argument JITI is not planned as such |
-| `unify_with_occurs_check/2` | Supported. SWI's global `occurs_check` flag is absent |
+| `unify_with_occurs_check/2`, the `occurs_check` flag | Supported: `false`, `true`, and `error` with SWI's `occurs_check(Var, Term)` error term, guarding general unification (`=/2`, builtins, read-mode head arguments). Divergence: write-mode head unification — an unbound call argument against a structure head embedding the same variable — is not checked and builds the rational tree |
 | Tabling (`:- table`, SLG, WFS) | Absent; a later roadmap phase |
 | Attributed variables, `dif/2`, `freeze/2`, `when/2` | Absent; a later roadmap phase |
 | Constraint solvers CLP(FD), CLP(R,Q), CHR | Absent; follows attributed variables on the roadmap |

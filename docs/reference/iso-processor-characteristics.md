@@ -71,6 +71,9 @@ from the flag's ISO domain. The value is scoped to the load unit: a
 `set_prolog_flag(double_quotes, _)` directive governs the rest of the file that issued it, and the
 entering value is restored when that file finishes loading.
 
+The extension flag `occurs_check` (`false`, `true`, `error`) exists in the `Extended` and
+`Modern` modes only and starts at `false`, the ISO behavior; `StrictIso` does not define it.
+
 The initial `char_conversion` flag is `off`.
 Character conversion applies to unquoted lexical input while quoted text, escapes, character-code
 literal payloads, and primitive character input remain unchanged.

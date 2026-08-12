@@ -33,6 +33,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - `setarg/3` and `nb_setarg/3`: destructive argument assignment, undone on backtracking for the
   first form through a value-undo stack interleaved with trail unwinding. `nb_setarg/3` accepts
   atomic replacement values only, which the counter idiom needs and heap truncation allows.
+- The `occurs_check` flag (`false`, `true`, `error`) in the `Extended` and `Modern` modes,
+  guarding general unification with SWI's `occurs_check(Var, Term)` error term. Write-mode head
+  unification is a documented unchecked window; `StrictIso` keeps the ISO flag set unchanged.
 
 ### Fixed
 
