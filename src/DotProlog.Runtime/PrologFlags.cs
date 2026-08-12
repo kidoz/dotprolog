@@ -13,6 +13,19 @@ public enum DoubleQuotesMode
     Atom,
 }
 
+/// <summary>What a cycle-creating unification does under the <c>occurs_check</c> flag.</summary>
+public enum OccursCheckMode
+{
+    /// <summary>No check: rational trees may form. The default, and the only ISO behavior.</summary>
+    False,
+
+    /// <summary>A cycle-creating unification fails.</summary>
+    True,
+
+    /// <summary>A cycle-creating unification raises <c>occurs_check(Var, Term)</c>.</summary>
+    Error,
+}
+
 /// <summary>What an undefined procedure call does.</summary>
 public enum UnknownProcedureAction
 {
@@ -53,6 +66,9 @@ public sealed class PrologFlags
     /// <summary>What an undefined procedure call does.</summary>
     public UnknownProcedureAction Unknown { get; internal set; } = UnknownProcedureAction.Error;
 
+    /// <summary>What a cycle-creating general unification does. An extension flag; see ADR 0046.</summary>
+    public OccursCheckMode OccursCheck { get; internal set; } = OccursCheckMode.False;
+
     /// <summary>Creates an independent copy of the current flag values.</summary>
     public PrologFlags Copy() =>
         new()
@@ -61,6 +77,7 @@ public sealed class PrologFlags
             Debug = Debug,
             DoubleQuotes = DoubleQuotes,
             Unknown = Unknown,
+            OccursCheck = OccursCheck,
         };
 
     /// <summary>Replaces every mutable flag value with those from another set.</summary>
@@ -71,5 +88,6 @@ public sealed class PrologFlags
         Debug = source.Debug;
         DoubleQuotes = source.DoubleQuotes;
         Unknown = source.Unknown;
+        OccursCheck = source.OccursCheck;
     }
 }

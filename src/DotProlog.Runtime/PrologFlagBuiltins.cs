@@ -3,7 +3,11 @@ namespace DotProlog.Runtime;
 /// <summary>ISO predicates that inspect and change Prolog execution flags.</summary>
 internal static class PrologFlagBuiltins
 {
-    private const int FlagCount = 10;
+    private const int IsoFlagCount = 10;
+
+    // occurs_check sits past the ISO flags, so the strict mode's count simply excludes it.
+    private static int FlagCount(Machine machine) =>
+        machine.Program.LanguageMode == PrologLanguageMode.StrictIso ? IsoFlagCount : IsoFlagCount + 1;
 
     internal static void Register(BuiltinRegistry registry)
     {
@@ -36,7 +40,8 @@ internal static class PrologFlagBuiltins
 
         Cell pattern = machine.CreateStructure(machine.Symbols.InternFunctor("-", 2), [flag, machine.Argument(offset + 1)]);
 
-        for (var index = (int)state; index < FlagCount; index++)
+        var count = FlagCount(machine);
+        for (var index = (int)state; index < count; index++)
         {
             (var name, Cell value) = ValueAt(machine, flags, index);
             Cell candidate = machine.CreateStructure(
@@ -49,7 +54,7 @@ internal static class PrologFlagBuiltins
                 continue;
             }
 
-            if (index + 1 < FlagCount)
+            if (index + 1 < count)
             {
                 machine.PushRetry(index + 1);
             }
@@ -90,6 +95,12 @@ internal static class PrologFlagBuiltins
             "debug" => SetOnOff(machine, flags, name, value, static (target, enabled) => target.Debug = enabled),
             "double_quotes" => SetDoubleQuotes(machine, flags, name, value),
             "unknown" => SetUnknown(machine, flags, name, value),
+            "occurs_check" when machine.Program.LanguageMode != PrologLanguageMode.StrictIso => SetOccursCheck(
+                machine,
+                flags,
+                name,
+                value
+            ),
             "bounded" => RejectReadOnly(machine, name, value, Cell.Atom(machine.Symbols.InternAtom("true"))),
             "max_integer" => RejectReadOnly(machine, name, value, Cell.Integer60(Cell.MaxInteger)),
             "min_integer" => RejectReadOnly(machine, name, value, Cell.Integer60(Cell.MinInteger)),
@@ -132,6 +143,18 @@ internal static class PrologFlagBuiltins
             "error" => UnknownProcedureAction.Error,
             "warning" => UnknownProcedureAction.Warning,
             _ => UnknownProcedureAction.Fail,
+        };
+        return true;
+    }
+
+    private static bool SetOccursCheck(Machine machine, PrologFlags flags, string flag, Cell value)
+    {
+        var atom = RequireValue(machine, flag, value, "false", "true", "error");
+        flags.OccursCheck = atom switch
+        {
+            "false" => OccursCheckMode.False,
+            "true" => OccursCheckMode.True,
+            _ => OccursCheckMode.Error,
         };
         return true;
     }
@@ -181,7 +204,8 @@ internal static class PrologFlagBuiltins
             6 => ("debug", Atom(machine, flags.Debug ? "on" : "off")),
             7 => ("double_quotes", Atom(machine, DoubleQuotesName(flags.DoubleQuotes))),
             8 => ("unknown", Atom(machine, UnknownName(flags.Unknown))),
-            _ => ("colon_sets_calling_context", Atom(machine, "true")),
+            9 => ("colon_sets_calling_context", Atom(machine, "true")),
+            _ => ("occurs_check", Atom(machine, OccursCheckName(flags.OccursCheck))),
         };
 
     private static Cell Atom(Machine machine, string name) => Cell.Atom(machine.Symbols.InternAtom(name));
@@ -192,6 +216,14 @@ internal static class PrologFlagBuiltins
             DoubleQuotesMode.Codes => "codes",
             DoubleQuotesMode.Chars => "chars",
             _ => "atom",
+        };
+
+    private static string OccursCheckName(OccursCheckMode mode) =>
+        mode switch
+        {
+            OccursCheckMode.False => "false",
+            OccursCheckMode.True => "true",
+            _ => "error",
         };
 
     private static string UnknownName(UnknownProcedureAction action) =>

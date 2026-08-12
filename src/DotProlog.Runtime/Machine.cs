@@ -1576,8 +1576,34 @@ public sealed class Machine
         return cell;
     }
 
-    /// <summary>Unifies two terms, trailing every binding so that backtracking can undo them.</summary>
-    public bool Unify(Cell left, Cell right) => UnifyCore(left, right, occursCheck: false);
+    private Cell _occursCycleVariable;
+    private Cell _occursCycleTerm;
+    private bool _occursCycleDetected;
+
+    /// <summary>
+    /// Unifies two terms, trailing every binding so that backtracking can undo them. The
+    /// <c>occurs_check</c> flag guards this entry: <c>false</c> is the unchanged fast path, and
+    /// the other modes route through the occurs-check unifier (ADR 0046). Write-mode head
+    /// unification does not pass through here and is not guarded.
+    /// </summary>
+    public bool Unify(Cell left, Cell right)
+    {
+        OccursCheckMode mode = _program.Flags.OccursCheck;
+        return mode == OccursCheckMode.False ? UnifyCore(left, right, occursCheck: false) : UnifyGuarded(left, right, mode);
+    }
+
+    private bool UnifyGuarded(Cell left, Cell right, OccursCheckMode mode)
+    {
+        _occursCycleDetected = false;
+        var unified = UnifyWithOccursCheck(left, right);
+
+        if (!unified && mode == OccursCheckMode.Error && _occursCycleDetected)
+        {
+            throw PrologErrors.OccursCheck(this, _occursCycleVariable, _occursCycleTerm);
+        }
+
+        return unified;
+    }
 
     private bool UnifyCore(Cell left, Cell right, bool occursCheck)
     {
@@ -1616,6 +1642,9 @@ public sealed class Machine
 
                 if (occursCheck && OccursIn(a.Index, b))
                 {
+                    _occursCycleVariable = a;
+                    _occursCycleTerm = b;
+                    _occursCycleDetected = true;
                     _unificationTop = 0;
                     return false;
                 }
@@ -1628,6 +1657,9 @@ public sealed class Machine
             {
                 if (occursCheck && OccursIn(b.Index, a))
                 {
+                    _occursCycleVariable = b;
+                    _occursCycleTerm = a;
+                    _occursCycleDetected = true;
                     _unificationTop = 0;
                     return false;
                 }

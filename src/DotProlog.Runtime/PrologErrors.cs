@@ -164,6 +164,18 @@ public static class PrologErrors
         return Build(machine, formal, $"{kind}({argument})");
     }
 
+    /// <summary>
+    /// The <c>occurs_check</c> flag's error action: <c>occurs_check(Variable, Term)</c>, carrying
+    /// the variable and the term whose binding would have created a cycle. The description leaves
+    /// the term unrendered because it may already be a rational tree.
+    /// </summary>
+    public static PrologException OccursCheck(Machine machine, Cell variable, Cell term)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+        Cell formal = machine.CreateStructure(machine.Symbols.InternFunctor("occurs_check", 2), [variable, term]);
+        return Build(machine, formal, "occurs_check: the binding would create a cyclic term");
+    }
+
     private static PrologException Binary(Machine machine, string kind, string first, Cell culprit)
     {
         Cell formal = machine.CreateStructure(

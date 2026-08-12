@@ -59,7 +59,10 @@ public sealed class SwiDifferentialTests
         "T = f(a, b), setarg(1, T, x), write(T)",
         "T = f(a), ( setarg(1, T, x), fail ; true ), write(T)",
         "T = f(a), call((setarg(1, T, x), true)), write(T)",
-        "T = counter(0), forall(member(_, [a, b, c]), ( arg(1, T, N), N1 is N + 1, nb_setarg(1, T, N1) )), arg(1, T, C), write(C)"
+        "T = counter(0), forall(member(_, [a, b, c]), ( arg(1, T, N), N1 is N + 1, nb_setarg(1, T, N1) )), arg(1, T, C), write(C)",
+        "set_prolog_flag(occurs_check, true), ( X = f(X) -> write(cycled) ; write(failed) )",
+        "set_prolog_flag(occurs_check, true), ( p(X, a) = p(f(X), a) -> write(cycled) ; write(failed) )",
+        "set_prolog_flag(occurs_check, error), catch(X = f(X), error(occurs_check(_, _), _), write(caught))"
     );
 
     // The corpus stays runnable on DotProlog alone, so a corpus typo or a regression in the
