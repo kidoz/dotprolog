@@ -184,9 +184,12 @@ internal static class Program
                 write(predicate_info), nl,
 
                 % ISO flags own runtime state explicitly and continue to work after trimming.
+                % The count is the ten ISO flags plus the occurs_check extension flag; it changes
+                % whenever the flag inventory does, deliberately.
                 current_prolog_flag(bounded, true),
                 findall(FlagName, current_prolog_flag(FlagName, _), FlagNames),
-                length(FlagNames, 10),
+                length(FlagNames, 11),
+                memberchk(occurs_check, FlagNames),
                 current_prolog_flag(max_integer, NativeMaxInteger),
                 catch(
                     set_prolog_flag(max_integer, NativeMaxInteger),
