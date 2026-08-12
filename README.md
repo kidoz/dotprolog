@@ -234,6 +234,7 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 | Ordered sets | `list_to_ord_set/2`, `ord_empty/1`, `ord_memberchk/2`, `ord_subset/2`, `ord_disjoint/2`, `ord_union/2,3`, `ord_intersection/2,3`, `ord_subtract/3`, `ord_add_element/3`, `ord_del_element/3` |
 | Assocs | AVL association lists: `empty_assoc/1`, `put_assoc/4`, `get_assoc/3`, `list_to_assoc/2`, `ord_list_to_assoc/2`, `assoc_to_list/2`, `assoc_to_keys/2`, `assoc_to_values/2`, `min_assoc/3`, `max_assoc/3`, `del_assoc/4` |
 | Validation | `must_be/2`, `is_of_type/2`, and the `library(error)` raisers from `instantiation_error/1` to `syntax_error/1` |
+| Global variables | `nb_setval/2`, `nb_getval/2`, `b_setval/2`, `b_getval/2`, engine-scoped |
 | Integers | `succ/2`, `plus/3` |
 | Output | `write/1,2`, `writeq/1,2`, `print/1,2`, `writeln/1`, `write_canonical/1,2`, `write_term/2,3`, `nl/0,1`, `format/1,2,3`, `tab/1,2` |
 | Operators | `op/3`, `current_op/3` |

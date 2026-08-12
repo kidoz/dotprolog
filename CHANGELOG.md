@@ -22,6 +22,10 @@ All notable changes to DotProlog are recorded here. The format follows
 - An opt-in differential suite that runs a shared goal corpus against a locally installed
   SWI-Prolog and asserts the outputs agree (`DOTPROLOG_RUN_SWI_DIFFERENTIAL_TESTS=1`); the corpus
   also runs unconditionally against DotProlog alone.
+- Engine-scoped global variables: `nb_setval/2` and `nb_getval/2` store and read a detached copy
+  that survives backtracking, while `b_setval/2` and `b_getval/2` hold the live term and the
+  assignment is undone when execution backtracks past it, including through `catch/3` and at the
+  end of the top-level goal.
 
 ### Changed
 

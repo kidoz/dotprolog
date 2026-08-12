@@ -40,7 +40,7 @@ a corpus of ledger goals against SWI-Prolog itself and asserts the outputs agree
 | Constraint solvers CLP(FD), CLP(R,Q), CHR | Absent; follows attributed variables on the roadmap |
 | Single-sided unification rules (`=>`) | Absent; a later roadmap phase |
 | Delimited continuations | Absent; a later roadmap phase |
-| Global variables (`nb_setval/2`, `b_setval/2`, …) | Absent; a later roadmap phase |
+| Global variables | Supported: `nb_setval/2`, `nb_getval/2`, `b_setval/2`, `b_getval/2`, scoped to the engine as SWI scopes them to a thread. `nb_getval/2` materializes a fresh copy per read, so term identity across reads differs from SWI while values agree. `nb_current/2` is absent |
 | `setup_call_cleanup/3`, `call_cleanup/2` | Absent; needs engine determinism hooks; a later roadmap phase |
 | Threads, engines, coroutining interactors | Absent. One machine runs one goal at a time; concurrency belongs to the .NET host today |
 | Garbage collection | Provided by the .NET runtime rather than a Prolog-specific collector |
