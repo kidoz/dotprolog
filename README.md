@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="docs/assets/dotprolog-logo.png" alt="DotProlog logo" width="720">
-</p>
+<img src="docs/assets/dotprolog-logo.png" alt="DotProlog logo" width="720">
 
 A Prolog language implementation for .NET 10, written in C# 14.
 

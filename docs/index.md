@@ -1,4 +1,4 @@
-# DotProlog
+<img src="assets/dotprolog-logo.png" alt="DotProlog logo" width="720">
 
 DotProlog is a Prolog language implementation for .NET 10, written in C# 14. It is building toward
 the same first-class SDK experience that C# and F# provide: `.dplproj` projects, `dotnet prolog`,
