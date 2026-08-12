@@ -1,4 +1,6 @@
-# DotProlog
+<p align="center">
+  <img src="docs/assets/dotprolog-logo.png" alt="DotProlog logo" width="720">
+</p>
 
 A Prolog language implementation for .NET 10, written in C# 14.
 
@@ -159,6 +161,8 @@ bundles of [widget, gadget]:
 | `samples/GreetingApp` | A Prolog application built from a `.dplproj` |
 | `samples/GreymereAdventure` | A complete fantasy text adventure written in Prolog |
 | `samples/PricingTests` | Prolog tests in a `.dplproj`, run by `DotProlog.Testing` |
+| `samples/TextGrammar` | A `.dplproj` in Modern mode: DCGs over double-quoted text |
+| `samples/NaturalLanguage` | Natural-language parsing and question answering in Modern mode |
 | `samples/AotAcceptance` | The NativeAOT acceptance sample |
 
 ## Common tasks
@@ -225,7 +229,7 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 | Unification | `=/2`, `\=/2` |
 | Arithmetic | ISO-oriented integer and float evaluable functors; `is/2`, `=:=/2`, `=\=/2`, `</2`, `>/2`, `=</2`, `>=/2` |
 | Standard order | `==/2`, `\==/2`, `@</2`, `@>/2`, `@=</2`, `@>=/2`, `compare/3` |
-| Term inspection | `functor/3`, `arg/3`, `=../2`, `copy_term/2`, `term_variables/2`, `numbervars/3`, `variant/2`, `?=/2` |
+| Term inspection | `functor/3`, `arg/3`, `=../2`, `copy_term/2`, `term_variables/2`, `numbervars/3`, `variant/2`, `?=/2`, `setarg/3`, `nb_setarg/3` |
 | Type tests | `var/1`, `nonvar/1`, `atom/1`, `number/1`, `integer/1`, `float/1`, `atomic/1`, `compound/1`, `callable/1`, `is_list/1`, `ground/1` |
 | Text | `atom_length/2`, `atom_chars/2`, `atom_codes/2`, `number_chars/2`, `number_codes/2`, `char_code/2`, `atom_number/2`, `atom_concat/3`, `sub_atom/5`, `atomic_list_concat/2,3`, `upcase_atom/2`, `downcase_atom/2`, `char_type/2`, `code_type/2` |
 | Lists | `length/2`, `append/3`, `member/2`, `memberchk/2`, `nth0/3`, `nth1/3`, `last/2`, `reverse/2`, `select/3`, `selectchk/3`, `subtract/3`, `intersection/3`, `union/3`, `delete/3`, `list_to_set/2`, `permutation/2`, `flatten/2`, `numlist/3`, `sum_list/2`, `max_list/2`, `min_list/2`, `max_member/2`, `min_member/2`, `pairs_keys_values/3`, `pairs_keys/2`, `pairs_values/2`, `transpose_pairs/2` |

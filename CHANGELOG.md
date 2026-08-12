@@ -30,6 +30,18 @@ All notable changes to DotProlog are recorded here. The format follows
   exit (including the redo that exhausts the alternatives), failure, or a thrown ball, with SWI's
   ball precedence. A surrounding cut that discards pending alternatives does not fire the
   deferred cleanup; `once(Goal)` gives commit semantics.
+- `setarg/3` and `nb_setarg/3`: destructive argument assignment, undone on backtracking for the
+  first form through a value-undo stack interleaved with trail unwinding. `nb_setarg/3` accepts
+  atomic replacement values only, which the counter idiom needs and heap truncation allows.
+
+### Fixed
+
+- Meta-called control goals now operate on the caller's live terms: the runtime lowering compiles
+  only the control skeleton and passes every leaf-goal argument through a register instead of
+  rebuilding bound terms, which destructive assignment made observable.
+- A compiled predicate that lowered a meta-called control goal could crash the dispatch loop with
+  an index error when appending the lowered bytecode grew the program's code array; the loop now
+  refreshes its cached arrays after compiled execution returns.
 
 ### Changed
 

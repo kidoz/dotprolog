@@ -60,7 +60,7 @@ a corpus of ledger goals against SWI-Prolog itself and asserts the outputs agree
 | Arithmetic helpers: `between/3`, `succ/2`, `plus/3` | Supported, including `between/3` with an `inf`/`infinite` upper bound |
 | Formatting: `format/1,2,3` with column stops, `tab/1,2` | Supported for the directive set in the language guide, including radix `~r`/`~R`; `~@` and `~W` are absent. `format/3` writes to `atom(A)`, `codes(C)`, `chars(C)`, or a stream |
 | Term text: `term_to_atom/2`, `atom_to_term/3`, `read_term_from_atom/3`, `with_output_to/2` | Supported (atom-based sinks; no string sink) |
-| Terms: `copy_term/2`, `term_variables/2`, `subsumes_term/2`, `numbervars/3`, `variant/2`, `?=/2` | Supported. `setarg/3`, `nb_setarg/3`, `term_size/2`, `term_string/2` are absent |
+| Terms: `copy_term/2`, `term_variables/2`, `subsumes_term/2`, `numbervars/3`, `variant/2`, `?=/2`, `setarg/3`, `nb_setarg/3` | Supported. `nb_setarg/3` accepts atomic replacement values only — a compound copy would dangle once backtracking truncates the heap; the counter idiom works unchanged. `term_size/2` and `term_string/2` are absent |
 | Atoms: `atom_length/2`, `atom_concat/3`, `sub_atom/5`, `atomic_list_concat/2,3`, `atom_number/2`, `upcase_atom/2`, `downcase_atom/2` | Supported |
 | String library (`string_concat/3`, `split_string/4`, …) | Absent with the string type |
 | `char_type/2`, `code_type/2` | Supported for a bound character and the common type set; enumeration over characters is absent. The counterintuitive SWI direction of `to_upper/1` and `to_lower/1` (a bound character answers its lowercase and uppercase respectively) is preserved, verified against SWI 10 |
