@@ -4,7 +4,7 @@
 `double_quotes` seeded at `chars`, and an extension surface whose reference behavior is
 SWI-Prolog's. This page is the ledger that keeps the alignment honest. A row says **supported**
 only when repository tests cover it; DotProlog does not claim SWI-Prolog compatibility as a
-whole. Deliberate behavioral divergences stay listed in [COMPATIBILITY.md](../../COMPATIBILITY.md).
+whole. Deliberate behavioral divergences stay listed in [COMPATIBILITY.md on GitHub](https://github.com/kidoz/dotprolog/blob/main/COMPATIBILITY.md).
 
 Unless a row says otherwise, a supported feature is available in the `Extended` and `Modern`
 modes and rejected by `StrictIso` as an implementation-specific extension. An opt-in
@@ -27,7 +27,7 @@ a corpus of ledger goals against SWI-Prolog itself and asserts the outputs agree
 
 | SWI feature | DotProlog status |
 |---|---|
-| ISO Part 1 core | Supported and independently verified — see [COMPATIBILITY.md](../../COMPATIBILITY.md) for the claim, which is `StrictIso`'s, not SWI alignment |
+| ISO Part 1 core | Supported and independently verified — see [COMPATIBILITY.md on GitHub](https://github.com/kidoz/dotprolog/blob/main/COMPATIBILITY.md) for the claim, which is `StrictIso`'s, not SWI alignment |
 | Module system (Quintus/SWI spellings `module/2`, `use_module/1,2`, `meta_predicate/1`) | Supported, alongside the ISO Part 2 forms |
 | DCGs, `phrase/2,3`, pushback | Supported (ISO TS 13211-3), plus soft cut in grammar bodies outside strict mode |
 | Exceptions, `catch/3` | Supported |
