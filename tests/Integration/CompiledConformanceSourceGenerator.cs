@@ -394,9 +394,11 @@ internal static class CompiledConformanceSourceGenerator
             text.AppendLine("                catch (global::System.Exception error)");
             text.AppendLine("                {");
             text.AppendLine("                    failed++;");
+            // A host crash without its origin is undiagnosable from CI logs, so a non-Prolog
+            // exception reports where it was thrown, not only what it said.
             text.AppendLine(
                 CultureInfo.InvariantCulture,
-                $"                    global::System.Console.Error.WriteLine($\"{{mode}} | {Escape(group.SourcePath)} | {Escape(name)} | {{error.Message}}\");"
+                $"                    global::System.Console.Error.WriteLine($\"{{mode}} | {Escape(group.SourcePath)} | {Escape(name)} | {{error.Message}}{{(error is global::DotProlog.Runtime.PrologException ? \"\" : \" @ \" + error.StackTrace?.Split('\\n')[0].Trim())}}\");"
             );
             text.AppendLine("                }");
 
