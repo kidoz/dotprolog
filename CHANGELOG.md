@@ -26,6 +26,10 @@ All notable changes to DotProlog are recorded here. The format follows
   that survives backtracking, while `b_setval/2` and `b_getval/2` hold the live term and the
   assignment is undone when execution backtracks past it, including through `catch/3` and at the
   end of the top-level goal.
+- `setup_call_cleanup/3` and `call_cleanup/2`: the cleanup runs exactly once on deterministic
+  exit (including the redo that exhausts the alternatives), failure, or a thrown ball, with SWI's
+  ball precedence. A surrounding cut that discards pending alternatives does not fire the
+  deferred cleanup; `once(Goal)` gives commit semantics.
 
 ### Changed
 
