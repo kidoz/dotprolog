@@ -38,6 +38,12 @@ All notable changes to DotProlog are recorded here. The format follows
   unification is a documented unchecked window; `StrictIso` keeps the ISO flag set unchanged.
 - A natural-language processing sample in `Modern` mode (`samples/NaturalLanguage`), and the
   DotProlog logo on the project landing pages.
+- Project-level initial flag overrides: the `DotPrologFlags` property in a `.dplproj` (and the
+  repeatable `--flag` option on `dotnet prolog run` and `lint`) layers an initial flag value over
+  the language mode, e.g. `double_quotes=chars` while staying in `extended` mode. The mode remains
+  the curated profile; `double_quotes` (`codes`, `chars`, `atom`) is the first overridable flag.
+  Generated code records the initial `double_quotes` value and refuses to install into an engine
+  that starts elsewhere, the same way it already guards the language mode.
 
 ### Fixed
 
@@ -47,6 +53,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - A compiled predicate that lowered a meta-called control goal could crash the dispatch loop with
   an index error when appending the lowered bytecode grew the program's code array; the loop now
   refreshes its cached arrays after compiled execution returns.
+- A build-time-compiled source containing `:- set_prolog_flag(double_quotes, ...)` no longer leaks
+  that value into the host engine when its generated `Install` replays the directive: the flag is
+  restored to its entering value afterwards, matching what consulting the same file leaves behind.
 
 ### Changed
 

@@ -44,7 +44,9 @@ predicates land in the surface `Extended` and `Modern` share, so selecting `Mode
 `chars` default rather than extra predicates.
 
 A mode is a curated dialect, not a flag matrix. A program that wants a combination no mode names —
-`double_quotes` starting at `atom`, say — sets the flag itself.
+`double_quotes` starting at `atom`, say — sets the flag itself, or asks the host to seed it: the
+`DotPrologFlags` project property, the `--flag` option, and the engine constructor's flag
+overrides layer an initial value for a curated flag over the mode without leaving the profile.
 
 Select a mode with the `PrologEngine` constructor, `dotnet prolog run --mode <name>`, or the
 `DotPrologLanguageMode` property in a `.dplproj`.

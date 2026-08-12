@@ -15,7 +15,7 @@ a corpus of ledger goals against SWI-Prolog itself and asserts the outputs agree
 
 | SWI feature | DotProlog status |
 |---|---|
-| `double_quotes` values `codes`, `chars`, `atom` | Supported. ISO leaves the initial value implementation defined; `Modern` starts at `chars`, other modes at `codes`. SWI's default `string` value has no DotProlog equivalent |
+| `double_quotes` values `codes`, `chars`, `atom` | Supported. ISO leaves the initial value implementation defined; `Modern` starts at `chars`, other modes at `codes`, and any mode's initial value can be moved to another ISO value with the `DotPrologFlags` project property or `dotnet prolog --flag`. SWI's default `string` value has no DotProlog equivalent |
 | String type and `"..."` strings | Absent by decision: aliasing string predicates to atoms would let portable code compile and misbehave. A real string type is a term-representation change planned as a later phase |
 | Unbounded integers and rationals (GMP) | Absent. Integers are bounded 60-bit tagged values, a published processor characteristic; overflow raises `evaluation_error(int_overflow)`. Unbounded arithmetic is a later roadmap phase |
 | Dicts and version-7 syntax (`point{x:1}`, `[\|]`, block operators, zero-arity compounds) | Absent; a later roadmap phase |

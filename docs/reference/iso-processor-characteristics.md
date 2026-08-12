@@ -67,9 +67,12 @@ encoding for a text file; binary streams do not perform character conversion.
 ISO/IEC 13211-1 leaves the initial `double_quotes` value implementation defined (7.11.2.5), and
 this page is where DotProlog defines it: `codes` in the `Extended` and `StrictIso` language modes,
 matching the ISO-oriented systems. The opt-in `Modern` mode starts it at `chars`, another value
-from the flag's ISO domain. The value is scoped to the load unit: a
-`set_prolog_flag(double_quotes, _)` directive governs the rest of the file that issued it, and the
-entering value is restored when that file finishes loading.
+from the flag's ISO domain. A host may move the initial value to any of the three ISO values in
+any mode — through the `DotPrologFlags` project property, `dotnet prolog --flag`, or the engine
+constructor's flag overrides — and the chosen value then plays the role the mode default
+otherwise would. The value is scoped to the load unit: a `set_prolog_flag(double_quotes, _)`
+directive governs the rest of the file that issued it, and the entering value is restored when
+that file finishes loading.
 
 The extension flag `occurs_check` (`false`, `true`, `error`) exists in the `Extended` and
 `Modern` modes only and starts at `false`, the ISO behavior; `StrictIso` does not define it.

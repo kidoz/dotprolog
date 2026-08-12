@@ -61,6 +61,16 @@ remains extended for backward compatibility.
 `--mode modern` keeps the extended surface but starts `double_quotes` at `chars`, so `"abc"` reads
 as `[a,b,c]`.
 
+To move one flag's starting value without changing mode, pass a flag override:
+
+```console
+dotnet run --project src/DotProlog.Tool -- run --flag double_quotes=chars path/to/program.pl
+```
+
+The overridable flags are curated; `double_quotes` (`codes`, `chars`, `atom`) is available in
+every mode. A `.dplproj` states the same override with the `DotPrologFlags` property; see
+[.NET integration](dotnet-integration.md).
+
 ## Lint source without running it
 
 The linter reports source warnings without consulting the program or executing directives:

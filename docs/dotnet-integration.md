@@ -111,9 +111,24 @@ particular language mode:
 The accepted values are `extended` (the default), `strict-iso`, and `modern`. See
 [the language guide](language-guide.md#language-modes) for what each one selects.
 
-Generated code records its language mode and refuses to install into an engine created in a
-different mode. This keeps build-time validation and runtime consultation under the same language
-contract.
+The mode is a curated profile. To move one flag's starting value without leaving the profile, set
+`DotPrologFlags` to semicolon-separated `name=value` pairs:
+
+```xml
+<PropertyGroup>
+  <DotPrologFlags>double_quotes=chars</DotPrologFlags>
+</PropertyGroup>
+```
+
+The override becomes the value every source file starts from — and returns to when a
+`set_prolog_flag/2` directive's load unit ends. The overridable flags are curated:
+`double_quotes` (`codes`, `chars`, `atom`) is available today, in every mode, because all three
+values are ISO-conforming. The same overrides are available on the command line as
+`dotnet prolog run --flag double_quotes=chars file.pl`.
+
+Generated code records its language mode and initial `double_quotes` value and refuses to install
+into an engine that starts elsewhere. This keeps build-time validation and runtime consultation
+under the same language contract.
 
 ## NativeAOT behavior
 
