@@ -36,6 +36,8 @@ All notable changes to DotProlog are recorded here. The format follows
 - The `occurs_check` flag (`false`, `true`, `error`) in the `Extended` and `Modern` modes,
   guarding general unification with SWI's `occurs_check(Var, Term)` error term. Write-mode head
   unification is a documented unchecked window; `StrictIso` keeps the ISO flag set unchanged.
+- A natural-language processing sample in `Modern` mode (`samples/NaturalLanguage`), and the
+  DotProlog logo on the project landing pages.
 
 ### Fixed
 
