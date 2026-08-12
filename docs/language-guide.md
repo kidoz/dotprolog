@@ -24,8 +24,9 @@ operators in Extended and Modern modes. A program may still define any operator 
 `op/3`.
 
 The opt-in `Modern` mode accepts the same surface as `Extended`, but starts the `double_quotes`
-flag at `chars` rather than the ISO initial value `codes`. A double-quoted token therefore reads as
-a list of one-character atoms:
+flag at `chars` rather than DotProlog's documented default `codes` — ISO/IEC 13211-1 leaves the
+initial value implementation defined, so both are conforming defaults. A double-quoted token
+therefore reads as a list of one-character atoms:
 
 ```prolog
 ?- "abc" = [L|Ls].
@@ -33,8 +34,14 @@ a list of one-character atoms:
 ```
 
 This is the default the newer Prolog systems settled on, and it is what makes text convenient to
-work with in DCGs. Nothing else about the mode differs from `Extended`, and any mode may still move
-the flag with `:- set_prolog_flag(double_quotes, codes).`
+work with in DCGs. Nothing else about the mode differs from `Extended` today, and any mode may
+still move the flag with `:- set_prolog_flag(double_quotes, codes).`
+
+`Modern` is also the dialect whose extension direction is SWI-Prolog: when a predicate exists in
+SWI and is adopted here, its behavior and error terms follow SWI's, and the coverage is recorded
+feature by feature in the [SWI compatibility ledger](reference/swi-compatibility.md). The aligned
+predicates land in the surface `Extended` and `Modern` share, so selecting `Modern` is about the
+`chars` default rather than extra predicates.
 
 A mode is a curated dialect, not a flag matrix. A program that wants a combination no mode names —
 `double_quotes` starting at `atom`, say — sets the flag itself.
@@ -162,7 +169,8 @@ supported streams, configurable end-of-file actions, term I/O, character and cha
 and byte I/O.
 
 The standard library also includes list processing, sorting, higher-order predicates, atom and
-number conversion, term inspection, arithmetic, formatting, and standard-order comparison.
+number conversion, term inspection, arithmetic, formatting, standard-order comparison, ordered
+sets, AVL association lists, and the `library(error)` validation predicates around `must_be/2`.
 
 ## Known limits
 

@@ -16,7 +16,8 @@ public enum PrologLanguageMode
     /// <summary>
     /// The <see cref="Extended"/> surface with the defaults the newer Prolog systems settled on:
     /// <c>double_quotes</c> starts at <c>chars</c>, so a double-quoted token reads as a list of
-    /// one-character atoms rather than character codes.
+    /// one-character atoms rather than character codes. This is also the dialect whose extension
+    /// direction is SWI-Prolog; the coverage ledger lives in docs/reference/swi-compatibility.md.
     /// </summary>
     Modern,
 }

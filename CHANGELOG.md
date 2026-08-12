@@ -6,6 +6,31 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The SWI-aligned library surface: `library(error)` (`must_be/2`, `is_of_type/2`, and the
+  error-raising helpers), `library(assoc)` as AVL trees, `library(ordsets)`, `foldl/6`,
+  `findall/4`, `numbervars/3`, `atom_to_term/3`, and `tab/2` — available in the `Extended` and
+  `Modern` modes, rejected by `StrictIso`.
+- A [SWI compatibility ledger](docs/reference/swi-compatibility.md) recording, feature by feature,
+  which parts of the SWI-Prolog surface the extended modes implement, which are later roadmap
+  phases, and which are out of charter.
+- A second SWI-aligned tranche: `del_assoc/4`, `transpose_pairs/2`, `ord_union/2`,
+  `ord_intersection/2`, `aggregate/3,4` and `aggregate_all/4` for the simple specs, `variant/2`,
+  `?=/2`, `char_type/2` and `code_type/2` for bound characters, `between/3` with an `inf` upper
+  bound, and the `~r`/`~R` radix format directives.
+- An opt-in differential suite that runs a shared goal corpus against a locally installed
+  SWI-Prolog and asserts the outputs agree (`DOTPROLOG_RUN_SWI_DIFFERENTIAL_TESTS=1`); the corpus
+  also runs unconditionally against DotProlog alone.
+
+### Changed
+
+- `Modern` mode is chartered as the SWI-aligned dialect: an ISO-conforming core, `double_quotes`
+  seeded at `chars`, and SWI-Prolog as the documented reference for extension behavior.
+- Documentation no longer states that ISO/IEC 13211-1 fixes the initial `double_quotes` value at
+  `codes`; the standard leaves it implementation defined (7.11.2.5), and `codes` is DotProlog's
+  documented choice for the `Extended` and `StrictIso` modes.
+
 ## [0.5.0] — 2026-08-03
 
 A conformance release. `StrictIso` now implements the ISO Prolog family rather than its core alone:

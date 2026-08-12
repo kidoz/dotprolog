@@ -218,25 +218,28 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 | Terms | atoms, variables, integers, floats, double-quoted code lists, lists, structures |
 | Control | `,/2`, `;/2`, `->/2`, `*->/2`, `\+/1`, `!/0`, `call/1..8`, `once/1`, `repeat/0`, `ignore/1`, `not/1`, `true/0`, `fail/0` |
 | Exceptions | `throw/1`, `catch/3`, with catchable ISO `error/2` terms |
-| All solutions | `findall/3`, `bagof/3`, `setof/3`, `forall/2`, `aggregate_all/3` (`count`, `bag`, `set`, `sum`, `max`, `min`) |
+| All solutions | `findall/3,4`, `bagof/3`, `setof/3`, `forall/2`, `aggregate_all/3,4` and `aggregate/3,4` (`count`, `bag`, `set`, `sum`, `max`, `min`) |
 | Database | `assertz/1`, `asserta/1`, `retract/1`, `clause/2`, `retractall/1`, `abolish/1`, `:- dynamic` |
-| Ranges | `between/3` |
+| Ranges | `between/3`, with `inf` as an open upper bound |
 | Loading | `consult/1`, `ensure_loaded/1` at run time |
 | Unification | `=/2`, `\=/2` |
 | Arithmetic | ISO-oriented integer and float evaluable functors; `is/2`, `=:=/2`, `=\=/2`, `</2`, `>/2`, `=</2`, `>=/2` |
 | Standard order | `==/2`, `\==/2`, `@</2`, `@>/2`, `@=</2`, `@>=/2`, `compare/3` |
-| Term inspection | `functor/3`, `arg/3`, `=../2`, `copy_term/2`, `term_variables/2` |
+| Term inspection | `functor/3`, `arg/3`, `=../2`, `copy_term/2`, `term_variables/2`, `numbervars/3`, `variant/2`, `?=/2` |
 | Type tests | `var/1`, `nonvar/1`, `atom/1`, `number/1`, `integer/1`, `float/1`, `atomic/1`, `compound/1`, `callable/1`, `is_list/1`, `ground/1` |
-| Text | `atom_length/2`, `atom_chars/2`, `atom_codes/2`, `number_chars/2`, `number_codes/2`, `char_code/2`, `atom_number/2`, `atom_concat/3`, `sub_atom/5`, `atomic_list_concat/2,3`, `upcase_atom/2`, `downcase_atom/2` |
-| Lists | `length/2`, `append/3`, `member/2`, `memberchk/2`, `nth0/3`, `nth1/3`, `last/2`, `reverse/2`, `select/3`, `selectchk/3`, `subtract/3`, `intersection/3`, `union/3`, `delete/3`, `list_to_set/2`, `permutation/2`, `flatten/2`, `numlist/3`, `sum_list/2`, `max_list/2`, `min_list/2`, `max_member/2`, `min_member/2`, `pairs_keys_values/3`, `pairs_keys/2`, `pairs_values/2` |
-| Higher order | `maplist/2..5`, `foldl/4,5`, `include/3`, `exclude/3`, `partition/4` |
+| Text | `atom_length/2`, `atom_chars/2`, `atom_codes/2`, `number_chars/2`, `number_codes/2`, `char_code/2`, `atom_number/2`, `atom_concat/3`, `sub_atom/5`, `atomic_list_concat/2,3`, `upcase_atom/2`, `downcase_atom/2`, `char_type/2`, `code_type/2` |
+| Lists | `length/2`, `append/3`, `member/2`, `memberchk/2`, `nth0/3`, `nth1/3`, `last/2`, `reverse/2`, `select/3`, `selectchk/3`, `subtract/3`, `intersection/3`, `union/3`, `delete/3`, `list_to_set/2`, `permutation/2`, `flatten/2`, `numlist/3`, `sum_list/2`, `max_list/2`, `min_list/2`, `max_member/2`, `min_member/2`, `pairs_keys_values/3`, `pairs_keys/2`, `pairs_values/2`, `transpose_pairs/2` |
+| Higher order | `maplist/2..5`, `foldl/4..6`, `include/3`, `exclude/3`, `partition/4` |
 | Sorting | `sort/2`, `sort/4`, `msort/2`, `keysort/2`, `predsort/3` |
+| Ordered sets | `list_to_ord_set/2`, `ord_empty/1`, `ord_memberchk/2`, `ord_subset/2`, `ord_disjoint/2`, `ord_union/2,3`, `ord_intersection/2,3`, `ord_subtract/3`, `ord_add_element/3`, `ord_del_element/3` |
+| Assocs | AVL association lists: `empty_assoc/1`, `put_assoc/4`, `get_assoc/3`, `list_to_assoc/2`, `ord_list_to_assoc/2`, `assoc_to_list/2`, `assoc_to_keys/2`, `assoc_to_values/2`, `min_assoc/3`, `max_assoc/3`, `del_assoc/4` |
+| Validation | `must_be/2`, `is_of_type/2`, and the `library(error)` raisers from `instantiation_error/1` to `syntax_error/1` |
 | Integers | `succ/2`, `plus/3` |
-| Output | `write/1,2`, `writeq/1,2`, `print/1,2`, `writeln/1`, `write_canonical/1,2`, `write_term/2,3`, `nl/0,1`, `format/1,2,3`, `tab/1` |
+| Output | `write/1,2`, `writeq/1,2`, `print/1,2`, `writeln/1`, `write_canonical/1,2`, `write_term/2,3`, `nl/0,1`, `format/1,2,3`, `tab/1,2` |
 | Operators | `op/3`, `current_op/3` |
 | Grammars | `-->/2` with `{}/1`, `!`, `\+//1`, `->//2`, `call//1`, `phrase//1`, semicontexts and pushback lists; `phrase/2`, `phrase/3`; `Name//Arity` indicators |
 | Streams | `open/3,4` text and binary streams, `close/1,2`, configurable EOF actions, `current_stream/1`, `stream_property/2`, `set_stream_position/2`, current-stream selection, EOF inspection, flushing |
-| Reading | term, character, character-code, and byte input/output; `read_term_from_atom/3`, `term_to_atom/2`; `char_conversion/2`, `current_char_conversion/2` |
+| Reading | term, character, character-code, and byte input/output; `read_term_from_atom/3`, `term_to_atom/2`, `atom_to_term/3`; `char_conversion/2`, `current_char_conversion/2` |
 | Modules | ISO interfaces and bodies with `module/1`, `body/1`, export/import/re-export, `metapredicate/1`, reflection, and `Module:Goal`; Quintus-style declarations in extended modes |
 | Directives | `:- Goal`, `:- initialization(Goal)`, `halt/0`, `halt/1` |
 

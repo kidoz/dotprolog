@@ -8,7 +8,9 @@ clause grammars. The licensed-text audits are published as the [Part 1
 ledger](docs/reference/iso-part1-conformance.md) and [Parts 2 and 3
 ledger](docs/reference/iso-parts2-3-conformance.md). The complete applicable independent Part 1
 corpus passes on every execution path; Parts 2 and 3 use focused direct, generated-C#, and
-NativeAOT evidence. This is not a claim of SWI-Prolog compatibility.
+NativeAOT evidence. This is not a claim of SWI-Prolog compatibility; which parts of the SWI
+surface the extended modes do implement is recorded feature by feature in the
+[SWI compatibility ledger](docs/reference/swi-compatibility.md).
 
 ## What has been measured
 
