@@ -551,6 +551,18 @@ internal static class StandardLibrary
             Es \== [],
             min_list(Es, Min).
 
+        % The witnessed specs answer max(Value, Witness) / min(Value, Witness),
+        % comparing values arithmetically; a tie keeps the first solution.
+        aggregate_all(max(E, W), Goal, max(Max, Witness)) :-
+            findall(E-W, Goal, Pairs),
+            Pairs \== [],
+            '$aggregate_max_pair'(Pairs, Max, Witness).
+
+        aggregate_all(min(E, W), Goal, min(Min, Witness)) :-
+            findall(E-W, Goal, Pairs),
+            Pairs \== [],
+            '$aggregate_min_pair'(Pairs, Min, Witness).
+
         % aggregate/3 is aggregate_all/3 with bagof/3 underneath: the goal's free
         % variables group the solutions, one aggregate per group on backtracking,
         % and no solutions at all is failure rather than a zero.
@@ -561,6 +573,12 @@ internal static class StandardLibrary
         aggregate(sum(E), Goal, Sum) :- bagof(E, Goal, Es), sum_list(Es, Sum).
         aggregate(max(E), Goal, Max) :- bagof(E, Goal, Es), max_list(Es, Max).
         aggregate(min(E), Goal, Min) :- bagof(E, Goal, Es), min_list(Es, Min).
+        aggregate(max(E, W), Goal, max(Max, Witness)) :-
+            bagof(E-W, Goal, Pairs),
+            '$aggregate_max_pair'(Pairs, Max, Witness).
+        aggregate(min(E, W), Goal, min(Min, Witness)) :-
+            bagof(E-W, Goal, Pairs),
+            '$aggregate_min_pair'(Pairs, Min, Witness).
 
         % The /4 forms count each distinct discriminator-template pair once. The
         % aggregate/4 family groups by free variables through setof/3; the
@@ -584,6 +602,14 @@ internal static class StandardLibrary
             setof(D-E, Goal, Ps),
             pairs_values(Ps, Es),
             min_list(Es, Min).
+        aggregate(max(E, W), D, Goal, max(Max, Witness)) :-
+            setof(D-(E-W), Goal, Ps),
+            pairs_values(Ps, Pairs),
+            '$aggregate_max_pair'(Pairs, Max, Witness).
+        aggregate(min(E, W), D, Goal, min(Min, Witness)) :-
+            setof(D-(E-W), Goal, Ps),
+            pairs_values(Ps, Pairs),
+            '$aggregate_min_pair'(Pairs, Min, Witness).
 
         aggregate_all(count, D, Goal, Count) :-
             findall(D, Goal, Ds0),
@@ -619,6 +645,38 @@ internal static class StandardLibrary
             sort(Ps0, Ps),
             pairs_values(Ps, Es),
             min_list(Es, Min).
+        aggregate_all(max(E, W), D, Goal, max(Max, Witness)) :-
+            findall(D-(E-W), Goal, Ps0),
+            Ps0 \== [],
+            sort(Ps0, Ps),
+            pairs_values(Ps, Pairs),
+            '$aggregate_max_pair'(Pairs, Max, Witness).
+        aggregate_all(min(E, W), D, Goal, min(Min, Witness)) :-
+            findall(D-(E-W), Goal, Ps0),
+            Ps0 \== [],
+            sort(Ps0, Ps),
+            pairs_values(Ps, Pairs),
+            '$aggregate_min_pair'(Pairs, Min, Witness).
+
+        '$aggregate_max_pair'([E-W|Pairs], Max, Witness) :-
+            '$aggregate_max_pair'(Pairs, E, W, Max, Witness).
+
+        '$aggregate_max_pair'([], Max, Witness, Max, Witness).
+        '$aggregate_max_pair'([E-W|Pairs], E0, W0, Max, Witness) :-
+            (   E > E0
+            ->  '$aggregate_max_pair'(Pairs, E, W, Max, Witness)
+            ;   '$aggregate_max_pair'(Pairs, E0, W0, Max, Witness)
+            ).
+
+        '$aggregate_min_pair'([E-W|Pairs], Min, Witness) :-
+            '$aggregate_min_pair'(Pairs, E, W, Min, Witness).
+
+        '$aggregate_min_pair'([], Min, Witness, Min, Witness).
+        '$aggregate_min_pair'([E-W|Pairs], E0, W0, Min, Witness) :-
+            (   E < E0
+            ->  '$aggregate_min_pair'(Pairs, E, W, Min, Witness)
+            ;   '$aggregate_min_pair'(Pairs, E0, W0, Min, Witness)
+            ).
 
         % --- Type and mode validation (library(error)) -------------------------------
         % Raising an ISO error term as a call. The context argument of error/2 is left
@@ -826,6 +884,22 @@ internal static class StandardLibrary
             ;   O == '=' -> Set = T
             ;   Set = [H|Rest], ord_del_element(T, Element, Rest)
             ).
+
+        % Ordered sets are canonical, so equal sets are the same list.
+        ord_seteq(Set1, Set2) :- Set1 == Set2.
+
+        ord_symdiff([], Set2, Set2).
+        ord_symdiff([H|T], Set2, Difference) :- '$ord_symdiff'(Set2, H, T, Difference).
+
+        '$ord_symdiff'([], H, T, [H|T]).
+        '$ord_symdiff'([H2|T2], H, T, Difference) :-
+            compare(O, H, H2),
+            '$ord_symdiff_step'(O, H, T, H2, T2, Difference).
+
+        '$ord_symdiff_step'('<', H, T, H2, T2, [H|Difference]) :-
+            ord_symdiff(T, [H2|T2], Difference).
+        '$ord_symdiff_step'('=', _, T, _, T2, Difference) :- ord_symdiff(T, T2, Difference).
+        '$ord_symdiff_step'('>', H, T, H2, T2, [H2|Difference]) :- '$ord_symdiff'(T2, H, T, Difference).
 
         % The n-ary forms fold the binary operation over a list of sets. The union
         % of no sets is empty; the intersection of no sets is undefined and fails.

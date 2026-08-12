@@ -136,6 +136,10 @@ public sealed class SwiLibraryTests
     [InlineData("ord_add_element([a, b], b, S), write(S)", "[a,b]")]
     [InlineData("ord_del_element([a, b, c], b, S), write(S)", "[a,c]")]
     [InlineData("ord_del_element([a, c], b, S), write(S)", "[a,c]")]
+    [InlineData("ord_symdiff([a, b, c], [b, d], D), write(D)", "[a,c,d]")]
+    [InlineData("ord_symdiff([], [a], D), write(D)", "[a]")]
+    [InlineData("ord_symdiff([a], [], D), write(D)", "[a]")]
+    [InlineData("ord_symdiff([a, b], [a, b], D), write(D)", "[]")]
     public void OrderedSetOperationsMergeInOnePass(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal(goal));
 
@@ -148,8 +152,38 @@ public sealed class SwiLibraryTests
     [InlineData("ord_disjoint([a], [b])", "yes")]
     [InlineData("ord_disjoint([a, b], [b, c])", "no")]
     [InlineData("ord_disjoint([], [])", "yes")]
+    [InlineData("ord_seteq([a, b], [a, b])", "yes")]
+    [InlineData("ord_seteq([a, b], [a, c])", "no")]
+    [InlineData("ord_seteq([], [])", "yes")]
     public void OrderedSetTestsAreSemideterministic(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal($"( {goal} -> write(yes) ; write(no) )"));
+
+    // The witnessed specs compare values arithmetically and answer max(Value, Witness); a tie
+    // keeps the first solution the goal produced.
+    [Theory]
+    [InlineData("aggregate_all(max(P, N), member(N-P, [alice-3, bob-5, carol-4]), M), write(M)", "max(5,bob)")]
+    [InlineData("aggregate_all(min(P, N), member(N-P, [alice-3, bob-5, carol-4]), M), write(M)", "min(3,alice)")]
+    [InlineData("aggregate_all(max(X, W), member(W-X, [a-2, b-2, c-1]), M), write(M)", "max(2,a)")]
+    [InlineData("aggregate_all(min(X, W), member(W-X, [a-1, b-2, c-1]), M), write(M)", "min(1,a)")]
+    [InlineData("aggregate_all(max(X, W), member(W-X, [a-1.5, b-2]), M), write(M)", "max(2,b)")]
+    [InlineData("( aggregate_all(max(_, _), fail, _) -> write(yes) ; write(no) )", "no")]
+    [InlineData("( aggregate_all(min(_, _), fail, _) -> write(yes) ; write(no) )", "no")]
+    [InlineData("aggregate(max(P, N), member(N-P, [alice-3, bob-5]), M), write(M)", "max(5,bob)")]
+    [InlineData("( aggregate(min(_, _), fail, _) -> write(yes) ; write(no) )", "no")]
+    [InlineData("aggregate_all(max(X, W), D, member(D-(W-X), [1-(a-5), 1-(a-5), 2-(b-7)]), M), write(M)", "max(7,b)")]
+    [InlineData("aggregate(min(X, W), D, member(D-(W-X), [1-(a-5), 2-(b-7)]), M), write(M)", "min(5,a)")]
+    public void WitnessedAggregationAnswersTheValueAndItsWitness(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    // aggregate/3's free variables group the solutions: one aggregate per group on backtracking.
+    [Fact]
+    public void WitnessedAggregateGroupsByFreeVariables() =>
+        Assert.Equal(
+            "[x-max(3,b),y-max(2,c)]",
+            PrologTestHost.RunGoal(
+                "findall(G-M, aggregate(max(S, N), member(g(G, N, S), [g(x, a, 1), g(x, b, 3), g(y, c, 2)]), M), L), write(L)"
+            )
+        );
 
     [Theory]
     [InlineData("empty_assoc(A), put_assoc(k, A, 1, A1), get_assoc(k, A1, V), write(V)", "1")]

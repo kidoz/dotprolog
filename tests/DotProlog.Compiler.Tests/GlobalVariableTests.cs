@@ -125,4 +125,28 @@ public sealed class GlobalVariableTests
         Assert.Equal(CompilerDiagnosticIds.StrictIsoViolation, diagnostic.Id);
         Assert.Contains("nb_setval/2", diagnostic.Message, StringComparison.Ordinal);
     }
+
+    // nb_current/2 reads the same store as the getters but fails for an unset name instead of
+    // raising, and enumerates every set variable — backtrackable or not — when the name is unbound.
+    [Theory]
+    [InlineData("nb_setval(k, 7), ( nb_current(k, V) -> write(V) ; write(no) )", "7")]
+    [InlineData("( nb_current(never_set, _) -> write(yes) ; write(no) )", "no")]
+    [InlineData("b_setval(k, live), ( nb_current(k, V) -> write(V) ; write(no) )", "live")]
+    [InlineData("nb_setval(a, 1), nb_setval(b, 2), findall(K-V, nb_current(K, V), L), msort(L, S), write(S)", "[a-1,b-2]")]
+    [InlineData("nb_setval(a, 1), nb_setval(b, 2), findall(K, nb_current(K, 2), L), write(L)", "[b]")]
+    [InlineData("findall(K, nb_current(K, _), L), write(L)", "[]")]
+    public void NbCurrentTestsAndEnumeratesTheStore(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Fact]
+    public void NbCurrentRaisesForANonAtomName() =>
+        Assert.Equal("type_error(atom,1)", PrologTestHost.RunGoal("catch(nb_current(1, _), error(E, _), true), write(E)"));
+
+    // Like nb_getval/2, reading a detached value materializes a fresh copy per solution.
+    [Fact]
+    public void NbCurrentMaterializesDetachedCopies() =>
+        Assert.Equal(
+            "fresh",
+            PrologTestHost.RunGoal("nb_setval(k, f(X)), X = bound, nb_current(k, f(Y)), ( var(Y) -> write(fresh) ; write(Y) )")
+        );
 }

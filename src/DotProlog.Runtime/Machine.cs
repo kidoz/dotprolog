@@ -1998,6 +1998,28 @@ public sealed class Machine
         return true;
     }
 
+    /// <summary>
+    /// Finds the smallest global-variable key at or above <paramref name="fromKeyAtom"/> without
+    /// materializing its value, so an enumeration can carry its position as one integer that stays
+    /// valid when assignments land between solutions.
+    /// </summary>
+    internal bool TryPeekNextGlobalKey(int fromKeyAtom, out int keyAtom)
+    {
+        var found = false;
+        var best = int.MaxValue;
+        foreach (var candidate in _globals.Keys)
+        {
+            if (candidate >= fromKeyAtom && candidate < best)
+            {
+                best = candidate;
+                found = true;
+            }
+        }
+
+        keyAtom = found ? best : 0;
+        return found;
+    }
+
     private readonly record struct GlobalVariable(Cell Live, TermBuffer? Detached, int Root);
 
     private struct GlobalUndo
