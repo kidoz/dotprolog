@@ -43,6 +43,22 @@ All notable changes to DotProlog are recorded here. The format follows
   `max/2` and `min/2` aggregation specs across `aggregate/3,4` and `aggregate_all/3,4`, which
   compare arithmetically, keep the first solution on a tie, and answer `max(Value, Witness)` /
   `min(Value, Witness)`. All verified against SWI-Prolog by the differential corpus.
+- The rest of SWI's `library(assoc)` surface: `is_assoc/1`, `gen_assoc/3`, `get_assoc/5`,
+  `map_assoc/2,3`, `del_min_assoc/4`, and `del_max_assoc/4`.
+- Compound aggregation templates: `aggregate_all(r(sum(X), count), Goal, r(Sum, Count))` and the
+  same shape in `aggregate/3,4` and `aggregate_all/4`, each template argument a spec, with SWI's
+  instantiation, type, and domain errors for invalid templates.
+- The `~@` and `~W` format directives: `~@` runs a goal once and inserts its output in place —
+  a failing or throwing goal still emits the text before it, as SWI's streaming does — and `~W`
+  writes a term under a `write_term/2` option list. `write_term` itself gains SWI's
+  `spacing(standard|next_argument)` option.
+- `portray_clause/1,2` with SWI's listing layout — one goal per line, bracketed disjunction,
+  if-then-else, and soft-cut blocks, `A`, `B`, ... variable names, `_` singletons — byte-identical
+  to SWI-Prolog 10 for the covered constructs, pinned by the differential corpus.
+- `char_type/2` and `code_type/2` enumerate an unbound character over a bound type in code
+  order; characters are UTF-16 code units, so Unicode-wide classes cover the BMP.
+- `term_size/2`: the cells of a detached copy of a term, counting shared subterms once per
+  occurrence and raising `representation_error(cyclic_term)` for a cyclic one.
 - Project-level initial flag overrides: the `DotPrologFlags` property in a `.dplproj` (and the
   repeatable `--flag` option on `dotnet prolog run` and `lint`) layers an initial flag value over
   the language mode, e.g. `double_quotes=chars` while staying in `extended` mode. The mode remains
@@ -64,6 +80,10 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Changed
 
+- An aggregation template that is unknown (`aggregate_all(foo, ...)`), a variable, or a compound
+  mixing specs with other terms now raises the error SWI raises instead of failing silently.
+- `char_type/2` and `code_type/2` with an unbound character now enumerate instead of raising an
+  instantiation error; the error remains when the type is unbound.
 - `Modern` mode is chartered as the SWI-aligned dialect: an ISO-conforming core, `double_quotes`
   seeded at `chars`, and SWI-Prolog as the documented reference for extension behavior.
 - Documentation no longer states that ISO/IEC 13211-1 fixes the initial `double_quotes` value at
