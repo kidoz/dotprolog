@@ -150,6 +150,13 @@ internal static class StandardLibrary
             call(G, H1, H2, V0, V1),
             '$foldl'(T1, T2, G, V1, V).
 
+        foldl(G, L1, L2, L3, V0, V) :- '$foldl'(L1, L2, L3, G, V0, V).
+
+        '$foldl'([], [], [], _, V, V).
+        '$foldl'([H1|T1], [H2|T2], [H3|T3], G, V0, V) :-
+            call(G, H1, H2, H3, V0, V1),
+            '$foldl'(T1, T2, T3, G, V1, V).
+
         numlist(L, H, R) :- L =< H, '$numlist'(L, H, R).
 
         '$numlist'(H, H, [H]) :- !.
@@ -211,6 +218,15 @@ internal static class StandardLibrary
         pairs_values([], []).
         pairs_values([_-V|T], [V|Vs]) :- pairs_values(T, Vs).
 
+        % transpose_pairs/2 swaps every Key-Value into Value-Key and key-sorts the
+        % result, which is the cheapest stable way to invert a pairs list.
+        transpose_pairs(Pairs, Transposed) :-
+            '$swap_pairs'(Pairs, Swapped),
+            keysort(Swapped, Transposed).
+
+        '$swap_pairs'([], []).
+        '$swap_pairs'([K-V|T], [V-K|R]) :- '$swap_pairs'(T, R).
+
         % --- Sorting with a user-supplied order ------------------------------------
         % A merge sort, because an insertion sort would call the comparison predicate
         % a quadratic number of times and that predicate is the expensive part.
@@ -271,6 +287,44 @@ internal static class StandardLibrary
         read_term_from_atom(Atom, Term, Options) :-
             atom_concat(Atom, ' .', Text),
             '$read_from_atom'(Text, Term, Options).
+
+        atom_to_term(Atom, Term, Bindings) :-
+            read_term_from_atom(Atom, Term, [variable_names(Bindings)]).
+
+        % --- Term utilities ----------------------------------------------------------
+        % numbervars/3 binds each distinct variable in Term to '$VAR'(N), the term the
+        % writer already prints as A, B, ... when the numbervars(true) option applies.
+
+        numbervars(Term, Start, End) :-
+            must_be(integer, Start),
+            term_variables(Term, Vars),
+            '$numbervars'(Vars, Start, End).
+
+        '$numbervars'([], N, N).
+        '$numbervars'(['$VAR'(N0)|Vs], N0, N) :-
+            N1 is N0 + 1,
+            '$numbervars'(Vs, N1, N).
+
+        % tab/2 is the native tab/1 with an explicit stream: the count is evaluated as
+        % an arithmetic expression, and a non-positive count writes nothing.
+        % Two terms are variants when each subsumes the other: equal up to a
+        % renaming of variables.
+        variant(X, Y) :- subsumes_term(X, Y), subsumes_term(Y, X).
+
+        % X ?= Y holds when further instantiation cannot change whether X and Y
+        % unify: they are already identical, or they cannot unify at all.
+        '?='(X, Y) :- ( X == Y -> true ; \+ X = Y ).
+
+        tab(Stream, Count) :-
+            N is Count,
+            ( integer(N) -> true ; type_error(integer, N) ),
+            '$tab'(N, Stream).
+
+        '$tab'(N, _) :- N =< 0, !.
+        '$tab'(N, Stream) :-
+            put_char(Stream, ' '),
+            N1 is N - 1,
+            '$tab'(N1, Stream).
 
         % --- Grammars ---------------------------------------------------------------
         % A grammar rule is translated into an ordinary clause when it is loaded. A body built at
@@ -419,6 +473,12 @@ internal static class StandardLibrary
             ),
             '$add_free'(Vs, Bound, Free1, Free).
 
+        % findall/4 is findall/3 with an explicit tail: the solutions are prefixed
+        % onto Tail, so consecutive calls can grow one list without a final append.
+        findall(Template, Goal, Bag, Tail) :-
+            findall(Template, Goal, Solutions),
+            append(Solutions, Tail, Bag).
+
         % --- Aggregation -----------------------------------------------------------
 
         aggregate_all(count, Goal, Count) :-
@@ -449,5 +509,460 @@ internal static class StandardLibrary
             findall(E, Goal, Es),
             Es \== [],
             min_list(Es, Min).
+
+        % aggregate/3 is aggregate_all/3 with bagof/3 underneath: the goal's free
+        % variables group the solutions, one aggregate per group on backtracking,
+        % and no solutions at all is failure rather than a zero.
+        aggregate(count, Goal, Count) :- bagof(x, Goal, Xs), length(Xs, Count).
+        aggregate(count(T), Goal, Count) :- bagof(T, Goal, Xs), length(Xs, Count).
+        aggregate(bag(T), Goal, Bag) :- bagof(T, Goal, Bag).
+        aggregate(set(T), Goal, Set) :- setof(T, Goal, Set).
+        aggregate(sum(E), Goal, Sum) :- bagof(E, Goal, Es), sum_list(Es, Sum).
+        aggregate(max(E), Goal, Max) :- bagof(E, Goal, Es), max_list(Es, Max).
+        aggregate(min(E), Goal, Min) :- bagof(E, Goal, Es), min_list(Es, Min).
+
+        % The /4 forms count each distinct discriminator-template pair once. The
+        % aggregate/4 family groups by free variables through setof/3; the
+        % aggregate_all/4 family deduplicates with sort/2 over all solutions.
+        aggregate(count, D, Goal, Count) :- setof(D, Goal, Ds), length(Ds, Count).
+        aggregate(count(T), D, Goal, Count) :- setof(D-T, Goal, Ps), length(Ps, Count).
+        aggregate(bag(T), D, Goal, Bag) :- setof(D-T, Goal, Ps), pairs_values(Ps, Bag).
+        aggregate(set(T), D, Goal, Set) :-
+            setof(D-T, Goal, Ps),
+            pairs_values(Ps, Vs),
+            sort(Vs, Set).
+        aggregate(sum(E), D, Goal, Sum) :-
+            setof(D-E, Goal, Ps),
+            pairs_values(Ps, Es),
+            sum_list(Es, Sum).
+        aggregate(max(E), D, Goal, Max) :-
+            setof(D-E, Goal, Ps),
+            pairs_values(Ps, Es),
+            max_list(Es, Max).
+        aggregate(min(E), D, Goal, Min) :-
+            setof(D-E, Goal, Ps),
+            pairs_values(Ps, Es),
+            min_list(Es, Min).
+
+        aggregate_all(count, D, Goal, Count) :-
+            findall(D, Goal, Ds0),
+            sort(Ds0, Ds),
+            length(Ds, Count).
+        aggregate_all(count(T), D, Goal, Count) :-
+            findall(D-T, Goal, Ps0),
+            sort(Ps0, Ps),
+            length(Ps, Count).
+        aggregate_all(bag(T), D, Goal, Bag) :-
+            findall(D-T, Goal, Ps0),
+            sort(Ps0, Ps),
+            pairs_values(Ps, Bag).
+        aggregate_all(set(T), D, Goal, Set) :-
+            findall(D-T, Goal, Ps0),
+            sort(Ps0, Ps),
+            pairs_values(Ps, Vs),
+            sort(Vs, Set).
+        aggregate_all(sum(E), D, Goal, Sum) :-
+            findall(D-E, Goal, Ps0),
+            sort(Ps0, Ps),
+            pairs_values(Ps, Es),
+            sum_list(Es, Sum).
+        aggregate_all(max(E), D, Goal, Max) :-
+            findall(D-E, Goal, Ps0),
+            Ps0 \== [],
+            sort(Ps0, Ps),
+            pairs_values(Ps, Es),
+            max_list(Es, Max).
+        aggregate_all(min(E), D, Goal, Min) :-
+            findall(D-E, Goal, Ps0),
+            Ps0 \== [],
+            sort(Ps0, Ps),
+            pairs_values(Ps, Es),
+            min_list(Es, Min).
+
+        % --- Type and mode validation (library(error)) -------------------------------
+        % Raising an ISO error term as a call. The context argument of error/2 is left
+        % unbound, matching the engine's convention for the errors it raises itself.
+
+        instantiation_error(_) :- throw(error(instantiation_error, _)).
+        uninstantiation_error(Culprit) :- throw(error(uninstantiation_error(Culprit), _)).
+        type_error(Type, Culprit) :- throw(error(type_error(Type, Culprit), _)).
+        domain_error(Domain, Culprit) :- throw(error(domain_error(Domain, Culprit), _)).
+        existence_error(Type, Culprit) :- throw(error(existence_error(Type, Culprit), _)).
+        permission_error(Action, Type, Culprit) :-
+            throw(error(permission_error(Action, Type, Culprit), _)).
+        representation_error(Flag) :- throw(error(representation_error(Flag), _)).
+        resource_error(Resource) :- throw(error(resource_error(Resource), _)).
+        syntax_error(Message) :- throw(error(syntax_error(Message), _)).
+
+        % must_be/2 succeeds silently or raises the error SWI's library(error) would:
+        % instantiation before type, uninstantiation for the var type, and an
+        % existence error for a type name the table below does not know.
+        must_be(Type, X) :-
+            (   var(Type) -> instantiation_error(Type)
+            ;   is_of_type(Type, X) -> true
+            ;   '$is_not'(Type, X)
+            ).
+
+        '$is_not'(list, X) :- !, '$not_a_list'(list, X).
+        '$is_not'(proper_list, X) :- !, '$not_a_list'(proper_list, X).
+        '$is_not'(chars, X) :- !, '$not_a_list'(chars, X).
+        '$is_not'(codes, X) :- !, '$not_a_list'(codes, X).
+        '$is_not'(list_or_partial_list, X) :- !, type_error(list, X).
+        '$is_not'(var, X) :- !, uninstantiation_error(X).
+        '$is_not'(Type, X) :-
+            (   \+ '$known_type'(Type) -> existence_error(type, Type)
+            ;   var(X) -> instantiation_error(X)
+            ;   Type == ground -> instantiation_error(X)
+            ;   type_error(Type, X)
+            ).
+
+        % A list that ends in a variable is insufficiently instantiated rather than
+        % of the wrong type, which decides between the two errors.
+        '$not_a_list'(Type, X) :-
+            (   '$ends_in_var'(X) -> instantiation_error(X)
+            ;   type_error(Type, X)
+            ).
+
+        '$ends_in_var'(V) :- var(V), !.
+        '$ends_in_var'([_|T]) :- '$ends_in_var'(T).
+
+        is_of_type(Type, X) :- '$has_type'(Type, X).
+
+        '$has_type'(any, _).
+        '$has_type'(atom, X) :- atom(X).
+        '$has_type'(atomic, X) :- atomic(X).
+        '$has_type'(boolean, X) :- ( X == true -> true ; X == false ).
+        '$has_type'(callable, X) :- callable(X).
+        '$has_type'(char, X) :- atom(X), atom_length(X, 1).
+        '$has_type'(chars, X) :- '$text_list'(X, char).
+        '$has_type'(code, X) :- integer(X), X >= 0, X =< 65535.
+        '$has_type'(codes, X) :- '$text_list'(X, code).
+        '$has_type'(compound, X) :- compound(X).
+        '$has_type'(constant, X) :- atomic(X).
+        '$has_type'(float, X) :- float(X).
+        '$has_type'(ground, X) :- ground(X).
+        '$has_type'(integer, X) :- integer(X).
+        '$has_type'(list, X) :- is_list(X).
+        '$has_type'(proper_list, X) :- is_list(X).
+        '$has_type'(list_or_partial_list, X) :- '$list_or_partial_list'(X).
+        '$has_type'(negative_integer, X) :- integer(X), X < 0.
+        '$has_type'(nonneg, X) :- integer(X), X >= 0.
+        '$has_type'(number, X) :- number(X).
+        '$has_type'(oneof(L), X) :- ground(X), memberchk(X, L).
+        '$has_type'(pair, X) :- nonvar(X), X = _-_.
+        '$has_type'(positive_integer, X) :- integer(X), X > 0.
+        '$has_type'(symbol, X) :- atom(X).
+        '$has_type'(text, X) :-
+            (   atom(X) -> true
+            ;   '$text_list'(X, char) -> true
+            ;   '$text_list'(X, code)
+            ).
+        '$has_type'(var, X) :- var(X).
+        '$has_type'(between(L, U), X) :-
+            (   integer(L), integer(U) -> integer(X), X >= L, X =< U
+            ;   number(X), X >= L, X =< U
+            ).
+
+        '$text_list'(X, _) :- var(X), !, fail.
+        '$text_list'([], _).
+        '$text_list'([H|T], Kind) :- '$text_element'(Kind, H), '$text_list'(T, Kind).
+
+        '$text_element'(char, X) :- atom(X), atom_length(X, 1).
+        '$text_element'(code, X) :- integer(X), X >= 0, X =< 65535.
+
+        '$list_or_partial_list'(V) :- var(V), !.
+        '$list_or_partial_list'([]) :- !.
+        '$list_or_partial_list'([_|T]) :- '$list_or_partial_list'(T).
+
+        '$known_type'(any).
+        '$known_type'(atom).
+        '$known_type'(atomic).
+        '$known_type'(between(_, _)).
+        '$known_type'(boolean).
+        '$known_type'(callable).
+        '$known_type'(char).
+        '$known_type'(chars).
+        '$known_type'(code).
+        '$known_type'(codes).
+        '$known_type'(compound).
+        '$known_type'(constant).
+        '$known_type'(float).
+        '$known_type'(ground).
+        '$known_type'(integer).
+        '$known_type'(list).
+        '$known_type'(list_or_partial_list).
+        '$known_type'(negative_integer).
+        '$known_type'(nonneg).
+        '$known_type'(number).
+        '$known_type'(oneof(_)).
+        '$known_type'(pair).
+        '$known_type'(positive_integer).
+        '$known_type'(proper_list).
+        '$known_type'(symbol).
+        '$known_type'(text).
+        '$known_type'(var).
+
+        % --- Ordered sets (library(ordsets)) -----------------------------------------
+        % An ordered set is a duplicate-free list sorted by the standard order, which
+        % is exactly what sort/2 produces. Every operation below is one merge pass
+        % driven by compare/3.
+
+        list_to_ord_set(List, Set) :- sort(List, Set).
+
+        ord_empty([]).
+
+        ord_memberchk(X, [H|T]) :- compare(O, X, H), '$ord_memberchk_step'(O, X, T).
+
+        '$ord_memberchk_step'('=', _, _).
+        '$ord_memberchk_step'('>', X, T) :- ord_memberchk(X, T).
+
+        ord_subset([], _).
+        ord_subset([H|T], [H2|T2]) :- compare(O, H, H2), '$ord_subset_step'(O, H, T, T2).
+
+        '$ord_subset_step'('=', _, T, T2) :- ord_subset(T, T2).
+        '$ord_subset_step'('>', H, T, T2) :- ord_subset([H|T], T2).
+
+        ord_disjoint([], _).
+        ord_disjoint([_|_], []).
+        ord_disjoint([H|T], [H2|T2]) :- compare(O, H, H2), '$ord_disjoint_step'(O, H, T, H2, T2).
+
+        '$ord_disjoint_step'('<', _, T, H2, T2) :- ord_disjoint(T, [H2|T2]).
+        '$ord_disjoint_step'('>', H, T, _, T2) :- ord_disjoint([H|T], T2).
+
+        ord_union([], Set, Set).
+        ord_union([H|T], Set2, Union) :- '$ord_union'(Set2, H, T, Union).
+
+        '$ord_union'([], H, T, [H|T]).
+        '$ord_union'([H2|T2], H, T, Union) :-
+            compare(O, H, H2),
+            '$ord_union_step'(O, H, T, H2, T2, Union).
+
+        '$ord_union_step'('<', H, T, H2, T2, [H|Union]) :- ord_union(T, [H2|T2], Union).
+        '$ord_union_step'('=', H, T, _, T2, [H|Union]) :- ord_union(T, T2, Union).
+        '$ord_union_step'('>', H, T, H2, T2, [H2|Union]) :- '$ord_union'(T2, H, T, Union).
+
+        ord_intersection([], _, []).
+        ord_intersection([H|T], Set2, Intersection) :-
+            '$ord_intersection'(Set2, H, T, Intersection).
+
+        '$ord_intersection'([], _, _, []).
+        '$ord_intersection'([H2|T2], H, T, Intersection) :-
+            compare(O, H, H2),
+            '$ord_intersection_step'(O, H, T, H2, T2, Intersection).
+
+        '$ord_intersection_step'('<', _, T, H2, T2, Intersection) :-
+            ord_intersection(T, [H2|T2], Intersection).
+        '$ord_intersection_step'('=', H, T, _, T2, [H|Intersection]) :-
+            ord_intersection(T, T2, Intersection).
+        '$ord_intersection_step'('>', H, T, _, T2, Intersection) :-
+            '$ord_intersection'(T2, H, T, Intersection).
+
+        ord_subtract([], _, []).
+        ord_subtract([H|T], Set2, Difference) :- '$ord_subtract'(Set2, H, T, Difference).
+
+        '$ord_subtract'([], H, T, [H|T]).
+        '$ord_subtract'([H2|T2], H, T, Difference) :-
+            compare(O, H, H2),
+            '$ord_subtract_step'(O, H, T, H2, T2, Difference).
+
+        '$ord_subtract_step'('<', H, T, H2, T2, [H|Difference]) :-
+            ord_subtract(T, [H2|T2], Difference).
+        '$ord_subtract_step'('=', _, T, _, T2, Difference) :- ord_subtract(T, T2, Difference).
+        '$ord_subtract_step'('>', H, T, _, T2, Difference) :- '$ord_subtract'(T2, H, T, Difference).
+
+        ord_add_element([], Element, [Element]).
+        ord_add_element([H|T], Element, Set) :-
+            compare(O, Element, H),
+            (   O == '<' -> Set = [Element, H|T]
+            ;   O == '=' -> Set = [H|T]
+            ;   Set = [H|Rest], ord_add_element(T, Element, Rest)
+            ).
+
+        ord_del_element([], _, []).
+        ord_del_element([H|T], Element, Set) :-
+            compare(O, Element, H),
+            (   O == '<' -> Set = [H|T]
+            ;   O == '=' -> Set = T
+            ;   Set = [H|Rest], ord_del_element(T, Element, Rest)
+            ).
+
+        % The n-ary forms fold the binary operation over a list of sets. The union
+        % of no sets is empty; the intersection of no sets is undefined and fails.
+        ord_union([], []).
+        ord_union([Set|Sets], Union) :- '$ord_union_all'(Sets, Set, Union).
+
+        '$ord_union_all'([], Union, Union).
+        '$ord_union_all'([Set|Sets], Acc, Union) :-
+            ord_union(Acc, Set, Next),
+            '$ord_union_all'(Sets, Next, Union).
+
+        ord_intersection([Set|Sets], Intersection) :-
+            '$ord_intersection_all'(Sets, Set, Intersection).
+
+        '$ord_intersection_all'([], Intersection, Intersection).
+        '$ord_intersection_all'([Set|Sets], Acc, Intersection) :-
+            ord_intersection(Acc, Set, Next),
+            '$ord_intersection_all'(Sets, Next, Intersection).
+
+        % --- Association lists (library(assoc)) --------------------------------------
+        % An assoc is an AVL tree: the atom t is the empty tree, and a node is
+        % t(Key, Value, Height, Left, Right). Heights are stored rather than balance
+        % atoms so rebalancing is plain arithmetic over the two child heights.
+
+        empty_assoc(t).
+
+        get_assoc(Key, t(K, V, _, L, R), Value) :-
+            compare(O, Key, K),
+            '$get_assoc_step'(O, Key, V, L, R, Value).
+
+        '$get_assoc_step'('=', _, V, _, _, V).
+        '$get_assoc_step'('<', Key, _, L, _, Value) :- get_assoc(Key, L, Value).
+        '$get_assoc_step'('>', Key, _, _, R, Value) :- get_assoc(Key, R, Value).
+
+        put_assoc(Key, t, Value, t(Key, Value, 1, t, t)).
+        put_assoc(Key, t(K, V, _, L, R), Value, Tree) :-
+            compare(O, Key, K),
+            '$put_assoc_step'(O, Key, Value, K, V, L, R, Tree).
+
+        '$put_assoc_step'('=', Key, Value, _, _, L, R, Tree) :-
+            '$assoc_node'(Key, Value, L, R, Tree).
+        '$put_assoc_step'('<', Key, Value, K, V, L, R, Tree) :-
+            put_assoc(Key, L, Value, NewLeft),
+            '$assoc_rebalance'(K, V, NewLeft, R, Tree).
+        '$put_assoc_step'('>', Key, Value, K, V, L, R, Tree) :-
+            put_assoc(Key, R, Value, NewRight),
+            '$assoc_rebalance'(K, V, L, NewRight, Tree).
+
+        '$assoc_height'(t, 0).
+        '$assoc_height'(t(_, _, H, _, _), H).
+
+        '$assoc_node'(K, V, L, R, t(K, V, H, L, R)) :-
+            '$assoc_height'(L, HL),
+            '$assoc_height'(R, HR),
+            ( HL >= HR -> H is HL + 1 ; H is HR + 1 ).
+
+        '$assoc_rebalance'(K, V, L, R, Tree) :-
+            '$assoc_height'(L, HL),
+            '$assoc_height'(R, HR),
+            Difference is HL - HR,
+            (   Difference =:= 2 -> '$assoc_rotate_right'(K, V, L, R, Tree)
+            ;   Difference =:= -2 -> '$assoc_rotate_left'(K, V, L, R, Tree)
+            ;   '$assoc_node'(K, V, L, R, Tree)
+            ).
+
+        % Left-heavy: one right rotation, or a left-right double rotation when the
+        % left child leans right. The mirror clause handles the right-heavy case.
+        '$assoc_rotate_right'(K, V, t(KL, VL, _, LL, LR), R, Tree) :-
+            '$assoc_height'(LL, HLL),
+            '$assoc_height'(LR, HLR),
+            (   HLL >= HLR
+            ->  '$assoc_node'(K, V, LR, R, NewRight),
+                '$assoc_node'(KL, VL, LL, NewRight, Tree)
+            ;   LR = t(KM, VM, _, ML, MR),
+                '$assoc_node'(KL, VL, LL, ML, NewLeft),
+                '$assoc_node'(K, V, MR, R, NewRight),
+                '$assoc_node'(KM, VM, NewLeft, NewRight, Tree)
+            ).
+
+        '$assoc_rotate_left'(K, V, L, t(KR, VR, _, RL, RR), Tree) :-
+            '$assoc_height'(RL, HRL),
+            '$assoc_height'(RR, HRR),
+            (   HRR >= HRL
+            ->  '$assoc_node'(K, V, L, RL, NewLeft),
+                '$assoc_node'(KR, VR, NewLeft, RR, Tree)
+            ;   RL = t(KM, VM, _, ML, MR),
+                '$assoc_node'(K, V, L, ML, NewLeft),
+                '$assoc_node'(KR, VR, MR, RR, NewRight),
+                '$assoc_node'(KM, VM, NewLeft, NewRight, Tree)
+            ).
+
+        list_to_assoc(List, Assoc) :-
+            must_be(list, List),
+            '$assoc_pairs_check'(List),
+            msort(List, Sorted),
+            '$assoc_unique_keys'(Sorted, List),
+            length(Sorted, N),
+            '$assoc_build'(N, Sorted, [], Assoc).
+
+        ord_list_to_assoc(Sorted, Assoc) :-
+            must_be(list, Sorted),
+            '$assoc_pairs_check'(Sorted),
+            '$assoc_ordered_keys'(Sorted, Sorted),
+            length(Sorted, N),
+            '$assoc_build'(N, Sorted, [], Assoc).
+
+        '$assoc_pairs_check'([]).
+        '$assoc_pairs_check'([Pair|T]) :-
+            ( nonvar(Pair), Pair = _-_ -> true ; type_error(pair, Pair) ),
+            '$assoc_pairs_check'(T).
+
+        '$assoc_unique_keys'([], _).
+        '$assoc_unique_keys'([_], _).
+        '$assoc_unique_keys'([K1-_, K2-V2|T], List) :-
+            ( K1 == K2 -> domain_error(unique_key_pairs, List) ; true ),
+            '$assoc_unique_keys'([K2-V2|T], List).
+
+        '$assoc_ordered_keys'([], _).
+        '$assoc_ordered_keys'([_], _).
+        '$assoc_ordered_keys'([K1-_, K2-V2|T], List) :-
+            ( K1 @< K2 -> true ; domain_error(key_ordered_pairs, List) ),
+            '$assoc_ordered_keys'([K2-V2|T], List).
+
+        % Builds the AVL for N sorted pairs directly: the middle pair becomes the
+        % root, so sibling heights differ by at most one without any rotation.
+        '$assoc_build'(0, Rest, Rest, t) :- !.
+        '$assoc_build'(N, List, Rest, Tree) :-
+            LeftCount is (N - 1) // 2,
+            RightCount is N - 1 - LeftCount,
+            '$assoc_build'(LeftCount, List, [K-V|Middle], Left),
+            '$assoc_build'(RightCount, Middle, Rest, Right),
+            '$assoc_node'(K, V, Left, Right, Tree).
+
+        assoc_to_list(Assoc, List) :- '$assoc_to_list'(Assoc, [], List).
+
+        '$assoc_to_list'(t, List, List).
+        '$assoc_to_list'(t(K, V, _, L, R), List0, List) :-
+            '$assoc_to_list'(R, List0, List1),
+            '$assoc_to_list'(L, [K-V|List1], List).
+
+        assoc_to_keys(Assoc, Keys) :- assoc_to_list(Assoc, Pairs), pairs_keys(Pairs, Keys).
+
+        assoc_to_values(Assoc, Values) :- assoc_to_list(Assoc, Pairs), pairs_values(Pairs, Values).
+
+        min_assoc(t(K, V, _, L, _), Key, Value) :- '$min_assoc'(L, K, V, Key, Value).
+
+        '$min_assoc'(t, Key, Value, Key, Value).
+        '$min_assoc'(t(K, V, _, L, _), _, _, Key, Value) :- '$min_assoc'(L, K, V, Key, Value).
+
+        max_assoc(t(K, V, _, _, R), Key, Value) :- '$max_assoc'(R, K, V, Key, Value).
+
+        '$max_assoc'(t, Key, Value, Key, Value).
+        '$max_assoc'(t(K, V, _, _, R), _, _, Key, Value) :- '$max_assoc'(R, K, V, Key, Value).
+
+        % del_assoc/4 removes a key, answering its value; a missing key fails.
+        % Deleting joins the two subtrees around the removed node and rebalances on
+        % the way back up, so the tree stays an AVL.
+        del_assoc(Key, t(K, V, _, L, R), Value, Assoc) :-
+            compare(O, Key, K),
+            '$del_assoc_step'(O, Key, K, V, L, R, Value, Assoc).
+
+        '$del_assoc_step'('=', _, _, V, L, R, V, Assoc) :- '$assoc_join'(L, R, Assoc).
+        '$del_assoc_step'('<', Key, K, V, L, R, Value, Assoc) :-
+            del_assoc(Key, L, Value, NewLeft),
+            '$assoc_rebalance'(K, V, NewLeft, R, Assoc).
+        '$del_assoc_step'('>', Key, K, V, L, R, Value, Assoc) :-
+            del_assoc(Key, R, Value, NewRight),
+            '$assoc_rebalance'(K, V, L, NewRight, Assoc).
+
+        '$assoc_join'(t, R, R) :- !.
+        '$assoc_join'(L, t, L) :- !.
+        '$assoc_join'(L, R, Assoc) :-
+            '$assoc_del_min'(R, K, V, NewRight),
+            '$assoc_rebalance'(K, V, L, NewRight, Assoc).
+
+        '$assoc_del_min'(t(K, V, _, t, R), K, V, R) :- !.
+        '$assoc_del_min'(t(K0, V0, _, L, R), K, V, Assoc) :-
+            '$assoc_del_min'(L, K, V, NewLeft),
+            '$assoc_rebalance'(K0, V0, NewLeft, R, Assoc).
         """;
 }

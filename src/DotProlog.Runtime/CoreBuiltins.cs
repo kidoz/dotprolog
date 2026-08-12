@@ -452,13 +452,14 @@ public static class CoreBuiltins
     private static ReadOnlySpan<int> MetaArgumentPositions(string name, int arity) =>
         (name, arity) switch
         {
-            ("findall", 3 or 4) or ("bagof", 3) or ("setof", 3) or ("aggregate_all", 3) => [1],
+            ("findall", 3 or 4) or ("bagof", 3) or ("setof", 3) or ("aggregate_all", 3) or ("aggregate", 3) => [1],
+            ("aggregate_all", 4) or ("aggregate", 4) => [2],
             ("forall", 2) => [0, 1],
             ("once", 1) or ("ignore", 1) or ("not", 1) => [0],
             ("catch", 3) => [0, 2],
             ("with_output_to", 2) => [1],
             ("call", >= 1 and <= 8) => [0],
-            ("maplist", >= 2 and <= 5) or ("foldl", 4 or 5) or ("include", 3) or ("exclude", 3) => [0],
+            ("maplist", >= 2 and <= 5) or ("foldl", >= 4 and <= 6) or ("include", 3) or ("exclude", 3) => [0],
             ("partition", 4) or ("predsort", 3) or ("phrase", 2 or 3) => [0],
             _ => [],
         };
@@ -567,26 +568,30 @@ public static class CoreBuiltins
             throw PrologErrors.Type(machine, "integer", low);
         }
 
-        if (high.Tag != CellTag.Integer)
+        // SWI compatibility: the atoms inf and infinite leave the range open above, so the
+        // enumeration only stops at the tagged-integer ceiling.
+        var unbounded = high.Tag == CellTag.Atom && machine.Symbols.AtomName(high.Index) is "inf" or "infinite";
+        if (high.Tag != CellTag.Integer && !unbounded)
         {
             throw PrologErrors.Type(machine, "integer", high);
         }
 
+        var ceiling = unbounded ? Cell.MaxInteger : high.Integer;
         var value = next == long.MinValue ? low.Integer : next;
         Cell target = machine.Argument(2);
 
         // With X already bound, between/3 is a range check with no solutions to enumerate.
         if (target.Tag == CellTag.Integer)
         {
-            return target.Integer >= low.Integer && target.Integer <= high.Integer;
+            return target.Integer >= low.Integer && target.Integer <= ceiling;
         }
 
-        if (value > high.Integer)
+        if (value > ceiling)
         {
             return false;
         }
 
-        if (value < high.Integer)
+        if (value < ceiling)
         {
             machine.PushRetry(value + 1);
         }

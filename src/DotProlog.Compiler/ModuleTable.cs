@@ -47,6 +47,9 @@ public sealed class ModuleTable
         DeclareMeta("bagof", 3, [(1, 0)]);
         DeclareMeta("setof", 3, [(1, 0)]);
         DeclareMeta("aggregate_all", 3, [(1, 0)]);
+        DeclareMeta("aggregate_all", 4, [(2, 0)]);
+        DeclareMeta("aggregate", 3, [(1, 0)]);
+        DeclareMeta("aggregate", 4, [(2, 0)]);
         DeclareMeta("forall", 2, [(0, 0), (1, 0)]);
         DeclareMeta("once", 1, [(0, 0)]);
         DeclareMeta("ignore", 1, [(0, 0)]);
@@ -76,6 +79,7 @@ public sealed class ModuleTable
 
         DeclareMeta("foldl", 4, [(0, 3)]);
         DeclareMeta("foldl", 5, [(0, 4)]);
+        DeclareMeta("foldl", 6, [(0, 5)]);
         DeclareMeta("include", 3, [(0, 1)]);
         DeclareMeta("exclude", 3, [(0, 1)]);
         DeclareMeta("partition", 4, [(0, 1)]);

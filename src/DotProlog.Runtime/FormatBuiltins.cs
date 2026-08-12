@@ -202,6 +202,11 @@ internal static class FormatBuiltins
                 output.Append(Real(machine, Next(machine, given, ref next, arguments), directive, count ?? 6));
                 break;
 
+            case 'r':
+            case 'R':
+                output.Append(Radix(machine, Next(machine, given, ref next, arguments), count, directive == 'R'));
+                break;
+
             case 's':
                 output.Append(TextBuiltins.TextOfList(machine, Next(machine, given, ref next, arguments)));
                 break;
@@ -249,6 +254,37 @@ internal static class FormatBuiltins
                     Cell.Atom(machine.Symbols.InternAtom(directive.ToString()))
                 );
         }
+    }
+
+    /// <summary>
+    /// <c>~Nr</c> and <c>~NR</c>: the integer in radix N between 2 and 36, lowercase or uppercase.
+    /// The radix is the directive's count and has no default.
+    /// </summary>
+    private static string Radix(Machine machine, Cell cell, int? radix, bool uppercase)
+    {
+        if (cell.Tag != CellTag.Integer)
+        {
+            throw PrologErrors.Type(machine, "integer", cell);
+        }
+
+        if (radix is null or < 2 or > 36)
+        {
+            throw PrologErrors.Domain(machine, "radix", Cell.Integer60(radix ?? 0));
+        }
+
+        var value = cell.Integer;
+        var negative = value < 0;
+        var magnitude = (ulong)Math.Abs(value);
+        var alphabet = uppercase ? "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" : "0123456789abcdefghijklmnopqrstuvwxyz";
+        var digits = new StringBuilder();
+
+        do
+        {
+            digits.Insert(0, alphabet[(int)(magnitude % (ulong)radix.Value)]);
+            magnitude /= (ulong)radix.Value;
+        } while (magnitude > 0);
+
+        return negative ? $"-{digits}" : digits.ToString();
     }
 
     private static string Decimal(Machine machine, Cell cell, int? shift, bool grouped)

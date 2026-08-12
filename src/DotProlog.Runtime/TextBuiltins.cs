@@ -37,7 +37,124 @@ internal static class TextBuiltins
 
         registry.RegisterNondeterministic("atom_concat", 3, static machine => AtomConcat(machine, 0), AtomConcat);
         registry.RegisterNondeterministic("sub_atom", 5, static machine => SubAtom(machine, 0), SubAtom);
+
+        registry.Register("char_type", 2, static machine => CharType(machine, code: false));
+        registry.Register("code_type", 2, static machine => CharType(machine, code: true));
     }
+
+    /// <summary>
+    /// <c>char_type(+Char, ?Type)</c> and <c>code_type(+Code, ?Type)</c>: SWI-style character
+    /// classification. The character must be bound; enumeration over characters is not offered.
+    /// Parametric types answer their companion in the caller's representation — a character for
+    /// <c>char_type/2</c>, a code for <c>code_type/2</c> — except <c>digit/1</c> and <c>code/1</c>,
+    /// whose companions are integers for both.
+    /// </summary>
+    private static bool CharType(Machine machine, bool code)
+    {
+        Cell value = machine.Argument(0);
+        if (value.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        char character;
+        if (code)
+        {
+            if (value.Tag != CellTag.Integer)
+            {
+                throw PrologErrors.Type(machine, "integer", value);
+            }
+
+            if (value.Integer < 0 || value.Integer > char.MaxValue)
+            {
+                throw PrologErrors.Representation(machine, "character_code");
+            }
+
+            character = (char)value.Integer;
+        }
+        else
+        {
+            if (value.Tag != CellTag.Atom || machine.Symbols.AtomName(value.Index) is not { Length: 1 } name)
+            {
+                throw PrologErrors.Type(machine, "character", value);
+            }
+
+            character = name[0];
+        }
+
+        Cell type = machine.Argument(1);
+        if (type.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        if (type.Tag == CellTag.Atom)
+        {
+            return machine.Symbols.AtomName(type.Index) switch
+            {
+                "alnum" => char.IsLetterOrDigit(character),
+                "alpha" => char.IsLetter(character),
+                "csym" => char.IsLetterOrDigit(character) || character == '_',
+                "csymf" => char.IsLetter(character) || character == '_',
+                "ascii" => character < 128,
+                "white" => character is ' ' or '\t',
+                "space" => char.IsWhiteSpace(character),
+                "cntrl" => char.IsControl(character),
+                "graph" => !char.IsControl(character) && !char.IsWhiteSpace(character),
+                "print" => !char.IsControl(character),
+                "punct" => !char.IsControl(character) && !char.IsWhiteSpace(character) && !char.IsLetterOrDigit(character),
+                "upper" => char.IsUpper(character),
+                "lower" => char.IsLower(character),
+                "end_of_line" => character is '\n' or '\r',
+                "newline" => character == '\n',
+                "period" => character is '.' or '!' or '?',
+                "quote" => character is '\'' or '"' or '`',
+                _ => throw PrologErrors.Domain(machine, "char_type", type),
+            };
+        }
+
+        if (type.Tag != CellTag.Structure)
+        {
+            throw PrologErrors.Domain(machine, "char_type", type);
+        }
+
+        Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(type.Index).Index);
+        if (functor.Arity != 1)
+        {
+            throw PrologErrors.Domain(machine, "char_type", type);
+        }
+
+        Cell companion = machine.HeapAt(type.Index + 1);
+        switch (machine.Symbols.AtomName(functor.NameAtom))
+        {
+            case "digit":
+                return char.IsAsciiDigit(character) && machine.Unify(companion, Cell.Integer60(character - '0'));
+
+            case "code":
+                return machine.Unify(companion, Cell.Integer60(character));
+
+            // SWI reads to_upper(U) as "Char is U converted to uppercase", so the companion it
+            // answers for a bound Char is the lowercase, and to_lower answers the uppercase.
+            // Verified against SWI-Prolog 10 rather than the intuitive reading.
+            case "to_lower":
+                return UnifyCompanion(machine, companion, char.ToUpperInvariant(character), code);
+
+            case "to_upper":
+                return UnifyCompanion(machine, companion, char.ToLowerInvariant(character), code);
+
+            case "upper":
+                return char.IsUpper(character) && UnifyCompanion(machine, companion, char.ToLowerInvariant(character), code);
+
+            case "lower":
+                return char.IsLower(character) && UnifyCompanion(machine, companion, char.ToUpperInvariant(character), code);
+
+            default:
+                throw PrologErrors.Domain(machine, "char_type", type);
+        }
+    }
+
+    private static bool UnifyCompanion(Machine machine, Cell companion, char character, bool code) =>
+        machine.Unify(companion, code ? Cell.Integer60(character) : Cell.Atom(machine.Symbols.InternAtom(character.ToString())));
 
     /// <summary>The text of an atomic term: an atom's name, or a number written as the writer writes it.</summary>
     internal static bool TryText(Machine machine, Cell cell, out string text)
