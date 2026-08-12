@@ -45,7 +45,10 @@ public sealed class SwiDifferentialTests
         "findall(X, member(X, [a, b]), L, [z]), write(L)",
         "atom_to_term('foo(X, Y)', T, _), functor(T, N, A), write(N/A)",
         "( variant(f(X, Y), f(_, _)) -> write(yes) ; write(no) )",
-        "current_output(S), write(a), tab(S, 2), write(b)"
+        "current_output(S), write(a), tab(S, 2), write(b)",
+        "nb_setval(k, f(1, a)), nb_getval(k, V), write(V)",
+        "b_setval(k, 1), ( b_setval(k, 2), fail ; b_getval(k, V) ), write(V)",
+        "nb_setval(k, base), ( b_setval(k, temp), fail ; true ), nb_getval(k, V), write(V)"
     );
 
     // The corpus stays runnable on DotProlog alone, so a corpus typo or a regression in the

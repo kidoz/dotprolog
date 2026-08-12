@@ -30,6 +30,10 @@ public sealed class Machine
     private int[] _trail = new int[1 << 12];
     private int _tr;
 
+    private readonly Dictionary<int, GlobalVariable> _globals = [];
+    private GlobalUndo[] _globalUndo = new GlobalUndo[8];
+    private int _globalUndoTop;
+
     private Cell[] _stack = new Cell[1 << 14];
     private int _stackTop;
     private int _e = -1;
@@ -1651,6 +1655,10 @@ public sealed class Machine
 
     private void ResetState()
     {
+        // Backtrackable global assignments must not outlive their top-level goal: fire the whole
+        // undo stack before the trail and heap they are ordered against are discarded.
+        UndoTrail(0);
+
         _h = 0;
         _tr = 0;
         _stackTop = 0;
@@ -1800,6 +1808,94 @@ public sealed class Machine
             var address = _trail[--_tr];
             _heap[address] = Cell.Reference(address);
         }
+
+        // A backtrackable global assignment is undone when the trail unwinds below its sentinel
+        // entry. Tentative-unification undos always target a mark at or above every recorded
+        // assignment, so they can never fire one.
+        while (_globalUndoTop > 0 && _globalUndo[_globalUndoTop - 1].TrailMark > mark)
+        {
+            ref GlobalUndo undo = ref _globalUndo[--_globalUndoTop];
+            if (undo.HadValue)
+            {
+                _globals[undo.KeyAtom] = undo.Previous;
+            }
+            else
+            {
+                _globals.Remove(undo.KeyAtom);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Sets the global variable named by <paramref name="keyAtom"/>. A backtrackable assignment
+    /// stores the live cell and is undone when the trail unwinds below the sentinel entry pushed
+    /// here; a non-backtrackable one stores a detached copy that survives any unwinding.
+    /// </summary>
+    internal void SetGlobal(int keyAtom, Cell value, bool backtrackable)
+    {
+        if (!backtrackable)
+        {
+            var buffer = new TermBuffer();
+            var root = buffer.Copy(this, value);
+            _globals[keyAtom] = new GlobalVariable(default, buffer, root);
+            return;
+        }
+
+        // The sentinel gives this assignment its own trail position, so undo entries stay totally
+        // ordered against choice-point trail tops even when nothing else was trailed in between.
+        Cell sentinel = NewVariable();
+        if (_tr == _trail.Length)
+        {
+            Array.Resize(ref _trail, _trail.Length * 2);
+        }
+
+        _trail[_tr++] = sentinel.Index;
+
+        if (_globalUndoTop == _globalUndo.Length)
+        {
+            Array.Resize(ref _globalUndo, _globalUndo.Length * 2);
+        }
+
+        ref GlobalUndo undo = ref _globalUndo[_globalUndoTop++];
+        undo.TrailMark = _tr;
+        undo.KeyAtom = keyAtom;
+        undo.HadValue = _globals.TryGetValue(keyAtom, out GlobalVariable previous);
+        undo.Previous = previous;
+
+        _globals[keyAtom] = new GlobalVariable(value, null, 0);
+    }
+
+    /// <summary>
+    /// Reads the global variable named by <paramref name="keyAtom"/>. A detached value
+    /// materializes as a fresh copy on the heap, the way a collected solution does.
+    /// </summary>
+    internal bool TryGetGlobal(int keyAtom, out Cell value)
+    {
+        if (!_globals.TryGetValue(keyAtom, out GlobalVariable entry))
+        {
+            value = default;
+            return false;
+        }
+
+        if (entry.Detached is TermBuffer buffer)
+        {
+            var origin = buffer.Materialize(this);
+            value = _heap[origin + entry.Root];
+            return true;
+        }
+
+        value = entry.Live;
+        return true;
+    }
+
+    private readonly record struct GlobalVariable(Cell Live, TermBuffer? Detached, int Root);
+
+    private struct GlobalUndo
+    {
+        public int TrailMark;
+        public int KeyAtom;
+        public bool HadValue;
+        public GlobalVariable Previous;
     }
 
     private void PushChoicePoint(int alternative)

@@ -153,6 +153,7 @@ public static class CoreBuiltins
         ModuleBuiltins.Register(registry);
         PrologFlagBuiltins.Register(registry);
         CharacterConversionBuiltins.Register(registry);
+        GlobalVariableBuiltins.Register(registry);
         ControlPredicates.Install(program);
     }
 
