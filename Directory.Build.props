@@ -21,7 +21,7 @@
     </PropertyGroup>
 
     <PropertyGroup Label="Publishing">
-        <VersionPrefix>0.5.0</VersionPrefix>
+        <VersionPrefix>0.7.0</VersionPrefix>
 
         <!--
           Publishing is opt-in. Tests, benchmarks, samples, and the projects that exist only to be

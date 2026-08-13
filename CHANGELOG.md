@@ -4,7 +4,7 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.0] — 2026-08-13
 
 ### Added
 
@@ -462,7 +462,7 @@ binary: a published executable can consult a `.pl` file it has never seen and ru
 
 **Full Changelog**: https://github.com/kidoz/dotprolog/commits/v0.1.0
 
-[Unreleased]: https://github.com/kidoz/dotprolog/compare/v0.5.0...HEAD
+[0.7.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.7.0
 [0.5.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.5.0
 [0.4.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.4.0
 [0.3.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.3.0
