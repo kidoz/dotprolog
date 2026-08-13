@@ -497,6 +497,7 @@ public sealed class LogtalkConformanceTests
                 "A non-error case was excluded by a condition option."
             );
             directCases = [.. directCases.Where(ConditionOptionApplies)];
+            nonApplicableCases.UnionWith(conditionExcludedCases);
 
             Require(directCases.Length == 763, "The applicable direct-case inventory changed.");
             Require(directCases.Count(test => test.OutcomeKind == "true") == 455, "The true-case inventory changed.");
@@ -1326,7 +1327,7 @@ public sealed class LogtalkConformanceTests
                 RepositoryLayout.Root
             );
             Require(exitCode == 0, $"Generated-C# conformance matrix failed:\n{log}");
-            Require(log.Contains("compiled-conformance: 2304/2304, failed=0", StringComparison.Ordinal), log);
+            Require(log.Contains("compiled-conformance: 2289/2289, failed=0", StringComparison.Ordinal), log);
             return;
         }
 
@@ -1356,7 +1357,7 @@ public sealed class LogtalkConformanceTests
         var executable = Path.Combine(publish, OperatingSystem.IsWindows() ? "Integration.Tests.exe" : "Integration.Tests");
         (var runExit, var runLog) = await ChildProcess.RunAsync(executable, [], RepositoryLayout.Root);
         Require(runExit == 0, $"Generated-C# NativeAOT matrix failed:\n{runLog}");
-        Require(runLog.Contains("compiled-conformance: 2304/2304, failed=0", StringComparison.Ordinal), runLog);
+        Require(runLog.Contains("compiled-conformance: 2289/2289, failed=0", StringComparison.Ordinal), runLog);
     }
 
     private static string BuildCompiledCases(

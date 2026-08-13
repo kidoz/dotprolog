@@ -186,7 +186,7 @@ internal static class Program
                 % ISO flags own runtime state explicitly and continue to work after trimming.
                 % The count is the ten ISO flags plus the occurs_check extension flag; it changes
                 % whenever the flag inventory does, deliberately.
-                current_prolog_flag(bounded, true),
+                current_prolog_flag(bounded, false),
                 findall(FlagName, current_prolog_flag(FlagName, _), FlagNames),
                 length(FlagNames, 11),
                 memberchk(occurs_check, FlagNames),
@@ -287,18 +287,16 @@ internal static class Program
                 read(ReadOptionIn, first), close(ReadOptionIn),
                 write(read_option_validation), nl,
 
-                % Runtime reading preserves bounded integer representation errors after trimming.
-                catch(
-                    read_term_from_atom('999999999999999999999999999999', _, []),
-                    error(representation_error(max_integer), _),
-                    MaxIntegerCaught = true),
-                MaxIntegerCaught == true,
-                catch(
-                    read_term_from_atom('-999999999999999999999999999999', _, []),
-                    error(representation_error(min_integer), _),
-                    MinIntegerCaught = true),
-                MinIntegerCaught == true,
-                write(integer_representation_errors), nl,
+                % Unbounded integers and rationals survive trimming: literals of any length
+                % read exactly, arithmetic promotes and demotes, and rdiv stays exact.
+                read_term_from_atom('999999999999999999999999999999', BigLiteral, []),
+                BigLiteral =:= 10 ^ 30 - 1,
+                BigProduct is BigLiteral + 1,
+                BigProduct =:= 10 ^ 30,
+                BigProduct - BigProduct + 7 =:= 7,
+                HalfRatio is 1 rdiv 2,
+                HalfRatio == 1r2,
+                write(unbounded_number_representations), nl,
 
                 % Runtime reading enforces the same maximum arity in the native image.
                 catch(

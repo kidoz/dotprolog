@@ -209,7 +209,7 @@ public sealed class NativeAotAcceptanceTests
                     "extended_character_syntax",
                     "read_options",
                     "read_option_validation",
-                    "integer_representation_errors",
+                    "unbounded_number_representations",
                     "max_arity_representation_error",
                     "float_read_limits",
                     "halt_status_errors",
@@ -295,14 +295,14 @@ public sealed class NativeAotAcceptanceTests
 
             (var runExit, var runLog) = await RunAsync(executable, [report], RepositoryLayout.Root);
             Assert.True(runExit == 0, $"Native independent ISO corpus failed:\n{runLog}");
-            Assert.Contains("768/768 passed", runLog, StringComparison.Ordinal);
+            Assert.Contains("763/763 passed", runLog, StringComparison.Ordinal);
 
             using JsonDocument document = JsonDocument.Parse(
                 await File.ReadAllTextAsync(report, TestContext.Current.CancellationToken)
             );
             JsonElement summary = document.RootElement.GetProperty("summary");
-            Assert.Equal(768, summary.GetProperty("applicable").GetInt32());
-            Assert.Equal(768, summary.GetProperty("passed").GetInt32());
+            Assert.Equal(763, summary.GetProperty("applicable").GetInt32());
+            Assert.Equal(763, summary.GetProperty("passed").GetInt32());
             Assert.Equal(0, summary.GetProperty("failed").GetInt32());
             Assert.Equal(0, summary.GetProperty("unsupported").GetInt32());
         }
