@@ -55,7 +55,7 @@ Select a mode with the `PrologEngine` constructor, `dotnet prolog run --mode <na
 
 ## Terms and clauses
 
-The reader supports variables, atoms, unbounded integers, finite floats, lists, structures, and
+The reader supports variables, atoms, unbounded integers, rationals, finite floats, lists, structures, and
 double-quoted code lists. Programs contain facts, rules, and directives:
 
 ```prolog

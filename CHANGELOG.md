@@ -8,6 +8,15 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Added
 
+- Rational numbers: `1r3` literals in the `Extended` and `Modern` modes (strict ISO lexing is
+  unchanged), `rdiv/2` as a 400 `yfx` operator, exact arithmetic mixing integers and rationals
+  with float contagion, rounding functions over rationals, the `numerator/1`, `denominator/1`,
+  `rational/1`, and `rationalize/1` evaluables, the `rational/1` type test, `must_be(rational, X)`,
+  number conversion of the `NrM` spelling, standard-order ranking beside integers, and canonical
+  demotion so a denominator of 1 is always an integer. Rationals reach both execution paths and
+  the embedding API (`PrologRational`, `PrologInput.Rational`), and are verified against
+  SWI-Prolog by the differential corpus.
+
 - Unbounded integers: arithmetic promotes past the 60-bit tagged range to interned big
   integers and normalizes back when results fit, literals of any length read to their exact value
   in source text and runtime term input, and number conversion, formatting (`~d`, `~D`, `~r`,
