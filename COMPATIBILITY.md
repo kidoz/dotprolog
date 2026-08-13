@@ -252,8 +252,7 @@ samples and exercise NativeAOT.
 
 | Feature | Why |
 |---|---|
-| A string type, and the SWI string predicates | An atom is the only text term. Aliasing the string predicates to atoms would let portable code compile here and then behave differently. |
-| Constraint solving, tabling, attributed variables | Out of scope for 0.1.0. |
+| Constraint solving, tabling, attributed variables | Later roadmap phases — see the [SWI compatibility ledger](docs/reference/swi-compatibility.md). |
 
 ## Known differences
 
