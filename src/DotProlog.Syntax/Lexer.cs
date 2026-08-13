@@ -332,7 +332,8 @@ internal sealed class Lexer
                 SpanFrom(start),
                 layout,
                 Integer: overflow ? 0 : (long)radixValue,
-                IntegerOverflow: overflow
+                IntegerOverflow: overflow,
+                Big: overflow ? radixValue : default
             );
         }
 
@@ -377,7 +378,8 @@ internal sealed class Lexer
 
         if (!long.TryParse(literal, NumberStyles.None, CultureInfo.InvariantCulture, out var integer))
         {
-            return new Token(TokenKind.Integer, literal, span, layout, IntegerOverflow: true);
+            BigInteger big = BigInteger.Parse(literal, NumberStyles.None, CultureInfo.InvariantCulture);
+            return new Token(TokenKind.Integer, literal, span, layout, IntegerOverflow: true, Big: big);
         }
 
         return new Token(TokenKind.Integer, literal, span, layout, Integer: integer);

@@ -92,6 +92,9 @@ internal static class TermReifier
             case CellTag.Integer:
                 return new IntegerTerm(cell.Integer, SourceSpan.None);
 
+            case CellTag.BigInteger:
+                return new BigIntegerTerm(machine.Symbols.GetBig(cell.Index), SourceSpan.None);
+
             case CellTag.Float:
                 return new FloatTerm(machine.Symbols.GetFloat(cell.Index), SourceSpan.None);
 
@@ -155,7 +158,10 @@ internal static class TermReifier
                 return Cell.Integer60(integer.Value);
 
             case IntegerTerm integer:
-                throw PrologErrors.Representation(machine, integer.Value < Cell.MinInteger ? "min_integer" : "max_integer");
+                return Cell.Big(machine.Symbols.InternBig(integer.Value));
+
+            case BigIntegerTerm big:
+                return Cell.Big(machine.Symbols.InternBig(big.Value));
 
             case FloatTerm number:
                 return Cell.Float(machine.Symbols.InternFloat(number.Value));

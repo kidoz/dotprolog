@@ -11,7 +11,8 @@ namespace DotProlog.Syntax;
 /// <param name="Integer">Value of an <see cref="TokenKind.Integer"/> token.</param>
 /// <param name="Float">Value of a <see cref="TokenKind.Float"/> token.</param>
 /// <param name="Quoted">Whether an atom token was written in quotes.</param>
-/// <param name="IntegerOverflow">Whether an integer token exceeds the lexer storage range.</param>
+/// <param name="IntegerOverflow">Whether an integer token exceeds <see cref="Integer"/>; the value is then in <see cref="Big"/>.</param>
+/// <param name="Big">The exact value of an integer token whose magnitude exceeds <see cref="Integer"/>.</param>
 /// <param name="FloatOverflow">Whether a float token exceeds the finite implementation range.</param>
 internal readonly record struct Token(
     TokenKind Kind,
@@ -22,6 +23,7 @@ internal readonly record struct Token(
     double Float = 0,
     bool Quoted = false,
     bool IntegerOverflow = false,
+    System.Numerics.BigInteger Big = default,
     bool FloatOverflow = false
 )
 {

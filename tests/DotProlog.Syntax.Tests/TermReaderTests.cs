@@ -158,22 +158,23 @@ public sealed class TermReaderTests
         Assert.Equal(DiagnosticIds.UnexpectedToken, Assert.Single(result.Diagnostics).Id);
     }
 
+    // Integers are unbounded: a literal past the long range parses to a
+    // BigIntegerTerm carrying the exact value.
     [Theory]
-    [InlineData("999999999999999999999999999999", DiagnosticIds.MaxIntegerExceeded)]
-    [InlineData("+999999999999999999999999999999", DiagnosticIds.MaxIntegerExceeded)]
-    [InlineData("-999999999999999999999999999999", DiagnosticIds.MinIntegerExceeded)]
-    [InlineData("0xffffffffffffffffffffffffffffffff", DiagnosticIds.MaxIntegerExceeded)]
-    [InlineData("-0xffffffffffffffffffffffffffffffff", DiagnosticIds.MinIntegerExceeded)]
-    public void ReportsSignedIntegerRepresentationLimits(string source, string expectedId)
+    [InlineData("999999999999999999999999999999", "999999999999999999999999999999")]
+    [InlineData("+999999999999999999999999999999", "999999999999999999999999999999")]
+    [InlineData("-999999999999999999999999999999", "-999999999999999999999999999999")]
+    [InlineData("0xffffffffffffffffffffffffffffffff", "340282366920938463463374607431768211455")]
+    [InlineData("-0xffffffffffffffffffffffffffffffff", "-340282366920938463463374607431768211455")]
+    public void ReadsIntegerLiteralsBeyondTheLongRange(string source, string expected)
     {
         ArgumentNullException.ThrowIfNull(source);
 
         ParseResult result = TermReader.ReadTerm(source, "limit.pl");
 
-        Diagnostic diagnostic = Assert.Single(result.Diagnostics);
-        Assert.Equal(expectedId, diagnostic.Id);
-        Assert.Equal(new SourceSpan(0, source.Length, 1, 1), diagnostic.Span);
-        Assert.Equal("limit.pl", diagnostic.FileName);
+        Assert.Empty(result.Diagnostics);
+        BigIntegerTerm big = Assert.IsType<BigIntegerTerm>(Assert.Single(result.Clauses));
+        Assert.Equal(System.Numerics.BigInteger.Parse(expected, CultureInfo.InvariantCulture), big.Value);
     }
 
     [Theory]

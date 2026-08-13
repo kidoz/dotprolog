@@ -31,21 +31,23 @@ public sealed class AtomicTermProcessingTests
     [InlineData("number_codes(_, [51,32])", "syntax_error(illegal_number)")]
     [InlineData("char_code(ab, _)", "type_error(character,ab)")]
     [InlineData("char_code(_, a)", "type_error(integer,a)")]
-    [InlineData(
-        "number_chars(_, ['1','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0'])",
-        "representation_error(max_integer)"
-    )]
-    [InlineData(
-        "number_codes(_, [45,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57])",
-        "representation_error(min_integer)"
-    )]
-    [InlineData("atom_number('1000000000000000000', _)", "representation_error(max_integer)")]
-    [InlineData("atom_number('0x10000000000000000', _)", "representation_error(max_integer)")]
-    [InlineData("atom_number('-0x10000000000000000', _)", "representation_error(min_integer)")]
     [InlineData("atom_number('1.0e400', _)", "syntax_error(float_overflow)")]
     [InlineData("number_chars(_, ['1','.','0','e','4','0','0'])", "syntax_error(float_overflow)")]
     public void ReportsIsoAtomicProcessingErrors(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+
+    // Integers are unbounded: conversions past the fixnum range answer exact values.
+    [Theory]
+    [InlineData(
+        "number_chars(N, ['1','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0'])",
+        "1000000000000000000"
+    )]
+    [InlineData("number_codes(N, [45,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57])", "-9999999999999999999")]
+    [InlineData("atom_number('1000000000000000000', N)", "1000000000000000000")]
+    [InlineData("atom_number('0x10000000000000000', N)", "18446744073709551616")]
+    [InlineData("atom_number('-0x10000000000000000', N)", "-18446744073709551616")]
+    public void ConvertsIntegersBeyondTheFixnumRange(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal($"{goal}, write(N)"));
 
     [Theory]
     [InlineData("atom_length(ab, 3)")]

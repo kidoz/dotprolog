@@ -59,6 +59,7 @@ public static class TermOrder
                 }
 
                 case CellTag.Integer:
+                case CellTag.BigInteger:
                 case CellTag.Float:
                 {
                     var numbers = CompareNumbers(machine, a, b);
@@ -125,12 +126,21 @@ public static class TermOrder
 
     private static int CompareNumbers(Machine machine, Cell a, Cell b)
     {
-        if (a.Tag == CellTag.Integer)
+        if (a.Tag == CellTag.Float)
+        {
+            return machine.Symbols.GetFloat(a.Index).CompareTo(machine.Symbols.GetFloat(b.Index));
+        }
+
+        if (a.Tag == CellTag.Integer && b.Tag == CellTag.Integer)
         {
             return a.Integer.CompareTo(b.Integer);
         }
 
-        return machine.Symbols.GetFloat(a.Index).CompareTo(machine.Symbols.GetFloat(b.Index));
+        // At least one side is big, and a big cell never holds a fixnum-range value,
+        // so widening the other side compares exactly.
+        System.Numerics.BigInteger left = a.Tag == CellTag.BigInteger ? machine.Symbols.GetBig(a.Index) : a.Integer;
+        System.Numerics.BigInteger right = b.Tag == CellTag.BigInteger ? machine.Symbols.GetBig(b.Index) : b.Integer;
+        return left.CompareTo(right);
     }
 
     // Strings rank after numbers and before atoms — SWI-Prolog 10's probed order, which its
@@ -140,7 +150,7 @@ public static class TermOrder
         {
             CellTag.Reference => 0,
             CellTag.Float => 1,
-            CellTag.Integer => 2,
+            CellTag.Integer or CellTag.BigInteger => 2,
             CellTag.String => 3,
             CellTag.Atom => 4,
             _ => 5,

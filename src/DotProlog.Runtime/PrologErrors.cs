@@ -129,6 +129,13 @@ public static class PrologErrors
         return Unary(machine, "representation_error", flag);
     }
 
+    /// <summary>A computation exceeded an implementation resource: <c>resource_error(What)</c>.</summary>
+    public static PrologException Resource(Machine machine, string what)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+        return Unary(machine, "resource_error", what);
+    }
+
     /// <summary>The host I/O system failed while carrying out a Prolog operation.</summary>
     public static PrologException System(Machine machine)
     {

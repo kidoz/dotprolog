@@ -646,12 +646,10 @@ internal sealed class ClauseCompiler
                 return _constants.IndexOf(Cell.Integer60(integer.Value));
 
             case IntegerTerm integer:
-                Report(
-                    CompilerDiagnosticIds.IntegerOutOfRange,
-                    $"Integer {integer.Value} does not fit in a term cell; the supported range is {Cell.MinInteger} to {Cell.MaxInteger}.",
-                    integer.Span
-                );
-                return _constants.IndexOf(Cell.Integer60(0));
+                return _constants.IndexOf(Cell.Big(_program.Symbols.InternBig(integer.Value)));
+
+            case BigIntegerTerm big:
+                return _constants.IndexOf(Cell.Big(_program.Symbols.InternBig(big.Value)));
 
             case FloatTerm number:
                 return _constants.IndexOf(Cell.Float(_program.Symbols.InternFloat(number.Value)));

@@ -937,14 +937,14 @@ internal static class StreamBuiltins
         ValidateExplicitStreamInstantiation(machine, stream);
         Cell code = machine.Argument(target);
 
-        if (code.Tag is not CellTag.Reference and not CellTag.Integer)
+        if (code.Tag is not CellTag.Reference and not CellTag.Integer and not CellTag.BigInteger)
         {
             throw PrologErrors.Type(machine, "integer", code);
         }
 
         PrologStream source = Resolve(machine, stream, input: true);
         PrepareInput(machine, source, stream);
-        if (code.Tag == CellTag.Integer && code.Integer is < -1 or > char.MaxValue)
+        if (code.Tag == CellTag.BigInteger || (code.Tag == CellTag.Integer && code.Integer is < -1 or > char.MaxValue))
         {
             throw PrologErrors.Representation(machine, "in_character_code");
         }
@@ -1007,13 +1007,13 @@ internal static class StreamBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        if (code.Tag != CellTag.Integer)
+        if (code.Tag is not (CellTag.Integer or CellTag.BigInteger))
         {
             throw PrologErrors.Type(machine, "integer", code);
         }
 
         PrologStream target = Resolve(machine, stream, input: false);
-        if (code.Integer is < 0 or > char.MaxValue)
+        if (code.Tag == CellTag.BigInteger || code.Integer is < 0 or > char.MaxValue)
         {
             throw PrologErrors.Representation(machine, "character_code");
         }

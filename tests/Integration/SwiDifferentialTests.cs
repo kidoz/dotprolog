@@ -134,7 +134,31 @@ public sealed class SwiDifferentialTests
         "catch(set_prolog_flag(message_context, []), _, true), print_message(warning, format('hello ~w', [world]))",
         "catch(set_prolog_flag(message_context, []), _, true), catch(set_prolog_flag(verbose, normal), _, true), print_message(informational, format('fyi ~w', [3]))",
         "catch(set_prolog_flag(message_context, []), _, true), print_message(error, hello_world(42))",
-        "print_message(silent, format('never', [])), write(done)"
+        "print_message(silent, format('never', [])), write(done)",
+        // Unbounded integers: promotion, demotion, literals, and helpers agree with GMP.
+        "X is 2 ^ 100, write(X)",
+        "X is 10 ^ 30 + 10 ^ 30, write(X)",
+        "X is 999999999999 * 999999999999, write(X)",
+        "X is -(10 ^ 30) mod 7, write(X)",
+        "X is (10 ^ 30) // 999, write(X)",
+        "X is (10 ^ 40) >> 100, write(X)",
+        "X is 1 << 100, write(X)",
+        "X is 2 ^ 100 - 2 ^ 100 + 7, write(X)",
+        "X is truncate(1.0e25), write(X)",
+        "X is min(10 ^ 30, 5), Y is max(10 ^ 30, 5), write(X-Y)",
+        "X = 123456789012345678901234567890, Y = 123456789012345678901234567890, ( X == Y -> write(eq) ; write(ne) )",
+        "atom_number('123456789012345678901234567890', X), Y is X + 1, write(Y)",
+        "number_codes(X, [57, 57, 57, 57, 57, 57, 57, 57, 57, 57, 57, 57, 57, 57, 57, 57, 57, 57, 57, 57]), write(X)",
+        // No floats beside integers: value-ordering numbers across kinds is SWI's documented
+        // ISO deviation, which DotProlog deliberately does not follow.
+        "msort([100000000000000000000000000000, 1, foo, 99999999999999999999999999999], L), write(L)",
+        "( integer(123456789012345678901234567890) -> write(yes) ; write(no) )",
+        "format('~d', [123456789012345678901234567890])",
+        "format('~16r', [123456789012345678901234567890])",
+        "succ(99999999999999999999999999, X), write(X)",
+        "between(99999999999999999999999999, inf, X), !, write(X)",
+        "current_prolog_flag(bounded, B), write(B)",
+        "X is 10 ^ 21, writeq(X), nl, write(X)"
     );
 
     // The corpus stays runnable on DotProlog alone, so a corpus typo or a regression in the

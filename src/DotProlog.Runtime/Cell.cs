@@ -53,6 +53,9 @@ public readonly struct Cell : IEquatable<Cell>
     /// <summary>Creates a string cell whose text is the interned atom <paramref name="atomId"/>.</summary>
     public static Cell String(int atomId) => Make(CellTag.String, atomId);
 
+    /// <summary>Creates a big-integer cell referring to interned big integer <paramref name="bigId"/>.</summary>
+    public static Cell Big(int bigId) => Make(CellTag.BigInteger, bigId);
+
     /// <summary>Creates an integer cell.</summary>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> does not fit in 60 bits.</exception>
     public static Cell Integer60(long value)

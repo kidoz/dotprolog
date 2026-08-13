@@ -20,14 +20,24 @@ internal static class TermBuiltins
         registry.Register("var", 1, static machine => machine.Argument(0).Tag == CellTag.Reference);
         registry.Register("nonvar", 1, static machine => machine.Argument(0).Tag != CellTag.Reference);
         registry.Register("atom", 1, static machine => machine.Argument(0).Tag == CellTag.Atom);
-        registry.Register("integer", 1, static machine => machine.Argument(0).Tag == CellTag.Integer);
+        registry.Register("integer", 1, static machine => machine.Argument(0).Tag is CellTag.Integer or CellTag.BigInteger);
         registry.Register("float", 1, static machine => machine.Argument(0).Tag == CellTag.Float);
-        registry.Register("number", 1, static machine => machine.Argument(0).Tag is CellTag.Integer or CellTag.Float);
+        registry.Register(
+            "number",
+            1,
+            static machine => machine.Argument(0).Tag is CellTag.Integer or CellTag.BigInteger or CellTag.Float
+        );
         registry.Register("compound", 1, static machine => machine.Argument(0).Tag == CellTag.Structure);
         registry.Register(
             "atomic",
             1,
-            static machine => machine.Argument(0).Tag is CellTag.Atom or CellTag.Integer or CellTag.Float or CellTag.String
+            static machine =>
+                machine.Argument(0).Tag
+                    is CellTag.Atom
+                        or CellTag.Integer
+                        or CellTag.BigInteger
+                        or CellTag.Float
+                        or CellTag.String
         );
         registry.Register("callable", 1, static machine => machine.Argument(0).Tag is CellTag.Atom or CellTag.Structure);
         registry.Register("string", 1, static machine => machine.Argument(0).Tag == CellTag.String);
@@ -97,7 +107,7 @@ internal static class TermBuiltins
     private static bool TermSize(Machine machine)
     {
         Cell size = machine.Argument(1);
-        if (size.Tag is not (CellTag.Reference or CellTag.Integer))
+        if (size.Tag is not (CellTag.Reference or CellTag.Integer or CellTag.BigInteger))
         {
             throw PrologErrors.Type(machine, "integer", size);
         }
@@ -311,9 +321,17 @@ internal static class TermBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        if (arity.Tag != CellTag.Integer)
+        if (arity.Tag is not (CellTag.Integer or CellTag.BigInteger))
         {
             throw PrologErrors.Type(machine, "integer", arity);
+        }
+
+        if (arity.Tag == CellTag.BigInteger)
+        {
+            // Outside the fixnum range the value cannot be a representable arity either way.
+            throw machine.Symbols.GetBig(arity.Index).Sign < 0
+                ? PrologErrors.Domain(machine, "not_less_than_zero", arity)
+                : PrologErrors.Representation(machine, "max_arity");
         }
 
         if (arity.Integer < 0)
@@ -368,7 +386,7 @@ internal static class TermBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        if (index.Tag != CellTag.Integer)
+        if (index.Tag is not (CellTag.Integer or CellTag.BigInteger))
         {
             throw PrologErrors.Type(machine, "integer", index);
         }
@@ -376,6 +394,14 @@ internal static class TermBuiltins
         if (term.Tag != CellTag.Structure)
         {
             throw PrologErrors.Type(machine, "compound", term);
+        }
+
+        if (index.Tag == CellTag.BigInteger)
+        {
+            // Positive big indexes exceed every arity and fail; negative ones stay a domain error.
+            return machine.Symbols.GetBig(index.Index).Sign < 0
+                ? throw PrologErrors.Domain(machine, "not_less_than_zero", index)
+                : false;
         }
 
         if (index.Integer < 0)
@@ -409,7 +435,7 @@ internal static class TermBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        if (index.Tag != CellTag.Integer)
+        if (index.Tag is not (CellTag.Integer or CellTag.BigInteger))
         {
             throw PrologErrors.Type(machine, "integer", index);
         }
@@ -419,7 +445,15 @@ internal static class TermBuiltins
             throw PrologErrors.Type(machine, "compound", term);
         }
 
-        if (!backtrackable && value.Tag is not (CellTag.Atom or CellTag.Integer or CellTag.Float or CellTag.String))
+        if (index.Tag == CellTag.BigInteger)
+        {
+            return false;
+        }
+
+        if (
+            !backtrackable
+            && value.Tag is not (CellTag.Atom or CellTag.Integer or CellTag.BigInteger or CellTag.Float or CellTag.String)
+        )
         {
             throw PrologErrors.Type(machine, "atomic", value);
         }

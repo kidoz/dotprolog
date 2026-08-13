@@ -190,7 +190,7 @@ iso_case('8.6.1', (X14 is \ 1, X14 =:= -2), success).
 iso_case('8.6.1', (_ is \ 1.0), error(type_error(integer, 1.0))).
 iso_case('8.6.1', (1 << 2 =:= 4), success).
 iso_case('8.6.1', (4 >> 2 =:= 1), success).
-iso_case('8.6.1', (_ is 1 << 60), error(evaluation_error(int_overflow))).
+iso_case('8.6.1', (X is 1 << 60, X =:= 1152921504606846976), success).
 iso_case('8.6.1', (_ is 1.0 << 2), error(type_error(integer, 1.0))).
 iso_case('8.6.1', (X15 is pi, X15 > 3.14, X15 < 3.15), success).
 iso_case('8.6.1', (X16 is sqrt(9), float(X16), X16 =:= 3.0), success).
@@ -216,7 +216,7 @@ iso_case('8.6.1', (_ is floor(1)), error(type_error(float, 1))).
 iso_case('8.6.1', (float_integer_part(-1.25) =:= -1.0), success).
 iso_case('8.6.1', (float_fractional_part(-1.25) =:= -0.25), success).
 iso_case('8.6.1', (_ is float_integer_part(1)), error(type_error(float, 1))).
-iso_case('8.6.1', (_ is max_tagged_integer + 1), error(evaluation_error(int_overflow))).
+iso_case('8.6.1', (X is max_tagged_integer + 1, X =:= 576460752303423488), success).
 iso_case('9.1.1', (+3 =:= 3), success).
 iso_case('9.1.1', ((-7 div 3) =:= -3), success).
 iso_case('9.3.11', (_ is asin(2)), error(evaluation_error(undefined))).
@@ -441,8 +441,8 @@ iso_case('8.16.8', number_codes(_, [51, 32]), error(syntax_error(illegal_number)
 iso_case('8.16.8', (number_codes(33, L1), L1 == [0'3, 0'3]), success).
 iso_case(
     '8.16.8',
-    (atom_codes('1000000000000000000', L2), number_codes(_, L2)),
-    error(representation_error(max_integer))
+    (atom_codes('1000000000000000000000000000000', L2), number_codes(N2, L2), N2 =:= 10 ^ 30),
+    success
 ).
 
 % --- 8.17 Implementation defined hooks ---------------------------------------
@@ -453,7 +453,7 @@ iso_case('8.17.1', catch(4, never, true), error(type_error(callable, 4))).
 iso_case('8.17.1', catch(throw(ball), ball, 4), error(type_error(callable, 4))).
 iso_case('8.17.1', catch(true, _, 4), success).
 iso_case('8.17.1', throw(_), error(instantiation_error)).
-iso_case('8.17.2', current_prolog_flag(bounded, true), success).
+iso_case('8.17.2', current_prolog_flag(bounded, false), success).
 iso_case('8.17.2', (current_prolog_flag(max_integer, M1), M1 =:= max_tagged_integer), success).
 iso_case('8.17.2', (current_prolog_flag(min_integer, M2), M2 =:= min_tagged_integer), success).
 iso_case('8.17.2', current_prolog_flag(integer_rounding_function, toward_zero), success).
@@ -470,8 +470,8 @@ iso_case('8.17.3', set_prolog_flag(double_quotes, _), error(instantiation_error)
 iso_case('8.17.3', set_prolog_flag(1, codes), error(type_error(atom, 1))).
 iso_case('8.17.3', set_prolog_flag(not_a_flag, value), error(domain_error(prolog_flag, not_a_flag))).
 iso_case('8.17.3', set_prolog_flag(double_quotes, strings), error(domain_error(flag_value, double_quotes+strings))).
-iso_case('8.17.3', set_prolog_flag(bounded, false), error(domain_error(flag_value, bounded+false))).
-iso_case('8.17.3', set_prolog_flag(bounded, true), error(permission_error(modify, flag, bounded))).
+iso_case('8.17.3', set_prolog_flag(bounded, true), error(domain_error(flag_value, bounded+true))).
+iso_case('8.17.3', set_prolog_flag(bounded, false), error(permission_error(modify, flag, bounded))).
 iso_case(
     '8.17.3',
     (current_prolog_flag(max_integer, M3), set_prolog_flag(max_integer, M3)),
@@ -763,28 +763,28 @@ iso_case('8.14.1', read_term(no_such_stream, _, [bad]), error(domain_error(read_
 iso_case('8.14.1', read_term(user_output, _, [bad]), error(domain_error(read_option, bad))).
 iso_case(
     '8.14.1',
-    read_term_from_atom('576460752303423488', _, []),
-    error(representation_error(max_integer))
+    (read_term_from_atom('576460752303423488', R1, []), R1 =:= 2 ^ 59),
+    success
 ).
 iso_case(
     '8.14.1',
-    read_term_from_atom('-576460752303423489', _, []),
-    error(representation_error(min_integer))
+    (read_term_from_atom('-576460752303423489', R2, []), R2 =:= -(2 ^ 59) - 1),
+    success
 ).
 iso_case(
     '8.14.1',
-    read_term_from_atom('999999999999999999999999999999', _, []),
-    error(representation_error(max_integer))
+    (read_term_from_atom('999999999999999999999999999999', R3, []), R3 =:= 10 ^ 30 - 1),
+    success
 ).
 iso_case(
     '8.14.1',
-    read_term_from_atom('-999999999999999999999999999999', _, []),
-    error(representation_error(min_integer))
+    (read_term_from_atom('-999999999999999999999999999999', R4, []), R4 =:= 1 - 10 ^ 30),
+    success
 ).
 iso_case(
     '8.14.1',
-    read_term_from_atom('f(999999999999999999999999999999)', _, []),
-    error(representation_error(max_integer))
+    (read_term_from_atom('f(999999999999999999999999999999)', R5, []), arg(1, R5, A5), A5 =:= 10 ^ 30 - 1),
+    success
 ).
 iso_case(
     '8.14.1',

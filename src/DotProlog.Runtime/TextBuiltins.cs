@@ -70,12 +70,12 @@ internal static class TextBuiltins
         char character;
         if (code)
         {
-            if (value.Tag != CellTag.Integer)
+            if (value.Tag is not (CellTag.Integer or CellTag.BigInteger))
             {
                 throw PrologErrors.Type(machine, "integer", value);
             }
 
-            if (value.Integer < 0 || value.Integer > char.MaxValue)
+            if (value.Tag == CellTag.BigInteger || value.Integer < 0 || value.Integer > char.MaxValue)
             {
                 throw PrologErrors.Representation(machine, "character_code");
             }
@@ -301,6 +301,10 @@ internal static class TextBuiltins
                 text = cell.Integer.ToString(CultureInfo.InvariantCulture);
                 return true;
 
+            case CellTag.BigInteger:
+                text = machine.Symbols.GetBig(cell.Index).ToString(CultureInfo.InvariantCulture);
+                return true;
+
             case CellTag.Float:
                 text = TermWriter.ToDisplayString(machine, cell);
                 return true;
@@ -346,9 +350,16 @@ internal static class TextBuiltins
             return machine.Unify(length, Cell.Integer60(actual));
         }
 
-        if (length.Tag != CellTag.Integer)
+        if (length.Tag is not (CellTag.Integer or CellTag.BigInteger))
         {
             throw PrologErrors.Type(machine, "integer", length);
+        }
+
+        if (length.Tag == CellTag.BigInteger)
+        {
+            return machine.Symbols.GetBig(length.Index).Sign < 0
+                ? throw PrologErrors.Domain(machine, "not_less_than_zero", length)
+                : false;
         }
 
         if (length.Integer < 0)
@@ -382,12 +393,12 @@ internal static class TextBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        if (code.Tag != CellTag.Integer)
+        if (code.Tag is not (CellTag.Integer or CellTag.BigInteger))
         {
             throw PrologErrors.Type(machine, "integer", code);
         }
 
-        if (code.Integer is < 0 or > char.MaxValue)
+        if (code.Tag == CellTag.BigInteger || code.Integer is < 0 or > char.MaxValue)
         {
             throw PrologErrors.Representation(machine, "character_code");
         }
@@ -446,7 +457,7 @@ internal static class TextBuiltins
 
         if (source.Tag != CellTag.Reference)
         {
-            if (numeric && source.Tag is not (CellTag.Integer or CellTag.Float))
+            if (numeric && source.Tag is not (CellTag.Integer or CellTag.BigInteger or CellTag.Float))
             {
                 throw PrologErrors.Type(machine, "number", source);
             }
@@ -513,12 +524,12 @@ internal static class TextBuiltins
                 continue;
             }
 
-            if (cell.Tag != CellTag.Integer)
+            if (cell.Tag is not (CellTag.Integer or CellTag.BigInteger))
             {
                 throw PrologErrors.Type(machine, "integer", cell);
             }
 
-            if (cell.Integer is < 0 or > char.MaxValue)
+            if (cell.Tag == CellTag.BigInteger || cell.Integer is < 0 or > char.MaxValue)
             {
                 throw PrologErrors.Representation(machine, "character_code");
             }
@@ -730,6 +741,8 @@ internal static class TextBuiltins
             CellTag.Reference => null,
             CellTag.Integer when cell.Integer >= 0 => cell.Integer,
             CellTag.Integer => throw PrologErrors.Domain(machine, "not_less_than_zero", cell),
+            CellTag.BigInteger when machine.Symbols.GetBig(cell.Index).Sign >= 0 => long.MaxValue,
+            CellTag.BigInteger => throw PrologErrors.Domain(machine, "not_less_than_zero", cell),
             _ => throw PrologErrors.Type(machine, "integer", cell),
         };
     }
@@ -804,10 +817,9 @@ internal static class TextBuiltins
     /// <remarks>
     /// This is a second, smaller number reader than the one in the syntax layer, because the runtime
     /// deliberately does not depend on it. The two must agree on what a number looks like; the tests
-    /// for <c>atom_number/2</c> are what hold them together. Text that spells a number the term
-    /// representation cannot hold raises the reader's error rather than returning false —
-    /// <c>representation_error(max_integer|min_integer)</c> for an oversized integer literal and
-    /// <c>syntax_error(float_overflow)</c> for a float outside binary64.
+    /// for <c>atom_number/2</c> are what hold them together. Integers are unbounded, so
+    /// only a float outside binary64 still raises the reader's error rather than returning false —
+    /// <c>syntax_error(float_overflow)</c>.
     /// </remarks>
     internal static bool TryParseNumber(Machine machine, string text, out PrologNumber number)
     {
@@ -830,14 +842,9 @@ internal static class TextBuiltins
             return false;
         }
 
-        if (TryParseRadix(span, out var radixValue, out var radixOverflow))
+        if (TryParseRadix(span, out System.Numerics.BigInteger radixValue))
         {
-            if (radixOverflow || !Cell.FitsInteger(negative ? -radixValue : radixValue))
-            {
-                throw PrologErrors.Representation(machine, negative ? "min_integer" : "max_integer");
-            }
-
-            number = PrologNumber.FromInteger(negative ? -radixValue : radixValue);
+            number = PrologNumber.FromBig(negative ? -radixValue : radixValue);
             return true;
         }
 
@@ -861,15 +868,14 @@ internal static class TextBuiltins
                 }
             }
 
-            if (
-                !long.TryParse(span, NumberStyles.None, CultureInfo.InvariantCulture, out var integer)
-                || !Cell.FitsInteger(negative ? -integer : integer)
-            )
+            if (long.TryParse(span, NumberStyles.None, CultureInfo.InvariantCulture, out var integer))
             {
-                throw PrologErrors.Representation(machine, negative ? "min_integer" : "max_integer");
+                number = PrologNumber.FromInteger(negative ? -integer : integer);
+                return true;
             }
 
-            number = PrologNumber.FromInteger(negative ? -integer : integer);
+            var big = System.Numerics.BigInteger.Parse(span, NumberStyles.None, CultureInfo.InvariantCulture);
+            number = PrologNumber.FromBig(negative ? -big : big);
             return true;
         }
 
@@ -896,10 +902,9 @@ internal static class TextBuiltins
         return true;
     }
 
-    private static bool TryParseRadix(ReadOnlySpan<char> span, out long value, out bool overflow)
+    private static bool TryParseRadix(ReadOnlySpan<char> span, out System.Numerics.BigInteger value)
     {
         value = 0;
-        overflow = false;
 
         if (span.Length < 3 || span[0] != '0')
         {
@@ -941,12 +946,6 @@ internal static class TextBuiltins
             if (digit < 0 || digit >= radix)
             {
                 return false;
-            }
-
-            if (value > (long.MaxValue - digit) / radix)
-            {
-                overflow = true;
-                continue;
             }
 
             value = (value * radix) + digit;

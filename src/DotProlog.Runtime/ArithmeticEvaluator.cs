@@ -1,11 +1,21 @@
+using System.Numerics;
+
 namespace DotProlog.Runtime;
 
 /// <summary>
 /// Evaluates arithmetic expressions for <c>is/2</c> and the arithmetic comparisons.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Evaluation recurses over the expression term. That is bounded by expression depth rather than by
 /// Prolog call depth, so it does not make the CLR stack part of the Prolog control stack.
+/// </para>
+/// <para>
+/// Integer arithmetic is unbounded: operations run on <see cref="long"/> while both
+/// operands are fixnums and redo in <see cref="BigInteger"/> when the 64-bit operation overflows,
+/// and every integer result is normalized so values in the fixnum range never take the big
+/// representation.
+/// </para>
 /// </remarks>
 public static class ArithmeticEvaluator
 {
@@ -23,6 +33,9 @@ public static class ArithmeticEvaluator
         {
             case CellTag.Integer:
                 return PrologNumber.FromInteger(cell.Integer);
+
+            case CellTag.BigInteger:
+                return PrologNumber.FromBig(machine.Symbols.GetBig(cell.Index));
 
             case CellTag.Float:
                 return PrologNumber.FromReal(machine.Symbols.GetFloat(cell.Index));
@@ -77,7 +90,6 @@ public static class ArithmeticEvaluator
     }
 
     /// <summary>Converts an evaluated number back to a term cell.</summary>
-    /// <exception cref="PrologException">An integer result does not fit in a term cell.</exception>
     public static Cell ToCell(Machine machine, PrologNumber number)
     {
         ArgumentNullException.ThrowIfNull(machine);
@@ -87,20 +99,25 @@ public static class ArithmeticEvaluator
             return Cell.Float(machine.Symbols.InternFloat(number.Real));
         }
 
-        if (!Cell.FitsInteger(number.Integer))
+        if (number.IsBig)
         {
-            throw PrologErrors.Evaluation(machine, "int_overflow");
+            return Cell.Big(machine.Symbols.InternBig(number.Big));
         }
 
         return Cell.Integer60(number.Integer);
     }
 
-    /// <summary>Orders two numbers, comparing across kinds by widening to double.</summary>
+    /// <summary>Orders two numbers, comparing integers exactly and mixed kinds by widening to double.</summary>
     public static int Compare(PrologNumber left, PrologNumber right)
     {
         if (!left.IsFloat && !right.IsFloat)
         {
-            return left.Integer.CompareTo(right.Integer);
+            if (!left.IsBig && !right.IsBig)
+            {
+                return left.Integer.CompareTo(right.Integer);
+            }
+
+            return left.Big.CompareTo(right.Big);
         }
 
         return left.AsDouble.CompareTo(right.AsDouble);
@@ -118,215 +135,279 @@ public static class ArithmeticEvaluator
             _ => throw PrologErrors.NotEvaluable(machine, name, 0),
         };
 
-    private static PrologNumber EvaluateUnary(string name, PrologNumber value, Machine machine, int functorId)
-    {
-        try
+    private static PrologNumber EvaluateUnary(string name, PrologNumber value, Machine machine, int functorId) =>
+        name switch
         {
-            return name switch
-            {
-                "+" => value,
-                "-" => value.IsFloat ? FloatResult(machine, -value.Real) : IntegerResult(machine, checked(-value.Integer)),
-                "abs" => value.IsFloat
-                    ? FloatResult(machine, Math.Abs(value.Real))
-                    : IntegerResult(machine, checked(Math.Abs(value.Integer))),
-                "sign" => Sign(machine, value),
-                "float" => FloatResult(machine, value.AsDouble),
-                "integer" => IntegerResult(machine, checked((long)Math.Round(value.AsDouble, MidpointRounding.AwayFromZero))),
-                "truncate" => FloatToInteger(machine, value, Math.Truncate),
-                "floor" => FloatToInteger(machine, value, Math.Floor),
-                "ceiling" => FloatToInteger(machine, value, Math.Ceiling),
-                "round" => FloatToInteger(machine, value, static operand => Math.Floor(operand + 0.5)),
-                "float_integer_part" => FloatPart(machine, value, fractional: false),
-                "float_fractional_part" => FloatPart(machine, value, fractional: true),
-                "sqrt" => FloatResult(machine, Math.Sqrt(value.AsDouble)),
-                "sin" => FloatResult(machine, Math.Sin(value.AsDouble)),
-                "cos" => FloatResult(machine, Math.Cos(value.AsDouble)),
-                "tan" => FloatResult(machine, Math.Tan(value.AsDouble)),
-                "asin" => FloatResult(machine, Math.Asin(value.AsDouble)),
-                "acos" => FloatResult(machine, Math.Acos(value.AsDouble)),
-                "atan" => FloatResult(machine, Math.Atan(value.AsDouble)),
-                "exp" => FloatResult(machine, Math.Exp(value.AsDouble)),
-                "log" => Log(machine, value),
-                "\\" => IntegerResult(machine, ~RequireInteger(machine, value)),
-                _ => throw Unevaluable(machine, functorId),
-            };
-        }
-        catch (OverflowException)
-        {
-            throw PrologErrors.Evaluation(machine, "int_overflow");
-        }
-    }
+            "+" => value,
+            "-" => Negate(machine, value),
+            "abs" => value.IsFloat ? FloatResult(machine, Math.Abs(value.Real))
+            : value.IsBig ? PrologNumber.FromBig(BigInteger.Abs(value.Big))
+            : PrologNumber.FromInteger(Math.Abs(value.Integer)),
+            "sign" => Sign(machine, value),
+            "float" => FloatResult(machine, value.AsDouble),
+            "integer" => value.IsFloat
+                ? FloatToInteger(machine, value, static operand => Math.Round(operand, MidpointRounding.AwayFromZero))
+                : value,
+            "truncate" => FloatToInteger(machine, value, Math.Truncate),
+            "floor" => FloatToInteger(machine, value, Math.Floor),
+            "ceiling" => FloatToInteger(machine, value, Math.Ceiling),
+            "round" => FloatToInteger(machine, value, static operand => Math.Floor(operand + 0.5)),
+            "float_integer_part" => FloatPart(machine, value, fractional: false),
+            "float_fractional_part" => FloatPart(machine, value, fractional: true),
+            "sqrt" => FloatResult(machine, Math.Sqrt(value.AsDouble)),
+            "sin" => FloatResult(machine, Math.Sin(value.AsDouble)),
+            "cos" => FloatResult(machine, Math.Cos(value.AsDouble)),
+            "tan" => FloatResult(machine, Math.Tan(value.AsDouble)),
+            "asin" => FloatResult(machine, Math.Asin(value.AsDouble)),
+            "acos" => FloatResult(machine, Math.Acos(value.AsDouble)),
+            "atan" => FloatResult(machine, Math.Atan(value.AsDouble)),
+            "exp" => FloatResult(machine, Math.Exp(value.AsDouble)),
+            "log" => Log(machine, value),
+            "\\" => Complement(machine, value),
+            _ => throw Unevaluable(machine, functorId),
+        };
 
     private static PrologNumber EvaluateBinary(string name, PrologNumber left, PrologNumber right, Machine machine, int functorId)
     {
         var real = left.IsFloat || right.IsFloat;
 
-        try
+        switch (name)
         {
-            switch (name)
+            case "+":
+                if (real)
+                {
+                    return FloatResult(machine, left.AsDouble + right.AsDouble);
+                }
+
+                if (!left.IsBig && !right.IsBig)
+                {
+                    // Two fixnums cannot overflow 64 bits; FromInteger widens past 60.
+                    return PrologNumber.FromInteger(left.Integer + right.Integer);
+                }
+
+                return PrologNumber.FromBig(left.Big + right.Big);
+
+            case "-":
+                if (real)
+                {
+                    return FloatResult(machine, left.AsDouble - right.AsDouble);
+                }
+
+                if (!left.IsBig && !right.IsBig)
+                {
+                    return PrologNumber.FromInteger(left.Integer - right.Integer);
+                }
+
+                return PrologNumber.FromBig(left.Big - right.Big);
+
+            case "*":
+                if (real)
+                {
+                    return FloatResult(machine, left.AsDouble * right.AsDouble);
+                }
+
+                if (!left.IsBig && !right.IsBig)
+                {
+                    try
+                    {
+                        return PrologNumber.FromInteger(checked(left.Integer * right.Integer));
+                    }
+                    catch (OverflowException)
+                    {
+                        // Falls through to the wide multiply below.
+                    }
+                }
+
+                return PrologNumber.FromBig(left.Big * right.Big);
+
+            case "/":
+                if (IsZero(right))
+                {
+                    // An integer zero divisor is zero_divisor even for 0/0; only the float
+                    // 0.0/0.0, whose IEEE result is NaN, is undefined.
+                    throw PrologErrors.Evaluation(machine, real && left.AsDouble == 0 ? "undefined" : "zero_divisor");
+                }
+
+                return FloatResult(machine, left.AsDouble / right.AsDouble);
+
+            case "//":
             {
-                case "+":
-                    return real
-                        ? FloatResult(machine, left.AsDouble + right.AsDouble)
-                        : IntegerResult(machine, checked(left.Integer + right.Integer));
-
-                case "-":
-                    return real
-                        ? FloatResult(machine, left.AsDouble - right.AsDouble)
-                        : IntegerResult(machine, checked(left.Integer - right.Integer));
-
-                case "*":
-                    return real
-                        ? FloatResult(machine, left.AsDouble * right.AsDouble)
-                        : IntegerResult(machine, checked(left.Integer * right.Integer));
-
-                case "/":
-                    if (right.AsDouble == 0)
-                    {
-                        // An integer zero divisor is zero_divisor even for 0/0; only the float
-                        // 0.0/0.0, whose IEEE result is NaN, is undefined.
-                        throw PrologErrors.Evaluation(machine, real && left.AsDouble == 0 ? "undefined" : "zero_divisor");
-                    }
-
-                    return FloatResult(machine, left.AsDouble / right.AsDouble);
-
-                case "//":
+                RequireIntegers(machine, left, right);
+                ThrowIfZeroInteger(machine, right);
+                if (!left.IsBig && !right.IsBig)
                 {
-                    var leftInteger = RequireInteger(machine, left);
-                    var rightInteger = RequireInteger(machine, right);
-                    ThrowIfZero(machine, rightInteger);
-                    return IntegerResult(machine, leftInteger / rightInteger);
+                    // long.MinValue cannot occur: fixnums are 60-bit, so the quotient fits.
+                    return PrologNumber.FromInteger(left.Integer / right.Integer);
                 }
 
-                case "div":
-                {
-                    var leftInteger = RequireInteger(machine, left);
-                    var rightInteger = RequireInteger(machine, right);
-                    ThrowIfZero(machine, rightInteger);
-                    return IntegerResult(machine, FloorDivide(leftInteger, rightInteger));
-                }
-
-                case "mod":
-                {
-                    var leftInteger = RequireInteger(machine, left);
-                    var rightInteger = RequireInteger(machine, right);
-                    ThrowIfZero(machine, rightInteger);
-                    var remainder = leftInteger % rightInteger;
-                    return IntegerResult(
-                        machine,
-                        remainder != 0 && (remainder < 0) != (rightInteger < 0) ? checked(remainder + rightInteger) : remainder
-                    );
-                }
-
-                case "rem":
-                {
-                    var leftInteger = RequireInteger(machine, left);
-                    var rightInteger = RequireInteger(machine, right);
-                    ThrowIfZero(machine, rightInteger);
-                    return IntegerResult(machine, leftInteger % rightInteger);
-                }
-
-                case "min":
-                    return Minimum(left, right);
-
-                case "max":
-                    return Maximum(left, right);
-
-                case "**":
-                    return PowerFloat(machine, left.AsDouble, right.AsDouble);
-
-                case "^":
-                    if (real)
-                    {
-                        return PowerFloat(machine, left.AsDouble, right.AsDouble);
-                    }
-
-                    if (right.Integer < 0)
-                    {
-                        if (left.Integer == 0)
-                        {
-                            throw PrologErrors.Evaluation(machine, "zero_divisor");
-                        }
-
-                        if (left.Integer is < -1 or > 1)
-                        {
-                            throw PrologErrors.Type(machine, "float", Cell.Integer60(left.Integer));
-                        }
-
-                        return PrologNumber.FromInteger(left.Integer == -1 && (right.Integer & 1) != 0 ? -1 : 1);
-                    }
-
-                    return IntegerResult(machine, IntegerPower(machine, left.Integer, right.Integer));
-
-                case "atan2":
-                    if (left.AsDouble == 0 && right.AsDouble == 0)
-                    {
-                        throw PrologErrors.Evaluation(machine, "undefined");
-                    }
-
-                    return FloatResult(machine, Math.Atan2(left.AsDouble, right.AsDouble));
-
-                case ">>":
-                    return IntegerResult(
-                        machine,
-                        ShiftRight(machine, RequireInteger(machine, left), RequireInteger(machine, right))
-                    );
-
-                case "<<":
-                    return IntegerResult(
-                        machine,
-                        ShiftLeft(machine, RequireInteger(machine, left), RequireInteger(machine, right))
-                    );
-
-                case "/\\":
-                    return IntegerResult(machine, RequireInteger(machine, left) & RequireInteger(machine, right));
-
-                case "\\/":
-                    return IntegerResult(machine, RequireInteger(machine, left) | RequireInteger(machine, right));
-
-                case "xor":
-                    return IntegerResult(machine, RequireInteger(machine, left) ^ RequireInteger(machine, right));
-
-                default:
-                    throw Unevaluable(machine, functorId);
+                return PrologNumber.FromBig(BigInteger.Divide(left.Big, right.Big));
             }
-        }
-        catch (OverflowException)
-        {
-            throw PrologErrors.Evaluation(machine, "int_overflow");
+
+            case "div":
+            {
+                RequireIntegers(machine, left, right);
+                ThrowIfZeroInteger(machine, right);
+                if (!left.IsBig && !right.IsBig)
+                {
+                    return PrologNumber.FromInteger(FloorDivide(left.Integer, right.Integer));
+                }
+
+                return PrologNumber.FromBig(FloorDivideBig(left.Big, right.Big));
+            }
+
+            case "mod":
+            {
+                RequireIntegers(machine, left, right);
+                ThrowIfZeroInteger(machine, right);
+                if (!left.IsBig && !right.IsBig)
+                {
+                    var remainder = left.Integer % right.Integer;
+                    return PrologNumber.FromInteger(
+                        remainder != 0 && (remainder < 0) != (right.Integer < 0) ? remainder + right.Integer : remainder
+                    );
+                }
+
+                BigInteger bigRemainder = left.Big % right.Big;
+                return PrologNumber.FromBig(
+                    !bigRemainder.IsZero && bigRemainder.Sign != right.Big.Sign ? bigRemainder + right.Big : bigRemainder
+                );
+            }
+
+            case "rem":
+            {
+                RequireIntegers(machine, left, right);
+                ThrowIfZeroInteger(machine, right);
+                if (!left.IsBig && !right.IsBig)
+                {
+                    return PrologNumber.FromInteger(left.Integer % right.Integer);
+                }
+
+                return PrologNumber.FromBig(left.Big % right.Big);
+            }
+
+            case "min":
+                return Minimum(left, right);
+
+            case "max":
+                return Maximum(left, right);
+
+            case "**":
+                return PowerFloat(machine, left.AsDouble, right.AsDouble);
+
+            case "^":
+                return real ? PowerFloat(machine, left.AsDouble, right.AsDouble) : IntegerPower(machine, left, right);
+
+            case "atan2":
+                if (left.AsDouble == 0 && right.AsDouble == 0)
+                {
+                    throw PrologErrors.Evaluation(machine, "undefined");
+                }
+
+                return FloatResult(machine, Math.Atan2(left.AsDouble, right.AsDouble));
+
+            case ">>":
+                RequireIntegers(machine, left, right);
+                return ShiftRight(machine, left, right);
+
+            case "<<":
+                RequireIntegers(machine, left, right);
+                return ShiftLeft(machine, left, right);
+
+            case "/\\":
+                RequireIntegers(machine, left, right);
+                if (!left.IsBig && !right.IsBig)
+                {
+                    return PrologNumber.FromInteger(left.Integer & right.Integer);
+                }
+
+                return PrologNumber.FromBig(left.Big & right.Big);
+
+            case "\\/":
+                RequireIntegers(machine, left, right);
+                if (!left.IsBig && !right.IsBig)
+                {
+                    return PrologNumber.FromInteger(left.Integer | right.Integer);
+                }
+
+                return PrologNumber.FromBig(left.Big | right.Big);
+
+            case "xor":
+                RequireIntegers(machine, left, right);
+                if (!left.IsBig && !right.IsBig)
+                {
+                    return PrologNumber.FromInteger(left.Integer ^ right.Integer);
+                }
+
+                return PrologNumber.FromBig(left.Big ^ right.Big);
+
+            default:
+                throw Unevaluable(machine, functorId);
         }
     }
 
-    private static long IntegerPower(Machine machine, long value, long exponent)
+    private static PrologNumber Negate(Machine machine, PrologNumber value)
     {
-        long result = 1;
-        var factor = value;
-        var remaining = exponent;
-
-        while (remaining > 0)
+        if (value.IsFloat)
         {
-            if ((remaining & 1) != 0)
-            {
-                result = checked(result * factor);
-                EnsureIntegerFits(machine, result);
-            }
-
-            remaining >>= 1;
-            if (remaining > 0)
-            {
-                factor = checked(factor * factor);
-                EnsureIntegerFits(machine, factor);
-            }
+            return FloatResult(machine, -value.Real);
         }
 
-        return result;
+        return value.IsBig ? PrologNumber.FromBig(-value.Big) : PrologNumber.FromInteger(-value.Integer);
+    }
+
+    private static PrologNumber Complement(Machine machine, PrologNumber value)
+    {
+        RequireIntegers(machine, value, value);
+        return value.IsBig ? PrologNumber.FromBig(~value.Big) : PrologNumber.FromInteger(~value.Integer);
+    }
+
+    private static PrologNumber IntegerPower(Machine machine, PrologNumber left, PrologNumber right)
+    {
+        if (right.IsBig ? right.Big.Sign < 0 : right.Integer < 0)
+        {
+            if (!left.IsBig && left.Integer == 0)
+            {
+                throw PrologErrors.Evaluation(machine, "zero_divisor");
+            }
+
+            if (left.IsBig || left.Integer is < -1 or > 1)
+            {
+                throw PrologErrors.Type(machine, "float", ToCell(machine, left));
+            }
+
+            var oddExponent = right.IsBig ? !right.Big.IsEven : (right.Integer & 1) != 0;
+            return PrologNumber.FromInteger(left.Integer == -1 && oddExponent ? -1 : 1);
+        }
+
+        if (!right.IsBig && right.Integer == 0)
+        {
+            // Anything to the zeroth power is 1, including ISO's 0^0.
+            return PrologNumber.FromInteger(1);
+        }
+
+        // Bases whose powers stay small are answered before the magnitude guard, so an
+        // enormous exponent over 0, 1, or -1 does not trip the resource check.
+        if (!left.IsBig && left.Integer is >= -1 and <= 1)
+        {
+            var oddPower = right.IsBig ? !right.Big.IsEven : (right.Integer & 1) != 0;
+            return PrologNumber.FromInteger(left.Integer == -1 && !oddPower ? 1 : left.Integer);
+        }
+
+        if (right.IsBig || right.Integer > int.MaxValue)
+        {
+            // The result would need more bits than a BigInteger can hold; SWI reports the
+            // equivalent GMP allocation failure as a resource error.
+            throw PrologErrors.Resource(machine, "memory");
+        }
+
+        return PrologNumber.FromBig(BigInteger.Pow(left.Big, (int)right.Integer));
     }
 
     private static PrologNumber Sign(Machine machine, PrologNumber value)
     {
         if (!value.IsFloat)
         {
-            return PrologNumber.FromInteger(Math.Sign(value.Integer));
+            return PrologNumber.FromInteger(value.IsBig ? value.Big.Sign : Math.Sign(value.Integer));
         }
 
         if (double.IsNaN(value.Real))
@@ -347,17 +428,14 @@ public static class ArithmeticEvaluator
         var operand = RequireFloat(machine, value);
         var result = operation(operand);
 
-        if (double.IsNaN(result))
+        if (double.IsNaN(result) || double.IsInfinity(result))
         {
             throw PrologErrors.Evaluation(machine, "undefined");
         }
 
-        if (double.IsInfinity(result) || result < Cell.MinInteger || result > Cell.MaxInteger)
-        {
-            throw PrologErrors.Evaluation(machine, "int_overflow");
-        }
-
-        return PrologNumber.FromInteger(checked((long)result));
+        // Exact: an integral double converts to BigInteger without rounding, and FromBig
+        // normalizes back to a fixnum when it fits.
+        return PrologNumber.FromBig(new BigInteger(result));
     }
 
     private static PrologNumber FloatPart(Machine machine, PrologNumber value, bool fractional)
@@ -386,12 +464,6 @@ public static class ArithmeticEvaluator
         return FloatResult(machine, Math.Pow(left, right));
     }
 
-    private static PrologNumber IntegerResult(Machine machine, long value)
-    {
-        EnsureIntegerFits(machine, value);
-        return PrologNumber.FromInteger(value);
-    }
-
     private static PrologNumber FloatResult(Machine machine, double value)
     {
         if (double.IsNaN(value))
@@ -407,24 +479,27 @@ public static class ArithmeticEvaluator
         return PrologNumber.FromReal(value);
     }
 
-    private static long RequireInteger(Machine machine, PrologNumber value)
+    private static void RequireIntegers(Machine machine, PrologNumber left, PrologNumber right)
     {
-        if (value.IsFloat)
+        if (left.IsFloat)
         {
-            throw PrologErrors.Type(machine, "integer", ToCell(machine, value));
+            throw PrologErrors.Type(machine, "integer", ToCell(machine, left));
         }
 
-        return value.Integer;
+        if (right.IsFloat)
+        {
+            throw PrologErrors.Type(machine, "integer", ToCell(machine, right));
+        }
     }
 
     private static double RequireFloat(Machine machine, PrologNumber value)
     {
-        if (!value.IsFloat)
+        if (value.IsFloat)
         {
-            throw PrologErrors.Type(machine, "float", ToCell(machine, value));
+            return value.Real;
         }
 
-        return value.Real;
+        throw PrologErrors.Type(machine, "float", ToCell(machine, value));
     }
 
     private static PrologNumber Minimum(PrologNumber left, PrologNumber right)
@@ -463,55 +538,66 @@ public static class ArithmeticEvaluator
     {
         var quotient = left / right;
         var remainder = left % right;
-        return remainder != 0 && (remainder < 0) != (right < 0) ? checked(quotient - 1) : quotient;
+        return remainder != 0 && (remainder < 0) != (right < 0) ? quotient - 1 : quotient;
     }
 
-    private static long ShiftLeft(Machine machine, long value, long count)
+    private static BigInteger FloorDivideBig(BigInteger left, BigInteger right)
     {
-        if (count < 0)
-        {
-            return count == long.MinValue ? (value < 0 ? -1 : 0) : ShiftRight(machine, value, -count);
-        }
-
-        if (value == 0)
-        {
-            return 0;
-        }
-
-        if (count >= 60 || value > (Cell.MaxInteger >> (int)count) || value < (Cell.MinInteger >> (int)count))
-        {
-            throw PrologErrors.Evaluation(machine, "int_overflow");
-        }
-
-        return value << (int)count;
+        BigInteger quotient = BigInteger.DivRem(left, right, out BigInteger remainder);
+        return !remainder.IsZero && remainder.Sign != right.Sign ? quotient - 1 : quotient;
     }
 
-    private static long ShiftRight(Machine machine, long value, long count)
+    private static PrologNumber ShiftLeft(Machine machine, PrologNumber value, PrologNumber count)
     {
-        if (count < 0)
+        if (count.IsBig ? count.Big.Sign < 0 : count.Integer < 0)
         {
-            if (count == long.MinValue)
-            {
-                throw PrologErrors.Evaluation(machine, "int_overflow");
-            }
-
-            return ShiftLeft(machine, value, -count);
+            return ShiftRight(machine, value, Negate(machine, count));
         }
 
-        return count >= 60 ? (value < 0 ? -1 : 0) : value >> (int)count;
-    }
-
-    private static void EnsureIntegerFits(Machine machine, long value)
-    {
-        if (!Cell.FitsInteger(value))
+        if (!value.IsBig && value.Integer == 0)
         {
-            throw PrologErrors.Evaluation(machine, "int_overflow");
+            return PrologNumber.FromInteger(0);
         }
+
+        if (count.IsBig || count.Integer > int.MaxValue)
+        {
+            throw PrologErrors.Resource(machine, "memory");
+        }
+
+        return PrologNumber.FromBig(value.Big << (int)count.Integer);
     }
 
-    private static void ThrowIfZero(Machine machine, double divisor)
+    private static PrologNumber ShiftRight(Machine machine, PrologNumber value, PrologNumber count)
     {
-        if (divisor == 0)
+        if (count.IsBig ? count.Big.Sign < 0 : count.Integer < 0)
+        {
+            return ShiftLeft(machine, value, Negate(machine, count));
+        }
+
+        if (count.IsBig || count.Integer > int.MaxValue)
+        {
+            // Every bit is shifted out; what remains is the sign, as an arithmetic shift.
+            var negative = value.IsBig ? value.Big.Sign < 0 : value.Integer < 0;
+            return PrologNumber.FromInteger(negative ? -1 : 0);
+        }
+
+        if (!value.IsBig)
+        {
+            var shift = count.Integer;
+            return PrologNumber.FromInteger(shift >= 60 ? (value.Integer < 0 ? -1 : 0) : value.Integer >> (int)shift);
+        }
+
+        return PrologNumber.FromBig(value.Big >> (int)count.Integer);
+    }
+
+    private static bool IsZero(PrologNumber value) =>
+        value.IsFloat ? value.Real == 0
+        : value.IsBig ? false
+        : value.Integer == 0;
+
+    private static void ThrowIfZeroInteger(Machine machine, PrologNumber divisor)
+    {
+        if (!divisor.IsFloat && !divisor.IsBig && divisor.Integer == 0)
         {
             throw PrologErrors.Evaluation(machine, "zero_divisor");
         }

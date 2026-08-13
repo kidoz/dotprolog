@@ -121,7 +121,7 @@ internal static class StringBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        if (value2.Tag is not (CellTag.Integer or CellTag.Float))
+        if (value2.Tag is not (CellTag.Integer or CellTag.BigInteger or CellTag.Float))
         {
             throw PrologErrors.Type(machine, "number", value2);
         }
@@ -208,9 +208,21 @@ internal static class StringBuiltins
         var text = RequireText(machine, 0);
         Cell before = machine.Argument(1);
         Cell length = machine.Argument(2);
-        if (before.Tag != CellTag.Integer || length.Tag != CellTag.Integer)
+        if (
+            before.Tag is not (CellTag.Integer or CellTag.BigInteger)
+            || length.Tag is not (CellTag.Integer or CellTag.BigInteger)
+        )
         {
-            throw PrologErrors.Type(machine, "integer", before.Tag != CellTag.Integer ? before : length);
+            throw PrologErrors.Type(
+                machine,
+                "integer",
+                before.Tag is not (CellTag.Integer or CellTag.BigInteger) ? before : length
+            );
+        }
+
+        if (before.Tag == CellTag.BigInteger || length.Tag == CellTag.BigInteger)
+        {
+            return false;
         }
 
         var start = (int)before.Integer;
@@ -226,9 +238,14 @@ internal static class StringBuiltins
     private static bool StringCode(Machine machine)
     {
         Cell index = machine.Argument(0);
-        if (index.Tag != CellTag.Integer)
+        if (index.Tag is not (CellTag.Integer or CellTag.BigInteger))
         {
             throw PrologErrors.Type(machine, "integer", index);
+        }
+
+        if (index.Tag == CellTag.BigInteger)
+        {
+            return false;
         }
 
         var text = RequireText(machine, 1);

@@ -408,6 +408,8 @@ internal static class CompiledProgramEmitter
                     $"global::DotProlog.Runtime.Cell.String(symbols.InternAtom({SyntaxFacts.Literal(constant.Text!)}))",
                 CellTag.Integer =>
                     $"global::DotProlog.Runtime.Cell.Integer60({constant.Integer.ToString(CultureInfo.InvariantCulture)}L)",
+                CellTag.BigInteger =>
+                    $"global::DotProlog.Runtime.Cell.Big(symbols.InternBig(global::System.Numerics.BigInteger.Parse({SyntaxFacts.Literal(constant.Text!)}, global::System.Globalization.CultureInfo.InvariantCulture)))",
                 CellTag.Float =>
                     $"global::DotProlog.Runtime.Cell.Float(symbols.InternFloat({constant.Float.ToString("R", CultureInfo.InvariantCulture)}))",
                 _ => throw new InvalidOperationException($"Unsupported generated constant {constant.Tag}."),
@@ -480,7 +482,8 @@ internal static class CompiledProgramEmitter
             CellTag.Reference => $"global::DotProlog.Runtime.Cell.Reference({cell.Value})",
             CellTag.Structure => $"global::DotProlog.Runtime.Cell.Structure({cell.Value})",
             CellTag.Functor => $"global::DotProlog.Runtime.Cell.Functor({program}.Functor({cell.Value}))",
-            CellTag.Atom or CellTag.Integer or CellTag.Float or CellTag.String => $"{program}.Constant({cell.Value})",
+            CellTag.Atom or CellTag.Integer or CellTag.BigInteger or CellTag.Float or CellTag.String =>
+                $"{program}.Constant({cell.Value})",
             _ => throw new InvalidOperationException($"Term cell tag {cell.Tag} cannot be generated."),
         };
 
@@ -701,12 +704,8 @@ internal static class CompiledProgramEmitter
                         {
                             CellTag.Reference or CellTag.Structure => cell.Index,
                             CellTag.Functor => AddFunctor(program, model, functors, cell.Index),
-                            CellTag.Atom or CellTag.Integer or CellTag.Float or CellTag.String => AddTermConstant(
-                                program,
-                                model,
-                                termConstants,
-                                cell
-                            ),
+                            CellTag.Atom or CellTag.Integer or CellTag.BigInteger or CellTag.Float or CellTag.String =>
+                                AddTermConstant(program, model, termConstants, cell),
                             _ => throw new InvalidOperationException($"Dynamic term cell {cell.Tag} cannot be generated."),
                         };
                         term.Add(new CompiledTermCell(cell.Tag, value));
@@ -793,7 +792,7 @@ internal static class CompiledProgramEmitter
                 {
                     CellTag.Reference or CellTag.Structure => cell.Index,
                     CellTag.Functor => AddFunctor(program, model, functors, cell.Index),
-                    CellTag.Atom or CellTag.Integer or CellTag.Float or CellTag.String => AddTermConstant(
+                    CellTag.Atom or CellTag.Integer or CellTag.BigInteger or CellTag.Float or CellTag.String => AddTermConstant(
                         program,
                         model,
                         termConstants,
@@ -849,6 +848,12 @@ internal static class CompiledProgramEmitter
             {
                 CellTag.Atom or CellTag.String => new(constant.Tag, program.Symbols.AtomName(constant.Index), 0, 0),
                 CellTag.Integer => new(constant.Tag, null, constant.Integer, 0),
+                CellTag.BigInteger => new(
+                    constant.Tag,
+                    program.Symbols.GetBig(constant.Index).ToString(CultureInfo.InvariantCulture),
+                    0,
+                    0
+                ),
                 CellTag.Float => new(constant.Tag, null, 0, program.Symbols.GetFloat(constant.Index)),
                 _ => throw new InvalidOperationException($"Constant tag {constant.Tag} cannot be generated."),
             };

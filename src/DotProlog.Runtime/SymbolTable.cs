@@ -1,9 +1,11 @@
+using System.Numerics;
+
 namespace DotProlog.Runtime;
 
 /// <summary>
-/// Interns the atoms, functors, and floats a program refers to, so that cells can carry small
-/// integer identifiers instead of object references. Identifiers are dense and allocated in order,
-/// which lets the runtime index tables by identifier rather than hashing.
+/// Interns the atoms, functors, floats, and big integers a program refers to, so that cells can
+/// carry small integer identifiers instead of object references. Identifiers are dense and
+/// allocated in order, which lets the runtime index tables by identifier rather than hashing.
 /// </summary>
 public sealed class SymbolTable
 {
@@ -13,6 +15,8 @@ public sealed class SymbolTable
     private readonly List<Functor> _functors = [];
     private readonly Dictionary<double, int> _floatIds = [];
     private readonly List<double> _floats = [];
+    private readonly Dictionary<BigInteger, int> _bigIds = [];
+    private readonly List<BigInteger> _bigs = [];
 
     /// <summary>Creates a table pre-populated with the atoms the runtime itself refers to.</summary>
     public SymbolTable()
@@ -115,4 +119,25 @@ public sealed class SymbolTable
 
     /// <summary>Returns the float with identifier <paramref name="floatId"/>.</summary>
     public double GetFloat(int floatId) => _floats[floatId];
+
+    /// <summary>
+    /// Returns the identifier for <paramref name="value"/>, interning it if necessary. The value
+    /// must be outside the fixnum range — values that fit a cell stay <see cref="CellTag.Integer"/>
+    /// cells, which keeps cell equality usable as integer value identity.
+    /// </summary>
+    public int InternBig(BigInteger value)
+    {
+        if (_bigIds.TryGetValue(value, out var id))
+        {
+            return id;
+        }
+
+        id = _bigs.Count;
+        _bigs.Add(value);
+        _bigIds[value] = id;
+        return id;
+    }
+
+    /// <summary>Returns the big integer with identifier <paramref name="bigId"/>.</summary>
+    public BigInteger GetBig(int bigId) => _bigs[bigId];
 }

@@ -26,4 +26,10 @@ public enum CellTag : byte
     /// and differs from the same-text atom only by tag.
     /// </summary>
     String = 6,
+
+    /// <summary>
+    /// An integer outside the 60-bit fixnum range. The payload indexes the interned big-integer
+    /// table; a value that fits <see cref="Integer"/> is never represented this way.
+    /// </summary>
+    BigInteger = 7,
 }

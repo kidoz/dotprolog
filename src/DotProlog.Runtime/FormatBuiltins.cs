@@ -218,9 +218,14 @@ internal static class FormatBuiltins
             case 'c':
             {
                 Cell cell = Next(machine, given, ref next, arguments);
-                if (cell.Tag != CellTag.Integer)
+                if (cell.Tag is not (CellTag.Integer or CellTag.BigInteger))
                 {
                     throw PrologErrors.Type(machine, "integer", cell);
+                }
+
+                if (cell.Tag == CellTag.BigInteger)
+                {
+                    throw PrologErrors.Representation(machine, "character_code");
                 }
 
                 output.Append(new string((char)cell.Integer, count ?? 1));
@@ -266,7 +271,7 @@ internal static class FormatBuiltins
     /// </summary>
     private static string Radix(Machine machine, Cell cell, int? radix, bool uppercase)
     {
-        if (cell.Tag != CellTag.Integer)
+        if (cell.Tag is not (CellTag.Integer or CellTag.BigInteger))
         {
             throw PrologErrors.Type(machine, "integer", cell);
         }
@@ -274,6 +279,11 @@ internal static class FormatBuiltins
         if (radix is null or < 2 or > 36)
         {
             throw PrologErrors.Domain(machine, "radix", Cell.Integer60(radix ?? 0));
+        }
+
+        if (cell.Tag == CellTag.BigInteger)
+        {
+            return BigRadix(machine.Symbols.GetBig(cell.Index), radix.Value, uppercase);
         }
 
         var value = cell.Integer;
@@ -291,11 +301,32 @@ internal static class FormatBuiltins
         return negative ? $"-{digits}" : digits.ToString();
     }
 
+    private static string BigRadix(System.Numerics.BigInteger value, int radix, bool uppercase)
+    {
+        var alphabet = uppercase ? "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" : "0123456789abcdefghijklmnopqrstuvwxyz";
+        var negative = value.Sign < 0;
+        System.Numerics.BigInteger magnitude = System.Numerics.BigInteger.Abs(value);
+        var digits = new StringBuilder();
+
+        do
+        {
+            magnitude = System.Numerics.BigInteger.DivRem(magnitude, radix, out System.Numerics.BigInteger digit);
+            digits.Insert(0, alphabet[(int)digit]);
+        } while (!magnitude.IsZero);
+
+        return negative ? $"-{digits}" : digits.ToString();
+    }
+
     private static string Decimal(Machine machine, Cell cell, int? shift, bool grouped)
     {
-        if (cell.Tag != CellTag.Integer)
+        if (cell.Tag is not (CellTag.Integer or CellTag.BigInteger))
         {
             throw PrologErrors.Type(machine, "integer", cell);
+        }
+
+        if (cell.Tag == CellTag.BigInteger)
+        {
+            return BigDecimal(machine.Symbols.GetBig(cell.Index), shift, grouped);
         }
 
         var value = cell.Integer;
@@ -317,11 +348,29 @@ internal static class FormatBuiltins
         return $"{sign}{digits[..^shift.Value]}.{digits[^shift.Value..]}";
     }
 
+    private static string BigDecimal(System.Numerics.BigInteger value, int? shift, bool grouped)
+    {
+        if (grouped)
+        {
+            return value.ToString("N0", CultureInfo.InvariantCulture);
+        }
+
+        if (shift is null or 0)
+        {
+            return value.ToString(CultureInfo.InvariantCulture);
+        }
+
+        var digits = System.Numerics.BigInteger.Abs(value).ToString(CultureInfo.InvariantCulture).PadLeft(shift.Value + 1, '0');
+        var sign = value.Sign < 0 ? "-" : "";
+        return $"{sign}{digits[..^shift.Value]}.{digits[^shift.Value..]}";
+    }
+
     private static string Real(Machine machine, Cell cell, char directive, int digits)
     {
         var value = cell.Tag switch
         {
             CellTag.Integer => cell.Integer,
+            CellTag.BigInteger => (double)machine.Symbols.GetBig(cell.Index),
             CellTag.Float => machine.Symbols.GetFloat(cell.Index),
             _ => throw PrologErrors.Type(machine, "number", cell),
         };

@@ -9,7 +9,7 @@ public sealed class PrologFlagTests
     public void EnumeratesEveryIsoFlagInStableOrder()
     {
         Assert.Equal(
-            "[bounded-true,max_integer-576460752303423487,min_integer- -576460752303423488,"
+            "[bounded-false,max_integer-576460752303423487,min_integer- -576460752303423488,"
                 + "integer_rounding_function-toward_zero,max_arity-255,char_conversion-off,debug-off,"
                 + "double_quotes-codes,unknown-error,colon_sets_calling_context-true,occurs_check-false]\n",
             PrologTestHost.RunGoal("findall(F-V, current_prolog_flag(F, V), Flags), write(Flags), nl")
@@ -146,8 +146,8 @@ public sealed class PrologFlagTests
     [InlineData("set_prolog_flag(1, codes)", "type_error(atom,1)")]
     [InlineData("set_prolog_flag(not_a_flag, value)", "domain_error(prolog_flag,not_a_flag)")]
     [InlineData("set_prolog_flag(double_quotes, strings)", "domain_error(flag_value,double_quotes+strings)")]
-    [InlineData("set_prolog_flag(bounded, false)", "domain_error(flag_value,bounded+false)")]
-    [InlineData("set_prolog_flag(bounded, true)", "permission_error(modify,flag,bounded)")]
+    [InlineData("set_prolog_flag(bounded, true)", "domain_error(flag_value,bounded+true)")]
+    [InlineData("set_prolog_flag(bounded, false)", "permission_error(modify,flag,bounded)")]
     [InlineData(
         "current_prolog_flag(max_integer, V), set_prolog_flag(max_integer, V)",
         "permission_error(modify,flag,max_integer)"

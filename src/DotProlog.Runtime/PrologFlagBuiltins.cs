@@ -101,7 +101,7 @@ internal static class PrologFlagBuiltins
                 name,
                 value
             ),
-            "bounded" => RejectReadOnly(machine, name, value, Cell.Atom(machine.Symbols.InternAtom("true"))),
+            "bounded" => RejectReadOnly(machine, name, value, Cell.Atom(machine.Symbols.InternAtom("false"))),
             "max_integer" => RejectReadOnly(machine, name, value, Cell.Integer60(Cell.MaxInteger)),
             "min_integer" => RejectReadOnly(machine, name, value, Cell.Integer60(Cell.MinInteger)),
             "integer_rounding_function" => RejectReadOnly(
@@ -201,7 +201,7 @@ internal static class PrologFlagBuiltins
     private static (string Name, Cell Value) ValueAt(Machine machine, PrologFlags flags, int index) =>
         index switch
         {
-            0 => ("bounded", Atom(machine, "true")),
+            0 => ("bounded", Atom(machine, "false")),
             1 => ("max_integer", Cell.Integer60(Cell.MaxInteger)),
             2 => ("min_integer", Cell.Integer60(Cell.MinInteger)),
             3 => ("integer_rounding_function", Atom(machine, "toward_zero")),

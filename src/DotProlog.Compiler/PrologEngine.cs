@@ -871,6 +871,10 @@ public sealed class PrologEngine : IRuntimeCompiler
                     key.Append('i').Append(cell.Integer).Append(',');
                     break;
 
+                case CellTag.BigInteger:
+                    key.Append('b').Append(cell.Index).Append(',');
+                    break;
+
                 case CellTag.Float:
                     key.Append('f').Append(cell.Index).Append(',');
                     break;
@@ -1182,8 +1186,6 @@ public sealed class PrologEngine : IRuntimeCompiler
             var error = parsed.Diagnostics.Count > 0 ? parsed.Diagnostics[0].Id : "cannot_start_term";
             throw error switch
             {
-                DiagnosticIds.MaxIntegerExceeded => PrologErrors.Representation(machine, "max_integer"),
-                DiagnosticIds.MinIntegerExceeded => PrologErrors.Representation(machine, "min_integer"),
                 DiagnosticIds.FloatOverflow => SyntaxError(machine, "float_overflow"),
                 _ => SyntaxError(machine, error),
             };

@@ -171,10 +171,11 @@ public static class CoreBuiltins
         Cell value = machine.Argument(0);
         Cell successor = machine.Argument(1);
 
-        if (value.Tag == CellTag.Integer)
+        if (value.Tag is CellTag.Integer or CellTag.BigInteger)
         {
-            return value.Integer >= 0
-                ? machine.Unify(successor, Cell.Integer60(value.Integer + 1))
+            System.Numerics.BigInteger number = IntegerValue(machine, value);
+            return number.Sign >= 0
+                ? machine.Unify(successor, IntegerCell(machine, number + 1))
                 : throw PrologErrors.Type(machine, "not_less_than_zero", value);
         }
 
@@ -188,13 +189,14 @@ public static class CoreBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        if (successor.Tag != CellTag.Integer)
+        if (successor.Tag is not (CellTag.Integer or CellTag.BigInteger))
         {
             throw PrologErrors.Type(machine, "integer", successor);
         }
 
         // succ(X, 0) has no solution, because 0 is not the successor of a natural number.
-        return successor.Integer > 0 && machine.Unify(value, Cell.Integer60(successor.Integer - 1));
+        System.Numerics.BigInteger given = IntegerValue(machine, successor);
+        return given.Sign > 0 && machine.Unify(value, IntegerCell(machine, given - 1));
     }
 
     /// <summary><c>plus(?A, ?B, ?Sum)</c>: any one of the three may be the unbound one.</summary>
@@ -204,25 +206,38 @@ public static class CoreBuiltins
         Cell second = machine.Argument(1);
         Cell sum = machine.Argument(2);
 
-        if (first.Tag == CellTag.Integer && second.Tag == CellTag.Integer)
+        var firstIsInteger = first.Tag is CellTag.Integer or CellTag.BigInteger;
+        var secondIsInteger = second.Tag is CellTag.Integer or CellTag.BigInteger;
+
+        if (firstIsInteger && secondIsInteger)
         {
-            return machine.Unify(sum, Cell.Integer60(first.Integer + second.Integer));
+            return machine.Unify(sum, IntegerCell(machine, IntegerValue(machine, first) + IntegerValue(machine, second)));
         }
 
-        if (sum.Tag != CellTag.Integer)
+        if (sum.Tag is not (CellTag.Integer or CellTag.BigInteger))
         {
             throw sum.Tag == CellTag.Reference ? PrologErrors.Instantiation(machine) : PrologErrors.Type(machine, "integer", sum);
         }
 
-        if (first.Tag == CellTag.Integer)
+        if (firstIsInteger)
         {
-            return machine.Unify(second, Cell.Integer60(sum.Integer - first.Integer));
+            return machine.Unify(second, IntegerCell(machine, IntegerValue(machine, sum) - IntegerValue(machine, first)));
         }
 
-        return second.Tag == CellTag.Integer
-            ? machine.Unify(first, Cell.Integer60(sum.Integer - second.Integer))
+        return secondIsInteger
+            ? machine.Unify(first, IntegerCell(machine, IntegerValue(machine, sum) - IntegerValue(machine, second)))
             : throw PrologErrors.Instantiation(machine);
     }
+
+    /// <summary>The full-width value of an integer cell of either representation.</summary>
+    private static System.Numerics.BigInteger IntegerValue(Machine machine, Cell cell) =>
+        cell.Tag == CellTag.BigInteger ? machine.Symbols.GetBig(cell.Index) : cell.Integer;
+
+    /// <summary>The canonical cell for an integer value: a fixnum when it fits, interned big otherwise.</summary>
+    private static Cell IntegerCell(Machine machine, System.Numerics.BigInteger value) =>
+        value >= Cell.MinInteger && value <= Cell.MaxInteger
+            ? Cell.Integer60((long)value)
+            : Cell.Big(machine.Symbols.InternBig(value));
 
     /// <summary>Accepts a proper or partial list and reports every other tail as an ISO list type error.</summary>
     private static bool ValidatePartialList(Machine machine)
@@ -574,40 +589,44 @@ public static class CoreBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        if (low.Tag != CellTag.Integer)
+        if (low.Tag is not (CellTag.Integer or CellTag.BigInteger))
         {
             throw PrologErrors.Type(machine, "integer", low);
         }
 
-        // SWI compatibility: the atoms inf and infinite leave the range open above, so the
-        // enumeration only stops at the tagged-integer ceiling.
+        // SWI compatibility: the atoms inf and infinite leave the range open above.
         var unbounded = high.Tag == CellTag.Atom && machine.Symbols.AtomName(high.Index) is "inf" or "infinite";
-        if (high.Tag != CellTag.Integer && !unbounded)
+        if (high.Tag is not (CellTag.Integer or CellTag.BigInteger) && !unbounded)
         {
             throw PrologErrors.Type(machine, "integer", high);
         }
 
-        var ceiling = unbounded ? Cell.MaxInteger : high.Integer;
-        var value = next == long.MinValue ? low.Integer : next;
+        System.Numerics.BigInteger floor = IntegerValue(machine, low);
+        System.Numerics.BigInteger? ceiling = unbounded ? null : IntegerValue(machine, high);
         Cell target = machine.Argument(2);
 
         // With X already bound, between/3 is a range check with no solutions to enumerate.
-        if (target.Tag == CellTag.Integer)
+        if (target.Tag is CellTag.Integer or CellTag.BigInteger)
         {
-            return target.Integer >= low.Integer && target.Integer <= ceiling;
+            System.Numerics.BigInteger bound = IntegerValue(machine, target);
+            return bound >= floor && (ceiling is null || bound <= ceiling.Value);
         }
 
-        if (value > ceiling)
+        // The retry state is the offset from Low; a running enumeration cannot exhaust a long.
+        var offset = next == long.MinValue ? 0 : next;
+        System.Numerics.BigInteger value = floor + offset;
+
+        if (ceiling is not null && value > ceiling.Value)
         {
             return false;
         }
 
-        if (value < ceiling)
+        if (ceiling is null || value < ceiling.Value)
         {
-            machine.PushRetry(value + 1);
+            machine.PushRetry(offset + 1);
         }
 
-        return machine.Unify(target, Cell.Integer60(value));
+        return machine.Unify(target, IntegerCell(machine, value));
     }
 
     private static int CompareArguments(Machine machine) =>

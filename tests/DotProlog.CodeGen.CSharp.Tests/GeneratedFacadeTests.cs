@@ -60,6 +60,17 @@ public sealed class GeneratedFacadeTests
 
         catalogued(widget).
         catalogued(gadget).
+
+        % A big-integer constant compiled into generated C#, exercised through
+        % promotion, demotion, and identity in the compiled execution path.
+        big_roundtrip(ok) :-
+            X = 123456789012345678901234567890,
+            Y is 123456789012345678900000000000 + 1234567890,
+            X == Y,
+            Z is X * X,
+            Z =:= 15241578753238836750190519987501905210000000000000000000000 - 15241578753238836750190519987501905210000000000000000000000 + Z,
+            W is X - X + 7,
+            W == 7.
         """;
 
     private const string Contract = """
@@ -77,6 +88,7 @@ public sealed class GeneratedFacadeTests
         :- clr_export(split/3, nondet, [in(items, list(atom)), out(left, list(atom)), out(right, list(atom))]).
         :- clr_export(audited/1, nondet, [out(value, atom)]).
         :- clr_export(catalogued/1, nondet, [in(item, atom)]).
+        :- clr_export(big_roundtrip/1, semidet, [in(value, atom)]).
         """;
 
     private static ModuleContract ReadContract()
@@ -132,6 +144,7 @@ public sealed class GeneratedFacadeTests
             MetadataReference.CreateFromFile(Path.Combine(runtime, "System.Runtime.dll")),
             MetadataReference.CreateFromFile(Path.Combine(runtime, "System.Linq.dll")),
             MetadataReference.CreateFromFile(Path.Combine(runtime, "System.Collections.dll")),
+            MetadataReference.CreateFromFile(Path.Combine(runtime, "System.Runtime.Numerics.dll")),
             MetadataReference.CreateFromFile(typeof(Runtime.Machine).Assembly.Location),
             MetadataReference.CreateFromFile(typeof(Compiler.PrologEngine).Assembly.Location),
         ];
@@ -174,6 +187,14 @@ public sealed class GeneratedFacadeTests
 
         Assert.Equal(true, Call(module, type, "InStock", "widget"));
         Assert.Equal(false, Call(module, type, "InStock", "sprocket"));
+    }
+
+    [Fact]
+    public void BigIntegerConstantsSurviveTheGeneratedPath()
+    {
+        var module = CreateModule(out Type type);
+
+        Assert.Equal(true, Call(module, type, "BigRoundtrip", "ok"));
     }
 
     [Fact]

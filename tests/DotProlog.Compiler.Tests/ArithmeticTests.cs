@@ -99,7 +99,6 @@ public sealed class ArithmeticTests
     [InlineData("log(0)", "zero_divisor")]
     [InlineData("atan2(0, 0)", "undefined")]
     [InlineData("exp(1000)", "float_overflow")]
-    [InlineData("max_tagged_integer + 1", "int_overflow")]
     [InlineData("floor(1)", "type_error(float, 1)")]
     [InlineData("\\ 1.0", "type_error(integer, 1.0)")]
     public void RaisesIsoArithmeticErrors(string expression, string expected)

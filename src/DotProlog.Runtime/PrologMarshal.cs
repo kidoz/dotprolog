@@ -13,12 +13,22 @@ public static class PrologMarshal
     public static long ToInteger(PrologValue value) =>
         value as PrologInteger is { } integer ? integer.Value : throw Mismatch(value, "integer");
 
+    /// <summary>Reads an integer of any magnitude, accepting both integer representations.</summary>
+    public static System.Numerics.BigInteger ToBigInteger(PrologValue value) =>
+        value switch
+        {
+            PrologInteger integer => integer.Value,
+            PrologBigInteger big => big.Value,
+            _ => throw Mismatch(value, "integer"),
+        };
+
     /// <summary>Reads a number as a double, accepting an integer where a float was declared.</summary>
     public static double ToFloat(PrologValue value) =>
         value switch
         {
             PrologFloat real => real.Value,
             PrologInteger integer => integer.Value,
+            PrologBigInteger big => (double)big.Value,
             _ => throw Mismatch(value, "float"),
         };
 

@@ -1,6 +1,9 @@
 namespace DotProlog.Compiler.Tests;
 
-/// <summary>ISO integer representation limits raised while runtime input is converted to heap terms.</summary>
+/// <summary>
+/// Unbounded integers at the runtime input boundary: literals of any magnitude read
+/// to their exact value, in either representation tier, and write back their decimal spelling.
+/// </summary>
 public sealed class IntegerRepresentationTests : IDisposable
 {
     private readonly string _directory = Directory.CreateTempSubdirectory("dotprolog-integer-limits-").FullName;
@@ -10,24 +13,25 @@ public sealed class IntegerRepresentationTests : IDisposable
     private string Path(string name) => System.IO.Path.Combine(_directory, name).Replace("\\", "/", StringComparison.Ordinal);
 
     [Theory]
-    [InlineData("576460752303423488", "max_integer")]
-    [InlineData("-576460752303423489", "min_integer")]
-    [InlineData("999999999999999999999999999999", "max_integer")]
-    [InlineData("-999999999999999999999999999999", "min_integer")]
-    [InlineData("0xffffffffffffffffffffffffffffffff", "max_integer")]
-    [InlineData("-0xffffffffffffffffffffffffffffffff", "min_integer")]
-    [InlineData("f(999999999999999999999999999999)", "max_integer")]
-    public void RuntimeTermInputRaisesCatchableRepresentationError(string source, string limit)
+    [InlineData("576460752303423488", "576460752303423488")]
+    [InlineData("-576460752303423489", "-576460752303423489")]
+    [InlineData("999999999999999999999999999999", "999999999999999999999999999999")]
+    [InlineData("-999999999999999999999999999999", "-999999999999999999999999999999")]
+    [InlineData("0xffffffffffffffffffffffffffffffff", "340282366920938463463374607431768211455")]
+    [InlineData("-0xffffffffffffffffffffffffffffffff", "-340282366920938463463374607431768211455")]
+    public void RuntimeTermInputReadsTheExactValue(string source, string expected)
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        Assert.Equal(
-            "yes",
-            PrologTestHost.RunGoal(
-                $"catch(read_term_from_atom('{source}', _, []), " + $"error(representation_error({limit}), _), write(yes))"
-            )
-        );
+        Assert.Equal(expected, PrologTestHost.RunGoal($"read_term_from_atom('{source}', X, []), write(X)"));
     }
+
+    [Fact]
+    public void ABigLiteralInsideACompoundReadsTheExactValue() =>
+        Assert.Equal(
+            "999999999999999999999999999999",
+            PrologTestHost.RunGoal("read_term_from_atom('f(999999999999999999999999999999)', T, []), arg(1, T, A), write(A)")
+        );
 
     [Fact]
     public void TaggedIntegerBoundariesStillReadSuccessfully() =>
@@ -40,18 +44,14 @@ public sealed class IntegerRepresentationTests : IDisposable
         );
 
     [Fact]
-    public void RepresentationErrorConsumesOnlyTheRejectedStreamTerm()
+    public void ABigStreamTermDoesNotDisturbTheFollowingTerm()
     {
         var path = Path("limits.pl");
         File.WriteAllText(path, "999999999999999999999999999999. next.");
 
         Assert.Equal(
-            "next\n",
-            PrologTestHost.RunGoal(
-                $"open('{path}', read, S), "
-                    + "catch(read(S, _), error(representation_error(max_integer), _), true), "
-                    + "read(S, Next), close(S), write(Next), nl"
-            )
+            "999999999999999999999999999999-next",
+            PrologTestHost.RunGoal($"open('{path}', read, S), read(S, Big), read(S, Next), close(S), write(Big-Next)")
         );
     }
 }

@@ -454,14 +454,12 @@ public sealed class TermReader
         return new AtomTerm(name, token.Span);
     }
 
-    private IntegerTerm IntegerLiteral(Token token, bool negate, SourceSpan span)
+    private static SyntaxTerm IntegerLiteral(Token token, bool negate, SourceSpan span)
     {
         if (token.IntegerOverflow)
         {
-            var id = negate ? DiagnosticIds.MinIntegerExceeded : DiagnosticIds.MaxIntegerExceeded;
-            var limit = negate ? "minimum" : "maximum";
-            Report(id, $"Integer literal '{(negate ? "-" : string.Empty)}{token.Text}' exceeds the {limit} value.", span);
-            return new IntegerTerm(0, span);
+            // Integers are unbounded; a literal past the long range keeps its exact value.
+            return new BigIntegerTerm(negate ? -token.Big : token.Big, span);
         }
 
         return new IntegerTerm(negate ? -token.Integer : token.Integer, span);

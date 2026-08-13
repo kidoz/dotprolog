@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace DotProlog.Runtime;
 
 /// <summary>
@@ -16,14 +18,23 @@ public readonly record struct PrologInput
     private readonly long _integer;
     private readonly double _real;
     private readonly PrologInput[]? _items;
+    private readonly BigInteger _big;
 
-    private PrologInput(PrologInputKind kind, string? text, long integer, double real, PrologInput[]? items)
+    private PrologInput(
+        PrologInputKind kind,
+        string? text,
+        long integer,
+        double real,
+        PrologInput[]? items,
+        BigInteger big = default
+    )
     {
         _kind = kind;
         _text = text;
         _integer = integer;
         _real = real;
         _items = items;
+        _big = big;
     }
 
     /// <summary>An unbound argument, whose value the call is expected to produce.</summary>
@@ -46,8 +57,15 @@ public readonly record struct PrologInput
         return new PrologInput(PrologInputKind.String, value, 0, 0, null);
     }
 
-    /// <summary>Passes an integer.</summary>
-    public static PrologInput Integer(long value) => new(PrologInputKind.Integer, null, value, 0, null);
+    /// <summary>Passes an integer, widening to the big representation when it is outside the fixnum range.</summary>
+    public static PrologInput Integer(long value) =>
+        Cell.FitsInteger(value) ? new PrologInput(PrologInputKind.Integer, null, value, 0, null) : Big(value);
+
+    /// <summary>Passes an integer of any magnitude.</summary>
+    public static PrologInput Big(BigInteger value) =>
+        value >= Cell.MinInteger && value <= Cell.MaxInteger
+            ? new PrologInput(PrologInputKind.Integer, null, (long)value, 0, null)
+            : new PrologInput(PrologInputKind.BigInteger, null, 0, 0, null, value);
 
     /// <summary>Passes a floating-point number.</summary>
     public static PrologInput Float(double value) => new(PrologInputKind.Float, null, 0, value, null);
@@ -77,6 +95,7 @@ public readonly record struct PrologInput
             PrologAtom atom => Atom(atom.Name),
             PrologString text => String(text.Value),
             PrologInteger integer => Integer(integer.Value),
+            PrologBigInteger big => Big(big.Value),
             PrologFloat real => Float(real.Value),
             PrologCompound compound => Compound(compound.Name, [.. compound.Arguments.Select(FromValue)]),
 
@@ -104,6 +123,9 @@ public readonly record struct PrologInput
 
             case PrologInputKind.Integer:
                 return Cell.Integer60(_integer);
+
+            case PrologInputKind.BigInteger:
+                return Cell.Big(machine.Symbols.InternBig(_big));
 
             case PrologInputKind.Float:
                 return Cell.Float(machine.Symbols.InternFloat(_real));

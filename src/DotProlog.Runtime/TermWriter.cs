@@ -212,6 +212,10 @@ public static class TermWriter
                 output.Write(cell.Integer.ToString(CultureInfo.InvariantCulture));
                 return;
 
+            case CellTag.BigInteger:
+                output.Write(machine.Symbols.GetBig(cell.Index).ToString(CultureInfo.InvariantCulture));
+                return;
+
             case CellTag.Float:
                 output.Write(FloatText(machine.Symbols.GetFloat(cell.Index)));
                 return;
