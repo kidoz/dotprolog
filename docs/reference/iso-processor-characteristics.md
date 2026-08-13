@@ -20,19 +20,25 @@ is the default for backward compatibility.
 
 | Characteristic | DotProlog choice |
 |---|---|
-| Integer model | Bounded signed tagged integers |
-| `min_integer` | −576460752303423488 |
-| `max_integer` | 576460752303423487 |
-| `bounded` | `true` |
+| Integer model | Unbounded, promoted from 60-bit tagged fixnums |
+| `min_integer` | −576460752303423488 (the fixnum promotion threshold) |
+| `max_integer` | 576460752303423487 (the fixnum promotion threshold) |
+| `bounded` | `false` |
 | Maximum predicate and compound arity | 255 |
 | Float model | Finite IEEE 754 binary64 |
 | Integer division rounding | Toward zero |
 
-Integer results outside the tagged range raise `evaluation_error(int_overflow)`. Integer source
-literals outside the range raise `representation_error(min_integer)` or
-`representation_error(max_integer)`. Float arithmetic rejects NaN and infinity with the applicable
-ISO evaluation error. A decimal float literal that overflows binary64 is a
-`syntax_error(float_overflow)`; underflow rounds to signed zero.
+Integer arithmetic is unbounded: results outside the tagged fixnum range promote to an interned
+big-integer representation, results that re-enter the range normalize back, and source literals of
+any length read to their exact value. The `max_integer` and `min_integer` flags report the fixnum
+bounds the way SWI-Prolog reports its word-size bounds beside GMP; the `max_tagged_integer` and
+`min_tagged_integer` evaluables name the same threshold. Interned big integers live for the
+program's lifetime, an embedding consideration beside atom growth. Converting a big integer to a
+float that overflows binary64 raises `evaluation_error(float_overflow)`; a shift count or exponent
+whose result would exceed the big-integer representation raises `resource_error(memory)`. Float
+arithmetic rejects NaN and infinity with the applicable ISO evaluation error. A decimal float
+literal that overflows binary64 is a `syntax_error(float_overflow)`; underflow rounds to signed
+zero.
 
 ## Bitwise arithmetic
 
@@ -48,8 +54,8 @@ implementation-defined examples as follows:
 | `-16 << 2` | −64 |
 | `-16 >> 2` | −4 |
 
-Right shift is sign-extending. A left shift whose result cannot be represented as a tagged integer
-raises `evaluation_error(int_overflow)`.
+Right shift is sign-extending. A left shift promotes past the tagged range instead of
+overflowing.
 
 ## Text and syntax
 

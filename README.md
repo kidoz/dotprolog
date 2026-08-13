@@ -366,8 +366,8 @@ standard order. Host reader and writer failures remain recoverable through `catc
 remaining best-effort. `write_term/2,3` supports the ISO `quoted`, `ignore_ops`, `numbervars`, and
 `variable_names` options. Boolean options are validated exactly, and `variable_names/1` uses the
 leftmost applicable name without binding its terms. `read_term/2,3` rejects malformed options
-before consuming the next term and reports bounded integer overflows as
-`representation_error(max_integer|min_integer)`. It also enforces the advertised `max_arity` of
+before consuming the next term, and integer literals of any length read to their exact unbounded
+value. It also enforces the advertised `max_arity` of
 255 while reading, raising `representation_error(max_arity)` before constructing a larger compound.
 Oversized float literals raise `syntax_error(float_overflow)` instead of becoming IEEE infinity;
 underflow rounds to signed zero.
@@ -436,7 +436,7 @@ catchable `representation_error(max_arity)`.
 
 DotProlog's `StrictIso` mode implements ISO/IEC 13211-1:1995 with Technical Corrigenda 1–3,
 ISO/IEC 13211-2:2000 modules, and ISO/IEC TS 13211-3:2025 definite clause grammars. The repository's
-608-case Part 1 corpus and all 768 applicable declarations in the independent pinned Logtalk corpus
+608-case Part 1 corpus and all 763 applicable declarations in the independent pinned Logtalk corpus
 pass across consulted bytecode, generated C#, both cross-path directions, and NativeAOT. Parts 2
 and 3 have licensed-text traceability and focused managed, generated, and NativeAOT coverage. This
 is not a claim of SWI-Prolog compatibility. See

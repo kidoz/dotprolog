@@ -8,6 +8,19 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Added
 
+- Unbounded integers: arithmetic promotes past the 60-bit tagged range to interned big
+  integers and normalizes back when results fit, literals of any length read to their exact value
+  in source text and runtime term input, and number conversion, formatting (`~d`, `~D`, `~r`,
+  `~R`), ordering, first-argument indexing, the dynamic database, generated C#, and the embedding
+  API (`PrologBigInteger`, `PrologInput.Big`, `PrologMarshal.ToBigInteger`) all carry the new
+  representation. The `bounded` flag is now `false`; `max_integer` and `min_integer` keep
+  reporting the fixnum promotion threshold. `evaluation_error(int_overflow)` and
+  `representation_error(max_integer|min_integer)` no longer occur; a shift count or exponent
+  whose result would exceed the representation raises `resource_error(memory)`. Verified against
+  SWI-Prolog by the differential corpus; the pinned independent ISO corpus now counts 763
+  applicable declarations, with five bounded-arithmetic cases correctly gated out by their
+  upstream `condition(current_prolog_flag(bounded, true))` option.
+
 - `print_message/2` with SWI's message system sized to this machine: the message term is
   translated to `Format-Args` lines, a user-defined `message_hook/3` may intercept them, and what
   remains is written to `user_error` behind SWI's kind prefixes (`ERROR: `, `Warning: `, `% `).

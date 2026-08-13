@@ -16,7 +16,7 @@ Every row below is covered by one or more of these executable evidence classes:
 |---|---|
 | `R` | Focused reader, compiler, runtime, or integration tests |
 | `D` | The 608-case repository corpus in `tests/conformance/iso_conformance.pl` |
-| `I` | All 768 applicable declarations from the pinned Logtalk 3.101.0 ISO corpus |
+| `I` | All 763 applicable declarations from the pinned Logtalk 3.101.0 ISO corpus |
 | `C` | The generated-C# runner |
 | `CB` | Generated C# calling consulted bytecode |
 | `BC` | Consulted bytecode calling generated C# |
@@ -202,7 +202,7 @@ Part 1 conformance is a maintained property, not a one-time test result. A relea
 the following green:
 
 1. The 608 repository cases.
-2. The exact 768-declaration independent inventory with zero unsupported or failed cases.
+2. The exact 763-declaration independent inventory with zero unsupported or failed cases.
 3. All 2,304 generated and bidirectional cross-path checks.
 4. The direct and generated NativeAOT runners for every release RID.
 5. The focused parser, compiler, runtime, stream, database, arithmetic, flag, and strict-mode tests.

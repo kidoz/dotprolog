@@ -3,7 +3,7 @@
 DotProlog's `StrictIso` mode implements ISO/IEC 13211-1:1995 with Technical Corrigenda 1–3,
 ISO/IEC 13211-2:2000, and ISO/IEC TS 13211-3:2025. The declaration is backed by the repository's
 [Part 1 traceability ledger](reference/iso-part1-conformance.md), its 608 standard-derived cases,
-and a 768-case independent corpus executed through every engine path, plus the
+and a 763-case independent corpus executed through every engine path, plus the
 [Parts 2 and 3 traceability ledger](reference/iso-parts2-3-conformance.md) and focused cross-path
 tests. It does not claim SWI-Prolog compatibility.
 
@@ -55,7 +55,7 @@ Select a mode with the `PrologEngine` constructor, `dotnet prolog run --mode <na
 
 ## Terms and clauses
 
-The reader supports variables, atoms, bounded integers, finite floats, lists, structures, and
+The reader supports variables, atoms, unbounded integers, finite floats, lists, structures, and
 double-quoted code lists. Programs contain facts, rules, and directives:
 
 ```prolog

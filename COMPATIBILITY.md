@@ -14,11 +14,13 @@ surface the extended modes do implement is recorded feature by feature in the
 
 ## What has been measured
 
-**The 768 applicable declarations in the pinned Logtalk 3.101.0 ISO Prolog corpus all pass.**
+**The 763 applicable declarations in the pinned Logtalk 3.101.0 ISO Prolog corpus all pass.**
 The same inventory passes as managed consulted bytecode, generated C#, generated C# calling
 consulted bytecode, consulted bytecode calling generated C#, and NativeAOT. The adapter inventories
-802 declarations in total: 29 are disabled upstream and five are non-applicable alternative
-branches. CI pins and verifies the upstream revision and rejects changed counts.
+802 declarations in total: 29 are disabled upstream, five are non-applicable alternative branches,
+and five are gated on `current_prolog_flag(bounded, true)`, which stopped holding when integers
+became unbounded. CI pins and verifies the upstream revision and rejects changed
+counts.
 
 The repository also carries conformance cases encoded from ISO/IEC 13211-1 and its published
 corrigenda, all passing.
@@ -130,9 +132,9 @@ Writing them was worth it immediately: they found these real defects.
 - `read_term/2,3` now validates its complete option list before asking the stream for input.
   Unknown options, variable elements, and partial lists therefore raise their ISO errors without
   consuming the next term.
-- Runtime term input now raises catchable `representation_error(max_integer|min_integer)` when a
-  decimal or radix literal exceeds the bounded tagged-integer range. Arbitrarily long literals
-  retain their sign, and a rejected stream term does not discard the following term.
+- Runtime term input validated the bounded tagged-integer range with catchable
+  `representation_error(max_integer|min_integer)` while integers were bounded; now
+  literals of any length read to their exact unbounded value.
 - Runtime term input enforces the advertised `max_arity` of 255. Reading a compound with 256 or
   more arguments raises catchable `representation_error(max_arity)`, including when the compound
   is nested, without discarding the following stream term.
@@ -202,9 +204,8 @@ Writing them was worth it immediately: they found these real defects.
   the result unified with the list, filling unbound elements and failing on a wrong-length list.
 - `atom_number/2` and the number conversions let an oversized float literal become an unprintable
   IEEE infinity and wrapped an oversized radix literal to an arbitrary small integer. They now
-  raise the reader path's `syntax_error(float_overflow)` and
-  `representation_error(max_integer|min_integer)`, the latter also replacing the incidental
-  `evaluation_error(int_overflow)` on oversized decimal input.
+  raise the reader path's `syntax_error(float_overflow)`, and integer conversions of any length
+  answer their exact unbounded value.
 - `format/3` accepted only the `user_output` and `user_error` aliases and routed both through the
   current output, so `with_output_to/2` captured error text. Stream arguments now resolve through
   the same handle and alias path as `write/2` — real `'$stream'(N)` handles and user aliases
@@ -244,7 +245,7 @@ samples and exercise NativeAOT.
 
 | Feature | Current state |
 |---|---|
-| Part 1 core | Licensed traceability plus the independent 768-declaration cross-path corpus |
+| Part 1 core | Licensed traceability plus the independent 763-declaration cross-path corpus |
 | Part 2 modules | Licensed traceability; interface/body preparation, visibility, reflection, database, generated-code, and NativeAOT tests |
 | Part 3 grammars | Licensed traceability; static/runtime expansion, controls, steadfastness, errors, generated-code, and NativeAOT tests |
 
