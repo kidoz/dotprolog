@@ -35,7 +35,9 @@ therefore reads as a list of one-character atoms:
 
 This is the default the newer Prolog systems settled on, and it is what makes text convenient to
 work with in DCGs. Nothing else about the mode differs from `Extended` today, and any mode may
-still move the flag with `:- set_prolog_flag(double_quotes, codes).`
+still move the flag with `:- set_prolog_flag(double_quotes, codes).` Outside strict ISO mode the
+flag also accepts `string`, reading `"..."` as a distinct string term with its own `string_*`
+library; no mode defaults to it.
 
 `Modern` is also the dialect whose extension direction is SWI-Prolog: when a predicate exists in
 SWI and is adopted here, its behavior and error terms follow SWI's, and the coverage is recorded

@@ -122,9 +122,13 @@ The mode is a curated profile. To move one flag's starting value without leaving
 
 The override becomes the value every source file starts from — and returns to when a
 `set_prolog_flag/2` directive's load unit ends. The overridable flags are curated:
-`double_quotes` (`codes`, `chars`, `atom`) is available today, in every mode, because all three
-values are ISO-conforming. The same overrides are available on the command line as
-`dotnet prolog run --flag double_quotes=chars file.pl`.
+`double_quotes` (`codes`, `chars`, `atom`, and — outside strict ISO mode — `string`) is available
+today; the three ISO values work in every mode. The same overrides are available on the command
+line as `dotnet prolog run --flag double_quotes=chars file.pl`.
+
+Strings are interned beside atom text and live for the program's lifetime: like atoms, they are
+never reclaimed, which is worth knowing for a long-running host that mints unbounded distinct
+strings. Marshalled string terms reach .NET as `PrologString` values.
 
 Generated code records its language mode and initial `double_quotes` value and refuses to install
 into an engine that starts elsewhere. This keeps build-time validation and runtime consultation

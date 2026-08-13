@@ -8,6 +8,21 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Added
 
+- A string term type (ADR 0047): `"..."` reads as a distinct interned string under
+  `set_prolog_flag(double_quotes, string)` — an extension value available in the `Extended` and
+  `Modern` modes and gated out of `StrictIso`; no mode defaults to it. `string/1` is true of a
+  string, `atom/1` false, `atomic/1` true; unification is identity; `write/1` emits the bare text
+  and `writeq/1` the `"..."` spelling with ISO escapes; the standard order places strings between
+  numbers and atoms, as SWI-Prolog 10 sorts them. Strings survive `assertz/1`, `findall/3`,
+  `copy_term/2`, `nb_setval/2`, build-time compiled code, and the embedding API (`PrologString`),
+  and the `DotPrologFlags`/`--flag` override surface accepts `double_quotes=string`.
+- The string library: `string_length/2`, `string_concat/3` with split enumeration,
+  `atom_string/2`, `string_to_atom/2`, `string_chars/2`, `string_codes/2`, `number_string/2`,
+  `term_string/2`, `sub_string/5`, `split_string/4`, `string_code/3`, `string_lower/2`,
+  `string_upper/2`; `string(S)` sinks for `format/3` and `with_output_to/2`; `~s` and format
+  text accepting strings; and `must_be(string, X)` with `text` admitting strings. Verified
+  against SWI-Prolog by the differential corpus. The atom predicates deliberately keep ISO's
+  `type_error(atom, …)` for strings.
 - The SWI-aligned library surface: `library(error)` (`must_be/2`, `is_of_type/2`, and the
   error-raising helpers), `library(assoc)` as AVL trees, `library(ordsets)`, `foldl/6`,
   `findall/4`, `numbervars/3`, `atom_to_term/3`, and `tab/2` — available in the `Extended` and

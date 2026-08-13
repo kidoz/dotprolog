@@ -76,6 +76,14 @@ that file finishes loading.
 
 The extension flag `occurs_check` (`false`, `true`, `error`) exists in the `Extended` and
 `Modern` modes only and starts at `false`, the ISO behavior; `StrictIso` does not define it.
+`double_quotes` likewise accepts the extension value `string` in the extended modes only — a
+directive, flag call, or project override selecting it inside `StrictIso` stays a domain error,
+so the conforming modes keep the three ISO values.
+
+The standard order of terms places strings between numbers and atoms:
+`Var < Float < Integer < String < Atom < Compound`. The string slot is SWI-Prolog 10's probed
+behavior; ISO leaves no slot for the type, and the float/integer split remains DotProlog's
+documented divergence.
 
 The initial `char_conversion` flag is `off`.
 Character conversion applies to unquoted lexical input while quoted text, escapes, character-code

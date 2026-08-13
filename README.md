@@ -307,9 +307,12 @@ Predicates written in Prolog rather than C# live in a standard library that ever
 construction, which costs about 220 µs. A consulted file that defines one of them replaces it
 outright, so a program is free to write its own `member/2` without inheriting extra solutions.
 
-There is no string type: an atom is the only text term. The SWI-Prolog string predicates are absent
-rather than aliased to their atom counterparts, because aliasing would let portable code compile
-here and then behave differently.
+Strings are a distinct term type: `string(S)` is true of one, `atom/1` is false, and the standard
+order places them between numbers and atoms as SWI-Prolog 10 does. A string is interned beside the
+atom text it shares, so unification is integer identity and a string survives every detached copy.
+Double-quoted text still reads as a code list by default (`chars` in `Modern` mode); reading it as
+strings is `set_prolog_flag(double_quotes, string)` — or the `DotPrologFlags` project property —
+away, outside strict ISO mode.
 
 `bagof/3` and `setof/3` group their solutions by whichever of the goal's variables are free —
 those the caller can still see — and offer one group per binding of them. A variable is made
