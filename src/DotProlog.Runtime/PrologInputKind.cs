@@ -18,6 +18,9 @@ internal enum PrologInputKind
     /// <summary>An integer outside the fixnum range.</summary>
     BigInteger,
 
+    /// <summary>A rational number.</summary>
+    Rational,
+
     /// <summary>A floating-point number.</summary>
     Float,
 

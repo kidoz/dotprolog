@@ -158,7 +158,26 @@ public sealed class SwiDifferentialTests
         "succ(99999999999999999999999999, X), write(X)",
         "between(99999999999999999999999999, inf, X), !, write(X)",
         "current_prolog_flag(bounded, B), write(B)",
-        "X is 10 ^ 21, writeq(X), nl, write(X)"
+        "X is 10 ^ 21, writeq(X), nl, write(X)",
+        // Rationals: exact arithmetic, canonical demotion, and the 1r3 spelling agree with GMP.
+        "X is 1 rdiv 3, write(X)",
+        "X is 2 rdiv 4, Y is 4 rdiv 2, write(X-Y)",
+        "X is 1r3 + 1r6, write(X)",
+        "X is 1r3 + 1, write(X)",
+        "X is 1r3 * 3, write(X)",
+        "X is 1r3 / 2, write(X)",
+        "X is 1r2 + 0.5, write(X)",
+        "X is 1r2 ^ 2, Y is 1r2 ^ (-2), write(X-Y)",
+        "X is floor(7r2), Y is ceiling(7r2), Z is truncate(-7r2), write(X-Y-Z)",
+        "X is numerator(6r4), Y is denominator(6r4), write(X-Y)",
+        "X is rational(0.5), write(X)",
+        "X is rationalize(0.1), write(X)",
+        "X is (10 ^ 30) rdiv (2 ^ 100), write(X)",
+        "X is min(1r3, 0), Y is max(1r3, 0), write(X-Y)",
+        "( rational(1r3), rational(5), \\+ rational(0.5), \\+ integer(1r3) -> write(yes) ; write(no) )",
+        "msort([1r2, 2, 1, 3r2, foo], L), write(L)",
+        "X = 22r7, writeq(X), nl, write(X)",
+        "catch(X is 0.5 rdiv 2, error(E, _), true), write(E)"
     );
 
     // The corpus stays runnable on DotProlog alone, so a corpus typo or a regression in the

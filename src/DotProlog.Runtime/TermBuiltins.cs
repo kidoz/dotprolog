@@ -25,7 +25,13 @@ internal static class TermBuiltins
         registry.Register(
             "number",
             1,
-            static machine => machine.Argument(0).Tag is CellTag.Integer or CellTag.BigInteger or CellTag.Float
+            static machine =>
+                machine.Argument(0).Tag is CellTag.Integer or CellTag.BigInteger or CellTag.Rational or CellTag.Float
+        );
+        registry.Register(
+            "rational",
+            1,
+            static machine => machine.Argument(0).Tag is CellTag.Integer or CellTag.BigInteger or CellTag.Rational
         );
         registry.Register("compound", 1, static machine => machine.Argument(0).Tag == CellTag.Structure);
         registry.Register(
@@ -36,6 +42,7 @@ internal static class TermBuiltins
                     is CellTag.Atom
                         or CellTag.Integer
                         or CellTag.BigInteger
+                        or CellTag.Rational
                         or CellTag.Float
                         or CellTag.String
         );

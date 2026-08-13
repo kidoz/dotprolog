@@ -72,6 +72,12 @@ public sealed class PrologFlags
     /// <summary>What a cycle-creating general unification does. An extension flag.</summary>
     public OccursCheckMode OccursCheck { get; internal set; } = OccursCheckMode.False;
 
+    /// <summary>
+    /// Whether the reader accepts <c>1r3</c> rational literals. Seeded from the language mode —
+    /// strict ISO keeps ISO lexing, where the same text is a syntax error — and not a Prolog flag.
+    /// </summary>
+    public bool RationalLiterals { get; internal set; } = true;
+
     /// <summary>Creates an independent copy of the current flag values.</summary>
     public PrologFlags Copy() =>
         new()
@@ -81,6 +87,7 @@ public sealed class PrologFlags
             DoubleQuotes = DoubleQuotes,
             Unknown = Unknown,
             OccursCheck = OccursCheck,
+            RationalLiterals = RationalLiterals,
         };
 
     /// <summary>Replaces every mutable flag value with those from another set.</summary>
@@ -92,5 +99,6 @@ public sealed class PrologFlags
         DoubleQuotes = source.DoubleQuotes;
         Unknown = source.Unknown;
         OccursCheck = source.OccursCheck;
+        RationalLiterals = source.RationalLiterals;
     }
 }

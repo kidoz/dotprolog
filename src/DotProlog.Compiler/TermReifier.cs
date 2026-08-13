@@ -95,6 +95,14 @@ internal static class TermReifier
             case CellTag.BigInteger:
                 return new BigIntegerTerm(machine.Symbols.GetBig(cell.Index), SourceSpan.None);
 
+            case CellTag.Rational:
+            {
+                (System.Numerics.BigInteger numerator, System.Numerics.BigInteger denominator) = machine.Symbols.GetRational(
+                    cell.Index
+                );
+                return new RationalTerm(numerator, denominator, SourceSpan.None);
+            }
+
             case CellTag.Float:
                 return new FloatTerm(machine.Symbols.GetFloat(cell.Index), SourceSpan.None);
 
@@ -162,6 +170,9 @@ internal static class TermReifier
 
             case BigIntegerTerm big:
                 return Cell.Big(machine.Symbols.InternBig(big.Value));
+
+            case RationalTerm rational:
+                return ArithmeticEvaluator.ToCell(machine, PrologNumber.FromRational(rational.Numerator, rational.Denominator));
 
             case FloatTerm number:
                 return Cell.Float(machine.Symbols.InternFloat(number.Value));

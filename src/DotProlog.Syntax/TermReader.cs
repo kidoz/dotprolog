@@ -456,6 +456,11 @@ public sealed class TermReader
 
     private static SyntaxTerm IntegerLiteral(Token token, bool negate, SourceSpan span)
     {
+        if (!token.RationalDenominator.IsZero)
+        {
+            return new RationalTerm(negate ? -token.Big : token.Big, token.RationalDenominator, span);
+        }
+
         if (token.IntegerOverflow)
         {
             // Integers are unbounded; a literal past the long range keeps its exact value.

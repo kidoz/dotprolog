@@ -875,6 +875,10 @@ public sealed class PrologEngine : IRuntimeCompiler
                     key.Append('b').Append(cell.Index).Append(',');
                     break;
 
+                case CellTag.Rational:
+                    key.Append('q').Append(cell.Index).Append(',');
+                    break;
+
                 case CellTag.Float:
                     key.Append('f').Append(cell.Index).Append(',');
                     break;

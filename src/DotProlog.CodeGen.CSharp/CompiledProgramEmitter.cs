@@ -410,6 +410,7 @@ internal static class CompiledProgramEmitter
                     $"global::DotProlog.Runtime.Cell.Integer60({constant.Integer.ToString(CultureInfo.InvariantCulture)}L)",
                 CellTag.BigInteger =>
                     $"global::DotProlog.Runtime.Cell.Big(symbols.InternBig(global::System.Numerics.BigInteger.Parse({SyntaxFacts.Literal(constant.Text!)}, global::System.Globalization.CultureInfo.InvariantCulture)))",
+                CellTag.Rational => RationalExpression(constant.Text!),
                 CellTag.Float =>
                     $"global::DotProlog.Runtime.Cell.Float(symbols.InternFloat({constant.Float.ToString("R", CultureInfo.InvariantCulture)}))",
                 _ => throw new InvalidOperationException($"Unsupported generated constant {constant.Tag}."),
@@ -486,6 +487,22 @@ internal static class CompiledProgramEmitter
                 $"{program}.Constant({cell.Value})",
             _ => throw new InvalidOperationException($"Term cell tag {cell.Tag} cannot be generated."),
         };
+
+    private static string RationalText(BytecodeProgram program, int rationalId)
+    {
+        (System.Numerics.BigInteger numerator, System.Numerics.BigInteger denominator) = program.Symbols.GetRational(rationalId);
+        return string.Create(CultureInfo.InvariantCulture, $"{numerator}r{denominator}");
+    }
+
+    private static string RationalExpression(string text)
+    {
+        var separator = text.IndexOf('r', StringComparison.Ordinal);
+        var numerator = SyntaxFacts.Literal(text[..separator]);
+        var denominator = SyntaxFacts.Literal(text[(separator + 1)..]);
+        return "global::DotProlog.Runtime.Cell.Rational(symbols.InternRational("
+            + $"global::System.Numerics.BigInteger.Parse({numerator}, global::System.Globalization.CultureInfo.InvariantCulture), "
+            + $"global::System.Numerics.BigInteger.Parse({denominator}, global::System.Globalization.CultureInfo.InvariantCulture)))";
+    }
 
     private sealed record CompiledPredicate(int Functor, int Entry);
 
@@ -792,12 +809,12 @@ internal static class CompiledProgramEmitter
                 {
                     CellTag.Reference or CellTag.Structure => cell.Index,
                     CellTag.Functor => AddFunctor(program, model, functors, cell.Index),
-                    CellTag.Atom or CellTag.Integer or CellTag.BigInteger or CellTag.Float or CellTag.String => AddTermConstant(
-                        program,
-                        model,
-                        termConstants,
-                        cell
-                    ),
+                    CellTag.Atom
+                    or CellTag.Integer
+                    or CellTag.BigInteger
+                    or CellTag.Rational
+                    or CellTag.Float
+                    or CellTag.String => AddTermConstant(program, model, termConstants, cell),
                     _ => throw new InvalidOperationException($"Static module term cell {cell.Tag} cannot be generated."),
                 };
                 term.Add(new CompiledTermCell(cell.Tag, value));
@@ -854,6 +871,7 @@ internal static class CompiledProgramEmitter
                     0,
                     0
                 ),
+                CellTag.Rational => new(constant.Tag, RationalText(program, constant.Index), 0, 0),
                 CellTag.Float => new(constant.Tag, null, 0, program.Symbols.GetFloat(constant.Index)),
                 _ => throw new InvalidOperationException($"Constant tag {constant.Tag} cannot be generated."),
             };

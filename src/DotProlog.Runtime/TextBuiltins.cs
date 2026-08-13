@@ -848,6 +848,33 @@ internal static class TextBuiltins
             return true;
         }
 
+        var rationalSeparator = span.IndexOf('r');
+        if (
+            rationalSeparator > 0
+            && machine.Program.LanguageMode != PrologLanguageMode.StrictIso
+            && AllAsciiDigits(span[..rationalSeparator])
+            && AllAsciiDigits(span[(rationalSeparator + 1)..])
+        )
+        {
+            var numerator = System.Numerics.BigInteger.Parse(
+                span[..rationalSeparator],
+                NumberStyles.None,
+                CultureInfo.InvariantCulture
+            );
+            var denominator = System.Numerics.BigInteger.Parse(
+                span[(rationalSeparator + 1)..],
+                NumberStyles.None,
+                CultureInfo.InvariantCulture
+            );
+            if (denominator.IsZero)
+            {
+                return false;
+            }
+
+            number = PrologNumber.FromRational(negative ? -numerator : numerator, denominator);
+            return true;
+        }
+
         foreach (var c in span)
         {
             if (!char.IsAsciiDigit(c) && c != '.' && c != 'e' && c != 'E' && c != '+' && c != '-')
@@ -899,6 +926,24 @@ internal static class TextBuiltins
         }
 
         number = PrologNumber.FromReal(negative ? -value : value);
+        return true;
+    }
+
+    private static bool AllAsciiDigits(ReadOnlySpan<char> span)
+    {
+        if (span.Length == 0)
+        {
+            return false;
+        }
+
+        foreach (var c in span)
+        {
+            if (!char.IsAsciiDigit(c))
+            {
+                return false;
+            }
+        }
+
         return true;
     }
 

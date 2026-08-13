@@ -17,6 +17,8 @@ public sealed class SymbolTable
     private readonly List<double> _floats = [];
     private readonly Dictionary<BigInteger, int> _bigIds = [];
     private readonly List<BigInteger> _bigs = [];
+    private readonly Dictionary<(BigInteger, BigInteger), int> _rationalIds = [];
+    private readonly List<(BigInteger Numerator, BigInteger Denominator)> _rationals = [];
 
     /// <summary>Creates a table pre-populated with the atoms the runtime itself refers to.</summary>
     public SymbolTable()
@@ -140,4 +142,26 @@ public sealed class SymbolTable
 
     /// <summary>Returns the big integer with identifier <paramref name="bigId"/>.</summary>
     public BigInteger GetBig(int bigId) => _bigs[bigId];
+
+    /// <summary>
+    /// Returns the identifier for the canonical rational <paramref name="numerator"/> over
+    /// <paramref name="denominator"/>, interning it if necessary. The pair must already be
+    /// canonical — gcd 1 and denominator greater than 1 — because values with denominator 1 stay
+    /// integer cells, which keeps cell equality usable as number identity.
+    /// </summary>
+    public int InternRational(BigInteger numerator, BigInteger denominator)
+    {
+        if (_rationalIds.TryGetValue((numerator, denominator), out var id))
+        {
+            return id;
+        }
+
+        id = _rationals.Count;
+        _rationals.Add((numerator, denominator));
+        _rationalIds[(numerator, denominator)] = id;
+        return id;
+    }
+
+    /// <summary>Returns the rational with identifier <paramref name="rationalId"/>.</summary>
+    public (BigInteger Numerator, BigInteger Denominator) GetRational(int rationalId) => _rationals[rationalId];
 }

@@ -216,6 +216,15 @@ public static class TermWriter
                 output.Write(machine.Symbols.GetBig(cell.Index).ToString(CultureInfo.InvariantCulture));
                 return;
 
+            case CellTag.Rational:
+            {
+                (System.Numerics.BigInteger numerator, System.Numerics.BigInteger denominator) = machine.Symbols.GetRational(
+                    cell.Index
+                );
+                output.Write(string.Create(CultureInfo.InvariantCulture, $"{numerator}r{denominator}"));
+                return;
+            }
+
             case CellTag.Float:
                 output.Write(FloatText(machine.Symbols.GetFloat(cell.Index)));
                 return;

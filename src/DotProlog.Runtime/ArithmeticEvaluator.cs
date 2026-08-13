@@ -14,7 +14,8 @@ namespace DotProlog.Runtime;
 /// Integer arithmetic is unbounded: operations run on <see cref="long"/> while both
 /// operands are fixnums and redo in <see cref="BigInteger"/> when the 64-bit operation overflows,
 /// and every integer result is normalized so values in the fixnum range never take the big
-/// representation.
+/// representation. Rationals join through <c>rdiv/2</c> and literals: arithmetic mixing
+/// integers and rationals is exact, while a float operand widens the whole operation to double.
 /// </para>
 /// </remarks>
 public static class ArithmeticEvaluator
@@ -36,6 +37,12 @@ public static class ArithmeticEvaluator
 
             case CellTag.BigInteger:
                 return PrologNumber.FromBig(machine.Symbols.GetBig(cell.Index));
+
+            case CellTag.Rational:
+            {
+                (BigInteger numerator, BigInteger denominator) = machine.Symbols.GetRational(cell.Index);
+                return PrologNumber.FromRational(numerator, denominator);
+            }
 
             case CellTag.Float:
                 return PrologNumber.FromReal(machine.Symbols.GetFloat(cell.Index));
@@ -99,6 +106,11 @@ public static class ArithmeticEvaluator
             return Cell.Float(machine.Symbols.InternFloat(number.Real));
         }
 
+        if (number.IsRational)
+        {
+            return Cell.Rational(machine.Symbols.InternRational(number.Numerator, number.Denominator));
+        }
+
         if (number.IsBig)
         {
             return Cell.Big(machine.Symbols.InternBig(number.Big));
@@ -107,17 +119,26 @@ public static class ArithmeticEvaluator
         return Cell.Integer60(number.Integer);
     }
 
-    /// <summary>Orders two numbers, comparing integers exactly and mixed kinds by widening to double.</summary>
+    /// <summary>
+    /// Orders two numbers, comparing integers and rationals exactly and mixed float kinds by
+    /// widening to double.
+    /// </summary>
     public static int Compare(PrologNumber left, PrologNumber right)
     {
         if (!left.IsFloat && !right.IsFloat)
         {
-            if (!left.IsBig && !right.IsBig)
+            if (!left.IsBig && !right.IsBig && !left.IsRational && !right.IsRational)
             {
                 return left.Integer.CompareTo(right.Integer);
             }
 
-            return left.Big.CompareTo(right.Big);
+            if (!left.IsRational && !right.IsRational)
+            {
+                return left.Big.CompareTo(right.Big);
+            }
+
+            // Cross-multiplying is exact; both denominators are positive by canonical form.
+            return (left.Numerator * right.Denominator).CompareTo(right.Numerator * left.Denominator);
         }
 
         return left.AsDouble.CompareTo(right.AsDouble);
@@ -141,17 +162,27 @@ public static class ArithmeticEvaluator
             "+" => value,
             "-" => Negate(machine, value),
             "abs" => value.IsFloat ? FloatResult(machine, Math.Abs(value.Real))
+            : value.IsRational ? PrologNumber.FromRational(BigInteger.Abs(value.Numerator), value.Denominator)
             : value.IsBig ? PrologNumber.FromBig(BigInteger.Abs(value.Big))
             : PrologNumber.FromInteger(Math.Abs(value.Integer)),
             "sign" => Sign(machine, value),
             "float" => FloatResult(machine, value.AsDouble),
             "integer" => value.IsFloat
                 ? FloatToInteger(machine, value, static operand => Math.Round(operand, MidpointRounding.AwayFromZero))
-                : value,
-            "truncate" => FloatToInteger(machine, value, Math.Truncate),
-            "floor" => FloatToInteger(machine, value, Math.Floor),
-            "ceiling" => FloatToInteger(machine, value, Math.Ceiling),
-            "round" => FloatToInteger(machine, value, static operand => Math.Floor(operand + 0.5)),
+            : value.IsRational ? RationalAwayFromZero(value)
+            : value,
+            "truncate" => value.IsRational
+                ? PrologNumber.FromBig(BigInteger.Divide(value.Numerator, value.Denominator))
+                : FloatToInteger(machine, value, Math.Truncate),
+            "floor" => value.IsRational
+                ? PrologNumber.FromBig(FloorDivideBig(value.Numerator, value.Denominator))
+                : FloatToInteger(machine, value, Math.Floor),
+            "ceiling" => value.IsRational
+                ? PrologNumber.FromBig(-FloorDivideBig(-value.Numerator, value.Denominator))
+                : FloatToInteger(machine, value, Math.Ceiling),
+            "round" => value.IsRational
+                ? PrologNumber.FromBig(FloorDivideBig((2 * value.Numerator) + value.Denominator, 2 * value.Denominator))
+                : FloatToInteger(machine, value, static operand => Math.Floor(operand + 0.5)),
             "float_integer_part" => FloatPart(machine, value, fractional: false),
             "float_fractional_part" => FloatPart(machine, value, fractional: true),
             "sqrt" => FloatResult(machine, Math.Sqrt(value.AsDouble)),
@@ -164,12 +195,21 @@ public static class ArithmeticEvaluator
             "exp" => FloatResult(machine, Math.Exp(value.AsDouble)),
             "log" => Log(machine, value),
             "\\" => Complement(machine, value),
+            "numerator" => value.IsFloat
+                ? throw PrologErrors.Type(machine, "rational", ToCell(machine, value))
+                : PrologNumber.FromBig(value.Numerator),
+            "denominator" => value.IsFloat
+                ? throw PrologErrors.Type(machine, "rational", ToCell(machine, value))
+                : PrologNumber.FromBig(value.Denominator),
+            "rational" => value.IsFloat ? ExactRational(machine, value.Real) : value,
+            "rationalize" => value.IsFloat ? Rationalize(machine, value.Real) : value,
             _ => throw Unevaluable(machine, functorId),
         };
 
     private static PrologNumber EvaluateBinary(string name, PrologNumber left, PrologNumber right, Machine machine, int functorId)
     {
         var real = left.IsFloat || right.IsFloat;
+        var rational = !real && (left.IsRational || right.IsRational);
 
         switch (name)
         {
@@ -177,6 +217,14 @@ public static class ArithmeticEvaluator
                 if (real)
                 {
                     return FloatResult(machine, left.AsDouble + right.AsDouble);
+                }
+
+                if (rational)
+                {
+                    return PrologNumber.FromRational(
+                        (left.Numerator * right.Denominator) + (right.Numerator * left.Denominator),
+                        left.Denominator * right.Denominator
+                    );
                 }
 
                 if (!left.IsBig && !right.IsBig)
@@ -193,6 +241,14 @@ public static class ArithmeticEvaluator
                     return FloatResult(machine, left.AsDouble - right.AsDouble);
                 }
 
+                if (rational)
+                {
+                    return PrologNumber.FromRational(
+                        (left.Numerator * right.Denominator) - (right.Numerator * left.Denominator),
+                        left.Denominator * right.Denominator
+                    );
+                }
+
                 if (!left.IsBig && !right.IsBig)
                 {
                     return PrologNumber.FromInteger(left.Integer - right.Integer);
@@ -204,6 +260,11 @@ public static class ArithmeticEvaluator
                 if (real)
                 {
                     return FloatResult(machine, left.AsDouble * right.AsDouble);
+                }
+
+                if (rational)
+                {
+                    return PrologNumber.FromRational(left.Numerator * right.Numerator, left.Denominator * right.Denominator);
                 }
 
                 if (!left.IsBig && !right.IsBig)
@@ -228,7 +289,32 @@ public static class ArithmeticEvaluator
                     throw PrologErrors.Evaluation(machine, real && left.AsDouble == 0 ? "undefined" : "zero_divisor");
                 }
 
+                if (rational)
+                {
+                    // Division with a rational operand stays exact; two integers keep the
+                    // documented processor choice of float division.
+                    return PrologNumber.FromRational(left.Numerator * right.Denominator, left.Denominator * right.Numerator);
+                }
+
                 return FloatResult(machine, left.AsDouble / right.AsDouble);
+
+            case "rdiv":
+                if (left.IsFloat)
+                {
+                    throw PrologErrors.Type(machine, "rational", ToCell(machine, left));
+                }
+
+                if (right.IsFloat)
+                {
+                    throw PrologErrors.Type(machine, "rational", ToCell(machine, right));
+                }
+
+                if (IsZero(right))
+                {
+                    throw PrologErrors.Evaluation(machine, "zero_divisor");
+                }
+
+                return PrologNumber.FromRational(left.Numerator * right.Denominator, left.Denominator * right.Numerator);
 
             case "//":
             {
@@ -295,7 +381,12 @@ public static class ArithmeticEvaluator
                 return PowerFloat(machine, left.AsDouble, right.AsDouble);
 
             case "^":
-                return real ? PowerFloat(machine, left.AsDouble, right.AsDouble) : IntegerPower(machine, left, right);
+                if (real || right.IsRational)
+                {
+                    return PowerFloat(machine, left.AsDouble, right.AsDouble);
+                }
+
+                return IntegerPower(machine, left, right);
 
             case "atan2":
                 if (left.AsDouble == 0 && right.AsDouble == 0)
@@ -352,6 +443,11 @@ public static class ArithmeticEvaluator
             return FloatResult(machine, -value.Real);
         }
 
+        if (value.IsRational)
+        {
+            return PrologNumber.FromRational(-value.Numerator, value.Denominator);
+        }
+
         return value.IsBig ? PrologNumber.FromBig(-value.Big) : PrologNumber.FromInteger(-value.Integer);
     }
 
@@ -365,18 +461,27 @@ public static class ArithmeticEvaluator
     {
         if (right.IsBig ? right.Big.Sign < 0 : right.Integer < 0)
         {
-            if (!left.IsBig && left.Integer == 0)
+            if (left.IsInteger)
             {
-                throw PrologErrors.Evaluation(machine, "zero_divisor");
+                if (!left.IsBig && left.Integer == 0)
+                {
+                    throw PrologErrors.Evaluation(machine, "zero_divisor");
+                }
+
+                if (left.IsBig || left.Integer is < -1 or > 1)
+                {
+                    // ISO's error for an unrepresentable integer power; SWI's rational answer
+                    // is deliberately not adopted for integer bases.
+                    throw PrologErrors.Type(machine, "float", ToCell(machine, left));
+                }
+
+                var oddExponent = right.IsBig ? !right.Big.IsEven : (right.Integer & 1) != 0;
+                return PrologNumber.FromInteger(left.Integer == -1 && oddExponent ? -1 : 1);
             }
 
-            if (left.IsBig || left.Integer is < -1 or > 1)
-            {
-                throw PrologErrors.Type(machine, "float", ToCell(machine, left));
-            }
-
-            var oddExponent = right.IsBig ? !right.Big.IsEven : (right.Integer & 1) != 0;
-            return PrologNumber.FromInteger(left.Integer == -1 && oddExponent ? -1 : 1);
+            // A rational base inverts exactly; its numerator is never zero in canonical form.
+            PrologNumber inverse = PrologNumber.FromRational(left.Denominator, left.Numerator);
+            return IntegerPower(machine, inverse, Negate(machine, right));
         }
 
         if (!right.IsBig && right.Integer == 0)
@@ -387,7 +492,7 @@ public static class ArithmeticEvaluator
 
         // Bases whose powers stay small are answered before the magnitude guard, so an
         // enormous exponent over 0, 1, or -1 does not trip the resource check.
-        if (!left.IsBig && left.Integer is >= -1 and <= 1)
+        if (left.IsInteger && !left.IsBig && left.Integer is >= -1 and <= 1)
         {
             var oddPower = right.IsBig ? !right.Big.IsEven : (right.Integer & 1) != 0;
             return PrologNumber.FromInteger(left.Integer == -1 && !oddPower ? 1 : left.Integer);
@@ -400,14 +505,23 @@ public static class ArithmeticEvaluator
             throw PrologErrors.Resource(machine, "memory");
         }
 
-        return PrologNumber.FromBig(BigInteger.Pow(left.Big, (int)right.Integer));
+        var exponent = (int)right.Integer;
+        if (left.IsRational)
+        {
+            return PrologNumber.FromRational(
+                BigInteger.Pow(left.Numerator, exponent),
+                BigInteger.Pow(left.Denominator, exponent)
+            );
+        }
+
+        return PrologNumber.FromBig(BigInteger.Pow(left.Big, exponent));
     }
 
     private static PrologNumber Sign(Machine machine, PrologNumber value)
     {
         if (!value.IsFloat)
         {
-            return PrologNumber.FromInteger(value.IsBig ? value.Big.Sign : Math.Sign(value.Integer));
+            return PrologNumber.FromInteger(value.IsRational ? value.Numerator.Sign : value.Big.Sign);
         }
 
         if (double.IsNaN(value.Real))
@@ -421,6 +535,73 @@ public static class ArithmeticEvaluator
                 : value.Real < 0 ? -1.0
                 : 0.0
         );
+    }
+
+    /// <summary>Rounds a rational to the nearest integer, ties away from zero, as SWI's <c>integer/1</c> does.</summary>
+    private static PrologNumber RationalAwayFromZero(PrologNumber value)
+    {
+        BigInteger magnitude = BigInteger.Divide(
+            (2 * BigInteger.Abs(value.Numerator)) + value.Denominator,
+            2 * value.Denominator
+        );
+        return PrologNumber.FromBig(value.Numerator.Sign < 0 ? -magnitude : magnitude);
+    }
+
+    /// <summary>The exact rational value of a finite double: its mantissa scaled by its exponent.</summary>
+    private static PrologNumber ExactRational(Machine machine, double value)
+    {
+        if (double.IsNaN(value) || double.IsInfinity(value))
+        {
+            throw PrologErrors.Evaluation(machine, "undefined");
+        }
+
+        var bits = BitConverter.DoubleToInt64Bits(value);
+        var exponentBits = (int)((bits >> 52) & 0x7FF);
+        var mantissa = bits & 0xF_FFFF_FFFF_FFFF;
+        var exponent = exponentBits == 0 ? -1074 : exponentBits - 1075;
+        if (exponentBits != 0)
+        {
+            mantissa |= 1L << 52;
+        }
+
+        BigInteger numerator = value < 0 ? -mantissa : mantissa;
+        return exponent >= 0
+            ? PrologNumber.FromBig(numerator << exponent)
+            : PrologNumber.FromRational(numerator, BigInteger.One << -exponent);
+    }
+
+    /// <summary>
+    /// The simplest rational that reads back as the same double, found by walking the float's
+    /// continued-fraction convergents — SWI's <c>rationalize/1</c>.
+    /// </summary>
+    private static PrologNumber Rationalize(Machine machine, double value)
+    {
+        if (double.IsNaN(value) || double.IsInfinity(value))
+        {
+            throw PrologErrors.Evaluation(machine, "undefined");
+        }
+
+        BigInteger previousNumerator = 0;
+        BigInteger previousDenominator = 1;
+        BigInteger numerator = 1;
+        BigInteger denominator = 0;
+        var rest = Math.Abs(value);
+
+        while (true)
+        {
+            var whole = Math.Floor(rest);
+            BigInteger term = new(whole);
+            (numerator, previousNumerator) = ((term * numerator) + previousNumerator, numerator);
+            (denominator, previousDenominator) = ((term * denominator) + previousDenominator, denominator);
+
+            var fraction = rest - whole;
+            if ((double)numerator / (double)denominator == Math.Abs(value) || fraction <= 0)
+            {
+                return PrologNumber.FromRational(value < 0 ? -numerator : numerator, denominator);
+            }
+
+            rest = 1.0 / fraction;
+        }
     }
 
     private static PrologNumber FloatToInteger(Machine machine, PrologNumber value, Func<double, double> operation)
@@ -481,12 +662,12 @@ public static class ArithmeticEvaluator
 
     private static void RequireIntegers(Machine machine, PrologNumber left, PrologNumber right)
     {
-        if (left.IsFloat)
+        if (!left.IsInteger)
         {
             throw PrologErrors.Type(machine, "integer", ToCell(machine, left));
         }
 
-        if (right.IsFloat)
+        if (!right.IsInteger)
         {
             throw PrologErrors.Type(machine, "integer", ToCell(machine, right));
         }
@@ -591,13 +772,11 @@ public static class ArithmeticEvaluator
     }
 
     private static bool IsZero(PrologNumber value) =>
-        value.IsFloat ? value.Real == 0
-        : value.IsBig ? false
-        : value.Integer == 0;
+        value.IsFloat ? value.Real == 0 : value.IsInteger && !value.IsBig && value.Integer == 0;
 
     private static void ThrowIfZeroInteger(Machine machine, PrologNumber divisor)
     {
-        if (!divisor.IsFloat && !divisor.IsBig && divisor.Integer == 0)
+        if (divisor.IsInteger && !divisor.IsBig && divisor.Integer == 0)
         {
             throw PrologErrors.Evaluation(machine, "zero_divisor");
         }

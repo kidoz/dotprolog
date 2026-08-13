@@ -60,6 +60,7 @@ public static class TermOrder
 
                 case CellTag.Integer:
                 case CellTag.BigInteger:
+                case CellTag.Rational:
                 case CellTag.Float:
                 {
                     var numbers = CompareNumbers(machine, a, b);
@@ -136,12 +137,23 @@ public static class TermOrder
             return a.Integer.CompareTo(b.Integer);
         }
 
-        // At least one side is big, and a big cell never holds a fixnum-range value,
-        // so widening the other side compares exactly.
-        System.Numerics.BigInteger left = a.Tag == CellTag.BigInteger ? machine.Symbols.GetBig(a.Index) : a.Integer;
-        System.Numerics.BigInteger right = b.Tag == CellTag.BigInteger ? machine.Symbols.GetBig(b.Index) : b.Integer;
-        return left.CompareTo(right);
+        // Cross-multiplying compares exactly; denominators are positive by canonical form, and
+        // equal values always share one representation, so ties cannot cross representations.
+        (System.Numerics.BigInteger leftNumerator, System.Numerics.BigInteger leftDenominator) = NumeratorDenominator(machine, a);
+        (System.Numerics.BigInteger rightNumerator, System.Numerics.BigInteger rightDenominator) = NumeratorDenominator(
+            machine,
+            b
+        );
+        return (leftNumerator * rightDenominator).CompareTo(rightNumerator * leftDenominator);
     }
+
+    private static (System.Numerics.BigInteger, System.Numerics.BigInteger) NumeratorDenominator(Machine machine, Cell cell) =>
+        cell.Tag switch
+        {
+            CellTag.Integer => (cell.Integer, System.Numerics.BigInteger.One),
+            CellTag.BigInteger => (machine.Symbols.GetBig(cell.Index), System.Numerics.BigInteger.One),
+            _ => machine.Symbols.GetRational(cell.Index),
+        };
 
     // Strings rank after numbers and before atoms — SWI-Prolog 10's probed order, which its
     // manual has not caught up with.
@@ -150,7 +162,7 @@ public static class TermOrder
         {
             CellTag.Reference => 0,
             CellTag.Float => 1,
-            CellTag.Integer or CellTag.BigInteger => 2,
+            CellTag.Integer or CellTag.BigInteger or CellTag.Rational => 2,
             CellTag.String => 3,
             CellTag.Atom => 4,
             _ => 5,

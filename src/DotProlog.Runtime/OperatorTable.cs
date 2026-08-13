@@ -217,6 +217,7 @@ public sealed class OperatorTable
         }
 
         Define(990, OperatorType.Xfx, ":=");
+        Define(400, OperatorType.Yfx, "rdiv");
         Define(100, OperatorType.Yfx, ".");
         Define(1, OperatorType.Fx, "$");
     }

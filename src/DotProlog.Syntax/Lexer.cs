@@ -367,6 +367,45 @@ internal sealed class Lexer
             }
         }
 
+        if (
+            !isFloat
+            && _position < _text.Length
+            && InputAt(_position) == 'r'
+            && char.IsAsciiDigit(Peek(1))
+            && (_flags?.RationalLiterals ?? true)
+        )
+        {
+            var numeratorText = ConvertedText(start, _position - start);
+            Advance();
+            var denominatorStart = _position;
+            while (_position < _text.Length && char.IsAsciiDigit(InputAt(_position)))
+            {
+                Advance();
+            }
+
+            BigInteger numerator = BigInteger.Parse(numeratorText, NumberStyles.None, CultureInfo.InvariantCulture);
+            BigInteger denominator = BigInteger.Parse(
+                ConvertedText(denominatorStart, _position - denominatorStart),
+                NumberStyles.None,
+                CultureInfo.InvariantCulture
+            );
+            SourceSpan rationalSpan = SpanFrom(start);
+            if (denominator.IsZero)
+            {
+                Report(DiagnosticIds.InvalidNumber, "A rational literal cannot have a zero denominator.", rationalSpan);
+                return new Token(TokenKind.Integer, ConvertedText(start, _position - start), rationalSpan, layout);
+            }
+
+            return new Token(
+                TokenKind.Integer,
+                ConvertedText(start, _position - start),
+                rationalSpan,
+                layout,
+                Big: numerator,
+                RationalDenominator: denominator
+            );
+        }
+
         var literal = ConvertedText(start, _position - start);
         SourceSpan span = SpanFrom(start);
 

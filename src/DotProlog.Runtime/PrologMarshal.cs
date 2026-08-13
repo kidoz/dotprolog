@@ -29,6 +29,7 @@ public static class PrologMarshal
             PrologFloat real => real.Value,
             PrologInteger integer => integer.Value,
             PrologBigInteger big => (double)big.Value,
+            PrologRational rational => (double)rational.Numerator / (double)rational.Denominator,
             _ => throw Mismatch(value, "float"),
         };
 

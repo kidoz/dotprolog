@@ -86,10 +86,17 @@ public abstract record PrologValue
             CellTag.String => new PrologString(machine.Symbols.AtomName(cell.Index)),
             CellTag.Integer => new PrologInteger(cell.Integer),
             CellTag.BigInteger => new PrologBigInteger(machine.Symbols.GetBig(cell.Index)),
+            CellTag.Rational => RationalValue(machine, cell),
             CellTag.Float => new PrologFloat(machine.Symbols.GetFloat(cell.Index)),
             CellTag.Reference => new PrologVariable(string.Create(CultureInfo.InvariantCulture, $"_G{cell.Index}")),
             _ => throw new PrologException($"Cannot marshal a {cell.Tag} cell."),
         };
+
+    private static PrologRational RationalValue(Machine machine, Cell cell)
+    {
+        (System.Numerics.BigInteger numerator, System.Numerics.BigInteger denominator) = machine.Symbols.GetRational(cell.Index);
+        return new PrologRational(numerator, denominator);
+    }
 
     private sealed class Frame(string name, Cell[] arguments)
     {

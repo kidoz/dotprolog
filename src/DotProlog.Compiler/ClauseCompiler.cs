@@ -651,6 +651,16 @@ internal sealed class ClauseCompiler
             case BigIntegerTerm big:
                 return _constants.IndexOf(Cell.Big(_program.Symbols.InternBig(big.Value)));
 
+            case RationalTerm rational:
+            {
+                PrologNumber value = PrologNumber.FromRational(rational.Numerator, rational.Denominator);
+                Cell cell =
+                    value.IsRational ? Cell.Rational(_program.Symbols.InternRational(value.Numerator, value.Denominator))
+                    : value.IsBig ? Cell.Big(_program.Symbols.InternBig(value.Big))
+                    : Cell.Integer60(value.Integer);
+                return _constants.IndexOf(cell);
+            }
+
             case FloatTerm number:
                 return _constants.IndexOf(Cell.Float(_program.Symbols.InternFloat(number.Value)));
 

@@ -1338,6 +1338,7 @@ internal static class StandardLibrary
         '$has_type'(atomic, X) :- atomic(X).
         '$has_type'(boolean, X) :- ( X == true -> true ; X == false ).
         '$has_type'(callable, X) :- callable(X).
+        '$has_type'(rational, X) :- rational(X).
         '$has_type'(char, X) :- atom(X), atom_length(X, 1).
         '$has_type'(chars, X) :- '$text_list'(X, char).
         '$has_type'(code, X) :- integer(X), X >= 0, X =< 65535.

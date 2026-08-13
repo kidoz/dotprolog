@@ -134,7 +134,7 @@ public sealed class OperatorDeclarationTests
     {
         // The ISO table this engine starts with; the count is asserted so that adding an operator to
         // the defaults has to be a deliberate edit here as well.
-        Assert.Equal("57", PrologTestHost.RunGoal("findall(N, current_op(_, _, N), L), length(L, C), write(C)"));
+        Assert.Equal("58", PrologTestHost.RunGoal("findall(N, current_op(_, _, N), L), length(L, C), write(C)"));
     }
 
     [Theory]

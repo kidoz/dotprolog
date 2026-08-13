@@ -32,4 +32,11 @@ public enum CellTag : byte
     /// table; a value that fits <see cref="Integer"/> is never represented this way.
     /// </summary>
     BigInteger = 7,
+
+    /// <summary>
+    /// A rational number. The payload indexes the interned rational table, whose entries are
+    /// canonical — gcd 1, denominator greater than 1 — so a value with denominator 1 is always
+    /// an integer cell instead.
+    /// </summary>
+    Rational = 8,
 }

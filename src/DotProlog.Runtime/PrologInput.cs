@@ -19,6 +19,7 @@ public readonly record struct PrologInput
     private readonly double _real;
     private readonly PrologInput[]? _items;
     private readonly BigInteger _big;
+    private readonly BigInteger _denominator;
 
     private PrologInput(
         PrologInputKind kind,
@@ -26,7 +27,8 @@ public readonly record struct PrologInput
         long integer,
         double real,
         PrologInput[]? items,
-        BigInteger big = default
+        BigInteger big = default,
+        BigInteger denominator = default
     )
     {
         _kind = kind;
@@ -35,6 +37,7 @@ public readonly record struct PrologInput
         _real = real;
         _items = items;
         _big = big;
+        _denominator = denominator;
     }
 
     /// <summary>An unbound argument, whose value the call is expected to produce.</summary>
@@ -60,6 +63,15 @@ public readonly record struct PrologInput
     /// <summary>Passes an integer, widening to the big representation when it is outside the fixnum range.</summary>
     public static PrologInput Integer(long value) =>
         Cell.FitsInteger(value) ? new PrologInput(PrologInputKind.Integer, null, value, 0, null) : Big(value);
+
+    /// <summary>Passes a rational number, canonicalized; a denominator that divides out passes an integer.</summary>
+    public static PrologInput Rational(BigInteger numerator, BigInteger denominator)
+    {
+        PrologNumber value = PrologNumber.FromRational(numerator, denominator);
+        return value.IsRational
+            ? new PrologInput(PrologInputKind.Rational, null, 0, 0, null, value.Numerator, value.Denominator)
+            : Big(value.Big);
+    }
 
     /// <summary>Passes an integer of any magnitude.</summary>
     public static PrologInput Big(BigInteger value) =>
@@ -96,6 +108,7 @@ public readonly record struct PrologInput
             PrologString text => String(text.Value),
             PrologInteger integer => Integer(integer.Value),
             PrologBigInteger big => Big(big.Value),
+            PrologRational rational => Rational(rational.Numerator, rational.Denominator),
             PrologFloat real => Float(real.Value),
             PrologCompound compound => Compound(compound.Name, [.. compound.Arguments.Select(FromValue)]),
 
@@ -126,6 +139,9 @@ public readonly record struct PrologInput
 
             case PrologInputKind.BigInteger:
                 return Cell.Big(machine.Symbols.InternBig(_big));
+
+            case PrologInputKind.Rational:
+                return Cell.Rational(machine.Symbols.InternRational(_big, _denominator));
 
             case PrologInputKind.Float:
                 return Cell.Float(machine.Symbols.InternFloat(_real));
