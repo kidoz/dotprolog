@@ -111,7 +111,30 @@ public sealed class SwiDifferentialTests
         "format(string(S), '~w', [42]), writeq(S)",
         "atom_string(hi, S), format('~s', [S])",
         "atom_string(ab, S), writeq(S), nl, write(S)",
-        "catch(must_be(string, foo), error(E, _), true), writeq(E)"
+        "catch(must_be(string, foo), error(E, _), true), writeq(E)",
+        // print_message/2 writes to user_error; the leading catch drops SWI's thread
+        // decoration (the flag does not exist here, and the catch swallows that error).
+        "catch(set_prolog_flag(message_context, []), _, true), print_message(error, error(type_error(atom, 1), context(foo/2, _)))",
+        "catch(set_prolog_flag(message_context, []), _, true), print_message(error, error(type_error(atom, []), context(foo/2, _)))",
+        "catch(set_prolog_flag(message_context, []), _, true), print_message(error, error(type_error(atom, f(x)), context(foo/2, _)))",
+        "catch(set_prolog_flag(message_context, []), _, true), print_message(error, error(type_error(evaluable, foo/0), context((is)/2, _)))",
+        "catch(set_prolog_flag(message_context, []), _, true), print_message(error, error(instantiation_error, context(foo/2, _)))",
+        "catch(set_prolog_flag(message_context, []), _, true), print_message(error, error(domain_error(order, x), context(compare/3, _)))",
+        "catch(set_prolog_flag(message_context, []), _, true), print_message(error, error(existence_error(procedure, foo/2), context(bar/1, _)))",
+        "catch(set_prolog_flag(message_context, []), _, true), print_message(error, error(existence_error(stream, mystream), context(close/1, _)))",
+        "catch(set_prolog_flag(message_context, []), _, true), print_message(error, error(permission_error(modify, static_procedure, foo/2), context(assertz/1, _)))",
+        "catch(set_prolog_flag(message_context, []), _, true), print_message(error, error(permission_error(input, stream, user_output), context(get_char/2, _)))",
+        "catch(set_prolog_flag(message_context, []), _, true), print_message(error, error(evaluation_error(zero_divisor), context((is)/2, _)))",
+        "catch(set_prolog_flag(message_context, []), _, true), print_message(error, error(representation_error(max_arity), context(f/1, _)))",
+        "catch(set_prolog_flag(message_context, []), _, true), print_message(error, error(resource_error(memory), context(f/1, _)))",
+        "catch(set_prolog_flag(message_context, []), _, true), print_message(error, error(syntax_error(operator_expected), context(read/1, _)))",
+        "catch(set_prolog_flag(message_context, []), _, true), print_message(error, error(uninstantiation_error(bound), context(open/4, _)))",
+        "catch(set_prolog_flag(message_context, []), _, true), print_message(error, error(weird_error(a, b), context(f/1, _)))",
+        "catch(set_prolog_flag(message_context, []), _, true), print_message(error, error(type_error(atom, 1), context(foo/2, 'extra note')))",
+        "catch(set_prolog_flag(message_context, []), _, true), print_message(warning, format('hello ~w', [world]))",
+        "catch(set_prolog_flag(message_context, []), _, true), catch(set_prolog_flag(verbose, normal), _, true), print_message(informational, format('fyi ~w', [3]))",
+        "catch(set_prolog_flag(message_context, []), _, true), print_message(error, hello_world(42))",
+        "print_message(silent, format('never', [])), write(done)"
     );
 
     // The corpus stays runnable on DotProlog alone, so a corpus typo or a regression in the
@@ -146,8 +169,10 @@ public sealed class SwiDifferentialTests
 
     private static string RunDotProlog(string goal)
     {
+        // One writer for both streams, because the swipl side of the comparison is also
+        // stdout and stderr concatenated. A corpus goal therefore writes to one stream only.
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output };
+        var engine = new PrologEngine { Output = output, Error = output };
 
         LoadResult loaded = engine.ConsultText($":- initialization(({goal})).", "differential.pl");
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));

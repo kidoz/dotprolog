@@ -597,6 +597,166 @@ internal static class StandardLibrary
                 atom_concat(L, Suffix, Name)
             ).
 
+        % --- Messages (print_message/2) ----------------------------------------------
+        % SWI's message system sized to this machine: the message term becomes a list
+        % of Format-Args lines, a user-defined message_hook/3 may intercept it, and
+        % what remains goes to user_error behind the kind's prefix. The wording of the
+        % error(Formal, Context) translations is SWI 10's; the location, thread, and
+        % did-you-mean decorations SWI adds around that text are not reproduced.
+
+        print_message(Kind, Message) :-
+            (   var(Kind)
+            ->  instantiation_error(Kind)
+            ;   '$message_prints'(Kind)
+            ->  '$message_lines'(Message, Lines),
+                (   current_predicate(message_hook/3),
+                    message_hook(Message, Kind, Lines)
+                ->  true
+                ;   '$message_output'(Kind, Lines)
+                )
+            ;   true
+            ).
+
+        % silent is never printed; debug(Topic) is not either, matching SWI with no
+        % debug topic enabled — this machine has no debug/1 to enable one.
+        '$message_prints'(silent) :- !, fail.
+        '$message_prints'(debug(_)) :- !, fail.
+        '$message_prints'(_).
+
+        '$message_prefix'(error, 'ERROR: ') :- !.
+        '$message_prefix'(warning, 'Warning: ') :- !.
+        '$message_prefix'(informational, '% ') :- !.
+        '$message_prefix'(_, '').
+
+        '$message_output'(Kind, Lines) :-
+            '$message_prefix'(Kind, Prefix),
+            format(user_error, Prefix, []),
+            '$message_write_lines'(Lines, Prefix),
+            nl(user_error).
+
+        % A line element is Format-Args, a bare format atom, or nl, which starts a
+        % new line behind the same prefix — the shape message_hook/3 also receives.
+        '$message_write_lines'([], _).
+        '$message_write_lines'([E|T], Prefix) :-
+            (   E == nl
+            ->  nl(user_error), format(user_error, Prefix, [])
+            ;   E = Fmt-Args
+            ->  format(user_error, Fmt, Args)
+            ;   format(user_error, E, [])
+            ),
+            '$message_write_lines'(T, Prefix).
+
+        '$message_lines'(Message, ['Unknown message: ~q'-[Message]]) :- var(Message), !.
+        '$message_lines'(error(Formal, Context), Lines) :- !,
+            '$message_caller'(Context, Caller),
+            '$message_formal'(Formal, Body),
+            '$message_extra'(Context, Extra),
+            append(Body, Extra, Tail),
+            append(Caller, Tail, Lines).
+        '$message_lines'(format(Fmt, Args), [Fmt-Args]) :- !.
+        '$message_lines'(Message, ['Unknown message: ~q'-[Message]]).
+
+        % A ground context(Caller, _) puts the caller before the text; the second
+        % context argument, when bound and non-empty, lands after it in parentheses.
+        '$message_caller'(Context, Parts) :-
+            (   nonvar(Context), Context = context(Caller, _), ground(Caller)
+            ->  (   Caller = Module:Name/Arity
+                ->  Parts = ['~q:~q/~w: '-[Module, Name, Arity]]
+                ;   Caller = Name/Arity
+                ->  Parts = ['~q/~w: '-[Name, Arity]]
+                ;   Parts = ['~q: '-[Caller]]
+                )
+            ;   Parts = []
+            ).
+
+        '$message_extra'(Context, Parts) :-
+            (   nonvar(Context), Context = context(_, Msg), nonvar(Msg), Msg \== ''
+            ->  Parts = [' (~w)'-[Msg]]
+            ;   Parts = []
+            ).
+
+        % SWI writes culprits with print/1 — quoted; ~q is this machine's equivalent.
+        '$message_formal'(Formal, ['Unknown error term: ~q'-[Formal]]) :- var(Formal), !.
+        '$message_formal'(resource_error(M), ['Not enough resources: ~w'-[M]]) :- !.
+        '$message_formal'(type_error(evaluable, A), ['Arithmetic: `~q'' is not a function'-[A]]) :-
+            callable(A), !.
+        '$message_formal'(type_error(E, A), Lines) :- !,
+            '$message_type'(A, Type),
+            '$message_article'(Type, Article),
+            Lines = ['Type error: `~w'' expected, found `~q'''-[E, A], ' (~w ~w)'-[Article, Type]].
+        '$message_formal'(domain_error(D, A), Lines) :- !,
+            (   nonvar(D), D = range(Low, High)
+            ->  Lines = ['Domain error: [~q..~q] expected, found `~q'''-[Low, High, A]]
+            ;   Lines = ['Domain error: `~w'' expected, found `~q'''-[D, A]]
+            ).
+        '$message_formal'(instantiation_error, ['Arguments are not sufficiently instantiated']) :- !.
+        '$message_formal'(uninstantiation_error(V), ['Uninstantiated argument expected, found ~q'-[V]]) :- !.
+        '$message_formal'(representation_error(W), ['Cannot represent due to `~w'''-[W]]) :- !.
+        '$message_formal'(permission_error(Action, Type, Object), Lines) :- !,
+            '$message_permission'(Action, Type, Object, Lines).
+        '$message_formal'(evaluation_error(W), ['Arithmetic: evaluation error: `~q'''-[W]]) :- !.
+        '$message_formal'(existence_error(procedure, P), ['Unknown procedure: ~q'-[P]]) :- !.
+        '$message_formal'(existence_error(T, O), ['~w `~q'' does not exist'-[T, O]]) :- !.
+        '$message_formal'(occurs_check(V, T), ['Cannot unify ~q with ~q: would create an infinite tree'-[V, T]]) :- !.
+        '$message_formal'(syntax_error(Id), ['Syntax error: '|Rest]) :- !,
+            '$message_syntax'(Id, Rest).
+        '$message_formal'(Formal, ['Unknown error term: ~q'-[Formal]]).
+
+        '$message_permission'(Action, static_procedure, P, ['No permission to ~w static procedure `~q'''-[Action, P]]) :- !.
+        '$message_permission'(input, stream, S, ['No permission to read from output stream `~q'''-[S]]) :- !.
+        '$message_permission'(output, stream, S, ['No permission to write to input stream `~q'''-[S]]) :- !.
+        '$message_permission'(input, text_stream, S, ['No permission to read bytes from TEXT stream `~q'''-[S]]) :- !.
+        '$message_permission'(output, text_stream, S, ['No permission to write bytes to TEXT stream `~q'''-[S]]) :- !.
+        '$message_permission'(input, binary_stream, S, ['No permission to read characters from binary stream `~q'''-[S]]) :- !.
+        '$message_permission'(output, binary_stream, S, ['No permission to write characters to binary stream `~q'''-[S]]) :- !.
+        '$message_permission'(open, source_sink, alias(A), ['No permission to reuse alias "~q": already taken'-[A]]) :- !.
+        '$message_permission'(Action, Type, Object, ['No permission to ~w ~w `~q'''-[Action, Type, Object]]).
+
+        '$message_syntax'(Id, [Text]) :- nonvar(Id), '$message_syntax_text'(Id, Text), !.
+        '$message_syntax'(punct(P, E), ['Unexpected `~w'' before `~w'''-[P, E]]) :- !.
+        '$message_syntax'(undefined_char_escape(C), ['Unknown character escape in quoted atom or string: `\\~w'''-[C]]) :- !.
+        '$message_syntax'(Id, ['~w'-[Id]]).
+
+        '$message_syntax_text'(end_of_clause, 'Unexpected end of clause').
+        '$message_syntax_text'(end_of_clause_expected, 'End of clause expected').
+        '$message_syntax_text'(end_of_file, 'Unexpected end of file').
+        '$message_syntax_text'(end_of_file_in_block_comment, 'End of file in /* ... */ comment').
+        '$message_syntax_text'(illegal_number, 'Illegal number').
+        '$message_syntax_text'(operator_clash, 'Operator priority clash').
+        '$message_syntax_text'(operator_expected, 'Operator expected').
+        '$message_syntax_text'(operator_balance, 'Unbalanced operator').
+        '$message_syntax_text'(quoted_punctuation, 'Operand expected, unquoted comma or bar found').
+        '$message_syntax_text'(list_rest, 'Unexpected comma or bar in rest of list').
+        '$message_syntax_text'(cannot_start_term, 'Illegal start of term').
+        '$message_syntax_text'(void_not_allowed, 'Empty argument list "()"').
+
+        % SWI's culprit classification, in its wording — [] classifies as empty_list
+        % even though ISO (and this machine) make [] an atom. The cyclic check comes
+        % before the list walk because the walk must not chase a cycle.
+        '$message_type'(T, Type) :-
+            (   var(T) -> Type = var
+            ;   T == [] -> Type = empty_list
+            ;   atom(T) -> Type = atom
+            ;   integer(T) -> Type = integer
+            ;   string(T) -> Type = string
+            ;   float(T) -> Type = float
+            ;   \+ acyclic_term(T) -> Type = cyclic
+            ;   is_list(T) -> Type = list
+            ;   T = [_|_] -> '$message_list_type'(T, Type)
+            ;   Type = compound
+            ).
+
+        '$message_list_type'(T, Type) :-
+            '$message_list_tail'(T, Tail),
+            ( var(Tail) -> Type = partial_list ; Type = invalid_list ).
+
+        '$message_list_tail'([_|T], Tail) :-
+            ( nonvar(T), T = [_|_] -> '$message_list_tail'(T, Tail) ; Tail = T ).
+
+        '$message_article'(Type, Article) :-
+            sub_atom(Type, 0, 1, _, First),
+            ( memberchk(First, [a, e, i, o, u]) -> Article = an ; Article = a ).
+
         % Reading and writing a term as an atom, which is what with_output_to/2 and
         % read_term_from_atom/3 make possible without a file anywhere in sight.
         term_to_atom(Term, Atom) :-
