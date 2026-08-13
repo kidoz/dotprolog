@@ -523,6 +523,9 @@ public sealed class PrologEngine : IRuntimeCompiler
                 case ("double_quotes", "atom"):
                     _program.Flags.DoubleQuotes = DoubleQuotesMode.Atom;
                     break;
+                case ("double_quotes", "string") when _program.LanguageMode != PrologLanguageMode.StrictIso:
+                    _program.Flags.DoubleQuotes = DoubleQuotesMode.String;
+                    break;
                 case ("unknown", "error"):
                     _program.Flags.Unknown = UnknownProcedureAction.Error;
                     break;

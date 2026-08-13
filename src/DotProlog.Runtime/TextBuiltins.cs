@@ -9,9 +9,9 @@ namespace DotProlog.Runtime;
 /// </summary>
 /// <remarks>
 /// <para>
-/// An atom is the only text term this engine has — there is no string type — so the SWI-Prolog
-/// string predicates are absent rather than aliased to their atom counterparts. Aliasing would let
-/// portable code compile here and then behave differently, which is worse than not compiling.
+/// The atom predicates here accept atoms and numbers only: the string term (ADR 0047) has its own
+/// library in <see cref="StringBuiltins"/>, and the phase that would loosen these predicates to
+/// accept strings the way SWI's do was deliberately deferred, keeping their ISO errors intact.
 /// </para>
 /// <para>
 /// A character is a one-character atom and a code is its UTF-16 code unit, so a character outside

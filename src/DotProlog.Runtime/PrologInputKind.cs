@@ -9,6 +9,9 @@ internal enum PrologInputKind
     /// <summary>An atom.</summary>
     Atom,
 
+    /// <summary>A string term.</summary>
+    String,
+
     /// <summary>An integer.</summary>
     Integer,
 

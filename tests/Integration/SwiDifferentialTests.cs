@@ -88,7 +88,30 @@ public sealed class SwiDifferentialTests
         "with_output_to(atom(A), portray_clause((foo(V, W) :- bar(V), baz(W)))), write(A)",
         "with_output_to(atom(A), portray_clause((p :- (a -> b ; c)))), write(A)",
         "with_output_to(atom(A), portray_clause((p :- q, (a, b ; c)))), write(A)",
-        "with_output_to(atom(A), portray_clause(f('A b', [1, 2]))), write(A)"
+        "with_output_to(atom(A), portray_clause(f('A b', [1, 2]))), write(A)",
+        "atom_string(ab, S), ( string(S) -> write(yes) ; write(no) ), writeq(S)",
+        "atom_string(b, S), msort([f(x), a, S, 1], L), writeq(L)",
+        "atom_string(ab, S), ( S == ab -> write(eq) ; write(neq) ), ( atom(S) -> write(a) ; write(na) ), ( atomic(S) -> write(t) ; write(nt) )",
+        "string_concat(ab, cd, R), writeq(R)",
+        "atom_string(abcd, W), string_concat(ab, B, W), writeq(B)",
+        "atom_string(ab, W), findall(A-B, string_concat(A, B, W), L), writeq(L)",
+        "string_to_atom(S, foo), writeq(S), string_to_atom(baz, B), writeq(B)",
+        "string_chars(S, [a, b]), writeq(S), string_codes(S2, [99, 100]), writeq(S2)",
+        "atom_string('42', T), number_string(N, T), writeq(N), number_string(2.5, S), writeq(S)",
+        "atom_string(abc, T), ( number_string(_, T) -> write(yes) ; write(no) )",
+        "split_string('a,b,,c', ',', '', L), writeq(L)",
+        "split_string('/a//b/', '/', '/', L), writeq(L)",
+        "split_string('  hi  ', '', ' ', L), writeq(L)",
+        "sub_string(abcde, 1, 3, A, S), writeq(S-A)",
+        "aggregate_all(count, sub_string(abc, _, _, _, _), N), writeq(N)",
+        "string_code(2, abc, C), writeq(C)",
+        "string_lower('AbC', L), string_upper('AbC', U), writeq(L), writeq(U)",
+        "string_length(foo, N), writeq(N)",
+        "with_output_to(string(S), write(hello)), writeq(S)",
+        "format(string(S), '~w', [42]), writeq(S)",
+        "atom_string(hi, S), format('~s', [S])",
+        "atom_string(ab, S), writeq(S), nl, write(S)",
+        "catch(must_be(string, foo), error(E, _), true), writeq(E)"
     );
 
     // The corpus stays runnable on DotProlog alone, so a corpus typo or a regression in the

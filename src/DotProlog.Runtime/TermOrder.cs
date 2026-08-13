@@ -47,6 +47,7 @@ public static class TermOrder
                     return a.Index.CompareTo(b.Index);
 
                 case CellTag.Atom:
+                case CellTag.String:
                 {
                     var names = string.CompareOrdinal(machine.Symbols.AtomName(a.Index), machine.Symbols.AtomName(b.Index));
                     if (names != 0)
@@ -132,13 +133,16 @@ public static class TermOrder
         return machine.Symbols.GetFloat(a.Index).CompareTo(machine.Symbols.GetFloat(b.Index));
     }
 
+    // Strings rank after numbers and before atoms — SWI-Prolog 10's probed order, which its
+    // manual has not caught up with; see ADR 0047.
     private static int RankOf(Cell cell) =>
         cell.Tag switch
         {
             CellTag.Reference => 0,
             CellTag.Float => 1,
             CellTag.Integer => 2,
-            CellTag.Atom => 3,
-            _ => 4,
+            CellTag.String => 3,
+            CellTag.Atom => 4,
+            _ => 5,
         };
 }

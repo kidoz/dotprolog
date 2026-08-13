@@ -78,6 +78,12 @@ public sealed class GeneratePrologFacade : Task
             return false;
         }
 
+        if (languageMode == PrologLanguageMode.StrictIso && flagOverrides.DoubleQuotes == DoubleQuotesMode.String)
+        {
+            Log.LogError("DotPrologFlags is invalid: double_quotes=string is not available in strict ISO mode.");
+            return false;
+        }
+
         Directory.CreateDirectory(OutputPath);
         List<ITaskItem> generated = [];
 

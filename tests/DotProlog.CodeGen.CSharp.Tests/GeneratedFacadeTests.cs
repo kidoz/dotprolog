@@ -519,6 +519,41 @@ public sealed class GeneratedFacadeTests
     }
 
     [Fact]
+    public void FacadeCarriesStringConstantsThroughGeneratedCode()
+    {
+        ContractReadResult contract = ContractReader.Read(
+            """
+            :- clr_module('Stringy').
+            :- clr_namespace('Generated.Stringy').
+            :- clr_export(check/0, semidet, []).
+            """,
+            "Generated.Stringy",
+            "stringy.dpli"
+        );
+        Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
+
+        var source = FacadeGenerator.Generate(
+            contract.Contract!,
+            """
+            :- set_prolog_flag(double_quotes, string).
+            str_text("hello").
+            check :- str_text(S), string(S), string_length(S, 5), string_concat(S, "!", "hello!").
+            """,
+            "stringy.pl",
+            Runtime.PrologLanguageMode.Extended
+        );
+
+        // The build-time constant reaches the generated installer as a string cell.
+        Assert.Contains("Cell.String(symbols.InternAtom(\"hello\"))", source, StringComparison.Ordinal);
+
+        Assembly assembly = CompileGenerated(source);
+        Type type = assembly.GetType("Generated.Stringy.StringyModule")!;
+        object module = type.GetMethod("Create", BindingFlags.Public | BindingFlags.Static, Type.EmptyTypes)!.Invoke(null, null)!;
+
+        Assert.Equal(true, Call(module, type, "Check"));
+    }
+
+    [Fact]
     public void EntryPointCarriesTheFlagOverrideIntoItsEngine()
     {
         var source = EntryPointGenerator.Generate(

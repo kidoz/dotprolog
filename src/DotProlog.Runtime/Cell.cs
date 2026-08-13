@@ -50,6 +50,9 @@ public readonly struct Cell : IEquatable<Cell>
     /// <summary>Creates a float cell referring to interned float <paramref name="floatId"/>.</summary>
     public static Cell Float(int floatId) => Make(CellTag.Float, floatId);
 
+    /// <summary>Creates a string cell whose text is the interned atom <paramref name="atomId"/>.</summary>
+    public static Cell String(int atomId) => Make(CellTag.String, atomId);
+
     /// <summary>Creates an integer cell.</summary>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> does not fit in 60 bits.</exception>
     public static Cell Integer60(long value)

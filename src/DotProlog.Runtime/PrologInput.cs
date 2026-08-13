@@ -39,6 +39,13 @@ public readonly record struct PrologInput
         return new PrologInput(PrologInputKind.Atom, name, 0, 0, null);
     }
 
+    /// <summary>Passes a string term.</summary>
+    public static PrologInput String(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return new PrologInput(PrologInputKind.String, value, 0, 0, null);
+    }
+
     /// <summary>Passes an integer.</summary>
     public static PrologInput Integer(long value) => new(PrologInputKind.Integer, null, value, 0, null);
 
@@ -68,6 +75,7 @@ public readonly record struct PrologInput
         return value switch
         {
             PrologAtom atom => Atom(atom.Name),
+            PrologString text => String(text.Value),
             PrologInteger integer => Integer(integer.Value),
             PrologFloat real => Float(real.Value),
             PrologCompound compound => Compound(compound.Name, [.. compound.Arguments.Select(FromValue)]),
@@ -90,6 +98,9 @@ public readonly record struct PrologInput
 
             case PrologInputKind.Atom:
                 return Cell.Atom(machine.Symbols.InternAtom(_text!));
+
+            case PrologInputKind.String:
+                return Cell.String(machine.Symbols.InternAtom(_text!));
 
             case PrologInputKind.Integer:
                 return Cell.Integer60(_integer);

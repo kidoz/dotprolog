@@ -134,6 +134,11 @@ internal sealed class DcgTranslator
             case StringTerm text:
                 return TryTranslateBody(TermNormalizer.Normalize(text), start, end, out goal);
 
+            // A string literal in a grammar body matches its code list even when double_quotes
+            // is string — SWI-Prolog 10's probed behavior (ADR 0047).
+            case StringValueTerm text:
+                return TryTranslateBody(TermNormalizer.Normalize(new StringTerm(text.Value, text.Span)), start, end, out goal);
+
             case AtomTerm { Name: "[]" }:
                 goal = Unify(start, end, element.Span);
                 return true;

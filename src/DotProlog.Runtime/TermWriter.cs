@@ -216,6 +216,10 @@ public static class TermWriter
                 output.Write(FloatText(machine.Symbols.GetFloat(cell.Index)));
                 return;
 
+            case CellTag.String:
+                output.Write(StringText(machine.Symbols.AtomName(cell.Index), quoted));
+                return;
+
             case CellTag.Structure:
                 break;
 
@@ -486,6 +490,41 @@ public static class TermWriter
     private static string OperatorText(string name, bool quoted) => name == "," ? "," : QuotedAtomText(name, quoted);
 
     private static void WriteAtomText(string name, Emitter output, bool quoted) => output.Write(QuotedAtomText(name, quoted));
+
+    /// <summary>A string writes its bare text, or <c>"..."</c> with the ISO escapes when quoted.</summary>
+    private static string StringText(string text, bool quoted)
+    {
+        if (!quoted)
+        {
+            return text;
+        }
+
+        var quotedText = new System.Text.StringBuilder(text.Length + 2);
+        quotedText.Append('"');
+
+        foreach (var c in text)
+        {
+            _ = c switch
+            {
+                '"' => quotedText.Append("\\\""),
+                '\\' => quotedText.Append("\\\\"),
+                '\a' => quotedText.Append("\\a"),
+                '\b' => quotedText.Append("\\b"),
+                '\f' => quotedText.Append("\\f"),
+                '\n' => quotedText.Append("\\n"),
+                '\r' => quotedText.Append("\\r"),
+                '\t' => quotedText.Append("\\t"),
+                '\v' => quotedText.Append("\\v"),
+                _ when char.IsControl(c) => quotedText
+                    .Append("\\x")
+                    .Append(((int)c).ToString("x", CultureInfo.InvariantCulture))
+                    .Append('\\'),
+                _ => quotedText.Append(c),
+            };
+        }
+
+        return quotedText.Append('"').ToString();
+    }
 
     private static string QuotedAtomText(string name, bool quoted)
     {

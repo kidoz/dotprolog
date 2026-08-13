@@ -74,6 +74,8 @@ internal static class FormatBuiltins
             {
                 case "atom":
                     return machine.Unify(target, Cell.Atom(machine.Symbols.InternAtom(text)));
+                case "string":
+                    return machine.Unify(target, Cell.String(machine.Symbols.InternAtom(text)));
                 case "codes":
                     return machine.Unify(target, TextBuiltins.BuildText(machine, text, chars: false));
                 case "chars":
@@ -197,8 +199,13 @@ internal static class FormatBuiltins
                 break;
 
             case 's':
-                output.Append(TextBuiltins.TextOfList(machine, Next(machine, given, ref next, arguments)));
+            {
+                Cell cell = Next(machine, given, ref next, arguments);
+                output.Append(
+                    cell.Tag == CellTag.String ? machine.Symbols.AtomName(cell.Index) : TextBuiltins.TextOfList(machine, cell)
+                );
                 break;
+            }
 
             case 'W':
             {
@@ -349,7 +356,11 @@ internal static class FormatBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        return format.Tag == CellTag.Atom ? machine.Symbols.AtomName(format.Index) : TextBuiltins.TextOfList(machine, format);
+        return format.Tag switch
+        {
+            CellTag.Atom or CellTag.String => machine.Symbols.AtomName(format.Index),
+            _ => TextBuiltins.TextOfList(machine, format),
+        };
     }
 
     /// <summary>

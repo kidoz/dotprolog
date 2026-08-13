@@ -41,6 +41,11 @@ internal static class TermNormalizer
             return new AtomTerm(text.Value, text.Span);
         }
 
+        if (doubleQuotes == DoubleQuotesMode.String)
+        {
+            return new StringValueTerm(text.Value, text.Span);
+        }
+
         SyntaxTerm result = new AtomTerm(TermReader.EmptyListAtom, text.Span);
 
         for (var i = text.Value.Length - 1; i >= 0; i--)

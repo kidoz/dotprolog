@@ -20,4 +20,10 @@ public enum CellTag : byte
 
     /// <summary>A float. The payload indexes the interned float table.</summary>
     Float = 5,
+
+    /// <summary>
+    /// A string. The payload is an atom identifier: the string shares the interned atom text table
+    /// and differs from the same-text atom only by tag (ADR 0047).
+    /// </summary>
+    String = 6,
 }

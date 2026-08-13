@@ -11,6 +11,9 @@ public enum DoubleQuotesMode
 
     /// <summary>One atom containing the complete text.</summary>
     Atom,
+
+    /// <summary>One string term. An extension value; see ADR 0047.</summary>
+    String,
 }
 
 /// <summary>What a cycle-creating unification does under the <c>occurs_check</c> flag.</summary>

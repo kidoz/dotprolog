@@ -27,9 +27,10 @@ internal static class TermBuiltins
         registry.Register(
             "atomic",
             1,
-            static machine => machine.Argument(0).Tag is CellTag.Atom or CellTag.Integer or CellTag.Float
+            static machine => machine.Argument(0).Tag is CellTag.Atom or CellTag.Integer or CellTag.Float or CellTag.String
         );
         registry.Register("callable", 1, static machine => machine.Argument(0).Tag is CellTag.Atom or CellTag.Structure);
+        registry.Register("string", 1, static machine => machine.Argument(0).Tag == CellTag.String);
         registry.Register("is_list", 1, static machine => TermList.IsProper(machine, machine.Argument(0)));
         registry.Register("ground", 1, static machine => IsGround(machine, machine.Argument(0)));
         registry.Register("acyclic_term", 1, static machine => IsAcyclic(machine, machine.Argument(0)));
@@ -418,7 +419,7 @@ internal static class TermBuiltins
             throw PrologErrors.Type(machine, "compound", term);
         }
 
-        if (!backtrackable && value.Tag is not (CellTag.Atom or CellTag.Integer or CellTag.Float))
+        if (!backtrackable && value.Tag is not (CellTag.Atom or CellTag.Integer or CellTag.Float or CellTag.String))
         {
             throw PrologErrors.Type(machine, "atomic", value);
         }

@@ -96,6 +96,9 @@ internal static class TermReifier
             case CellTag.Float:
                 return new FloatTerm(machine.Symbols.GetFloat(cell.Index), SourceSpan.None);
 
+            case CellTag.String:
+                return new StringValueTerm(machine.Symbols.AtomName(cell.Index), SourceSpan.None);
+
             case CellTag.Structure:
             {
                 Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(cell.Index).Index);
@@ -157,6 +160,9 @@ internal static class TermReifier
 
             case FloatTerm number:
                 return Cell.Float(machine.Symbols.InternFloat(number.Value));
+
+            case StringValueTerm text:
+                return Cell.String(machine.Symbols.InternAtom(text.Value));
 
             case CompoundTerm compound:
             {

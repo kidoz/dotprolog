@@ -656,6 +656,9 @@ internal sealed class ClauseCompiler
             case FloatTerm number:
                 return _constants.IndexOf(Cell.Float(_program.Symbols.InternFloat(number.Value)));
 
+            case StringValueTerm text:
+                return _constants.IndexOf(Cell.String(_program.Symbols.InternAtom(text.Value)));
+
             default:
                 Report(CompilerDiagnosticIds.UnsupportedGoal, $"Cannot lower {term.GetType().Name} to a constant.", term.Span);
                 return _constants.IndexOf(Cell.Atom(_program.Symbols.InternAtom("[]")));

@@ -9,7 +9,7 @@ namespace DotProlog.Runtime;
 public sealed record PrologFlagOverrides
 {
     /// <summary>The accepted entries, spelled as a usage message lists them.</summary>
-    public const string Entries = "double_quotes=codes|chars|atom";
+    public const string Entries = "double_quotes=codes|chars|atom|string";
 
     /// <summary>The empty override set: every flag starts at its mode default.</summary>
     public static PrologFlagOverrides None { get; } = new();
@@ -70,6 +70,7 @@ public sealed record PrologFlagOverrides
                         "codes" => DoubleQuotesMode.Codes,
                         "chars" => DoubleQuotesMode.Chars,
                         "atom" => DoubleQuotesMode.Atom,
+                        "string" => DoubleQuotesMode.String,
                         _ => null,
                     };
                     if (doubleQuotes is null)

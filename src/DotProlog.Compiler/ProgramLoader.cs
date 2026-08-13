@@ -1152,7 +1152,13 @@ public sealed class ProgramLoader
                         break;
                 }
 
-                if (TryDoubleQuotesDirective(goal, out DoubleQuotesMode selected))
+                if (
+                    TryDoubleQuotesDirective(
+                        goal,
+                        _program.LanguageMode != PrologLanguageMode.StrictIso,
+                        out DoubleQuotesMode selected
+                    )
+                )
                 {
                     doubleQuotes = selected;
                     _program.Flags.DoubleQuotes = selected;
@@ -1715,7 +1721,7 @@ public sealed class ProgramLoader
     /// subsequent reader tokens in the same source unit are represented. The directive is still
     /// compiled and run normally so the ordinary builtin owns validation and final runtime state.
     /// </summary>
-    private static bool TryDoubleQuotesDirective(SyntaxTerm goal, out DoubleQuotesMode selected)
+    private static bool TryDoubleQuotesDirective(SyntaxTerm goal, bool allowString, out DoubleQuotesMode selected)
     {
         selected = default;
         if (
@@ -1736,10 +1742,11 @@ public sealed class ProgramLoader
             "codes" => DoubleQuotesMode.Codes,
             "chars" => DoubleQuotesMode.Chars,
             "atom" => DoubleQuotesMode.Atom,
+            "string" when allowString => DoubleQuotesMode.String,
             _ => default,
         };
 
-        return value.Name is "codes" or "chars" or "atom";
+        return value.Name is "codes" or "chars" or "atom" || (allowString && value.Name == "string");
     }
 
     /// <summary>Handles <c>:- dynamic Name/Arity</c>, a comma sequence of them, or a list of them.</summary>
@@ -1972,6 +1979,7 @@ public sealed class ProgramLoader
             AtomTerm atom => Cell.Atom(_program.Symbols.InternAtom(atom.Name)),
             IntegerTerm integer when Cell.FitsInteger(integer.Value) => Cell.Integer60(integer.Value),
             FloatTerm floating => Cell.Float(_program.Symbols.InternFloat(floating.Value)),
+            StringValueTerm text => Cell.String(_program.Symbols.InternAtom(text.Value)),
             CompoundTerm structure => Cell.Functor(_program.Symbols.InternFunctor(structure.Name, structure.Arity)),
             _ => ClauseIndexing.AnyKey,
         };

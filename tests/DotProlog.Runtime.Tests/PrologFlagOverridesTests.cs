@@ -20,6 +20,7 @@ public sealed class PrologFlagOverridesTests
     [InlineData("double_quotes=codes", DoubleQuotesMode.Codes)]
     [InlineData("double_quotes=chars", DoubleQuotesMode.Chars)]
     [InlineData("double_quotes=atom", DoubleQuotesMode.Atom)]
+    [InlineData("double_quotes=string", DoubleQuotesMode.String)]
     [InlineData(" Double_Quotes = ATOM ;", DoubleQuotesMode.Atom)]
     public void DoubleQuotesEntryParses(string text, DoubleQuotesMode expected)
     {
@@ -30,7 +31,7 @@ public sealed class PrologFlagOverridesTests
 
     [Theory]
     [InlineData("double_quotes", "not a name=value pair")]
-    [InlineData("double_quotes=string", "not a double_quotes value")]
+    [InlineData("double_quotes=strings", "not a double_quotes value")]
     [InlineData("occurs_check=true", "not an overridable flag")]
     [InlineData("double_quotes=codes;double_quotes=chars", "more than once")]
     public void InvalidTextIsRejectedWithTheReason(string text, string reason)

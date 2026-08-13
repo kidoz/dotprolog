@@ -69,6 +69,14 @@ public sealed class BytecodeProgram
             throw new ArgumentOutOfRangeException(nameof(languageMode), languageMode, "Unknown Prolog language mode.");
         }
 
+        if (languageMode == PrologLanguageMode.StrictIso && flagOverrides?.DoubleQuotes == DoubleQuotesMode.String)
+        {
+            throw new ArgumentException(
+                "double_quotes=string is an extension value and is not available in strict ISO mode.",
+                nameof(flagOverrides)
+            );
+        }
+
         LanguageMode = languageMode;
         InitialDoubleQuotes = flagOverrides?.DoubleQuotes ?? InitialDoubleQuotesOf(languageMode);
         Flags.DoubleQuotes = InitialDoubleQuotes;

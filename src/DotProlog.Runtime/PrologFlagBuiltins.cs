@@ -125,11 +125,17 @@ internal static class PrologFlagBuiltins
 
     private static bool SetDoubleQuotes(Machine machine, PrologFlags flags, string flag, Cell value)
     {
-        var atom = RequireValue(machine, flag, value, "codes", "chars", "atom");
+        // The string value is an extension gated by mode, the occurs_check pattern (ADR 0047):
+        // StrictIso keeps the ISO domain of three values.
+        var atom =
+            machine.Program.LanguageMode == PrologLanguageMode.StrictIso
+                ? RequireValue(machine, flag, value, "codes", "chars", "atom")
+                : RequireValue(machine, flag, value, "codes", "chars", "atom", "string");
         flags.DoubleQuotes = atom switch
         {
             "codes" => DoubleQuotesMode.Codes,
             "chars" => DoubleQuotesMode.Chars,
+            "string" => DoubleQuotesMode.String,
             _ => DoubleQuotesMode.Atom,
         };
         return true;
@@ -215,6 +221,7 @@ internal static class PrologFlagBuiltins
         {
             DoubleQuotesMode.Codes => "codes",
             DoubleQuotesMode.Chars => "chars",
+            DoubleQuotesMode.String => "string",
             _ => "atom",
         };
 

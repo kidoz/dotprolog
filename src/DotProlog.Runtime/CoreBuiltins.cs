@@ -152,6 +152,7 @@ public static class CoreBuiltins
         registry.Register("$qualify", 3, Qualify);
 
         TextBuiltins.Register(registry);
+        StringBuiltins.Register(registry);
         OperatorBuiltins.Register(registry);
         StreamBuiltins.Register(registry);
         SortBuiltins.Register(registry);

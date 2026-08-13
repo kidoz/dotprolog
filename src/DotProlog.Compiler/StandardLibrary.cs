@@ -314,6 +314,7 @@ internal static class StandardLibrary
         '$sink'(atom(A), Text) :- !, A = Text.
         '$sink'(codes(C), Text) :- !, atom_codes(Text, C).
         '$sink'(chars(C), Text) :- !, atom_chars(Text, C).
+        '$sink'(string(S), Text) :- !, atom_string(Text, S).
         '$sink'(Sink, _) :- throw(error(domain_error(output_sink, Sink), with_output_to/2)).
 
         % --- Formatted output -------------------------------------------------------
@@ -349,7 +350,7 @@ internal static class StandardLibrary
 
         '$format_capture_sink'(Sink) :-
             nonvar(Sink),
-            ( Sink = atom(_) ; Sink = codes(_) ; Sink = chars(_) ).
+            ( Sink = atom(_) ; Sink = codes(_) ; Sink = chars(_) ; Sink = string(_) ).
 
         '$format_stop'(stopped(fail)) :- fail.
         '$format_stop'(stopped(throw(Ball))) :- throw(Ball).
@@ -366,6 +367,7 @@ internal static class StandardLibrary
 
         '$format_codes'(Text, Codes) :-
             (   atom(Text) -> atom_codes(Text, Codes)
+            ;   string(Text) -> string_codes(Text, Codes)
             ;   is_list(Text) -> '$format_list_codes'(Text, Codes)
             ;   fail
             ).
@@ -610,6 +612,55 @@ internal static class StandardLibrary
 
         atom_to_term(Atom, Term, Bindings) :-
             read_term_from_atom(Atom, Term, [variable_names(Bindings)]).
+
+        % --- Strings (ADR 0047) ------------------------------------------------------
+        % The nondeterministic string predicates enumerate through between/3 over the
+        % native slicing primitives; bound arguments filter by converted content, so
+        % an atom or number is accepted wherever SWI accepts one.
+
+        string_concat(Left, Right, Whole) :-
+            (   '$string_text'(Left), '$string_text'(Right)
+            ->  '$string_concat'(Left, Right, Whole)
+            ;   '$string_text'(Whole)
+            ->  string_length(Whole, Total),
+                between(0, Total, Cut),
+                Length is Total - Cut,
+                '$string_slice'(Whole, 0, Cut, LeftSlice),
+                '$string_slice'(Whole, Cut, Length, RightSlice),
+                '$string_part'(Left, LeftSlice),
+                '$string_part'(Right, RightSlice)
+            ;   instantiation_error(Whole)
+            ).
+
+        sub_string(String, Before, Length, After, Sub) :-
+            string_length(String, Total),
+            between(0, Total, Before),
+            Rest is Total - Before,
+            between(0, Rest, Length),
+            After is Total - Before - Length,
+            '$string_slice'(String, Before, Length, Slice),
+            '$string_part'(Sub, Slice).
+
+        string_code(Index, String, Code) :-
+            string_length(String, Length),
+            between(1, Length, Index),
+            '$string_code'(Index, String, Code).
+
+        term_string(Term, String) :-
+            (   '$string_text'(String)
+            ->  string_to_atom(String, Atom),
+                term_to_atom(Term, Atom)
+            ;   term_to_atom(Term, Atom),
+                atom_string(Atom, String)
+            ).
+
+        '$string_text'(Text) :- nonvar(Text), ( string(Text) ; atom(Text) ; number(Text) ), !.
+
+        '$string_part'(Given, Slice) :-
+            (   var(Given)
+            ->  Given = Slice
+            ;   '$as_string'(Given, Slice)
+            ).
 
         % --- Term utilities ----------------------------------------------------------
         % numbervars/3 binds each distinct variable in Term to '$VAR'(N), the term the
@@ -1145,9 +1196,11 @@ internal static class StandardLibrary
         '$has_type'(oneof(L), X) :- ground(X), memberchk(X, L).
         '$has_type'(pair, X) :- nonvar(X), X = _-_.
         '$has_type'(positive_integer, X) :- integer(X), X > 0.
+        '$has_type'(string, X) :- string(X).
         '$has_type'(symbol, X) :- atom(X).
         '$has_type'(text, X) :-
             (   atom(X) -> true
+            ;   string(X) -> true
             ;   '$text_list'(X, char) -> true
             ;   '$text_list'(X, code)
             ).
@@ -1193,6 +1246,7 @@ internal static class StandardLibrary
         '$known_type'(positive_integer).
         '$known_type'(proper_list).
         '$known_type'(symbol).
+        '$known_type'(string).
         '$known_type'(text).
         '$known_type'(var).
 

@@ -83,6 +83,7 @@ public abstract record PrologValue
         cell.Tag switch
         {
             CellTag.Atom => new PrologAtom(machine.Symbols.AtomName(cell.Index)),
+            CellTag.String => new PrologString(machine.Symbols.AtomName(cell.Index)),
             CellTag.Integer => new PrologInteger(cell.Integer),
             CellTag.Float => new PrologFloat(machine.Symbols.GetFloat(cell.Index)),
             CellTag.Reference => new PrologVariable(string.Create(CultureInfo.InvariantCulture, $"_G{cell.Index}")),
