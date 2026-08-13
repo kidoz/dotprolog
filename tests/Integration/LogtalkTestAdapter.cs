@@ -815,6 +815,36 @@ internal static class LogtalkTestAdapter
     }
 
     /// <summary>
+    /// Extracts the goal of an lgtunit <c>condition(Goal)</c> test option, when the declaration
+    /// carries one. A test whose condition fails is not applicable to the running backend — the
+    /// corpus guards its bounded-arithmetic cases this way.
+    /// </summary>
+    internal static bool TryReadConditionOption(string? options, out string condition)
+    {
+        condition = string.Empty;
+        if (options is null)
+        {
+            return false;
+        }
+
+        var start = options.IndexOf("condition(", StringComparison.Ordinal);
+        if (start < 0)
+        {
+            return false;
+        }
+
+        var opening = start + "condition".Length;
+        var closing = FindMatchingParenthesis(options, opening);
+        if (closing < 0)
+        {
+            return false;
+        }
+
+        condition = options[(opening + 1)..closing];
+        return true;
+    }
+
+    /// <summary>
     /// Translates Logtalk's backend escape braces inside a conditional directive to ordinary Prolog
     /// grouping. The pinned corpus uses these braces only to ask the backend about a capability.
     /// </summary>

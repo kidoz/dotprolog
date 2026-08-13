@@ -487,11 +487,22 @@ public sealed class LogtalkConformanceTests
                 ),
             ];
 
-            Require(directCases.Length == 768, "The applicable direct-case inventory changed.");
+            // lgtunit condition/1 options gate a test on a backend capability. The corpus guards
+            // its bounded-arithmetic cases with condition(current_prolog_flag(bounded, true)),
+            // which stopped holding when integers became unbounded.
+            LogtalkTestDeclaration[] conditionExcludedCases = [.. directCases.Where(test => !ConditionOptionApplies(test))];
+            Require(conditionExcludedCases.Length == 5, "The condition-option inventory changed.");
+            Require(
+                conditionExcludedCases.All(test => test.OutcomeKind == "error"),
+                "A non-error case was excluded by a condition option."
+            );
+            directCases = [.. directCases.Where(ConditionOptionApplies)];
+
+            Require(directCases.Length == 763, "The applicable direct-case inventory changed.");
             Require(directCases.Count(test => test.OutcomeKind == "true") == 455, "The true-case inventory changed.");
             Require(directCases.Count(test => test.OutcomeKind == "false") == 74, "The false-case inventory changed.");
             Require(directCases.Count(test => test.OutcomeKind == "fail") == 3, "The fail-case inventory changed.");
-            Require(directCases.Count(test => test.OutcomeKind == "error") == 154, "The error-case inventory changed.");
+            Require(directCases.Count(test => test.OutcomeKind == "error") == 149, "The error-case inventory changed.");
             Require(directCases.Count(test => test.OutcomeKind == "variant") == 13, "The variant-case inventory changed.");
             Require(directCases.Count(test => test.OutcomeKind == "exists") == 41, "The exists-case inventory changed.");
             Require(directCases.Count(test => test.OutcomeKind == "subsumes") == 3, "The subsumes-case inventory changed.");
@@ -606,13 +617,21 @@ public sealed class LogtalkConformanceTests
             );
         }
 
+        return BackendConditionHolds(LogtalkTestAdapter.TranslateConditionalGoal(declaration.ConditionalGoal));
+    }
+
+    /// <summary>Whether a declaration's lgtunit <c>condition(Goal)</c> option, if any, holds here.</summary>
+    private static bool ConditionOptionApplies(LogtalkTestDeclaration declaration) =>
+        !LogtalkTestAdapter.TryReadConditionOption(declaration.Options, out var condition) || BackendConditionHolds(condition);
+
+    private static bool BackendConditionHolds(string condition)
+    {
         var engine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
         engine.Program.Builtins.Register("current_logtalk_flag", 2, CurrentLogtalkFlag);
         // The corpus's operating-system conditionals select newline expectations. DotProlog's text
         // convention is '\n' on every platform — nl/0 writes a bare line feed — so the unix branch
         // is the applicable one everywhere, including Windows hosts.
         engine.Program.Builtins.Register("$logtalk_is_windows", 0, static _ => false);
-        var condition = LogtalkTestAdapter.TranslateConditionalGoal(declaration.ConditionalGoal);
         try
         {
             RunResult result = engine.RunGoal(condition, out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics);
