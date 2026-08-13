@@ -8,6 +8,14 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Added
 
+- `print_message/2` with SWI's message system sized to this machine: the message term is
+  translated to `Format-Args` lines, a user-defined `message_hook/3` may intercept them, and what
+  remains is written to `user_error` behind SWI's kind prefixes (`ERROR: `, `Warning: `, `% `).
+  The `error(Formal, Context)` translations follow SWI 10's wording — including the culprit
+  classification of type errors and the special-cased permission and existence messages — and are
+  verified against SWI-Prolog by the differential corpus. `silent` and `debug(_)` messages are
+  not printed; SWI's source-location and thread decorations are not reproduced.
+
 - A string term type: `"..."` reads as a distinct interned string under
   `set_prolog_flag(double_quotes, string)` — an extension value available in the `Extended` and
   `Modern` modes and gated out of `StrictIso`; no mode defaults to it. `string/1` is true of a
