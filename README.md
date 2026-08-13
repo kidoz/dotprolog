@@ -15,7 +15,7 @@ Russian whose examples all run on DotProlog.
 works today, and `dotnet test` discovers Prolog tests under Microsoft.Testing.Platform. What is
 missing: the `plc` compiler and generating IL for predicate bodies — a `.dplproj` currently embeds
 its Prolog source and compiles it to bytecode at startup. The packages have been on NuGet.org since
-0.2.0 and the current release is 0.5.0: see [CHANGELOG.md](CHANGELOG.md) and
+0.2.0 and the current release is 0.7.0: see [CHANGELOG.md](CHANGELOG.md) and
 [COMPATIBILITY.md](COMPATIBILITY.md).
 
 ## Hello, world
@@ -467,7 +467,7 @@ typed library for C#, F#, and VB; and `prolog-test` creates a Prolog test execut
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
-  <Sdk Name="DotProlog.Sdk" Version="0.5.0" />
+  <Sdk Name="DotProlog.Sdk" Version="0.7.0" />
 ```
 
 A `.dplproj` publishes with NativeAOT like any other project:
@@ -476,7 +476,7 @@ A `.dplproj` publishes with NativeAOT like any other project:
 $ dotnet publish HelloProlog -c Release -r osx-arm64 -p:PublishAot=true
 ```
 
-The packages are published on NuGet.org as `DotProlog.*`, starting at 0.2.0 and currently at 0.5.0.
+The packages are published on NuGet.org as `DotProlog.*`, starting at 0.2.0 and currently at 0.7.0.
 The commands above are also verified against a local feed built by `dotnet pack`, so they work
 before a version ships.
 
@@ -552,7 +552,7 @@ version, because the release notes are extracted from it.
 # 1. Move the version's changelog heading from "unreleased" to today's date, and add its link ref.
 # 2. Set VersionPrefix in Directory.Build.props if the version is changing.
 # 3. Commit and push, wait for CI, then:
-git tag v0.5.0 && git push origin v0.5.0
+git tag v0.7.0 && git push origin v0.7.0
 ```
 
 The publication job authenticates by trusted publishing: it
