@@ -3,7 +3,7 @@ using DotProlog.Runtime;
 namespace DotProlog.Compiler.Tests;
 
 /// <summary>
-/// The interned string term of ADR 0047: a seventh cell tag over the atom text table, the
+/// The interned string term: a seventh cell tag over the atom text table, the
 /// double_quotes string value gated out of strict mode, SWI's probed standard-order slot between
 /// numbers and atoms, and the string library. Expected values are pinned against SWI-Prolog 10.
 /// </summary>
@@ -42,7 +42,7 @@ public sealed class StringTypeTests
         );
 
     // SWI-Prolog 10 sorts strings after numbers and before atoms; its manual still documents the
-    // older order, and the probe wins (ADR 0047).
+    // older order, and the probe wins.
     [Fact]
     public void StandardOrderPlacesStringsBetweenNumbersAndAtoms() =>
         Assert.Equal("[2.5,1,\"a\",\"b\",zz,f(x)]", RunString("msort([f(x), zz, \"b\", 1, 2.5, \"a\"], L), writeq(L)"));

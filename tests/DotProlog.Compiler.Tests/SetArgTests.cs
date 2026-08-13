@@ -3,7 +3,7 @@ using DotProlog.Runtime;
 namespace DotProlog.Compiler.Tests;
 
 /// <summary>
-/// setarg/3 and nb_setarg/3 per ADR 0044: destructive slot assignment restored by the value-undo
+/// setarg/3 and nb_setarg/3: destructive slot assignment restored by the value-undo
 /// stack interleaved with trail unwinding. The tests pin transitions — assign, backtrack,
 /// reassign, bind-then-assign on one slot — rather than only final answers.
 /// </summary>

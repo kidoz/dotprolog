@@ -10,7 +10,7 @@ namespace DotProlog.CodeGen.CSharp;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The determinism of each export decides its signature, per [ADR 0006]: <c>det</c> returns its
+/// The determinism of each export decides its signature, per the facade contract: <c>det</c> returns its
 /// output, <c>semidet</c> returns <see langword="bool"/> or a <c>TryX</c> pair, and <c>multi</c> and
 /// <c>nondet</c> return an enumerable that streams solutions as the caller pulls them.
 /// </para>
@@ -329,7 +329,7 @@ public static class FacadeGenerator
     private static string ResultTypeExpression(ContractExport export) =>
         export.Outputs.Count() switch
         {
-            // nondet with no outputs streams its successes, per ADR 0006's determinism table.
+            // nondet with no outputs streams its successes, per the facade determinism table.
             0 => "global::DotProlog.Runtime.Unit",
             1 => export.Outputs.First().Type.ClrTypeName,
             _ => ResultTypeName(export),

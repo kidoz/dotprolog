@@ -3,7 +3,7 @@ using DotProlog.Runtime;
 namespace DotProlog.Compiler.Tests;
 
 /// <summary>
-/// The facade shape ADR 0006 specifies, hand-written against <see cref="PrologHost"/>.
+/// The facade shape the contract specifies, hand-written against <see cref="PrologHost"/>.
 /// </summary>
 /// <remarks>
 /// This is the target the code generator has to emit, written out by hand first so the invocation

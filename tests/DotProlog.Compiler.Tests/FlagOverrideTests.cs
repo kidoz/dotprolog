@@ -2,7 +2,7 @@ using DotProlog.Runtime;
 
 namespace DotProlog.Compiler.Tests;
 
-/// <summary>Initial flag overrides layered over a language mode's defaults (ADR 0048).</summary>
+/// <summary>Initial flag overrides layered over a language mode's defaults.</summary>
 public sealed class FlagOverrideTests
 {
     private static PrologEngine Engine(PrologLanguageMode languageMode, DoubleQuotesMode doubleQuotes) =>

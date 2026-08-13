@@ -3,7 +3,7 @@ using DotProlog.Runtime;
 namespace DotProlog.Compiler.Tests;
 
 /// <summary>
-/// setup_call_cleanup/3 and call_cleanup/2 per ADR 0043: cleanup runs exactly once on a
+/// setup_call_cleanup/3 and call_cleanup/2: cleanup runs exactly once on a
 /// deterministic exit, on the redo that exhausts the alternatives, on failure, and on a thrown
 /// ball, with the SWI ball-precedence rules probed against SWI-Prolog 10.
 /// </summary>

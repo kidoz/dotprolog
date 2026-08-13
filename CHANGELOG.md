@@ -8,7 +8,7 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Added
 
-- A string term type (ADR 0047): `"..."` reads as a distinct interned string under
+- A string term type: `"..."` reads as a distinct interned string under
   `set_prolog_flag(double_quotes, string)` — an extension value available in the `Extended` and
   `Modern` modes and gated out of `StrictIso`; no mode defaults to it. `string/1` is true of a
   string, `atom/1` false, `atomic/1` true; unification is identity; `write/1` emits the bare text
@@ -350,7 +350,7 @@ nothing on NuGet.org — so its content is folded in here and this release is 0.
   of source files changes — not only when a surviving file's timestamp moves.
 - Contract mistakes that previously escaped into raw C# compiler errors — or crashed the build
   task — are reported as `DPL2011`–`DPL2014` diagnostics, and a `nondet` export with no outputs
-  streams one unit value per solution as ADR 0006 promises.
+  streams one unit value per solution as the facade contract promises.
 - Prolog test projects honour run filters, capture `user_error` into failure reports, and fail a
   looping test after a configurable per-test timeout instead of hanging `dotnet test`.
 

@@ -835,7 +835,7 @@ public sealed class PrologEngine : IRuntimeCompiler
     // The key walks the goal exactly as TermReifier.ToControlSyntax does — depth-first, left to
     // right, one ordinal per distinct cell address, structures in leaf positions abstracted the
     // same way variables are — so the variable list stays aligned with the compiled head's
-    // first-occurrence argument order (ADR 0045).
+    // first-occurrence argument order.
     private static string ControlGoalKey(Machine machine, Cell goal, out List<Cell> variables)
     {
         var key = new System.Text.StringBuilder();

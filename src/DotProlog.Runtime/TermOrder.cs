@@ -134,7 +134,7 @@ public static class TermOrder
     }
 
     // Strings rank after numbers and before atoms — SWI-Prolog 10's probed order, which its
-    // manual has not caught up with; see ADR 0047.
+    // manual has not caught up with.
     private static int RankOf(Cell cell) =>
         cell.Tag switch
         {

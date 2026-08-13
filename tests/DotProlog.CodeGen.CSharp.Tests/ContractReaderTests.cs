@@ -277,7 +277,7 @@ public sealed class ContractReaderTests
     [Fact]
     public void AMultiExportWithNoOutputsIsRejected()
     {
-        // ADR 0006 defines no signature for this shape.
+        // The facade contract defines no signature for this shape.
         Assert.Equal(
             CodeGenDiagnosticIds.MultiExportNeedsOutput,
             ErrorId(":- clr_module('M').\n:- clr_export(p/1, multi, [in(v, atom)]).")
@@ -287,7 +287,7 @@ public sealed class ContractReaderTests
     [Fact]
     public void ANondetExportWithNoOutputsIsAccepted()
     {
-        // Its facade streams a Unit per solution, per ADR 0006's determinism table.
+        // Its facade streams a Unit per solution, per the facade determinism table.
         ModuleContract contract = ReadValid(":- clr_module('M').\n:- clr_export(p/1, nondet, [in(v, atom)]).");
 
         Assert.Empty(contract.Exports[0].Outputs);

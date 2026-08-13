@@ -42,6 +42,6 @@ public static class CodeGenDiagnosticIds
     /// <summary>An exported predicate or argument name does not map to a C# identifier.</summary>
     public const string NameDoesNotMapToIdentifier = "DPL2013";
 
-    /// <summary>A <c>multi</c> export declares no outputs, a shape ADR 0006 leaves undefined.</summary>
+    /// <summary>A <c>multi</c> export declares no outputs, a shape the facade contract leaves undefined.</summary>
     public const string MultiExportNeedsOutput = "DPL2014";
 }

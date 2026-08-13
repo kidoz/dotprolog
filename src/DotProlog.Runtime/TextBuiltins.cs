@@ -9,7 +9,7 @@ namespace DotProlog.Runtime;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The atom predicates here accept atoms and numbers only: the string term (ADR 0047) has its own
+/// The atom predicates here accept atoms and numbers only: the string term has its own
 /// library in <see cref="StringBuiltins"/>, and the phase that would loosen these predicates to
 /// accept strings the way SWI's do was deliberately deferred, keeping their ISO errors intact.
 /// </para>

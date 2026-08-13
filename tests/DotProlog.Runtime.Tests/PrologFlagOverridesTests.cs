@@ -1,6 +1,6 @@
 namespace DotProlog.Runtime.Tests;
 
-/// <summary>The shared name=value spelling of initial flag overrides (ADR 0048).</summary>
+/// <summary>The shared name=value spelling of initial flag overrides.</summary>
 public sealed class PrologFlagOverridesTests
 {
     [Theory]

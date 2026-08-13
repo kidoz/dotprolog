@@ -125,7 +125,7 @@ internal static class PrologFlagBuiltins
 
     private static bool SetDoubleQuotes(Machine machine, PrologFlags flags, string flag, Cell value)
     {
-        // The string value is an extension gated by mode, the occurs_check pattern (ADR 0047):
+        // The string value is an extension gated by mode, the occurs_check pattern:
         // StrictIso keeps the ISO domain of three values.
         var atom =
             machine.Program.LanguageMode == PrologLanguageMode.StrictIso

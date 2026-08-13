@@ -31,8 +31,7 @@ internal static class TermReifier
     /// Rebuilds a meta-called control goal as syntax, keeping only the control skeleton
     /// structural. Every argument of a leaf goal — bound or unbound — becomes a shared variable
     /// carried through an argument register, so the compiled goal operates on the caller's live
-    /// cells rather than rebuilt copies; <c>setarg/3</c> makes the difference observable. See
-    /// ADR 0045.
+    /// cells rather than rebuilt copies; <c>setarg/3</c> makes the difference observable.
     /// </summary>
     internal static SyntaxTerm ToControlSyntax(Machine machine, Cell term, Dictionary<string, Cell> variables)
     {

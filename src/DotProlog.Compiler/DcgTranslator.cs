@@ -135,7 +135,7 @@ internal sealed class DcgTranslator
                 return TryTranslateBody(TermNormalizer.Normalize(text), start, end, out goal);
 
             // A string literal in a grammar body matches its code list even when double_quotes
-            // is string — SWI-Prolog 10's probed behavior (ADR 0047).
+            // is string — SWI-Prolog 10's probed behavior.
             case StringValueTerm text:
                 return TryTranslateBody(TermNormalizer.Normalize(new StringTerm(text.Value, text.Span)), start, end, out goal);
 

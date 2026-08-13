@@ -3,7 +3,7 @@ using DotProlog.Runtime;
 namespace DotProlog.Compiler.Tests;
 
 /// <summary>
-/// The SWI-aligned library surface chartered by ADR 0041: library(error), library(ordsets),
+/// The SWI-aligned library surface: library(error), library(ordsets),
 /// library(assoc), and the smaller companions foldl/6, findall/4, numbervars/3, atom_to_term/3,
 /// and tab/2.
 /// </summary>

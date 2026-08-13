@@ -23,7 +23,7 @@ public enum CellTag : byte
 
     /// <summary>
     /// A string. The payload is an atom identifier: the string shares the interned atom text table
-    /// and differs from the same-text atom only by tag (ADR 0047).
+    /// and differs from the same-text atom only by tag.
     /// </summary>
     String = 6,
 }

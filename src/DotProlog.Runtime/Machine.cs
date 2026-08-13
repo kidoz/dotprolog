@@ -1583,7 +1583,7 @@ public sealed class Machine
     /// <summary>
     /// Unifies two terms, trailing every binding so that backtracking can undo them. The
     /// <c>occurs_check</c> flag guards this entry: <c>false</c> is the unchanged fast path, and
-    /// the other modes route through the occurs-check unifier (ADR 0046). Write-mode head
+    /// the other modes route through the occurs-check unifier. Write-mode head
     /// unification does not pass through here and is not guarded.
     /// </summary>
     public bool Unify(Cell left, Cell right)

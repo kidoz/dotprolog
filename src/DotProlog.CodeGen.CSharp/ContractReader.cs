@@ -258,7 +258,7 @@ public static class ContractReader
             return null;
         }
 
-        // ADR 0006 defines no signature for multi with no outputs; nondet with none streams units.
+        // The facade contract defines no signature for multi with no outputs; nondet with none streams units.
         if (determinism == Determinism.Multi && arguments.TrueForAll(argument => argument.Mode == ArgumentMode.In))
         {
             Report(

@@ -1,7 +1,7 @@
 namespace DotProlog.Runtime;
 
 /// <summary>
-/// The string library over the interned string term (ADR 0047). Inputs are text-lenient the way
+/// The string library over the interned string term. Inputs are text-lenient the way
 /// SWI's are — an atom or a number is accepted wherever a string is — while results are strings.
 /// The atom predicates stay strict about atoms; that phase-3 loosening was deliberately deferred.
 /// </summary>

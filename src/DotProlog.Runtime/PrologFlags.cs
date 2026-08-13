@@ -12,7 +12,7 @@ public enum DoubleQuotesMode
     /// <summary>One atom containing the complete text.</summary>
     Atom,
 
-    /// <summary>One string term. An extension value; see ADR 0047.</summary>
+    /// <summary>One string term. An extension value.</summary>
     String,
 }
 
@@ -69,7 +69,7 @@ public sealed class PrologFlags
     /// <summary>What an undefined procedure call does.</summary>
     public UnknownProcedureAction Unknown { get; internal set; } = UnknownProcedureAction.Error;
 
-    /// <summary>What a cycle-creating general unification does. An extension flag; see ADR 0046.</summary>
+    /// <summary>What a cycle-creating general unification does. An extension flag.</summary>
     public OccursCheckMode OccursCheck { get; internal set; } = OccursCheckMode.False;
 
     /// <summary>Creates an independent copy of the current flag values.</summary>

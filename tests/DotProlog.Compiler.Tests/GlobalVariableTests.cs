@@ -3,7 +3,7 @@ using DotProlog.Runtime;
 namespace DotProlog.Compiler.Tests;
 
 /// <summary>
-/// The engine-scoped global variables of ADR 0042: nb_setval/2 and nb_getval/2 survive
+/// The engine-scoped global variables: nb_setval/2 and nb_getval/2 survive
 /// backtracking through a detached copy, while b_setval/2 and b_getval/2 hold the live term and
 /// are undone by trail unwinding. The tests pin transitions — set, backtrack, cut, rethrow,
 /// reset — rather than only final answers.

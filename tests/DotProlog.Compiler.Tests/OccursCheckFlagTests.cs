@@ -3,7 +3,7 @@ using DotProlog.Runtime;
 namespace DotProlog.Compiler.Tests;
 
 /// <summary>
-/// The occurs_check flag per ADR 0046: false is the ISO default, true fails a cycle-creating
+/// The occurs_check flag: false is the ISO default, true fails a cycle-creating
 /// general unification, and error raises occurs_check(Var, Term) the way SWI-Prolog 10 does.
 /// Write-mode head unification is a documented unchecked window, pinned below.
 /// </summary>
@@ -62,7 +62,7 @@ public sealed class OccursCheckFlagTests
             )
         );
 
-    // The documented ADR 0046 divergence: write-mode head unification binds before it fills, so
+    // The documented divergence: write-mode head unification binds before it fills, so
     // p(W, W) against p(X, f(X)) builds the rational tree SWI would reject. This test pins the
     // current behavior; closing the window needs structure-completion markers in the bytecode.
     [Fact]

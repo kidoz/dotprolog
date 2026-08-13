@@ -613,7 +613,7 @@ internal static class StandardLibrary
         atom_to_term(Atom, Term, Bindings) :-
             read_term_from_atom(Atom, Term, [variable_names(Bindings)]).
 
-        % --- Strings (ADR 0047) ------------------------------------------------------
+        % --- Strings ------------------------------------------------------
         % The nondeterministic string predicates enumerate through between/3 over the
         % native slicing primitives; bound arguments filter by converted content, so
         % an atom or number is accepted wherever SWI accepts one.

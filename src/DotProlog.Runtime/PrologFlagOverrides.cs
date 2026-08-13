@@ -4,7 +4,7 @@ namespace DotProlog.Runtime;
 /// Initial flag values a host layers over a language mode's defaults. The mode stays the curated
 /// profile; an override moves one flag's starting value without changing anything else the mode
 /// chose. Only flags whose starting value is meaningful before any source is read are overridable,
-/// and each one is admitted deliberately; see ADR 0048.
+/// and each one is admitted deliberately.
 /// </summary>
 public sealed record PrologFlagOverrides
 {
