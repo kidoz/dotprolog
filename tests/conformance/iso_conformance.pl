@@ -460,7 +460,8 @@ iso_case('8.17.2', current_prolog_flag(integer_rounding_function, toward_zero), 
 iso_case('8.17.2', current_prolog_flag(max_arity, 255), success).
 iso_case('8.17.2', current_prolog_flag(char_conversion, off), success).
 iso_case('8.17.2', current_prolog_flag(debug, off), success).
-iso_case('8.17.2', current_prolog_flag(double_quotes, codes), success).
+% The initial double_quotes value is implementation defined; the standard fixes only its domain.
+iso_case('8.17.2', (current_prolog_flag(double_quotes, DQ), (DQ == chars ; DQ == codes ; DQ == atom)), success).
 iso_case('8.17.2', current_prolog_flag(unknown, error), success).
 iso_case('8.17.2', current_prolog_flag(not_a_flag, _), failure).
 iso_case('8.17.2', (\+ current_prolog_flag(F1, F1), var(F1)), success).
