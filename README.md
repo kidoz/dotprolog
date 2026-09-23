@@ -4,8 +4,8 @@ A Prolog language implementation for .NET 10, written in C# 14.
 
 The goal is a first-class Prolog experience on the .NET SDK, the way C# and F# have one: `.dplproj` projects, a `plc` compiler, `dotnet prolog`, `dotnet new` templates, and NativeAOT publishing.
 
-Read the [DotProlog documentation](docs/index.md) for setup, language support, .NET integration,
-and architecture. New to Prolog — or to programming? Start with
+Read the [DotProlog documentation](docs/index.md) for tutorials, how-to guides, reference,
+and explanations of the design. New to Prolog — or to programming? Start with
 [A Gentle Introduction to Prolog](docs/book/index.md), a free beginner book in English and
 Russian whose examples all run on DotProlog.
 
@@ -150,7 +150,7 @@ bundles of [widget, gadget]:
 | `src/DotProlog.Tool` | The `dotnet prolog` command |
 | `tests/` | Unit tests per component, plus end-to-end execution tests |
 | `benchmarks/` | BenchmarkDotNet suite for the reader, compiler, and engine |
-| `docs/` | MkDocs documentation source |
+| `docs/` | Diátaxis documentation, built with MkDocs |
 | `samples/HelloProlog` | The Hello World sample |
 | `samples/PricingRules` | A `.dplproj`: Prolog rules plus their `.dpli` contract |
 | `samples/PricingConsole`, `samples/PricingFSharp`, `samples/PricingVisualBasic` | C#, F#, and VB apps referencing it |

@@ -1,11 +1,13 @@
-# .NET integration
+# .NET integration reference {#net-integration}
 
-DotProlog offers two .NET-facing paths: embed the engine directly, or expose a `.dplproj` library
-through a generated typed facade.
+DotProlog offers an embedded engine and generated typed facades over `.dplproj` libraries. This
+page describes their contracts. For complete procedures, see [embed Prolog in C#](how-to/embed-engine.md),
+[create a typed library](how-to/create-library.md), and [reference a Prolog project](how-to/reference-project.md).
 
 ## Embed the engine
 
-Create a `PrologEngine`, consult source, and pull solutions from a query:
+`ConsultText` returns load diagnostics and a success flag. Check it before querying.
+`Query(...).Solutions()` lazily enumerates named bindings. A minimal successful query is:
 
 ```csharp
 using DotProlog.Compiler;
@@ -37,7 +39,8 @@ engine.
 
 ## Bind a predicate
 
-`PrologHost` resolves a predicate once and exposes call shapes for common determinism modes:
+`PrologHost.Bind` resolves a predicate once. The predicate must already be loaded into the
+engine; this example assumes `discount/3` from the library below:
 
 ```csharp
 var host = new PrologHost(engine.Machine);
@@ -50,9 +53,14 @@ PrologValue[]? result = host.CallOnce(
     PrologInput.Output);
 ```
 
-- `Prove` is the semidet shape for a success/failure result.
-- `CallOnce` returns one deterministic result.
-- `CallAll` streams nondeterministic results.
+| Method | Result |
+|---|---|
+| `Prove` | Success/failure, ignoring outputs |
+| `CallOnce` | First solution's output values, or `null` on failure; later solutions are discarded |
+| `CallAll` | Lazy sequence of output-value arrays, one per solution |
+
+These methods do not validate a determinism declaration. Generated facades select the call shape
+from the `.dpli` contract.
 
 ## Define a `.dplproj` library
 
@@ -92,7 +100,7 @@ bool found = pricing.InCatalogue("widget");
 
 ## Reference Prolog from another .NET language
 
-A normal project reference is enough:
+Consumers reference a `.dplproj` as an ordinary project:
 
 ```xml
 <ProjectReference Include="..\PricingRules\PricingRules.dplproj" />
@@ -101,33 +109,20 @@ A normal project reference is enough:
 The generated facade is ordinary .NET code, so C#, F#, and Visual Basic consume the same assembly.
 The repository exercises all three languages against `samples/PricingRules`.
 
-Set the following property in a `.dplproj` to validate and generate the whole project in a
-particular language mode:
+### SDK language settings
 
-```xml
-<PropertyGroup>
-  <DotPrologLanguageMode>strict-iso</DotPrologLanguageMode>
-</PropertyGroup>
-```
+| Property | Values and default |
+|---|---|
+| `DotPrologLanguageMode` | `modern` (default) or `strict-iso` |
+| `DotPrologFlags` | Semicolon-separated `name=value` pairs overriding curated initial flags |
 
-The accepted values are `modern` (the default) and `strict-iso`. See
-[the language guide](language-guide.md#language-modes) for what each one selects.
-
-The mode is a curated profile. To move one flag's starting value without leaving the profile, set
-`DotPrologFlags` to semicolon-separated `name=value` pairs:
-
-```xml
-<PropertyGroup>
-  <DotPrologFlags>double_quotes=codes</DotPrologFlags>
-</PropertyGroup>
-```
+See [configure language modes and flags](how-to/configure-language.md) for project XML and CLI
+commands, and the [language reference](language-guide.md#language-modes) for the mode contract.
 
 The override becomes the value every source file starts from — and returns to when a
 `set_prolog_flag/2` directive's load unit ends. The overridable flags are curated:
 `double_quotes` (`codes`, `chars`, `atom`, and — outside strict ISO mode — `string`) is available
-today; the three ISO values work in every mode. The same overrides are available on the command
-line as `dotnet prolog run --flag double_quotes=codes file.pl`. A project written for code lists
-keeps its behavior with exactly that override.
+today; the three ISO values work in every mode. The same overrides are available through the CLI and engine constructor.
 
 Strings are interned beside atom text and live for the program's lifetime: like atoms, they are
 never reclaimed, which is worth knowing for a long-running host that mints unbounded distinct
@@ -143,3 +138,5 @@ NativeAOT applications may consult previously unseen `.pl` files at run time. Th
 parsed and compiled into internal bytecode for the existing virtual machine. DotProlog does not use
 runtime Roslyn, `Reflection.Emit`, dynamic assembly loading, or reflection-based predicate
 discovery on the NativeAOT path.
+
+See [publish with NativeAOT](how-to/publish-nativeaot.md) for publishing and acceptance checks.

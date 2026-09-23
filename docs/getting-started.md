@@ -1,38 +1,31 @@
-# Getting started
+# Your first DotProlog program {#getting-started}
 
-DotProlog currently targets developers working from the repository. The packaged templates and tool
-are exercised in CI, but they are not yet available from NuGet.org.
+In this tutorial you will run DotProlog from its source repository, then write a program that
+greets three people. You will see Prolog find several answers to the same question.
 
 ## Prerequisites
 
-- The [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- Git
-- Optional: [just](https://just.systems/) for the repository shortcuts
-- [uv](https://docs.astral.sh/uv/) when running the documentation checks or the full `just check`
+Install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) and Git. You also need
+a text editor and a terminal. Run all commands below from the repository root after cloning it.
 
-Check the SDK selected by the repository:
+This tutorial uses the repository tool so the examples match the checked-out source. Packaged
+projects are another entry point; see [create a typed Prolog library](how-to/create-library.md).
 
-```console
-dotnet --version
-```
+## Get the source {#build-and-test}
 
-## Build and test
-
-Clone the repository, then restore and build the solution:
+Get the source:
 
 ```console
 git clone https://github.com/kidoz/dotprolog.git
 cd dotprolog
-dotnet restore DotProlog.slnx
-dotnet build DotProlog.slnx
-dotnet test --solution DotProlog.slnx --no-ansi
+dotnet --version
 ```
 
-With `just`, the equivalent full check is:
+The last command should print a `10.0` SDK version. The repository's `global.json` selects the SDK;
+if .NET reports that it cannot find a compatible version, install the version requested there.
 
-```console
-just check
-```
+The next command builds the tool automatically. Running the whole test suite is covered in
+[build and test the repository](how-to/build-and-test.md).
 
 ## Run the Hello World sample
 
@@ -40,61 +33,18 @@ just check
 dotnet run --project src/DotProlog.Tool -- run samples/HelloProlog/hello.pl
 ```
 
-Or:
+After any build messages, you should see:
 
-```console
-just hello
+```text
+Hello! World!
 ```
 
-The `run` command consults the file, reports reader or compiler diagnostics, and then executes its
-directives and initialization goal.
-
-To reject known implementation-specific language features, run the file in strict ISO mode:
-
-```console
-dotnet run --project src/DotProlog.Tool -- run --mode strict-iso path/to/program.pl
-```
-
-Strict mode reports `DPL1018` when source calls a predefined DotProlog extension, and starts
-`double_quotes` at `codes`. The default mode is `modern`, which keeps the extensions and starts
-`double_quotes` at `chars`, so `"abc"` reads as `[a,b,c]`.
-
-To move one flag's starting value without changing mode — for a program written for code lists,
-say — pass a flag override:
-
-```console
-dotnet run --project src/DotProlog.Tool -- run --flag double_quotes=codes path/to/program.pl
-```
-
-The overridable flags are curated; `double_quotes` (`codes`, `chars`, `atom`) is available in
-every mode. A `.dplproj` states the same override with the `DotPrologFlags` property; see
-[.NET integration](dotnet-integration.md).
-
-## Lint source without running it
-
-The linter reports source warnings without consulting the program or executing directives:
-
-```console
-dotnet run --project src/DotProlog.Tool -- lint path/to/program.pl
-```
-
-Warnings do not fail the command unless CI opts in:
-
-```console
-dotnet run --project src/DotProlog.Tool -- lint --warnings-as-errors path/to/program.pl
-```
-
-Apply the optional Covington layout profile when the project wants a consistent source style:
-
-```console
-dotnet run --project src/DotProlog.Tool -- lint --profile covington path/to/program.pl
-```
-
-See [Source linting](linting.md) for the diagnostic and exit-code contract.
+Open `samples/HelloProlog/hello.pl`. Its `initialization(main)` directive asks DotProlog to run
+`main` after loading the file. The rule prints a greeting and a newline.
 
 ## Run your own program
 
-Create a UTF-8 `.pl` file:
+Create a UTF-8 file named `greetings.pl` in the repository root:
 
 ```prolog
 :- initialization(main).
@@ -106,40 +56,41 @@ main :-
 main.
 ```
 
-Run it from the repository root:
+Run it:
 
 ```console
-dotnet run --project src/DotProlog.Tool -- run path/to/program.pl
+dotnet run --project src/DotProlog.Tool -- run greetings.pl
 ```
 
-## Run Prolog tests
+You should see these three lines in order:
 
-A `.dplproj` test project discovers every zero-arity predicate whose name starts with `test_`.
-Each test runs in a fresh engine:
-
-```prolog
-test_addition :-
-    2 + 2 =:= 4.
-
-test_lists :-
-    append([a, b], [c], [a, b, c]).
+```text
+Hello, ada!
+Hello, grace!
+Hello, edsger!
 ```
 
-Run the included sample with:
+`member/2` selects a name, and `format/2` prints it. `fail` asks Prolog to try another answer.
+After all names have been printed, the final `main.` lets the program finish successfully.
 
-```console
-dotnet test --project samples/PricingTests/PricingTests.dplproj
-```
+Add `alan` to the list and run the command again. You should get a fourth greeting. You have now
+changed a Prolog program and observed how another answer changes its output. You can delete
+`greetings.pl` when you are finished.
 
-## Exercise NativeAOT
+Continue with [A Gentle Introduction to Prolog](book/index.md) for a sequence of lessons and
+exercises, available in English and [Russian](book/ru/index.md).
 
-The integration suite can publish and run the NativeAOT acceptance sample. It is opt-in because a
-native publish is slower than the normal test suite:
+## Next steps
 
-```console
-DOTPROLOG_RUN_AOT_TESTS=1 dotnet test --project tests/Integration
-```
+### Lint source without running it
 
-The test publishes a self-contained executable, consults an external `.pl` file at run time,
-enumerates solutions, changes the dynamic database, and verifies that trimming and AOT produce no
-warnings.
+Follow [lint source locally and in CI](how-to/lint-source.md).
+
+### Run Prolog tests
+
+Follow [run Prolog tests](how-to/run-tests.md).
+
+### Exercise NativeAOT
+
+Follow [publish with NativeAOT](how-to/publish-nativeaot.md). For mode selection and code-list
+programs, see [configure language modes and flags](how-to/configure-language.md).

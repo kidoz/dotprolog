@@ -1,4 +1,4 @@
-# Language guide
+# Language reference {#language-guide}
 
 DotProlog's `StrictIso` mode implements ISO/IEC 13211-1:1995 with Technical Corrigenda 1–3,
 ISO/IEC 13211-2:2000, and ISO/IEC TS 13211-3:2025. The declaration is backed by the repository's
@@ -11,24 +11,14 @@ tests. It does not claim SWI-Prolog compatibility.
 
 DotProlog has two language modes.
 
-The default `Modern` mode accepts the ISO Parts 1–3 surface plus documented DotProlog extensions
-such as soft cut, `format/1,2,3`, `member/2`, and higher-order list predicates. It starts the
-`double_quotes` flag at `chars` — ISO/IEC 13211-1 leaves the initial value implementation
-defined, so this is a conforming default — and a double-quoted token therefore reads as a list of
-one-character atoms:
+| Mode | Predefined surface | Initial `double_quotes` |
+|---|---|---|
+| `Modern` (default) | ISO Parts 1–3 plus documented DotProlog extensions | `chars` |
+| `StrictIso` | ISO Parts 1–3 inventory | `codes` |
 
-```prolog
-?- "abc" = [L|Ls].
-   L = a, Ls = [b,c].
-```
-
-This is the default the newer Prolog systems settled on, and it is what makes text convenient to
-work with in DCGs. Outside strict ISO mode the flag also accepts `string`, reading `"..."` as a
-distinct string term with its own `string_*` library; no mode defaults to it.
-
-`Modern` is also the dialect whose extension direction is SWI-Prolog: when a predicate exists in
-SWI and is adopted here, its behavior and error terms follow SWI's, and the coverage is recorded
-feature by feature in the [SWI compatibility ledger](reference/swi-compatibility.md).
+With `chars`, `"abc"` reads as `[a,b,c]`; with `codes`, it reads as `[97,98,99]`.
+`double_quotes` also accepts `atom`, and outside strict mode, `string`. No mode defaults to
+`string`; it produces a distinct string term with its own `string_*` predicates.
 
 The opt-in `StrictIso` mode restricts predefined language features to the explicit ISO Parts 1–3
 inventory and starts `double_quotes` at `codes`. A source call to a known predefined extension is
@@ -41,25 +31,18 @@ extended library predicate.
 Strict mode starts from the standardized operator table rather than the additional predefined
 operators of Modern mode. A program may still define any operator permitted by `op/3`.
 
-A mode is a curated dialect, not a flag matrix. A program that wants a combination no mode names —
-`double_quotes` starting at `codes` in `Modern`, say — sets the flag itself with
-`:- set_prolog_flag(double_quotes, codes).`, which governs the rest of that file, or asks the host
-to seed it for every file: the `DotPrologFlags` project property, the `--flag` option, and the
-engine constructor's flag overrides layer an initial value for a curated flag over the mode
-without leaving the profile. That is also how a program written for code lists keeps working:
+Initial overrides are available through the engine constructor, the CLI's repeatable
+`--flag name=value`, and the SDK's `DotPrologFlags` property. A source `set_prolog_flag/2` directive
+affects the remainder of its load unit. The former `extended` mode has been removed; its starting
+settings are `modern` with `double_quotes=codes`.
 
-```xml
-<DotPrologFlags>double_quotes=codes</DotPrologFlags>
-```
-
-Select a mode with the `PrologEngine` constructor, `dotnet prolog run --mode <name>`, or the
-`DotPrologLanguageMode` property in a `.dplproj`. The former `extended` mode was `modern` with
-`double_quotes=codes`, and that override is how to get it.
+For a procedure, see [configure language modes and flags](how-to/configure-language.md).
+For the design and text representation choices, see [language modes and text](explanation/language-modes.md).
 
 ## Terms and clauses
 
 The reader supports variables, atoms, unbounded integers, rationals, finite floats, lists, structures, and
-double-quoted code lists. Programs contain facts, rules, and directives:
+double-quoted text interpreted according to `double_quotes`. Programs contain facts, rules, and directives:
 
 ```prolog
 parent(ada, byron).

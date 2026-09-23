@@ -1,31 +1,31 @@
-# Source linting
+# Linting reference {#source-linting}
 
 `dotnet prolog lint` analyzes Prolog source without consulting it or executing directives. It uses
 the same reader, operator table, language modes, source spans, and diagnostic format as the compiler.
+For a procedure, see [lint source locally and in CI](how-to/lint-source.md).
 
-```console
-dotnet prolog lint program.pl library.pl
+## Invocation and options
+
+```text
+dotnet prolog lint [options] <file.pl> [more.pl ...]
 ```
 
-Warnings are advisory by default, so a warning does not make the command fail. Use
-`--warnings-as-errors` in CI:
+| Option | Contract |
+|---|---|
+| `--warnings-as-errors` | Return `1` if warnings are reported; warnings are advisory by default |
+| `--profile semantic` | Default profile: source-local variable checks |
+| `--profile covington` | Add automatically checkable Covington layout guidelines 2.1–2.7 |
+| `--mode modern` or `--mode strict-iso` | Seed the reader's language mode; default `modern` |
+| `--flag name=value` | Override a curated initial flag; repeatable |
+| `--indent-size N` | Positive indentation unit; Covington default `4` |
+| `--max-line-length N` | Positive line limit; Covington default `80` |
+| `--max-clause-lines N` | Positive clause limit; Covington default `24` |
 
-```console
-dotnet prolog lint --warnings-as-errors src/*.pl
-```
+Profile names are case-insensitive. Options may appear in any order. Language settings are defined
+in the [language reference](language-guide.md#language-modes). Strict-mode linting seeds the reader;
+it does not replace compiling or running a project to enforce the strict language surface.
 
-Layout policy is opt-in. The `covington` profile implements the automatically checkable layout
-guidelines 2.1 through 2.7 from *Coding Guidelines for Prolog*:
-
-```console
-dotnet prolog lint --profile covington program.pl
-dotnet prolog lint --profile covington --warnings-as-errors src/*.pl
-```
-
-The default `semantic` profile preserves the source-local variable checks without imposing a
-project style. Profile names are case-insensitive.
-
-The exit codes are:
+## Exit codes
 
 | Code | Meaning |
 |---:|---|
@@ -33,16 +33,6 @@ The exit codes are:
 | `1` | Warnings were found with `--warnings-as-errors` |
 | `64` | The command line is invalid |
 | `65` | A file is missing or unreadable, or the reader reported an error |
-
-Select the source language mode, and any flag override, with the same options accepted by `run`:
-
-```console
-dotnet prolog lint --mode strict-iso program.pl
-dotnet prolog lint --flag double_quotes=codes legacy.pl
-```
-
-The mode and overrides seed the reader state used by linting; the default is `modern`. `lint --mode strict-iso` does not replace compiling
-or running a project when strict-surface enforcement is required.
 
 ## Semantic diagnostics
 
@@ -53,7 +43,7 @@ These rules run in every profile:
 | `DPL3001` | An ordinary named variable occurs once in its clause |
 | `DPL3002` | An underscore-prefixed singleton marker occurs more than once in its clause |
 
-Prefix an intentionally unused variable with an underscore:
+An underscore-prefixed name marks an intentionally unused variable:
 
 ```prolog
 head(_Ignored) :-
@@ -78,12 +68,7 @@ The anonymous variable `_` is always exempt because every occurrence denotes a f
 | `DPL3010` | A line ends in spaces or tabs |
 
 The preset uses a four-space indentation unit, an 80-character line limit, and a 24-line clause
-limit. Override those positive integer thresholds when a project has a different convention:
-
-```console
-dotnet prolog lint --profile covington --indent-size 2 program.pl
-dotnet prolog lint --max-line-length 100 --max-clause-lines 40 program.pl
-```
+limit. `--indent-size`, `--max-line-length`, and `--max-clause-lines` accept positive integers.
 
 A numeric option also enables that individual check when the profile is `semantic`. Options may
 appear in any order. Comma analysis ignores quoted text and comments; all diagnostics retain exact
