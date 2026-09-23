@@ -29,9 +29,11 @@ unbounded goal.
 One engine runs one goal at a time and is not thread-safe. Use separate engine instances when
 independent callers need to execute concurrently.
 
-The parameterless constructor selects `PrologLanguageMode.Extended`. Pass
-`PrologLanguageMode.StrictIso` before consulting any source to restrict predefined features to the
-ISO Parts 1–3 inventory. The selection is immutable for the lifetime of the engine.
+The parameterless constructor selects `PrologLanguageMode.Modern`, where double-quoted text reads
+as a list of characters. Pass `PrologLanguageMode.StrictIso` before consulting any source to
+restrict predefined features to the ISO Parts 1–3 inventory, or pass a `PrologFlagOverrides` to
+seed another initial `double_quotes` value. The selection is immutable for the lifetime of the
+engine.
 
 ## Bind a predicate
 
@@ -108,7 +110,7 @@ particular language mode:
 </PropertyGroup>
 ```
 
-The accepted values are `extended` (the default), `strict-iso`, and `modern`. See
+The accepted values are `modern` (the default) and `strict-iso`. See
 [the language guide](language-guide.md#language-modes) for what each one selects.
 
 The mode is a curated profile. To move one flag's starting value without leaving the profile, set
@@ -116,7 +118,7 @@ The mode is a curated profile. To move one flag's starting value without leaving
 
 ```xml
 <PropertyGroup>
-  <DotPrologFlags>double_quotes=chars</DotPrologFlags>
+  <DotPrologFlags>double_quotes=codes</DotPrologFlags>
 </PropertyGroup>
 ```
 
@@ -124,7 +126,8 @@ The override becomes the value every source file starts from — and returns to 
 `set_prolog_flag/2` directive's load unit ends. The overridable flags are curated:
 `double_quotes` (`codes`, `chars`, `atom`, and — outside strict ISO mode — `string`) is available
 today; the three ISO values work in every mode. The same overrides are available on the command
-line as `dotnet prolog run --flag double_quotes=chars file.pl`.
+line as `dotnet prolog run --flag double_quotes=codes file.pl`. A project written for code lists
+keeps its behavior with exactly that override.
 
 Strings are interned beside atom text and live for the program's lifetime: like atoms, they are
 never reclaimed, which is worth knowing for a long-running host that mints unbounded distinct

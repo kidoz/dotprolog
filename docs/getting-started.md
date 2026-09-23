@@ -55,16 +55,15 @@ To reject known implementation-specific language features, run the file in stric
 dotnet run --project src/DotProlog.Tool -- run --mode strict-iso path/to/program.pl
 ```
 
-Strict mode reports `DPL1018` when source calls a predefined DotProlog extension. The default mode
-remains extended for backward compatibility.
+Strict mode reports `DPL1018` when source calls a predefined DotProlog extension, and starts
+`double_quotes` at `codes`. The default mode is `modern`, which keeps the extensions and starts
+`double_quotes` at `chars`, so `"abc"` reads as `[a,b,c]`.
 
-`--mode modern` keeps the extended surface but starts `double_quotes` at `chars`, so `"abc"` reads
-as `[a,b,c]`.
-
-To move one flag's starting value without changing mode, pass a flag override:
+To move one flag's starting value without changing mode — for a program written for code lists,
+say — pass a flag override:
 
 ```console
-dotnet run --project src/DotProlog.Tool -- run --flag double_quotes=chars path/to/program.pl
+dotnet run --project src/DotProlog.Tool -- run --flag double_quotes=codes path/to/program.pl
 ```
 
 The overridable flags are curated; `double_quotes` (`codes`, `chars`, `atom`) is available in

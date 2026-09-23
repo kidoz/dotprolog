@@ -13,8 +13,8 @@ meta-goal or host binding raises the catchable term
 `permission_error(access, implementation_specific_feature, Name/Arity)`.
 
 The bundled implementation library is trusted below this boundary so it may use private helpers
-to implement standardized predicates. User-defined predicate names are unrestricted. Extended mode
-is the default for backward compatibility.
+to implement standardized predicates. User-defined predicate names are unrestricted. The default
+mode is `Modern`, which keeps the documented extensions.
 
 ## Representation limits
 
@@ -71,8 +71,8 @@ collation is ordinal by UTF-16 code unit. The byte sequence associated with a ch
 encoding for a text file; binary streams do not perform character conversion.
 
 ISO/IEC 13211-1 leaves the initial `double_quotes` value implementation defined (7.11.2.5), and
-this page is where DotProlog defines it: `codes` in the `Extended` and `StrictIso` language modes,
-matching the ISO-oriented systems. The opt-in `Modern` mode starts it at `chars`, another value
+this page is where DotProlog defines it: `chars` in the default `Modern` language mode, as in the
+newer Prolog systems, and `codes` in `StrictIso`, as in the older ISO-oriented ones. Both come
 from the flag's ISO domain. A host may move the initial value to any of the three ISO values in
 any mode — through the `DotPrologFlags` project property, `dotnet prolog --flag`, or the engine
 constructor's flag overrides — and the chosen value then plays the role the mode default
@@ -80,11 +80,10 @@ otherwise would. The value is scoped to the load unit: a `set_prolog_flag(double
 directive governs the rest of the file that issued it, and the entering value is restored when
 that file finishes loading.
 
-The extension flag `occurs_check` (`false`, `true`, `error`) exists in the `Extended` and
-`Modern` modes only and starts at `false`, the ISO behavior; `StrictIso` does not define it.
-`double_quotes` likewise accepts the extension value `string` in the extended modes only — a
-directive, flag call, or project override selecting it inside `StrictIso` stays a domain error,
-so the conforming modes keep the three ISO values.
+The extension flag `occurs_check` (`false`, `true`, `error`) exists in `Modern` only and starts at
+`false`, the ISO behavior; `StrictIso` does not define it. `double_quotes` likewise accepts the
+extension value `string` in `Modern` only — a directive, flag call, or project override selecting
+it inside `StrictIso` stays a domain error, so the strict mode keeps the three ISO values.
 
 The standard order of terms places strings between numbers and atoms:
 `Var < Float < Integer < String < Atom < Compound`. The string slot is SWI-Prolog 10's probed
@@ -102,8 +101,8 @@ The Part 2 `colon_sets_calling_context` flag is fixed and has the value `true`.
 output name. Inspecting the list neither unifies nor otherwise binds its terms.
 
 The `StrictIso` initial operator table contains the ISO Part 1 table as corrected by Corrigendum 2,
-together with the documented Part 2 and Part 3 operators. Extended and Modern modes additionally
-predefine the convenience directive operators and `:=`, `.` as an infix operator, and `$`.
+together with the documented Part 2 and Part 3 operators. Modern mode additionally
+predefines the convenience directive operators and `:=`, `.` as an infix operator, and `$`.
 `current_op/3` enumerates a captured table version in ordinal operator-name order and then
 operator-specifier order. Mutating the table while an enumeration is active does not change that
 enumeration.
@@ -193,14 +192,14 @@ first loaded export therefore owns a plain-name alias; later modules remain reac
 qualification or an unambiguous import. Loading source and its relationship to files are DotProlog
 extensions rather than claims about the Part 2 filesystem model.
 
-Extended and Modern modes additionally accept the Quintus-family `module/2`, `use_module/1,2`, and
+Modern mode additionally accepts the Quintus-family `module/2`, `use_module/1,2`, and
 `meta_predicate/1` declarations. They are compatibility extensions and are rejected in StrictIso.
 
 ## Definite clause grammars
 
 Grammar alternative `|` is predefined as `xfy` at priority 1105. DotProlog supports terminal
 semicontexts, `Name//Arity` in `dynamic/1`, `multifile/1`, and `discontiguous/1`, and the standard
-grammar control constructs. In extended mode, the additional soft-cut grammar forms follow the
+grammar control constructs. In Modern mode, the additional soft-cut grammar forms follow the
 corresponding DotProlog control semantics. In strict mode, soft cut is translated as an ordinary
 nonterminal rather than an additional grammar control construct.
 

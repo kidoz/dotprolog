@@ -4,6 +4,40 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `Modern` is the default language mode everywhere: `new PrologEngine()`, `new BytecodeProgram()`,
+  `dotnet prolog run` and `lint`, the `DotPrologLanguageMode` project default, and generated entry
+  points, test hosts, and facades. Double-quoted text therefore reads as a list of one-character
+  atoms unless a project says otherwise — `"abc" = [L|Ls]` gives `L = a, Ls = [b,c]`. ISO/IEC
+  13211-1 leaves the initial value implementation defined, so `chars` is a conforming default,
+  and it is the one Scryer, Trealla, ichiban, Flowlog, and Trilog use. `StrictIso` still starts
+  at `codes`.
+- The ISO conformance case for the initial `double_quotes` value now checks that it lies in the
+  flag's ISO domain rather than pinning `codes`, since the standard leaves the value to the
+  processor.
+
+### Removed
+
+- The `Extended` language mode. It differed from `Modern` only in starting `double_quotes` at
+  `codes`, which the `double_quotes=codes` flag override already expresses. `--mode extended` and
+  `<DotPrologLanguageMode>extended` are now rejected as unknown mode names, and
+  `PrologLanguageMode.Extended` no longer exists; `PrologLanguageMode.Modern` is now the enum's
+  first value. `dotnet prolog` and `dotnet prolog lint` list `modern|strict-iso`.
+
+### Compatibility
+
+- A program that relied on the unstated `codes` default reads double-quoted text differently.
+  Mixing the two conventions can fail silently in grammars — a terminal written as `"abc"` no
+  longer matches code input — or raise type errors, as in `number_codes(N, "42")`. Restore the
+  old reading for a whole project with `<DotPrologFlags>double_quotes=codes</DotPrologFlags>` or
+  `dotnet prolog run --flag double_quotes=codes`, for one file with
+  `:- set_prolog_flag(double_quotes, codes).`, or for an embedding host with
+  `new PrologFlagOverrides { DoubleQuotes = DoubleQuotesMode.Codes }`. A project or host that
+  named `extended` replaces it with that override.
+
 ## [0.7.0] — 2026-08-13
 
 ### Added

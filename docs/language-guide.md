@@ -9,24 +9,13 @@ tests. It does not claim SWI-Prolog compatibility.
 
 ## Language modes
 
-The default `Extended` mode accepts the ISO Parts 1–3 surface plus documented DotProlog
-extensions such as soft cut, `format/1,2,3`, `member/2`, and higher-order list predicates.
+DotProlog has two language modes.
 
-The opt-in `StrictIso` mode restricts predefined language features to the explicit ISO Parts 1–3
-inventory. A source call to a known predefined extension is rejected with diagnostic `DPL1018`.
-Runtime-constructed meta-goals and host bindings reject the same extensions with a catchable
-`permission_error(access, implementation_specific_feature, Name/Arity)`. Arbitrarily named
-predicates defined by the program remain valid, including a user definition whose name matches an
-extended library predicate.
-
-Strict mode starts from the standardized operator table rather than the additional predefined
-operators in Extended and Modern modes. A program may still define any operator permitted by
-`op/3`.
-
-The opt-in `Modern` mode accepts the same surface as `Extended`, but starts the `double_quotes`
-flag at `chars` rather than DotProlog's documented default `codes` — ISO/IEC 13211-1 leaves the
-initial value implementation defined, so both are conforming defaults. A double-quoted token
-therefore reads as a list of one-character atoms:
+The default `Modern` mode accepts the ISO Parts 1–3 surface plus documented DotProlog extensions
+such as soft cut, `format/1,2,3`, `member/2`, and higher-order list predicates. It starts the
+`double_quotes` flag at `chars` — ISO/IEC 13211-1 leaves the initial value implementation
+defined, so this is a conforming default — and a double-quoted token therefore reads as a list of
+one-character atoms:
 
 ```prolog
 ?- "abc" = [L|Ls].
@@ -34,24 +23,38 @@ therefore reads as a list of one-character atoms:
 ```
 
 This is the default the newer Prolog systems settled on, and it is what makes text convenient to
-work with in DCGs. Nothing else about the mode differs from `Extended` today, and any mode may
-still move the flag with `:- set_prolog_flag(double_quotes, codes).` Outside strict ISO mode the
-flag also accepts `string`, reading `"..."` as a distinct string term with its own `string_*`
-library; no mode defaults to it.
+work with in DCGs. Outside strict ISO mode the flag also accepts `string`, reading `"..."` as a
+distinct string term with its own `string_*` library; no mode defaults to it.
 
 `Modern` is also the dialect whose extension direction is SWI-Prolog: when a predicate exists in
 SWI and is adopted here, its behavior and error terms follow SWI's, and the coverage is recorded
-feature by feature in the [SWI compatibility ledger](reference/swi-compatibility.md). The aligned
-predicates land in the surface `Extended` and `Modern` share, so selecting `Modern` is about the
-`chars` default rather than extra predicates.
+feature by feature in the [SWI compatibility ledger](reference/swi-compatibility.md).
+
+The opt-in `StrictIso` mode restricts predefined language features to the explicit ISO Parts 1–3
+inventory and starts `double_quotes` at `codes`. A source call to a known predefined extension is
+rejected with diagnostic `DPL1018`. Runtime-constructed meta-goals and host bindings reject the
+same extensions with a catchable
+`permission_error(access, implementation_specific_feature, Name/Arity)`. Arbitrarily named
+predicates defined by the program remain valid, including a user definition whose name matches an
+extended library predicate.
+
+Strict mode starts from the standardized operator table rather than the additional predefined
+operators of Modern mode. A program may still define any operator permitted by `op/3`.
 
 A mode is a curated dialect, not a flag matrix. A program that wants a combination no mode names —
-`double_quotes` starting at `atom`, say — sets the flag itself, or asks the host to seed it: the
-`DotPrologFlags` project property, the `--flag` option, and the engine constructor's flag
-overrides layer an initial value for a curated flag over the mode without leaving the profile.
+`double_quotes` starting at `codes` in `Modern`, say — sets the flag itself with
+`:- set_prolog_flag(double_quotes, codes).`, which governs the rest of that file, or asks the host
+to seed it for every file: the `DotPrologFlags` project property, the `--flag` option, and the
+engine constructor's flag overrides layer an initial value for a curated flag over the mode
+without leaving the profile. That is also how a program written for code lists keeps working:
+
+```xml
+<DotPrologFlags>double_quotes=codes</DotPrologFlags>
+```
 
 Select a mode with the `PrologEngine` constructor, `dotnet prolog run --mode <name>`, or the
-`DotPrologLanguageMode` property in a `.dplproj`.
+`DotPrologLanguageMode` property in a `.dplproj`. The former `extended` mode was `modern` with
+`double_quotes=codes`, and that override is how to get it.
 
 ## Terms and clauses
 
@@ -69,8 +72,9 @@ ancestor(X, Y) :-
     ancestor(Z, Y).
 ```
 
-The maximum compound arity is 255. Atom text is the language's text term; DotProlog deliberately
-does not add the SWI-Prolog string type or alias string predicates to atoms.
+The maximum compound arity is 255. Double-quoted text is a list of characters by default; the
+distinct string term exists only where `double_quotes` is set to `string`, and the string
+predicates are never aliased to atoms.
 
 ## Control and errors
 
@@ -140,7 +144,7 @@ Interfaces use `export/1`, `reexport/1,2`, and `metapredicate/1`; bodies use `im
 database operations, and meta-arguments all observe the calling module. Conflicting visibility,
 missing interfaces, invalid exports, and implicit modification of imports are rejected.
 
-Extended and Modern modes retain `module/2`, `use_module/1,2`, and `meta_predicate/1` as
+Modern mode retains `module/2`, `use_module/1,2`, and `meta_predicate/1` as
 compatibility extensions. StrictIso requires the standard Part 2 forms.
 
 Definite clause grammars use `-->/2` and run through `phrase/2,3`:
@@ -161,7 +165,7 @@ cannot define grammar control constructs or expand over predefined procedures. `
 that its input can be a list; `phrase/3` deliberately leaves its sequence arguments unchecked, the
 implementation-defined lower-overhead choice permitted by the grammar specification.
 
-In extended mode, soft cut is also recognized as a grammar control extension. In strict mode it is
+In Modern mode, soft cut is also recognized as a grammar control extension. In strict mode it is
 an ordinary nonterminal, as required for additional grammar controls by Part 3.
 
 `op/3` changes the program-owned operator table used by both reading and writing terms.

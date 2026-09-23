@@ -34,14 +34,14 @@ The exit codes are:
 | `64` | The command line is invalid |
 | `65` | A file is missing or unreadable, or the reader reported an error |
 
-Select the source language mode with the same names accepted by `run`:
+Select the source language mode, and any flag override, with the same options accepted by `run`:
 
 ```console
 dotnet prolog lint --mode strict-iso program.pl
-dotnet prolog lint --mode modern grammar.pl
+dotnet prolog lint --flag double_quotes=codes legacy.pl
 ```
 
-The mode seeds the reader state used by linting. `lint --mode strict-iso` does not replace compiling
+The mode and overrides seed the reader state used by linting; the default is `modern`. `lint --mode strict-iso` does not replace compiling
 or running a project when strict-surface enforcement is required.
 
 ## Semantic diagnostics

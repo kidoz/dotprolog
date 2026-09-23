@@ -9,7 +9,7 @@ ledger](docs/reference/iso-part1-conformance.md) and [Parts 2 and 3
 ledger](docs/reference/iso-parts2-3-conformance.md). The complete applicable independent Part 1
 corpus passes on every execution path; Parts 2 and 3 use focused direct, generated-C#, and
 NativeAOT evidence. This is not a claim of SWI-Prolog compatibility; which parts of the SWI
-surface the extended modes do implement is recorded feature by feature in the
+surface the default `Modern` mode does implement is recorded feature by feature in the
 [SWI compatibility ledger](docs/reference/swi-compatibility.md).
 
 ## What has been measured
@@ -263,8 +263,8 @@ samples and exercise NativeAOT.
 | A character is a UTF-16 code unit | A character outside the Basic Multilingual Plane is two codes, and `atom_length/2` counts it as two | SWI counts code points |
 | Two modules exporting the same name | The first loaded gets the unqualified name | SWI reports a conflict |
 | Clause selection | First-argument indexed in the bytecode VM; linear in build-time generated C# | Indexed |
-| Arithmetic extensions | Evaluable `integer/1`, `e/0`, `inf/0`, `nan/0`, and several utility functions remain available in extended mode and are rejected in strict mode | Not part of the ISO core |
-| Initial `double_quotes` | `codes` in `Extended` and `StrictIso`, per ISO. The opt-in `Modern` mode starts it at `chars`; any mode may be seeded with another ISO value through the `DotPrologFlags` project property or `dotnet prolog --flag` | Scryer, Trealla, ichiban, Flowlog, and Trilog default to `chars`; SWI defaults to its own string type |
+| Arithmetic extensions | Evaluable `integer/1`, `e/0`, `inf/0`, `nan/0`, and several utility functions remain available in Modern mode and are rejected in strict mode | Not part of the ISO core |
+| Initial `double_quotes` | ISO leaves it implementation defined. `chars` in the default `Modern` mode, `codes` in `StrictIso`; any mode may be seeded with another ISO value through the `DotPrologFlags` project property or `dotnet prolog --flag`, and `double_quotes=codes` keeps a program written for code lists unchanged | Scryer, Trealla, ichiban, Flowlog, and Trilog default to `chars`; GNU Prolog and SICStus to `codes`; SWI to its own string type |
 | `double_quotes` scope | Scoped to the load unit: a directive governs the rest of its own file, and the entering value is restored afterwards | SWI and Scryer also scope it per file |
 
 ## Platforms

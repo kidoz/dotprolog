@@ -57,12 +57,12 @@ the plain-name alias assigned to the first free export are documented compatibil
 DotProlog selects both implementation-defined sequence checks for `phrase/2`, producing
 `type_error(list, Sequence)` when no list instance exists. `phrase/3` selects the permitted
 unchecked option for its second and third arguments, while remaining steadfast in the third.
-An invalid semicontext is rejected during source preparation. Extended mode additionally recognizes
+An invalid semicontext is rejected during source preparation. Modern mode additionally recognizes
 soft cut as a grammar control extension; StrictIso treats it as an ordinary nonterminal.
 
 ## Continuing gate
 
-A release must keep the focused module and grammar suites green in both Extended and StrictIso,
+A release must keep the focused module and grammar suites green in both Modern and StrictIso,
 preserve module metadata in generated C#, and execute the strict generated/consulted scenario in a
 warning-free NativeAOT publication. The independent Logtalk corpus remains Part 1 evidence and is
 not represented here as independent Part 2 or Part 3 certification.

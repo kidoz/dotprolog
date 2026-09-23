@@ -159,8 +159,8 @@ bundles of [widget, gadget]:
 | `samples/GreetingApp` | A Prolog application built from a `.dplproj` |
 | `samples/GreymereAdventure` | A complete fantasy text adventure written in Prolog |
 | `samples/PricingTests` | Prolog tests in a `.dplproj`, run by `DotProlog.Testing` |
-| `samples/TextGrammar` | A `.dplproj` in Modern mode: DCGs over double-quoted text |
-| `samples/NaturalLanguage` | Natural-language parsing and question answering in Modern mode |
+| `samples/TextGrammar` | A `.dplproj` whose DCGs walk double-quoted text as characters |
+| `samples/NaturalLanguage` | Natural-language parsing and question answering over character lists |
 | `samples/AotAcceptance` | The NativeAOT acceptance sample |
 
 ## Common tasks
@@ -244,7 +244,7 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 | Grammars | `-->/2` with `{}/1`, `!`, `\+//1`, `->//2`, `call//1`, `phrase//1`, semicontexts and pushback lists; `phrase/2`, `phrase/3`; `Name//Arity` indicators |
 | Streams | `open/3,4` text and binary streams, `close/1,2`, configurable EOF actions, `current_stream/1`, `stream_property/2`, `set_stream_position/2`, current-stream selection, EOF inspection, flushing |
 | Reading | term, character, character-code, and byte input/output; `read_term_from_atom/3`, `term_to_atom/2`, `atom_to_term/3`; `char_conversion/2`, `current_char_conversion/2` |
-| Modules | ISO interfaces and bodies with `module/1`, `body/1`, export/import/re-export, `metapredicate/1`, reflection, and `Module:Goal`; Quintus-style declarations in extended modes |
+| Modules | ISO interfaces and bodies with `module/1`, `body/1`, export/import/re-export, `metapredicate/1`, reflection, and `Module:Goal`; Quintus-style declarations in Modern mode |
 | Directives | `:- Goal`, `:- initialization(Goal)`, `halt/0`, `halt/1` |
 
 Control constructs are compiled in place inside a clause body, so cut scopes the way ISO specifies: opaque in the condition of if-then-else, transparent in its branches, clause-scoped elsewhere. A bootstrap library written in Prolog makes the same constructs reachable when a goal is assembled at run time and passed to `call/1`.
@@ -310,9 +310,9 @@ outright, so a program is free to write its own `member/2` without inheriting ex
 Strings are a distinct term type: `string(S)` is true of one, `atom/1` is false, and the standard
 order places them between numbers and atoms as SWI-Prolog 10 does. A string is interned beside the
 atom text it shares, so unification is integer identity and a string survives every detached copy.
-Double-quoted text still reads as a code list by default (`chars` in `Modern` mode); reading it as
-strings is `set_prolog_flag(double_quotes, string)` — or the `DotPrologFlags` project property —
-away, outside strict ISO mode.
+Double-quoted text reads as a list of characters by default (`codes` in `StrictIso`, or anywhere
+with `double_quotes=codes`); reading it as strings is `set_prolog_flag(double_quotes, string)` —
+or the `DotPrologFlags` project property — away, outside strict ISO mode.
 
 `bagof/3` and `setof/3` group their solutions by whichever of the goal's variables are free —
 those the caller can still see — and offer one group per binding of them. A variable is made
@@ -420,8 +420,8 @@ lets a generated facade, `dotnet prolog run`, and an embedding host call it with
 exist. A goal that is only known at run time carries its module and is resolved when called, so a
 closure handed to a metapredicate finds the predicate it meant. `:- metapredicate(run(:))` both
 declares and exports a Part 2 metapredicate. `current_module/1`, `current_predicate/1`, and
-`predicate_property/2` inspect the calling module's visible database. Extended and Modern modes
-also retain the compatibility declarations `module/2`, `use_module/1,2`, and `meta_predicate/1`;
+`predicate_property/2` inspect the calling module's visible database. Modern mode
+also retains the compatibility declarations `module/2`, `use_module/1,2`, and `meta_predicate/1`;
 StrictIso rejects those spellings in favor of the standard interface/body representation.
 
 Nothing in the engine knows modules exist: resolution is a rewrite performed while loading.
