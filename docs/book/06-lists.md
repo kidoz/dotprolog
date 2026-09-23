@@ -83,12 +83,13 @@ first two and keeps the rest. And one more shape to know: `[H|T]` refuses to uni
 the empty list has no head to give. That refusal is not a nuisance; it is what will stop our
 recursions, the way running out of `parent` facts stopped `ancestor/2`.
 
-!!! note "Double quotes are not text — yet"
+!!! note "Double quotes are not atoms"
     You might guess that `"hello"` is how to write text. Not in this book, not yet: in Prolog,
-    double quotes make a *list of numbers* — character codes — for reasons
-    [chapter 10](10-words-and-text.md) explains and puts to good use. Until then, text is always
-    an atom in single quotes: `'hello'`, `'New York'`. If output ever shows a burst of numbers
-    where you expected words, a stray double quote is almost certainly why.
+    double quotes make a *list* — in DotProlog, a list of single letters, `[h,e,l,l,o]` — for
+    reasons [chapter 10](10-words-and-text.md) explains and puts to good use. Until then, text is
+    always an atom in single quotes: `'hello'`, `'New York'`. If output ever shows a word spelled
+    out letter by letter in brackets where you expected the word, a stray double quote is almost
+    certainly why.
 
 ## Writing my_member: is it in the list?
 

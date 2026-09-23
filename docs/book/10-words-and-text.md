@@ -148,27 +148,29 @@ done that, and you have earned the explanation. Watch:
 ```prolog
 main :-
     write("abc"), nl,
-    X = "hello", write(X), nl,
-    number_codes(N, "427"), Double is N * 2, write(Double), nl.
+    X = "hello", X = [First|_], write(First), nl,
+    number_chars(N, "427"), Double is N * 2, write(Double), nl.
 ```
 
 ```text
-[97,98,99]
-[104,101,108,108,111]
+[a,b,c]
+h
 854
 ```
 
-In Prolog, `"abc"` is not an atom at all — it is *the list of character codes* `[97,98,99]`,
-the numbers you just met with `char_code`. That is occasionally exactly what you want: the last
-line uses `number_codes/2`, which converts between a number and its codes, so `"427"` is a
-handy way to write those three digit codes. The grammar rules in DotProlog's
-[language guide](../language-guide.md) put code lists to serious use.
+In Prolog, `"abc"` is not an atom at all — it is a *list*. In DotProlog it is the list of
+characters `[a,b,c]`, the same one-letter atoms `atom_chars/2` gave you above, so everything
+chapter 6 taught about lists works on it: the second line takes the head of `"hello"`. The last
+line uses `number_chars/2`, which converts between a number and its characters, so `"427"` is a
+handy way to write those three digits. The grammar rules in DotProlog's
+[language guide](../language-guide.md) put character lists to serious use.
 
-But for a beginner it is a trap: `write("abc")` printing `[97,98,99]` has ruined many an
-afternoon, and different Prolog systems disagree about what double quotes should mean — some
-make them a string type that DotProlog deliberately does not have. Hence this book's rule, which
-you can now adopt knowingly: **text is atoms, in single quotes when needed; double quotes mean a
-list of codes.**
+Be warned that Prolog systems disagree about what double quotes should mean. Older systems — and
+DotProlog's strict ISO mode — make `"abc"` the list of character *codes* `[97,98,99]`, the numbers
+you just met with `char_code`; SWI-Prolog makes it a string, a type of its own. A program written
+for codes asks for them with `:- set_prolog_flag(double_quotes, codes).` at the top of its file.
+Hence this book's rule, which you can now adopt knowingly: **text is atoms, in single quotes when
+needed; double quotes mean a list of characters.**
 
 ## Tidier printing: `format`
 
