@@ -10,11 +10,11 @@ and architecture. New to Prolog — or to programming? Start with
 Russian whose examples all run on DotProlog.
 
 **Status: early, but usable.** `dotnet new prolog-console` through `dotnet publish -p:PublishAot=true`
-works today, and `dotnet test` discovers Prolog tests under Microsoft.Testing.Platform. What is
-missing: the `plc` compiler and generating IL for predicate bodies — a `.dplproj` currently embeds
-its Prolog source and compiles it to bytecode at startup. The packages have been on NuGet.org since
-0.2.0 and the current release is 0.7.0: see [CHANGELOG.md](CHANGELOG.md) and
-[COMPATIBILITY.md](COMPATIBILITY.md).
+works today, and `dotnet test` discovers Prolog tests under Microsoft.Testing.Platform. `.dplproj`
+predicate bodies compile to generated C# and ordinary CLR IL at build time; source consulted at run
+time compiles to bytecode for an AOT-safe VM. The standalone `plc` compiler is not implemented yet.
+The packages have been on NuGet.org since 0.2.0 and the current release is 0.7.0: see
+[CHANGELOG.md](CHANGELOG.md) and [COMPATIBILITY.md](COMPATIBILITY.md).
 
 ## Hello, world
 
@@ -142,7 +142,7 @@ bundles of [widget, gadget]:
 | `src/DotProlog.Syntax` | Lexer, ISO operator table, operator-precedence reader, diagnostics |
 | `src/DotProlog.Runtime` | Tagged terms, heap, trail, choice points, bytecode VM, builtins |
 | `src/DotProlog.Compiler` | Clause analysis, source linting, bytecode lowering, consult and embedding API |
-| `src/DotProlog.CodeGen.CSharp` | `.dpli` contract reader and C# facade generator |
+| `src/DotProlog.CodeGen.CSharp` | `.dpli` contract reader, facade and entry-point generators, and the Prolog-to-C# predicate emitter |
 | `src/DotProlog.Build.Tasks` | MSBuild task that runs the generator |
 | `src/DotProlog.Sdk` | The `DotProlog.Sdk` MSBuild SDK package |
 | `src/DotProlog.Templates` | `dotnet new prolog-console`, `prolog-lib`, and `prolog-test` |
@@ -183,14 +183,18 @@ See the `justfile` for the underlying `dotnet` and `uv` commands.
 
 ## How it executes
 
-Two paths are planned, and they are deliberately different:
+Two paths share one reader, loader, and clause compiler, and deliberately end differently:
 
 ```text
-Build-time Prolog        : parser -> semantic IR -> generated C# -> Roslyn -> IL -> JIT/NativeAOT
-Runtime consult / assert : parser -> semantic IR -> Prolog bytecode -> AOT-compatible bytecode VM
+Build-time Prolog        : reader -> loader -> bytecode -> generated C# -> Roslyn -> IL -> JIT/NativeAOT
+Runtime consult / assert : reader -> loader -> bytecode -> AOT-compatible bytecode VM
 ```
 
-Only the second is implemented today. It never emits CLR IL, so it stays valid inside a NativeAOT process — runtime-loaded predicates execute as bytecode and are not turned into new machine code.
+A `.dplproj` takes the first path: its predicates become direct-threaded C# blocks at build time, so
+generated applications, facades, and test hosts neither embed nor consult their source. The second
+path never emits CLR IL, so it stays valid inside a NativeAOT process — runtime-loaded predicates
+execute as bytecode and are not turned into new machine code. Both drive the same heap, trail, and
+choice-point state, so compiled and consulted predicates call each other freely.
 
 That is verified, not assumed. `samples/AotAcceptance` publishes to a self-contained native executable with no managed assemblies beside it, then at run time consults a `.pl` file it has never seen, enumerates solutions, asserts and retracts clauses, and catches an ISO error — with zero trimming or AOT warnings in the build. CI runs it on Windows, Linux, and macOS:
 
@@ -211,11 +215,39 @@ p(2).
 
 The engine owns its control state: heap, trail, environment stack, choice-point stack, and argument registers are plain arrays, and Prolog calls are jumps inside a single dispatch loop. Prolog recursion depth therefore does not consume CLR stack, and failure is a return value rather than an exception. Last-call optimisation makes tail recursion run at constant stack depth.
 
+## Language modes
+
+A program runs in one of two modes, fixed when its engine is created:
+
+| Mode | Surface | `"abc"` reads as |
+|---|---|---|
+| `modern` (default) | ISO Parts 1–3 plus the documented extensions, SWI-Prolog-aligned | `[a,b,c]` |
+| `strict-iso` | Only the ISO/IEC 13211 Parts 1–3 surface | `[97,98,99]` |
+
+```prolog
+?- "abc" = [L|Ls].
+   L = a, Ls = [b,c].
+```
+
+ISO leaves the initial `double_quotes` value to the processor. `chars` is what Scryer, Trealla,
+ichiban, Flowlog, and Trilog use, and it lets a grammar over text look like the text it parses. A
+program written for code lists keeps working with one override: `double_quotes=codes` in the
+`DotPrologFlags` project property, `--flag double_quotes=codes` on the command line, or
+`:- set_prolog_flag(double_quotes, codes).` at the top of a file.
+
+```console
+$ dotnet prolog run --mode strict-iso program.pl
+$ dotnet prolog run --flag double_quotes=codes legacy.pl
+```
+
+A `.dplproj` selects its mode with `<DotPrologLanguageMode>`. See the
+[language guide](docs/language-guide.md#language-modes) for details.
+
 ## What the language supports today
 
 | Area | Predicates |
 |---|---|
-| Terms | atoms, variables, integers, floats, double-quoted code lists, lists, structures |
+| Terms | atoms, variables, unbounded integers, rationals, floats, strings, lists, double-quoted character lists, structures |
 | Control | `,/2`, `;/2`, `->/2`, `*->/2`, `\+/1`, `!/0`, `call/1..8`, `once/1`, `repeat/0`, `ignore/1`, `not/1`, `true/0`, `fail/0` |
 | Exceptions | `throw/1`, `catch/3`, with catchable ISO `error/2` terms |
 | All solutions | `findall/3,4`, `bagof/3`, `setof/3`, `forall/2`, `aggregate_all/3,4` and `aggregate/3,4` (`count`, `bag`, `set`, `sum`, `max`, `min`) |
@@ -223,11 +255,12 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 | Ranges | `between/3`, with `inf` as an open upper bound |
 | Loading | `consult/1`, `ensure_loaded/1` at run time |
 | Unification | `=/2`, `\=/2` |
-| Arithmetic | ISO-oriented integer and float evaluable functors; `is/2`, `=:=/2`, `=\=/2`, `</2`, `>/2`, `=</2`, `>=/2` |
+| Arithmetic | ISO-oriented evaluable functors over unbounded integers, rationals (`1r3`, `rdiv/2`), and floats; `is/2`, `=:=/2`, `=\=/2`, `</2`, `>/2`, `=</2`, `>=/2` |
 | Standard order | `==/2`, `\==/2`, `@</2`, `@>/2`, `@=</2`, `@>=/2`, `compare/3` |
 | Term inspection | `functor/3`, `arg/3`, `=../2`, `copy_term/2`, `term_variables/2`, `numbervars/3`, `variant/2`, `?=/2`, `setarg/3`, `nb_setarg/3` |
-| Type tests | `var/1`, `nonvar/1`, `atom/1`, `number/1`, `integer/1`, `float/1`, `atomic/1`, `compound/1`, `callable/1`, `is_list/1`, `ground/1` |
+| Type tests | `var/1`, `nonvar/1`, `atom/1`, `number/1`, `integer/1`, `float/1`, `rational/1`, `string/1`, `atomic/1`, `compound/1`, `callable/1`, `is_list/1`, `ground/1` |
 | Text | `atom_length/2`, `atom_chars/2`, `atom_codes/2`, `number_chars/2`, `number_codes/2`, `char_code/2`, `atom_number/2`, `atom_concat/3`, `sub_atom/5`, `atomic_list_concat/2,3`, `upcase_atom/2`, `downcase_atom/2`, `char_type/2`, `code_type/2` |
+| Strings | `atom_string/2`, `string_chars/2`, `string_codes/2`, `string_concat/3`, `string_length/2`, `number_string/2`, `string_to_atom/2`, `term_string/2`, `sub_string/5`, `split_string/4`, `string_code/3`, `string_lower/2`, `string_upper/2` |
 | Lists | `length/2`, `append/3`, `member/2`, `memberchk/2`, `nth0/3`, `nth1/3`, `last/2`, `reverse/2`, `select/3`, `selectchk/3`, `subtract/3`, `intersection/3`, `union/3`, `delete/3`, `list_to_set/2`, `permutation/2`, `flatten/2`, `numlist/3`, `sum_list/2`, `max_list/2`, `min_list/2`, `max_member/2`, `min_member/2`, `pairs_keys_values/3`, `pairs_keys/2`, `pairs_values/2`, `transpose_pairs/2` |
 | Higher order | `maplist/2..5`, `foldl/4..6`, `include/3`, `exclude/3`, `partition/4` |
 | Sorting | `sort/2`, `sort/4`, `msort/2`, `keysort/2`, `predsort/3` |
@@ -237,7 +270,7 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 | Global variables | `nb_setval/2`, `nb_getval/2`, `b_setval/2`, `b_getval/2`, engine-scoped |
 | Cleanup | `setup_call_cleanup/3`, `call_cleanup/2` |
 | Integers | `succ/2`, `plus/3` |
-| Output | `write/1,2`, `writeq/1,2`, `print/1,2`, `writeln/1`, `write_canonical/1,2`, `write_term/2,3`, `nl/0,1`, `format/1,2,3`, `tab/1,2` |
+| Output | `write/1,2`, `writeq/1,2`, `print/1,2`, `writeln/1`, `write_canonical/1,2`, `write_term/2,3`, `nl/0,1`, `format/1,2,3`, `tab/1,2`, `print_message/2` with `message_hook/3` |
 | Operators | `op/3`, `current_op/3` |
 | Grammars | `-->/2` with `{}/1`, `!`, `\+//1`, `->//2`, `call//1`, `phrase//1`, semicontexts and pushback lists; `phrase/2`, `phrase/3`; `Name//Arity` indicators |
 | Streams | `open/3,4` text and binary streams, `close/1,2`, configurable EOF actions, `current_stream/1`, `stream_property/2`, `set_stream_position/2`, current-stream selection, EOF inspection, flushing |
@@ -308,9 +341,9 @@ outright, so a program is free to write its own `member/2` without inheriting ex
 Strings are a distinct term type: `string(S)` is true of one, `atom/1` is false, and the standard
 order places them between numbers and atoms as SWI-Prolog 10 does. A string is interned beside the
 atom text it shares, so unification is integer identity and a string survives every detached copy.
-Double-quoted text reads as a list of characters by default (`codes` in `StrictIso`, or anywhere
-with `double_quotes=codes`); reading it as strings is `set_prolog_flag(double_quotes, string)` —
-or the `DotPrologFlags` project property — away, outside strict ISO mode.
+Double-quoted text reads as a list of characters by default (see [Language modes](#language-modes));
+reading it as strings is `set_prolog_flag(double_quotes, string)` — or the `DotPrologFlags` project
+property — away, outside strict ISO mode.
 
 `bagof/3` and `setof/3` group their solutions by whichever of the goal's variables are free —
 those the caller can still see — and offer one group per binding of them. A variable is made
@@ -333,9 +366,9 @@ rewrites the input that the rules after it will see.
 ```prolog
 digits([D|T]) --> digit(D), digits(T).
 digits([D])   --> digit(D).
-digit(D)      --> [D], { D >= 0'0, D =< 0'9 }.
+digit(D)      --> [D], { char_type(D, digit(_)) }.
 
-number(N)     --> digits(Ds), { number_codes(N, Ds) }.
+number(N)     --> digits(Ds), { number_chars(N, Ds) }.
 
 ?- phrase(number(N), "427", Rest).   % N = 427, Rest = []
 ```
@@ -444,7 +477,8 @@ is not a claim of SWI-Prolog compatibility. See
 
 ## Diagnostics
 
-Diagnostic identifiers are stable and product-specific: `DPL0xxx` from the reader, `DPL1xxx` from the compiler.
+Diagnostic identifiers are stable and product-specific: `DPL0xxx` from the reader, `DPL1xxx` from
+the compiler, `DPL2xxx` from `.dpli` contracts and code generation, and `DPL3xxx` from the linter.
 
 ```text
 hello.pl(4,12): error DPL0005: Expected '.' to end the clause but found 'b'.
@@ -510,10 +544,11 @@ xUnit and Prolog test suite.
 ```console
 $ git clone https://github.com/kidoz/dotprolog.git
 $ cd dotprolog
-$ just check          # format-check, build, and test
+$ just check          # format-check, docs, build, and test
 ```
 
-.NET SDK 10.0 or later is the only requirement; everything else restores from NuGet.
+.NET SDK 10.0 or later is all that building and testing need; everything else restores from NuGet.
+The documentation step in `just check` also needs [uv](https://docs.astral.sh/uv/).
 
 ## Releasing
 
