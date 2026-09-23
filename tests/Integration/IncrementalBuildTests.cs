@@ -135,6 +135,11 @@ public sealed class IncrementalBuildTests : IDisposable
         Assert.Contains("DoubleQuotesMode.Atom", flaggedFacade, StringComparison.Ordinal);
         Assert.Contains("requires double_quotes to start at atom", flaggedFacade, StringComparison.Ordinal);
 
+        // The removed extended mode is an unknown name, not a silent fallback.
+        (var removedExit, var removedLog) = await Build("-p:DotPrologLanguageMode=extended");
+        Assert.True(removedExit != 0, "The removed extended mode was accepted.");
+        Assert.Contains("'extended' is not a known Prolog language mode", removedLog, StringComparison.Ordinal);
+
         (var badFlagExit, var badFlagLog) = await Build("-p:DotPrologFlags=double_quotes=strings");
         Assert.True(badFlagExit != 0, "An invalid DotPrologFlags value was accepted.");
         Assert.Contains("DotPrologFlags is invalid", badFlagLog, StringComparison.Ordinal);

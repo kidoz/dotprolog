@@ -11,7 +11,7 @@ public sealed class PrologFlagTests
         Assert.Equal(
             "[bounded-false,max_integer-576460752303423487,min_integer- -576460752303423488,"
                 + "integer_rounding_function-toward_zero,max_arity-255,char_conversion-off,debug-off,"
-                + "double_quotes-codes,unknown-error,colon_sets_calling_context-true,occurs_check-false]\n",
+                + "double_quotes-chars,unknown-error,colon_sets_calling_context-true,occurs_check-false]\n",
             PrologTestHost.RunGoal("findall(F-V, current_prolog_flag(F, V), Flags), write(Flags), nl")
         );
     }
@@ -20,7 +20,7 @@ public sealed class PrologFlagTests
     public void EnumerationHandlesBoundAndSharedArgumentsTransactionally()
     {
         Assert.Equal(
-            "codes yes\n",
+            "chars yes\n",
             PrologTestHost.RunGoal(
                 "current_prolog_flag(double_quotes, Value), "
                     + "\\+ current_prolog_flag(Same, Same), var(Same), "
@@ -85,7 +85,8 @@ public sealed class PrologFlagTests
                 atom_text(ab),
                 chars_text([a,b]),
                 codes_text([97,98]),
-                current_prolog_flag(double_quotes, codes),
+                % Deferred to after the unit, so it sees the restored entering value.
+                current_prolog_flag(double_quotes, chars),
                 write(yes), nl
             )).
             """

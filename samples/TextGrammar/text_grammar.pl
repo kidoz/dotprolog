@@ -5,8 +5,8 @@
 % over text then looks like the text it parses: "0123456789" is a list of digit characters, and
 % " " is a single space character.
 %
-% Under the default extended mode the same literals would be lists of character codes, and every
-% rule below would have to be written against integers such as 0'0 and 0' instead.
+% Under double_quotes=codes, or in strict ISO mode, the same literals would be lists of character
+% codes, and every rule below would have to be written against integers such as 0'0 and 0' instead.
 
 :- initialization(main).
 

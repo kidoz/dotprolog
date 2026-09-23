@@ -8,27 +8,24 @@ namespace DotProlog.Runtime;
 public static class PrologLanguageModes
 {
     /// <summary>The accepted mode names, spelled as a usage message lists them.</summary>
-    public const string Names = "extended|strict-iso|modern";
+    public const string Names = "modern|strict-iso";
 
     /// <summary>Parses a mode name, accepting any casing and both spellings of the ISO mode.</summary>
     /// <param name="text">The name to parse.</param>
-    /// <param name="languageMode">The parsed mode, or <see cref="PrologLanguageMode.Extended"/>.</param>
+    /// <param name="languageMode">The parsed mode, or <see cref="PrologLanguageMode.Modern"/>.</param>
     /// <returns><c>true</c> when <paramref name="text"/> named a mode.</returns>
     public static bool TryParse(string? text, out PrologLanguageMode languageMode)
     {
         switch (text?.Trim().ToLowerInvariant())
         {
-            case "extended":
-                languageMode = PrologLanguageMode.Extended;
+            case "modern":
+                languageMode = PrologLanguageMode.Modern;
                 return true;
             case "strict-iso" or "strictiso":
                 languageMode = PrologLanguageMode.StrictIso;
                 return true;
-            case "modern":
-                languageMode = PrologLanguageMode.Modern;
-                return true;
             default:
-                languageMode = PrologLanguageMode.Extended;
+                languageMode = PrologLanguageMode.Modern;
                 return false;
         }
     }

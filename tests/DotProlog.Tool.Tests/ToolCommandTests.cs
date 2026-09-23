@@ -203,10 +203,46 @@ public sealed class ToolCommandTests : IDisposable
     {
         var path = Source("clean.pl", "same(X, X).\n");
 
-        (var exitCode, _, var error) = Execute("lint", "--flag", "double_quotes=chars", path);
+        (var exitCode, _, var error) = Execute("lint", "--flag", "double_quotes=codes", path);
 
         Assert.Equal(0, exitCode);
         Assert.Empty(error);
+    }
+
+    [Fact]
+    public void RunDefaultsToModernMode()
+    {
+        var path = Source("default.pl", ":- initialization((\"ab\" == [a,b], writeln(ok))).\n");
+
+        (var exitCode, var output, var error) = Execute("run", path);
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("ok\n", output);
+        Assert.Empty(error);
+    }
+
+    [Fact]
+    public void RunReadsCodeListsUnderACodesOverride()
+    {
+        var path = Source("codes.pl", ":- initialization((\"ab\" == [97,98], writeln(ok))).\n");
+
+        (var exitCode, var output, var error) = Execute("run", "--flag", "double_quotes=codes", path);
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("ok\n", output);
+        Assert.Empty(error);
+    }
+
+    [Fact]
+    public void RunRejectsTheRemovedExtendedMode()
+    {
+        var path = Source("clean.pl", "same(X, X).\n");
+
+        (var exitCode, _, var error) = Execute("run", "--mode", "extended", path);
+
+        Assert.Equal(64, exitCode);
+        Assert.Contains("unknown language mode: extended", error, StringComparison.Ordinal);
+        Assert.Contains("modern|strict-iso", error, StringComparison.Ordinal);
     }
 
     public void Dispose() => Directory.Delete(_directory, recursive: true);

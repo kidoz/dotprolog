@@ -93,7 +93,7 @@ public sealed class StringTypeTests
     public void TheFlagValueIsScopedToItsLoadUnitAndAbsentFromStrictMode()
     {
         Assert.Equal(
-            "string codes",
+            "string chars",
             PrologTestHost.Run(
                 """
                 :- set_prolog_flag(double_quotes, string).
@@ -116,7 +116,7 @@ public sealed class StringTypeTests
     public void TheOverrideSurfaceAcceptsStringOutsideStrictMode()
     {
         var engine = new PrologEngine(
-            PrologLanguageMode.Extended,
+            PrologLanguageMode.Modern,
             new PrologFlagOverrides { DoubleQuotes = DoubleQuotesMode.String }
         )
         {

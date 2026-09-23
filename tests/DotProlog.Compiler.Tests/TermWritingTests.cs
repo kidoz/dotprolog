@@ -73,8 +73,8 @@ public sealed class TermWritingTests
     }
 
     [Fact]
-    public void DoubleQuotedTextBecomesAListOfCharacterCodes()
+    public void DoubleQuotedTextBecomesAListOfCharacters()
     {
-        Assert.Equal("[104,105]", PrologTestHost.RunGoal(@"X = ""hi"", write(X)"));
+        Assert.Equal("[h,i]", PrologTestHost.RunGoal(@"X = ""hi"", write(X)"));
     }
 }

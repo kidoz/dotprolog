@@ -24,9 +24,9 @@ public sealed class PrologEngine : IRuntimeCompiler
     private readonly Dictionary<string, (int Address, int ArgumentCount)> _controlGoals = new(StringComparer.Ordinal);
     private bool _preparationHalted;
 
-    /// <summary>Creates an extended-mode engine with the core builtins registered and an empty program.</summary>
+    /// <summary>Creates a modern-mode engine with the core builtins registered and an empty program.</summary>
     public PrologEngine()
-        : this(PrologLanguageMode.Extended) { }
+        : this(PrologLanguageMode.Modern) { }
 
     /// <summary>
     /// Creates an engine using <paramref name="languageMode"/>, with
@@ -41,7 +41,7 @@ public sealed class PrologEngine : IRuntimeCompiler
         Program.RuntimeCompiler = this;
 
         // The bundled libraries are processor implementation, not user source, so they are read under
-        // the ISO initial value whatever mode the host chose. Modern mode cannot reinterpret them.
+        // codes whatever mode or override the host chose; no dialect can reinterpret them.
         Program.Flags.DoubleQuotes = DoubleQuotesMode.Codes;
         LoadLibrary(BootstrapLibrary.Source, "bootstrap");
         LoadLibrary(StandardLibrary.Source, "library");

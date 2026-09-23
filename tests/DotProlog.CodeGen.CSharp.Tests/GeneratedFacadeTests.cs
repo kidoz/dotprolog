@@ -15,6 +15,7 @@ namespace DotProlog.CodeGen.CSharp.Tests;
 public sealed class GeneratedFacadeTests
 {
     private static readonly string[] SplitInput = ["a", "b"];
+    private static readonly Runtime.PrologFlagOverrides CodesOverride = new() { DoubleQuotes = Runtime.DoubleQuotesMode.Codes };
 
     private const string PrologSource = """
         discount(Price, Percent, Result) :- Result is Price - (Price * Percent / 100).
@@ -487,7 +488,7 @@ public sealed class GeneratedFacadeTests
             contract.Contract!,
             "text(\"hello\").",
             "quoted.pl",
-            Runtime.PrologLanguageMode.Extended,
+            Runtime.PrologLanguageMode.Modern,
             new Runtime.PrologFlagOverrides { DoubleQuotes = Runtime.DoubleQuotesMode.Atom }
         );
 
@@ -525,12 +526,13 @@ public sealed class GeneratedFacadeTests
             chars_text("ab").
             """,
             "replay.pl",
-            Runtime.PrologLanguageMode.Extended
+            Runtime.PrologLanguageMode.Modern,
+            CodesOverride
         );
 
         Assembly assembly = CompileGenerated(source);
         Type type = assembly.GetType("Generated.Replay.ReplayModule")!;
-        var engine = new Compiler.PrologEngine();
+        var engine = new Compiler.PrologEngine(Runtime.PrologLanguageMode.Modern, CodesOverride);
         object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
 
         // The source was one load unit: replaying its directive at install time must not leak the
@@ -561,7 +563,7 @@ public sealed class GeneratedFacadeTests
             check :- str_text(S), string(S), string_length(S, 5), string_concat(S, "!", "hello!").
             """,
             "stringy.pl",
-            Runtime.PrologLanguageMode.Extended
+            Runtime.PrologLanguageMode.Modern
         );
 
         // The build-time constant reaches the generated installer as a string cell.
@@ -580,11 +582,11 @@ public sealed class GeneratedFacadeTests
         var source = EntryPointGenerator.Generate(
             "Generated.App",
             [("app.pl", ":- initialization(true).")],
-            Runtime.PrologLanguageMode.Extended,
-            new Runtime.PrologFlagOverrides { DoubleQuotes = Runtime.DoubleQuotesMode.Chars }
+            Runtime.PrologLanguageMode.Modern,
+            CodesOverride
         );
 
-        Assert.Contains("DoubleQuotes = global::DotProlog.Runtime.DoubleQuotesMode.Chars", source, StringComparison.Ordinal);
-        Assert.Contains("requires double_quotes to start at chars", source, StringComparison.Ordinal);
+        Assert.Contains("DoubleQuotes = global::DotProlog.Runtime.DoubleQuotesMode.Codes", source, StringComparison.Ordinal);
+        Assert.Contains("requires double_quotes to start at codes", source, StringComparison.Ordinal);
     }
 }

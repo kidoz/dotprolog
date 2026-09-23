@@ -49,14 +49,13 @@ public sealed class BytecodeProgram
     /// </summary>
     private static readonly PrologLanguageMode[] SupportedLanguageModes =
     [
-        PrologLanguageMode.Extended,
-        PrologLanguageMode.StrictIso,
         PrologLanguageMode.Modern,
+        PrologLanguageMode.StrictIso,
     ];
 
-    /// <summary>Creates an empty extended-mode program with its own symbol table and builtin registry.</summary>
+    /// <summary>Creates an empty modern-mode program with its own symbol table and builtin registry.</summary>
     public BytecodeProgram()
-        : this(PrologLanguageMode.Extended) { }
+        : this(PrologLanguageMode.Modern) { }
 
     /// <summary>
     /// Creates an empty program in <paramref name="languageMode"/>, with
@@ -105,11 +104,12 @@ public sealed class BytecodeProgram
 
     /// <summary>
     /// The initial <c>double_quotes</c> value a mode carries. ISO/IEC 13211-1 leaves the initial
-    /// value implementation defined; DotProlog's documented choice is <c>codes</c>, which every
-    /// mode but <see cref="PrologLanguageMode.Modern"/> keeps.
+    /// value implementation defined; DotProlog's documented choice is <c>chars</c> in the default
+    /// <see cref="PrologLanguageMode.Modern"/> mode and <c>codes</c> in
+    /// <see cref="PrologLanguageMode.StrictIso"/>.
     /// </summary>
     private static DoubleQuotesMode InitialDoubleQuotesOf(PrologLanguageMode languageMode) =>
-        languageMode == PrologLanguageMode.Modern ? DoubleQuotesMode.Chars : DoubleQuotesMode.Codes;
+        languageMode == PrologLanguageMode.StrictIso ? DoubleQuotesMode.Codes : DoubleQuotesMode.Chars;
 
     /// <summary>
     /// Whether the loader dispatches multi-clause static predicates through a first-argument

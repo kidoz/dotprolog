@@ -6,11 +6,11 @@ namespace DotProlog.Compiler.Tests;
 public sealed class StrictIsoTests
 {
     [Fact]
-    public void ExtendedModeRemainsTheDefault()
+    public void StrictModeIsOptIn()
     {
         var engine = new PrologEngine();
 
-        Assert.Equal(PrologLanguageMode.Extended, engine.Program.LanguageMode);
+        Assert.Equal(PrologLanguageMode.Modern, engine.Program.LanguageMode);
         Assert.True(engine.ConsultText("p :- member(a, [a]).").Success);
     }
 
@@ -100,11 +100,11 @@ public sealed class StrictIsoTests
     [InlineData("p :- a := b.")]
     [InlineData("p :- $ true.")]
     [InlineData("p(X) :- X = (a '.' b).")]
-    public void ExtendedModeKeepsItsPredefinedOperators(string source)
+    public void ModernModeKeepsItsPredefinedOperators(string source)
     {
         var engine = new PrologEngine();
 
-        LoadResult loaded = engine.ConsultText(source, "extended.pl");
+        LoadResult loaded = engine.ConsultText(source, "modern.pl");
 
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
     }

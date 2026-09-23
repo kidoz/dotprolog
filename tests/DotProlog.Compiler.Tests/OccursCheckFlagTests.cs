@@ -91,7 +91,7 @@ public sealed class OccursCheckFlagTests
         );
 
     [Fact]
-    public void TheFlagEnumeratesInExtendedMode() =>
+    public void TheFlagEnumeratesInModernMode() =>
         Assert.Equal("false", PrologTestHost.RunGoal("current_prolog_flag(occurs_check, V), write(V)"));
 
     [Fact]

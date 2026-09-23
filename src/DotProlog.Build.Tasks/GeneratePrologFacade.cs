@@ -40,7 +40,7 @@ public sealed class GeneratePrologFacade : Task
     public bool GenerateTestHost { get; set; }
 
     /// <summary>The language mode generated source is built against; see <c>DotPrologLanguageMode</c>.</summary>
-    public string LanguageMode { get; set; } = "extended";
+    public string LanguageMode { get; set; } = "modern";
 
     /// <summary>Initial flag overrides layered over the mode; see <c>DotPrologFlags</c>.</summary>
     public string Flags { get; set; } = string.Empty;

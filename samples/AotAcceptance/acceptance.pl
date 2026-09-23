@@ -13,8 +13,9 @@ describe(C, Text) :- colour(C), atom_or_self(C, Text).
 
 atom_or_self(X, X).
 
-% A grammar, to prove the loader's DCG translation runs inside a native image.
-number(N)     --> digits(Ds), { number_codes(N, Ds) }.
+% A grammar, to prove the loader's DCG translation runs inside a native image. Double-quoted
+% text reads as characters, so the grammar walks characters.
+number(N)     --> digits(Ds), { number_chars(N, Ds) }.
 digits([D|T]) --> digit(D), digits(T).
 digits([D])   --> digit(D).
-digit(D)      --> [D], { D >= 0'0, D =< 0'9 }.
+digit(D)      --> [D], { D @>= '0', D @=< '9' }.

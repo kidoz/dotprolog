@@ -27,7 +27,7 @@ public static class FacadeGenerator
     /// <param name="prologSource">The module's Prolog source, compiled into generated C# blocks.</param>
     /// <param name="sourceName">Name reported in build-time diagnostics.</param>
     public static string Generate(ModuleContract contract, string prologSource, string sourceName) =>
-        Generate(contract, prologSource, sourceName, PrologLanguageMode.Extended);
+        Generate(contract, prologSource, sourceName, PrologLanguageMode.Modern);
 
     /// <summary>Generates a facade whose build-time and runtime behavior use <paramref name="languageMode"/>.</summary>
     public static string Generate(

@@ -49,7 +49,7 @@ public sealed class StandardLibraryTests
         // The distinction is the point of having both: atom_number/2 tests, number_codes/2 converts.
         Assert.Equal(
             "syntax_error(illegal_number)",
-            PrologTestHost.RunGoal("catch(number_codes(_, \"zz\"), error(E, _), write(E))")
+            PrologTestHost.RunGoal("catch(number_codes(_, [0'z, 0'z]), error(E, _), write(E))")
         );
     }
 

@@ -5,13 +5,14 @@ using DotProlog.Runtime;
 namespace DotProlog.Benchmarks;
 
 /// <summary>
-/// What selecting a language mode costs, and what the load-unit scope of <c>double_quotes</c> costs.
+/// What seeding <c>double_quotes</c> costs, and what the load-unit scope of <c>double_quotes</c> costs.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Modern mode differs from Extended only in the value <c>double_quotes</c> starts at, so these
-/// benchmarks are watching for two things: that seeding the flag does not change what engine
-/// construction costs, and that reading text as chars is not slower than reading it as codes.
+/// The default mode starts <c>double_quotes</c> at <c>chars</c>, and a project override moves it to
+/// <c>codes</c>, so these benchmarks are watching for two things: that seeding the flag does not
+/// change what engine construction costs, and that reading text as chars is not slower than reading
+/// it as codes.
 /// Both paths go through <c>TermNormalizer</c>, which builds a list either way — a list of atoms
 /// rather than a list of integers.
 /// </para>
@@ -34,23 +35,23 @@ public class LanguageModeBenchmarks
     /// <summary>Twenty separate load units, which is what the scope restore is paid per.</summary>
     private static readonly string[] ManyUnits = [.. Enumerable.Range(0, 20).Select(index => $"unit{index}(\"text {index}\").")];
 
-    [Params(PrologLanguageMode.Extended, PrologLanguageMode.Modern)]
-    public PrologLanguageMode Mode { get; set; }
+    [Params(DoubleQuotesMode.Codes, DoubleQuotesMode.Chars)]
+    public DoubleQuotesMode DoubleQuotes { get; set; }
 
-    [Benchmark(Description = "Construct an engine in the mode")]
-    public PrologEngine Construct() => new(Mode) { Output = TextWriter.Null };
+    [Benchmark(Description = "Construct an engine with the initial value")]
+    public PrologEngine Construct() => NewEngine();
 
     [Benchmark(Description = "Consult a string-heavy source")]
     public bool ConsultStringHeavy()
     {
-        var engine = new PrologEngine(Mode) { Output = TextWriter.Null };
+        PrologEngine engine = NewEngine();
         return engine.ConsultText(StringHeavySource, "bench.pl").Success;
     }
 
     [Benchmark(Description = "Consult 20 separate load units")]
     public bool ConsultManyUnits()
     {
-        var engine = new PrologEngine(Mode) { Output = TextWriter.Null };
+        PrologEngine engine = NewEngine();
         var success = true;
         for (var index = 0; index < ManyUnits.Length; index++)
         {
@@ -59,4 +60,7 @@ public class LanguageModeBenchmarks
 
         return success;
     }
+
+    private PrologEngine NewEngine() =>
+        new(PrologLanguageMode.Modern, new PrologFlagOverrides { DoubleQuotes = DoubleQuotes }) { Output = TextWriter.Null };
 }

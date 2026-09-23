@@ -284,11 +284,16 @@ internal static class CompiledConformanceSourceGenerator
                         return 7;
                     }
 
-                    // Generated code refuses an engine built in a different mode.
-                    var extended = new global::DotProlog.Compiler.PrologEngine();
+                    // Generated code refuses an engine whose double_quotes starts elsewhere.
+                    var codes = new global::DotProlog.Compiler.PrologEngine(
+                        global::DotProlog.Runtime.PrologLanguageMode.Modern,
+                        new global::DotProlog.Runtime.PrologFlagOverrides
+                        {
+                            DoubleQuotes = global::DotProlog.Runtime.DoubleQuotesMode.Codes,
+                        });
                     try
                     {
-                        __ModernCompiled.Install(extended);
+                        __ModernCompiled.Install(codes);
                         return 8;
                     }
                     catch (global::DotProlog.Runtime.PrologException)

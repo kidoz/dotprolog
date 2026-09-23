@@ -9,6 +9,9 @@ namespace DotProlog.Compiler.Tests;
 public sealed class GrammarTests
 {
     private const string Grammar = """
+        % The digit rules compare character codes, so this unit reads double-quoted text as codes.
+        :- set_prolog_flag(double_quotes, codes).
+
         greeting --> [hello], name.
         name --> [world].
         name --> [prolog].

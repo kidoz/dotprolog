@@ -41,7 +41,7 @@ internal static class Program
 
     private static int Run(ReadOnlySpan<string> args, TextWriter output, TextWriter error)
     {
-        PrologLanguageMode languageMode = PrologLanguageMode.Extended;
+        PrologLanguageMode languageMode = PrologLanguageMode.Modern;
         List<string> flagEntries = [];
         List<string> paths = [];
 
@@ -141,7 +141,7 @@ internal static class Program
 
     private static int Lint(ReadOnlySpan<string> args, TextWriter error)
     {
-        PrologLanguageMode languageMode = PrologLanguageMode.Extended;
+        PrologLanguageMode languageMode = PrologLanguageMode.Modern;
         PrologLintOptions lintOptions = PrologLintOptions.SemanticOnly;
         var warningsAsErrors = false;
         int? indentSize = null;
@@ -401,9 +401,8 @@ internal static class Program
         output.WriteLine("      analyze source without consulting it or executing directives");
         output.WriteLine();
         output.WriteLine("Language modes:");
-        output.WriteLine("  extended     ISO plus the DotProlog extensions (default)");
-        output.WriteLine("  strict-iso   only the standardized ISO/IEC 13211 surface");
-        output.WriteLine("  modern       extended, with double_quotes starting at chars");
+        output.WriteLine("  modern       ISO plus the DotProlog extensions, double_quotes starting at chars (default)");
+        output.WriteLine("  strict-iso   only the standardized ISO/IEC 13211 surface, double_quotes starting at codes");
         output.WriteLine();
         output.WriteLine("Flag overrides (--flag, repeatable) layer an initial flag value over the mode:");
         output.WriteLine($"  {PrologFlagOverrides.Entries}");

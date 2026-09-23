@@ -25,7 +25,7 @@ public static class EntryPointGenerator
     /// <param name="namespace">Namespace to generate into.</param>
     /// <param name="sources">Each source file's name and contents.</param>
     public static string GenerateTestHost(string @namespace, IReadOnlyList<(string Name, string Text)> sources) =>
-        GenerateTestHost(@namespace, sources, PrologLanguageMode.Extended);
+        GenerateTestHost(@namespace, sources, PrologLanguageMode.Modern);
 
     /// <summary>Generates a test host using <paramref name="languageMode"/>.</summary>
     public static string GenerateTestHost(
@@ -110,7 +110,7 @@ public static class EntryPointGenerator
     /// <param name="namespace">Namespace to generate into.</param>
     /// <param name="sources">Each source file's name and contents, consulted in order.</param>
     public static string Generate(string @namespace, IReadOnlyList<(string Name, string Text)> sources) =>
-        Generate(@namespace, sources, PrologLanguageMode.Extended);
+        Generate(@namespace, sources, PrologLanguageMode.Modern);
 
     /// <summary>Generates an application entry point using <paramref name="languageMode"/>.</summary>
     public static string Generate(

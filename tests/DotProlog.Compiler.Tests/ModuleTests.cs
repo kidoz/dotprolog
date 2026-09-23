@@ -529,7 +529,7 @@ public sealed class ModuleTests : IDisposable
     }
 
     [Theory]
-    [InlineData(PrologLanguageMode.Extended)]
+    [InlineData(PrologLanguageMode.Modern)]
     [InlineData(PrologLanguageMode.StrictIso)]
     public void IsoInterfacesAndBodiesPrepareImportsBeforeExecution(PrologLanguageMode mode)
     {

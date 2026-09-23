@@ -13,14 +13,14 @@ internal static class CompiledProgramEmitter
         IReadOnlyList<(string Name, string Text)> sources,
         string typeName,
         out IReadOnlyList<Diagnostic> diagnostics
-    ) => Generate(sources, typeName, [], PrologLanguageMode.Extended, out diagnostics);
+    ) => Generate(sources, typeName, [], PrologLanguageMode.Modern, out diagnostics);
 
     internal static string Generate(
         IReadOnlyList<(string Name, string Text)> sources,
         string typeName,
         IReadOnlyList<(string Name, int Arity)> hostBuiltins,
         out IReadOnlyList<Diagnostic> diagnostics
-    ) => Generate(sources, typeName, hostBuiltins, PrologLanguageMode.Extended, out diagnostics);
+    ) => Generate(sources, typeName, hostBuiltins, PrologLanguageMode.Modern, out diagnostics);
 
     internal static string Generate(
         IReadOnlyList<(string Name, string Text)> sources,
