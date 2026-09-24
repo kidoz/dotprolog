@@ -84,7 +84,7 @@ internal static class CharacterConversionBuiltins
         }
     }
 
-    private static char RequireConversionCharacter(Machine machine, Cell cell)
+    private static int RequireConversionCharacter(Machine machine, Cell cell)
     {
         if (cell.Tag == CellTag.Reference)
         {
@@ -96,7 +96,7 @@ internal static class CharacterConversionBuiltins
             : throw PrologErrors.Representation(machine, "character");
     }
 
-    private static char RequireCharacter(Machine machine, Cell cell)
+    private static int RequireCharacter(Machine machine, Cell cell)
     {
         if (!TryCharacter(machine, cell, out var character))
         {
@@ -106,7 +106,7 @@ internal static class CharacterConversionBuiltins
         return character;
     }
 
-    private static bool TryCharacter(Machine machine, Cell cell, out char character)
+    private static bool TryCharacter(Machine machine, Cell cell, out int character)
     {
         character = default;
         if (cell.Tag != CellTag.Atom)
@@ -115,16 +115,17 @@ internal static class CharacterConversionBuiltins
         }
 
         var text = machine.Symbols.AtomName(cell.Index);
-        if (text.Length != 1)
+        if (!PrologText.IsCharacter(machine, text))
         {
             return false;
         }
 
-        character = text[0];
+        character = PrologText.CodeOf(text);
         return true;
     }
 
-    private static Cell Character(Machine machine, char value) => Cell.Atom(machine.Symbols.InternAtom(value.ToString()));
+    private static Cell Character(Machine machine, int code) =>
+        Cell.Atom(machine.Symbols.InternAtom(PrologText.CharacterOf(code)));
 
     private static ModuleDefinition Context(Machine machine, int argument)
     {

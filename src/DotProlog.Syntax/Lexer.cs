@@ -168,10 +168,21 @@ internal sealed class Lexer
     /// The character at <paramref name="position"/> and its width in code units: a surrogate pair is
     /// one character when characters are code points; otherwise it is the converted code unit.
     /// </summary>
-    private (int Code, int Width) CharacterAt(int position) =>
-        CodePoints && position < _text.Length && CodePointText.IsPairAt(_text, position)
-            ? (char.ConvertToUtf32(_text[position], _text[position + 1]), 2)
-            : (InputAt(position), 1);
+    private (int Code, int Width) CharacterAt(int position)
+    {
+        if (CodePoints && position < _text.Length && CodePointText.IsPairAt(_text, position))
+        {
+            return (Convert(char.ConvertToUtf32(_text[position], _text[position + 1])), 2);
+        }
+
+        if (position < 0 || position >= _text.Length)
+        {
+            return ('\0', 1);
+        }
+
+        var input = _text[position];
+        return (input is '\'' or '"' or '`' || (CodePoints && char.IsSurrogate(input)) ? input : Convert(input), 1);
+    }
 
     private bool IsAlphanumericAt(int position, out int width)
     {
@@ -185,6 +196,11 @@ internal sealed class Lexer
 
     private char RawPeek(int offset) => _position + offset < _text.Length ? _text[_position + offset] : '\0';
 
+    /// <summary>
+    /// The code unit at <paramref name="position"/>, through character conversion. A converted
+    /// character outside the Basic Multilingual Plane is no source structure the lexer compares
+    /// against, so it reads as U+FFFF here; <see cref="CharacterAt"/> carries its real code.
+    /// </summary>
     private char InputAt(int position)
     {
         if (position < 0 || position >= _text.Length)
@@ -193,14 +209,22 @@ internal sealed class Lexer
         }
 
         var input = _text[position];
-        if (input is '\'' or '"' or '`')
+        if (input is '\'' or '"' or '`' || (CodePoints && char.IsSurrogate(input)))
         {
             return input;
         }
 
-        return _flags?.CharConversion == true && _conversions is not null ? _conversions.Convert(input) : input;
+        var converted = Convert(input);
+        return converted <= char.MaxValue ? (char)converted : '\uFFFF';
     }
 
+    private int Convert(int code) =>
+        _flags?.CharConversion == true && _conversions is not null ? _conversions.Convert(code) : code;
+
+    /// <summary>
+    /// The source text between two code-unit positions, each character converted. Conversion works per
+    /// character — per code point in the default mode — and may change the UTF-16 length.
+    /// </summary>
     private string ConvertedText(int start, int length)
     {
         if (_flags?.CharConversion != true || _conversions is null)
@@ -208,17 +232,24 @@ internal sealed class Lexer
             return _text.Substring(start, length);
         }
 
-        return string.Create(
-            length,
-            (Text: _text, Start: start, Conversions: _conversions),
-            static (output, state) =>
+        var converted = new StringBuilder(length);
+        for (var index = start; index < start + length; )
+        {
+            var (code, width) = CharacterClass.At(_text, index, CodePoints);
+            var output = code is '\'' or '"' or '`' ? code : Convert(code);
+            if (output <= char.MaxValue)
             {
-                for (var index = 0; index < output.Length; index++)
-                {
-                    output[index] = state.Conversions.Convert(state.Text[state.Start + index]);
-                }
+                converted.Append((char)output);
             }
-        );
+            else
+            {
+                converted.Append(char.ConvertFromUtf32(output));
+            }
+
+            index += width;
+        }
+
+        return converted.ToString();
     }
 
     private void Advance(int count = 1)

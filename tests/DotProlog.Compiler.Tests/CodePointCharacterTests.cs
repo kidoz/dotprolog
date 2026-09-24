@@ -72,11 +72,51 @@ public sealed class CodePointCharacterTests
         Assert.Equal(expected, PrologTestHost.RunGoal(goal));
 
     [Theory]
+    [InlineData("format(\"~w~t~6|x\", ['😀'])", "😀     x")]
+    [InlineData("format(\"~`😀t~3|\", []), nl", "😀😀😀\n")]
+    [InlineData("format(\"~c~c\", [128512, 97])", "😀a")]
+    [InlineData("catch(format(\"~c\", [0xD800]), error(E, _), true), writeq(E)", "representation_error(code_point)")]
+    [InlineData("catch(format(\"~c\", [-1]), error(E, _), true), writeq(E)", "format_argument_type(c,-1)")]
+    public void FormatCountsColumnsInCodePoints(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Fact]
+    public void StreamsReadAndPeekWholeCharacters()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"dotprolog-codepoints-{Guid.NewGuid():N}.txt");
+        try
+        {
+            File.WriteAllText(path, "a😀😀b.");
+            Assert.Equal(
+                "[a,128512,128512,'😀',b]",
+                PrologTestHost.RunGoal(
+                    $"open('{path.Replace("\\", "\\\\", StringComparison.Ordinal)}', read, S), get_char(S, A), peek_code(S, P), get_code(S, C), get_char(S, D), read(S, T), close(S), writeq([A, P, C, D, T])"
+                )
+            );
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Theory]
+    [InlineData("put_char('😀'), put_code(128513)", "😀😁")]
+    [InlineData(
+        "char_conversion('😀', x), set_prolog_flag(char_conversion, on), read_term_from_atom('f(😀)', T, []), writeq(T)",
+        "f(x)"
+    )]
+    public void OutputAndConversionUseCodePoints(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Theory]
     [InlineData("writeq('𝑎bc')", "'𝑎bc'")]
     [InlineData("atom_length('a😀b', N), write(N)", "4")]
     [InlineData("atom_codes('😀', L), write(L)", "[55357,56832]")]
     [InlineData("catch(char_code(_, 128512), error(E, _), true), writeq(E)", "representation_error(character_code)")]
     [InlineData("findall(B-L, sub_atom('a😀b', B, L, _, _), All), All = [_|_], write(done)", "done")]
+    [InlineData("catch(put_code(65536), error(E, _), true), writeq(E)", "representation_error(character_code)")]
+    [InlineData("catch(get_code(65536), error(E, _), true), writeq(E)", "representation_error(in_character_code)")]
     public void StrictModeKeepsCodeUnitCharacters(string goal, string expected)
     {
         var output = new StringWriter();

@@ -306,10 +306,7 @@ internal static class CompiledProgramEmitter
             text.AppendLine(CultureInfo.InvariantCulture, $"        {variable}.CharacterConversions.Clear();");
             foreach ((var input, var output) in module.CharacterConversions)
             {
-                text.AppendLine(
-                    CultureInfo.InvariantCulture,
-                    $"        {variable}.CharacterConversions.Set((char){(int)input}, (char){(int)output});"
-                );
+                text.AppendLine(CultureInfo.InvariantCulture, $"        {variable}.CharacterConversions.Set({input}, {output});");
             }
 
             text.AppendLine(
@@ -537,7 +534,7 @@ internal static class CompiledProgramEmitter
         string Name,
         bool InterfacePrepared,
         List<PrologOperator> Operators,
-        List<(char Input, char Output)> CharacterConversions,
+        List<(int Input, int Output)> CharacterConversions,
         bool CharConversion,
         bool Debug,
         DoubleQuotesMode DoubleQuotes,

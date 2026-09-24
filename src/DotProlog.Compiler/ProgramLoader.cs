@@ -585,7 +585,7 @@ public sealed class ProgramLoader
                             or { Name: "set_prolog_flag", Arity: 2 }:
                     // These directives have already affected lexical preparation at their source
                     // position. Module-specific reader snapshots are installed by the reader seam.
-                    ValidateIsoReaderDirective(readerDirective, diagnostics, fileName);
+                    ValidateIsoReaderDirective(readerDirective, diagnostics, fileName, _program.Flags.CodePointCharacters);
                     break;
 
                 default:
@@ -928,15 +928,20 @@ public sealed class ProgramLoader
         }
     }
 
-    private static void ValidateIsoReaderDirective(CompoundTerm directive, List<Diagnostic> diagnostics, string? fileName)
+    private static void ValidateIsoReaderDirective(
+        CompoundTerm directive,
+        List<Diagnostic> diagnostics,
+        string? fileName,
+        bool codePoints
+    )
     {
         bool valid = directive switch
         {
             { Name: "op", Arguments: [IntegerTerm priority, AtomTerm type, var names] } => priority.Value is >= 0 and <= 1200
                 && type.Name is "xfx" or "xfy" or "yfx" or "fx" or "fy" or "xf" or "yf"
                 && OperatorNames(names).All(name => name is AtomTerm),
-            { Name: "char_conversion", Arguments: [AtomTerm input, AtomTerm output] } => IsSingleCharacter(input)
-                && IsSingleCharacter(output),
+            { Name: "char_conversion", Arguments: [AtomTerm input, AtomTerm output] } => IsSingleCharacter(input, codePoints)
+                && IsSingleCharacter(output, codePoints),
             { Name: "set_prolog_flag", Arguments: [AtomTerm flag, AtomTerm value] } => (flag.Name, value.Name) switch
             {
                 ("char_conversion", "on" or "off") => true,
@@ -974,7 +979,8 @@ public sealed class ProgramLoader
         }
     }
 
-    private static bool IsSingleCharacter(AtomTerm atom) => atom.Name.Length == 1;
+    private static bool IsSingleCharacter(AtomTerm atom, bool codePoints) =>
+        atom.Name.Length == 1 || (codePoints && atom.Name.Length == 2 && CodePointText.IsPairAt(atom.Name, 0));
 
     private bool IsPredefinedProcedure(PredicateIndicator indicator)
     {

@@ -962,7 +962,7 @@ internal static class StreamBuiltins
         if (character.Tag != CellTag.Reference)
         {
             var atom = character.Tag == CellTag.Atom ? machine.Symbols.AtomName(character.Index) : null;
-            if (atom is null || (atom.Length != 1 && atom != "end_of_file"))
+            if (atom is null || (!PrologText.IsCharacter(machine, atom) && atom != "end_of_file"))
             {
                 throw PrologErrors.Type(machine, "in_character", character);
             }
@@ -970,6 +970,15 @@ internal static class StreamBuiltins
 
         PrologStream source = Resolve(machine, stream, input: true);
         PrepareInput(machine, source, stream);
+        if (machine.Symbols.CodePoints)
+        {
+            var code = NextCodePoint(machine, source, consume);
+            return machine.Unify(
+                character,
+                Cell.Atom(machine.Symbols.InternAtom(code < 0 ? "end_of_file" : PrologText.CharacterOf(code)))
+            );
+        }
+
         TextReader reader = source.Reader!;
 
         // Whatever a term read left behind has to be consumed before the reader itself is touched.
@@ -999,6 +1008,55 @@ internal static class StreamBuiltins
 
     private static Cell Character(Machine machine, char value) => Cell.Atom(machine.Symbols.InternAtom(value.ToString()));
 
+    /// <summary>
+    /// The code of the next character of <paramref name="source"/>, or -1 at its end, consuming the
+    /// character when <paramref name="consume"/> is set. A surrogate pair is one character: when its
+    /// first half is next, the second is moved into the lookahead buffer, so a peek sees the whole
+    /// character and a later read or term read still finds it. A stray surrogate, which only a host
+    /// reader can supply, reads as U+FFFD.
+    /// </summary>
+    private static int NextCodePoint(Machine machine, PrologStream source, bool consume)
+    {
+        if (source.Buffer.Length == 0)
+        {
+            var first = GuardIo(machine, () => source.Reader!.Read());
+            if (first < 0)
+            {
+                if (consume)
+                {
+                    source.RecordInput(read: false);
+                }
+
+                return -1;
+            }
+
+            source.Buffer = ((char)first).ToString();
+        }
+
+        if (source.Buffer.Length == 1 && char.IsHighSurrogate(source.Buffer[0]))
+        {
+            var second = GuardIo(machine, () => source.Reader!.Read());
+            if (second >= 0)
+            {
+                source.Buffer += (char)second;
+            }
+        }
+
+        var width = CodePointText.IsPairAt(source.Buffer, 0) ? 2 : 1;
+        var code =
+            width == 2 ? char.ConvertToUtf32(source.Buffer[0], source.Buffer[1])
+            : char.IsSurrogate(source.Buffer[0]) ? 0xFFFD
+            : source.Buffer[0];
+
+        if (consume)
+        {
+            source.Buffer = source.Buffer[width..];
+            source.RecordInput(read: true);
+        }
+
+        return code;
+    }
+
     private static bool GetCode(Machine machine, int stream, int target, bool consume)
     {
         ValidateExplicitStreamInstantiation(machine, stream);
@@ -1011,9 +1069,17 @@ internal static class StreamBuiltins
 
         PrologStream source = Resolve(machine, stream, input: true);
         PrepareInput(machine, source, stream);
-        if (code.Tag == CellTag.BigInteger || (code.Tag == CellTag.Integer && code.Integer is < -1 or > char.MaxValue))
+        if (
+            code.Tag == CellTag.BigInteger
+            || (code.Tag == CellTag.Integer && code.Integer != -1 && !PrologText.IsCode(machine, code.Integer))
+        )
         {
             throw PrologErrors.Representation(machine, "in_character_code");
+        }
+
+        if (machine.Symbols.CodePoints)
+        {
+            return machine.Unify(code, Cell.Integer60(NextCodePoint(machine, source, consume)));
         }
 
         int next;
@@ -1054,7 +1120,7 @@ internal static class StreamBuiltins
                 ? machine.Symbols.AtomName(character.Index)
                 : throw PrologErrors.Type(machine, "character", character);
 
-        if (text.Length != 1)
+        if (!PrologText.IsCharacter(machine, text))
         {
             throw PrologErrors.Type(machine, "character", character);
         }
@@ -1080,12 +1146,12 @@ internal static class StreamBuiltins
         }
 
         PrologStream target = Resolve(machine, stream, input: false);
-        if (code.Tag == CellTag.BigInteger || code.Integer is < 0 or > char.MaxValue)
+        if (code.Tag == CellTag.BigInteger || !PrologText.IsCode(machine, code.Integer))
         {
             throw PrologErrors.Representation(machine, "character_code");
         }
 
-        GuardIo(machine, () => target.Writer!.Write((char)code.Integer));
+        GuardIo(machine, () => target.Writer!.Write(PrologText.CharacterOf(code.Integer)));
         return true;
     }
 

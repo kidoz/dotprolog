@@ -1,9 +1,13 @@
 namespace DotProlog.Runtime;
 
-/// <summary>Program-owned ISO input-character mappings with immutable versions for stable redo.</summary>
+/// <summary>
+/// Program-owned ISO input-character mappings with immutable versions for stable redo. Characters are
+/// given by their codes: Unicode code points in the default mode, and UTF-16 code units — never above
+/// 0xFFFF — in strict ISO mode.
+/// </summary>
 public sealed class CharacterConversionTable
 {
-    private readonly Dictionary<char, char> _mappings = [];
+    private readonly Dictionary<int, int> _mappings = [];
     private readonly List<Entry[]> _versions =
     [
         [],
@@ -12,11 +16,11 @@ public sealed class CharacterConversionTable
     /// <summary>The immutable mapping version current when this property is read.</summary>
     internal int Version => _versions.Count - 1;
 
-    /// <summary>Maps one unquoted input character through the current table.</summary>
-    public char Convert(char input) => _mappings.TryGetValue(input, out var output) ? output : input;
+    /// <summary>Maps the code of one unquoted input character through the current table.</summary>
+    public int Convert(int input) => _mappings.TryGetValue(input, out var output) ? output : input;
 
-    /// <summary>Sets a mapping, removing it when input and output are identical.</summary>
-    public void Set(char input, char output)
+    /// <summary>Sets a mapping between two character codes, removing it when they are identical.</summary>
+    public void Set(int input, int output)
     {
         bool changed;
         if (input == output)
@@ -61,8 +65,8 @@ public sealed class CharacterConversionTable
         }
     }
 
-    /// <summary>Every current non-identity mapping in character order.</summary>
-    public IReadOnlyList<(char Input, char Output)> All() => [.. _versions[^1].Select(entry => (entry.Input, entry.Output))];
+    /// <summary>Every current non-identity mapping, as character codes in code order.</summary>
+    public IReadOnlyList<(int Input, int Output)> All() => [.. _versions[^1].Select(entry => (entry.Input, entry.Output))];
 
     /// <summary>Removes every character conversion.</summary>
     public void Clear()
@@ -73,5 +77,5 @@ public sealed class CharacterConversionTable
     }
 
     /// <summary>One non-identity input-to-output mapping.</summary>
-    internal readonly record struct Entry(char Input, char Output);
+    internal readonly record struct Entry(int Input, int Output);
 }

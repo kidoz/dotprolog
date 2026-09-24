@@ -256,7 +256,7 @@ public sealed class TermReader
             && IsCharacter(output)
         )
         {
-            _conversions.Set(input.Name[0], output.Name[0]);
+            _conversions.Set(CodeOf(input.Name), CodeOf(output.Name));
             return;
         }
 
@@ -276,7 +276,13 @@ public sealed class TermReader
         }
     }
 
-    private static bool IsCharacter(AtomTerm atom) => atom.Name.Length == 1;
+    /// <summary>Whether an atom is one character: one code point, or in strict ISO mode one code unit.</summary>
+    private bool IsCharacter(AtomTerm atom) =>
+        atom.Name.Length == 1
+        || ((_flags?.CodePointCharacters ?? true) && atom.Name.Length == 2 && CodePointText.IsPairAt(atom.Name, 0));
+
+    private static int CodeOf(string character) =>
+        character.Length == 2 ? char.ConvertToUtf32(character[0], character[1]) : character[0];
 
     private void SkipToClauseEnd()
     {

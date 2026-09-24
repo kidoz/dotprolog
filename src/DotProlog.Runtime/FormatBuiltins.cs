@@ -79,7 +79,7 @@ internal static class FormatBuiltins
     {
         var text = FormatText(machine, format);
         List<Cell> given = ArgumentsOf(machine, arguments);
-        var output = new Layout();
+        var output = new Layout(machine.Symbols.CodePoints);
         var next = 0;
 
         for (var i = 0; i < text.Length; i++)
@@ -102,8 +102,8 @@ internal static class FormatBuiltins
 
             if (text[i] == '`' && i + 1 < text.Length)
             {
-                count = text[++i];
-                i++;
+                (count, var width) = CharacterClass.At(text, ++i, machine.Symbols.CodePoints);
+                i += width;
             }
             else if (text[i] == '*')
             {
@@ -215,12 +215,24 @@ internal static class FormatBuiltins
                     throw PrologErrors.Type(machine, "integer", cell);
                 }
 
-                if (cell.Tag == CellTag.BigInteger)
+                // SWI's errors: a negative code is not an argument ~c prints, and a code past Unicode
+                // or in the surrogate range names no code point.
+                if (cell.Tag == CellTag.Integer && cell.Integer < 0)
                 {
-                    throw PrologErrors.Representation(machine, "character_code");
+                    throw PrologErrors.FormatArgumentType(machine, 'c', cell);
                 }
 
-                output.Append(new string((char)cell.Integer, count ?? 1));
+                if (cell.Tag == CellTag.BigInteger || !PrologText.IsCode(machine, cell.Integer))
+                {
+                    throw PrologErrors.Representation(machine, "code_point");
+                }
+
+                var character = PrologText.CharacterOf(cell.Integer);
+                for (var copies = count ?? 1; copies > 0; copies--)
+                {
+                    output.Append(character);
+                }
+
                 break;
             }
 
@@ -233,7 +245,7 @@ internal static class FormatBuiltins
                 break;
 
             case 't':
-                output.Fill(count is null ? ' ' : (char)count.Value);
+                output.Fill(count ?? ' ');
                 break;
 
             case '|':
@@ -430,15 +442,20 @@ internal static class FormatBuiltins
     /// the padding is then shared out among those positions, with any remainder going to the last, so
     /// that a single <c>~t</c> right-aligns and two of them centre.
     /// </remarks>
-    private sealed class Layout
+    /// <summary>
+    /// The text being formatted, with its column stops. Columns count characters as the program's mode
+    /// counts them — code points in <c>Modern</c>, code units in strict ISO mode — while fill positions
+    /// stay indexes into the text.
+    /// </summary>
+    private sealed class Layout(bool codePoints)
     {
         private readonly StringBuilder _text = new();
-        private readonly List<(int Position, char Fill)> _fills = [];
-        private int _lineStart;
+        private readonly List<(int Position, int Fill)> _fills = [];
+        private int _column;
         private int _stop;
 
         /// <summary>The column the next character would be written at.</summary>
-        internal int CurrentColumn => _text.Length - _lineStart;
+        internal int CurrentColumn => _column;
 
         internal void Append(char character)
         {
@@ -446,9 +463,13 @@ internal static class FormatBuiltins
 
             if (character == '\n')
             {
-                _lineStart = _text.Length;
-                _stop = _text.Length;
+                _column = 0;
+                _stop = 0;
                 _fills.Clear();
+            }
+            else if (!(codePoints && char.IsLowSurrogate(character) && _text.Length >= 2 && char.IsHighSurrogate(_text[^2])))
+            {
+                _column++;
             }
         }
 
@@ -460,11 +481,11 @@ internal static class FormatBuiltins
             }
         }
 
-        internal void Fill(char character) => _fills.Add((_text.Length, character));
+        internal void Fill(int character) => _fills.Add((_text.Length, character));
 
         internal void Column(int column, bool relative)
         {
-            var target = relative ? _stop - _lineStart + column : column;
+            var target = relative ? _stop + column : column;
             var padding = target - CurrentColumn;
 
             if (padding > 0)
@@ -472,7 +493,7 @@ internal static class FormatBuiltins
                 Pad(padding);
             }
 
-            _stop = _text.Length;
+            _stop = _column;
             _fills.Clear();
         }
 
@@ -481,6 +502,7 @@ internal static class FormatBuiltins
             if (_fills.Count == 0)
             {
                 _text.Append(' ', padding);
+                _column += padding;
                 return;
             }
 
@@ -491,8 +513,11 @@ internal static class FormatBuiltins
             for (var i = _fills.Count - 1; i >= 0; i--)
             {
                 var amount = share + (i == _fills.Count - 1 ? remainder : 0);
-                _text.Insert(_fills[i].Position, new string(_fills[i].Fill, amount));
+                var fill = PrologText.CharacterOf(_fills[i].Fill);
+                _text.Insert(_fills[i].Position, string.Concat(Enumerable.Repeat(fill, amount)));
             }
+
+            _column += padding;
         }
 
         public override string ToString() => _text.ToString();
