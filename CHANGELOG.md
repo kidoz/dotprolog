@@ -4,7 +4,7 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.0] — 2026-09-24
 
 ### Added
 
@@ -16,7 +16,6 @@ All notable changes to DotProlog are recorded here. The format follows
   or a grammar-rule terminal, a grammar in the same file that compares character codes — the case
   that fails silently rather than raising an error. Both help move code-list programs to the
   `chars` default.
-
 - The SWI-aligned string predicates read text the way SWI-Prolog does, predicate by predicate,
   through one shared reader. Character and code lists are text for `string_length/2`,
   `split_string/4`, `string_code/3`, `atom_string/2`, `string_to_atom/2`, `string_chars/2` and
@@ -42,6 +41,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - `number_string/2` reads only strings and character or code lists as its text, and fails rather
   than trimming when the number is surrounded by layout, as SWI does; `string_code/3` raises
   `type_error(integer, I)` and `domain_error(not_less_than_zero, I)` for a bad index.
+- Numbers are no longer text where SWI does not take them as text: `split_string/4`,
+  `string_code/3`, and the `format` template reject them with `type_error(text, N)`, and `~a`
+  with `format_argument_type(a, N)`.
 - `must_be(text, X)` raises `instantiation_error` for a partial or non-ground list.
 - Under the `chars` default, `""` is `[]`, and where lists are text `[]` is empty text:
   `string_length("", N)` gives 0 and `format("", [])` prints nothing. The term converters read `[]`
@@ -549,6 +551,7 @@ binary: a published executable can consult a `.pl` file it has never seen and ru
 
 **Full Changelog**: https://github.com/kidoz/dotprolog/commits/v0.1.0
 
+[0.9.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.9.0
 [0.8.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.8.0
 [0.7.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.7.0
 [0.5.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.5.0
