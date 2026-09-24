@@ -59,16 +59,27 @@ overflowing.
 
 ## Text and syntax
 
-Atoms and source text use .NET Unicode strings. The reader accepts Unicode source characters and
-the ISO numeric character escapes supported by the language guide. Character predicates require a
-one-character atom as represented by one .NET UTF-16 code unit.
+Atoms and source text use .NET Unicode strings, and what counts as one character depends on the
+mode. In `Modern`, a character is a Unicode code point: a code from 0 to 0x10FFFF outside the
+surrogate range 0xD800–0xDFFF. A character outside the Basic Multilingual Plane is therefore one
+character with one code, although .NET stores it as two UTF-16 code units, and an unpaired
+surrogate arriving in a host string is read as U+FFFD. In `StrictIso`, a character is a UTF-16
+code unit, 0 to 0xFFFF with the surrogates included, so the same character is two. Character
+predicates require a one-character atom in the mode's sense, and a code outside the mode's range
+raises `representation_error(character_code)`.
+
+The reader accepts Unicode source characters and ISO's numeric escapes; `\x…\` reaches 0x10FFFF in
+`Modern` and 0xFFFF in `StrictIso`. `Modern` also reads SWI-Prolog's `\uXXXX` and `\UXXXXXXXX`
+escapes, and a surrogate escape is a syntax error there.
 
 The required portable characters have their Unicode/ASCII ordinal values. Extended characters are
 classified before tokenization: Unicode uppercase letters and underscore begin variables, other
 Unicode letters begin unquoted atoms, ASCII digits begin numbers, and other supported punctuation
 is classified by the explicit graphic, solo, layout, and meta-character tables. Atom and character
-collation is ordinal by UTF-16 code unit. The byte sequence associated with a character is its UTF-8
-encoding for a text file; binary streams do not perform character conversion.
+collation is by character code: code-point order in `Modern` and code-unit order in `StrictIso`.
+The two orders differ only where a character outside the Basic Multilingual Plane meets one from
+U+E000 to U+FFFF. The byte sequence associated with a character is its UTF-8 encoding for a text
+file; binary streams do not perform character conversion.
 
 ISO/IEC 13211-1 leaves the initial `double_quotes` value implementation defined (7.11.2.5), and
 this page is where DotProlog defines it: `chars` in the default `Modern` language mode, as in the

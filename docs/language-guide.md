@@ -11,12 +11,14 @@ tests. It does not claim SWI-Prolog compatibility.
 
 DotProlog has two language modes.
 
-| Mode | Predefined surface | Initial `double_quotes` |
-|---|---|---|
-| `Modern` (default) | ISO Parts 1–3 plus documented DotProlog extensions | `chars` |
-| `StrictIso` | ISO Parts 1–3 inventory | `codes` |
+| Mode | Predefined surface | Initial `double_quotes` | Character |
+|---|---|---|---|
+| `Modern` (default) | ISO Parts 1–3 plus documented DotProlog extensions | `chars` | Unicode code point |
+| `StrictIso` | ISO Parts 1–3 inventory | `codes` | UTF-16 code unit |
 
 With `chars`, `"abc"` reads as `[a,b,c]`; with `codes`, it reads as `[97,98,99]`.
+In `Modern`, `"😀"` is one character, `atom_length('😀', 1)` holds, and `0'😀` is 128512; in
+`StrictIso`, the same text is two code units, as .NET stores it.
 `double_quotes` also accepts `atom`, and outside strict mode, `string`. No mode defaults to
 `string`; it produces a distinct string term with its own `string_*` predicates.
 

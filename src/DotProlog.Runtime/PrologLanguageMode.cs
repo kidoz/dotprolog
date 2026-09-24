@@ -11,15 +11,15 @@ public enum PrologLanguageMode
     /// <summary>
     /// The default: ISO constructs plus the documented DotProlog extensions, with the defaults the
     /// newer Prolog systems settled on — <c>double_quotes</c> starts at <c>chars</c>, so a
-    /// double-quoted token reads as a list of one-character atoms. This is also the dialect whose
-    /// extension direction is SWI-Prolog; the coverage ledger lives in
-    /// docs/reference/swi-compatibility.md.
+    /// double-quoted token reads as a list of one-character atoms, and a character is a Unicode
+    /// code point. This is also the dialect whose extension direction is SWI-Prolog; the coverage
+    /// ledger lives in docs/reference/swi-compatibility.md.
     /// </summary>
     Modern,
 
     /// <summary>
     /// Only the standardized ISO/IEC 13211 Parts 1, 2, and 3 surface, with <c>double_quotes</c>
-    /// starting at <c>codes</c>.
+    /// starting at <c>codes</c> and a character being a UTF-16 code unit.
     /// </summary>
     StrictIso,
 }

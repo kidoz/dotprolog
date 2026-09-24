@@ -71,7 +71,7 @@ predefined-predicate and evaluable-functor inventory is also pinned by
 | 6.4.7 backquoted names | The processor choice is atom-valued; delimiters, escapes, and continuations are covered | R/D/I/A/P |
 | 6.4.8 other tokens | punctuation, end token, and Corrigendum 2 bar-token behavior are covered | R/D/I |
 | 6.5 character set | Required characters and the documented Unicode extension classes are recognized explicitly | R/D/I/P |
-| 6.6 collating sequence | Character codes and atom ordering use the documented ordinal UTF-16 policy | R/D/I/P |
+| 6.6 collating sequence | Character codes and atom ordering follow the documented per-mode policy: code points in `Modern`, UTF-16 code units in `StrictIso` | R/D/I/P |
 
 ## Clause 7 language concepts and semantics
 

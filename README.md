@@ -221,10 +221,10 @@ The engine owns its control state: heap, trail, environment stack, choice-point 
 
 A program runs in one of two modes, fixed when its engine is created:
 
-| Mode | Surface | `"abc"` reads as |
-|---|---|---|
-| `modern` (default) | ISO Parts 1–3 plus the documented extensions, SWI-Prolog-aligned | `[a,b,c]` |
-| `strict-iso` | Only the ISO/IEC 13211 Parts 1–3 surface | `[97,98,99]` |
+| Mode | Surface | `"abc"` reads as | A character is |
+|---|---|---|---|
+| `modern` (default) | ISO Parts 1–3 plus the documented extensions, SWI-Prolog-aligned | `[a,b,c]` | a Unicode code point |
+| `strict-iso` | Only the ISO/IEC 13211 Parts 1–3 surface | `[97,98,99]` | a UTF-16 code unit |
 
 ```prolog
 ?- "abc" = [L|Ls].

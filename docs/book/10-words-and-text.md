@@ -42,8 +42,8 @@ Two predicates you will use constantly. `atom_length(Atom, Length)` counts chara
 saw it report 8 for `'New York'`, space included. `atom_concat(A, B, C)` glues two atoms into
 one:
 
-Here, a character means one UTF-16 code unit. A character outside the Basic Multilingual Plane,
-such as 😀, therefore contributes two to `atom_length/2`.
+A character here is one Unicode code point, so an emoji such as 😀 counts as one character, just
+as a letter does.
 
 ```prolog
 main :-

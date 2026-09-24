@@ -20,6 +20,11 @@ different term kinds, not interchangeable labels for the same value. In particul
 predicates are not aliases for atom predicates. Strings are interned for the program's lifetime,
 so a long-running host that creates unbounded distinct strings must account for their storage.
 
+What a character is also differs by mode. Modern counts Unicode code points, as SWI-Prolog does,
+so an emoji is one character wherever text is measured, split, read, or sorted. StrictIso keeps the
+UTF-16 code units .NET stores, which ISO permits and which earlier DotProlog releases used in every
+mode.
+
 ## Defaults and local directives have different scopes
 
 A host override chooses the starting value for every source file without changing the mode's
