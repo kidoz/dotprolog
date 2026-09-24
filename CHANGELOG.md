@@ -33,6 +33,10 @@ All notable changes to DotProlog are recorded here. The format follows
   included, and `put_char/1,2` and `put_code/1,2` write one. `format/2,3` counts columns in code
   points, so `~t` padding lines up around a supplementary character, and a supplementary fill
   character works. `char_conversion/2` maps any character.
+- In `Modern`, the standard order compares atoms, strings, and functor names by code point, as
+  SWI-Prolog does. UTF-16 order had put a supplementary character before U+E000–U+FFFF, so
+  `msort(['😀', '\xFFFD\'], L)` now gives `['\xFFFD\', '😀']`; text within the Basic Multilingual
+  Plane sorts as before. `StrictIso` keeps code-unit order.
 - `CharacterConversionTable` takes and returns character codes as `int` rather than `char`, so it
   can hold a supplementary character: `Convert(int)`, `Set(int, int)`, and `All()` returning
   `(int Input, int Output)` pairs. Hosts that call it directly need recompiling.
