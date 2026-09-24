@@ -4,6 +4,21 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- In `Modern`, a character is a Unicode code point rather than a UTF-16 code unit, so a character
+  outside the Basic Multilingual Plane is one character with one code: `atom_length('😀', N)` gives
+  1, `atom_codes('😀', L)` gives `[128512]`, `char_code(C, 128512)` succeeds, and `"😀é"` reads as a
+  two-element list. The atom and string predicates count, slice, and enumerate by code point —
+  `atom_length/2`, `sub_atom/5`, `atom_concat/3`, `atom_chars/2`, `atom_codes/2`, `char_code/2`,
+  `number_codes/2`, `atom_number/2`'s `0'c`, `string_length/2`, `sub_string/5`, `string_code/3`,
+  `split_string/4` — and `char_type/2` and `code_type/2` classify supplementary characters. A
+  surrogate code is not a character code; a host string's unpaired surrogate reads as U+FFFD. The
+  ISO predicates keep ISO's `representation_error(character_code)`. `StrictIso` is unchanged: its
+  characters remain UTF-16 code units.
+
 ## [0.9.0] — 2026-09-24
 
 ### Added
