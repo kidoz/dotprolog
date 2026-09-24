@@ -219,27 +219,83 @@ internal static class TextBuiltins
     private static bool NamedTypeApplies(string name, int character) =>
         name switch
         {
-            "alnum" => CharacterClass.IsLetterOrDigit(character),
-            "alpha" => CharacterClass.IsLetter(character),
-            "csym" => CharacterClass.IsLetterOrDigit(character) || character == '_',
-            "csymf" => CharacterClass.IsLetter(character) || character == '_',
+            "alnum" => IsAlphanumeric(KindOf(character)),
+            "alpha" => KindOf(character) is CharacterKind.Upper or CharacterKind.Lower or CharacterKind.Alpha,
+            "csym" => IsAlphanumeric(KindOf(character)) || character == '_',
+            "csymf" => KindOf(character) is CharacterKind.Upper or CharacterKind.Lower or CharacterKind.Alpha || character == '_',
             "ascii" => character < 128,
             "white" => character is ' ' or '\t',
             "space" => CharacterClass.IsWhiteSpace(character),
-            "cntrl" => CharacterClass.IsControl(character),
-            "graph" => !CharacterClass.IsControl(character) && !CharacterClass.IsWhiteSpace(character),
-            "print" => !CharacterClass.IsControl(character),
-            "punct" => !CharacterClass.IsControl(character)
-                && !CharacterClass.IsWhiteSpace(character)
-                && !CharacterClass.IsLetterOrDigit(character),
-            "upper" => CharacterClass.IsUpper(character),
-            "lower" => CharacterClass.IsLower(character),
-            "end_of_line" => character is '\n' or '\r',
+            "cntrl" => KindOf(character) == CharacterKind.Control,
+            "graph" => IsGraphic(KindOf(character)),
+            "print" => IsPrintable(KindOf(character)),
+            "punct" => KindOf(character) is CharacterKind.Mark or CharacterKind.Punctuation or CharacterKind.Private,
+            "upper" => KindOf(character) == CharacterKind.Upper,
+            "lower" => KindOf(character) == CharacterKind.Lower,
+            "end_of_line" => character is (>= '\n' and <= '\r') or 0x85 or 0x2028 or 0x2029,
             "newline" => character == '\n',
             "period" => character is '.' or '!' or '?',
             "quote" => character is '\'' or '"' or '`',
             _ => false,
         };
+
+    /// <summary>
+    /// The one class of a character that the Unicode-wide types are unions of, which is how
+    /// SWI-Prolog classifies characters since 10.1: from the Unicode data, the same on every
+    /// platform, rather than from the C library. First match wins.
+    /// </summary>
+    private static CharacterKind KindOf(int character) =>
+        CharacterClass.CategoryOf(character) switch
+        {
+            UnicodeCategory.Control or UnicodeCategory.Format => CharacterKind.Control,
+            UnicodeCategory.SpaceSeparator or UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator =>
+                CharacterKind.Separator,
+            _ when character is >= '0' and <= '9' => CharacterKind.Digit,
+            _ when CharacterClass.IsUppercase(character) => CharacterKind.Upper,
+            _ when CharacterClass.IsLowercase(character) => CharacterKind.Lower,
+            _ when CharacterClass.IsAlphabetic(character) => CharacterKind.Alpha,
+            UnicodeCategory.DecimalDigitNumber or UnicodeCategory.LetterNumber or UnicodeCategory.OtherNumber =>
+                CharacterKind.Number,
+            UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark or UnicodeCategory.EnclosingMark =>
+                CharacterKind.Mark,
+            UnicodeCategory.ConnectorPunctuation
+            or UnicodeCategory.DashPunctuation
+            or UnicodeCategory.OpenPunctuation
+            or UnicodeCategory.ClosePunctuation
+            or UnicodeCategory.InitialQuotePunctuation
+            or UnicodeCategory.FinalQuotePunctuation
+            or UnicodeCategory.OtherPunctuation
+            or UnicodeCategory.MathSymbol
+            or UnicodeCategory.CurrencySymbol
+            or UnicodeCategory.ModifierSymbol
+            or UnicodeCategory.OtherSymbol => CharacterKind.Punctuation,
+            UnicodeCategory.PrivateUse => CharacterKind.Private,
+            _ => CharacterKind.Unassigned,
+        };
+
+    private static bool IsAlphanumeric(CharacterKind kind) =>
+        kind is CharacterKind.Digit or CharacterKind.Upper or CharacterKind.Lower or CharacterKind.Alpha or CharacterKind.Number;
+
+    private static bool IsGraphic(CharacterKind kind) =>
+        IsAlphanumeric(kind) || kind is CharacterKind.Mark or CharacterKind.Punctuation or CharacterKind.Private;
+
+    private static bool IsPrintable(CharacterKind kind) => IsGraphic(kind) || kind == CharacterKind.Separator;
+
+    /// <summary>A partition of the characters; <see cref="Unassigned"/> also holds the surrogates.</summary>
+    private enum CharacterKind
+    {
+        Unassigned,
+        Control,
+        Separator,
+        Digit,
+        Upper,
+        Lower,
+        Alpha,
+        Number,
+        Mark,
+        Punctuation,
+        Private,
+    }
 
     /// <summary>
     /// Whether a parametric type applies to <paramref name="character"/>, and the companion value
@@ -274,7 +330,7 @@ internal static class TextBuiltins
                 return true;
 
             case "upper":
-                if (!CharacterClass.IsUpper(character))
+                if (KindOf(character) != CharacterKind.Upper)
                 {
                     companionValue = default;
                     return false;
@@ -284,7 +340,7 @@ internal static class TextBuiltins
                 return true;
 
             case "lower":
-                if (!CharacterClass.IsLower(character))
+                if (KindOf(character) != CharacterKind.Lower)
                 {
                     companionValue = default;
                     return false;

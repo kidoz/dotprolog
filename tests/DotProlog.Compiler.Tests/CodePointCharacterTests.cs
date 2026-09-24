@@ -122,6 +122,29 @@ public sealed class CodePointCharacterTests
         Assert.Equal(expected, PrologTestHost.RunGoal(goal));
 
     [Theory]
+    [InlineData("findall(T, (member(T, [graph, print, punct, cntrl, alnum]), code_type(0x378, T)), L), write(L)", "[]")]
+    [InlineData("findall(T, (member(T, [graph, print, punct, cntrl, alnum]), code_type(0x200B, T)), L), write(L)", "[cntrl]")]
+    [InlineData(
+        "findall(T, (member(T, [graph, print, punct, cntrl, alnum]), code_type(0x1F600, T)), L), write(L)",
+        "[graph,print,punct]"
+    )]
+    [InlineData(
+        "findall(T, (member(T, [graph, print, punct, cntrl, alnum]), code_type(0xE000, T)), L), write(L)",
+        "[graph,print,punct]"
+    )]
+    [InlineData(
+        "findall(T, (member(T, [graph, print, punct, cntrl, alnum]), code_type(0xB2, T)), L), write(L)",
+        "[graph,print,alnum]"
+    )]
+    [InlineData("( code_type(0x93F, alpha) -> write(yes) ; write(no) )", "yes")]
+    [InlineData("code_type(0x2160, upper(L)), write(L)", "8560")]
+    [InlineData("( code_type(0xAA, lower) -> write(yes) ; write(no) )", "yes")]
+    [InlineData("findall(C, (between(9, 14, C), code_type(C, end_of_line)), L), write(L)", "[10,11,12,13]")]
+    [InlineData("aggregate_all(count, code_type(_, graph), N), ( N < 400000 -> write(assigned) ; write(N) )", "assigned")]
+    public void CharacterTypesFollowTheUnicodeData(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Theory]
     [InlineData("writeq('𝑎bc')", "'𝑎bc'")]
     [InlineData("atom_length('a😀b', N), write(N)", "4")]
     [InlineData("atom_codes('😀', L), write(L)", "[55357,56832]")]
