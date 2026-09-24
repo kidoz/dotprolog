@@ -6,6 +6,12 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `\uXXXX` and `\UXXXXXXXX` escapes in quoted text in `Modern`, with exactly four and eight
+  hexadecimal digits, as SWI-Prolog reads them. A surrogate escape is a syntax error rather than half
+  of a pair, and `StrictIso` rejects both forms, which ISO does not have.
+
 ### Changed
 
 - In `Modern`, a character is a Unicode code point rather than a UTF-16 code unit, so a character
@@ -18,6 +24,10 @@ All notable changes to DotProlog are recorded here. The format follows
   surrogate code is not a character code; a host string's unpaired surrogate reads as U+FFFD. The
   ISO predicates keep ISO's `representation_error(character_code)`. `StrictIso` is unchanged: its
   characters remain UTF-16 code units.
+- In `Modern`, the reader and writer work in code points too. `0'😀` is 128512, `\x…\` escapes reach
+  U+10FFFF, and a supplementary letter reads and writes like any other letter — `𝑎bc` is an atom,
+  `𐐀x` a variable, and `writeq/1` leaves `𝑎bc` unquoted. The layout linter's line-length limit
+  counts code points.
 
 ## [0.9.0] — 2026-09-24
 
