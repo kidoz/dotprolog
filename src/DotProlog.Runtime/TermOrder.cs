@@ -2,8 +2,8 @@ namespace DotProlog.Runtime;
 
 /// <summary>
 /// The ISO standard order of terms: <c>Variable @&lt; Float @&lt; Integer @&lt; Atom @&lt; Compound</c>.
-/// Numbers of the same type compare by value. Compound terms compare by arity, then by functor name,
-/// then argument by argument.
+/// Numbers of the same type compare by value, and atoms and strings by the codes of their characters.
+/// Compound terms compare by arity, then by functor name, then argument by argument.
 /// </summary>
 /// <remarks>
 /// Traversal is iterative over an explicit work list, so comparing deeply nested terms cannot
@@ -49,7 +49,7 @@ public static class TermOrder
                 case CellTag.Atom:
                 case CellTag.String:
                 {
-                    var names = string.CompareOrdinal(machine.Symbols.AtomName(a.Index), machine.Symbols.AtomName(b.Index));
+                    var names = CompareText(machine, machine.Symbols.AtomName(a.Index), machine.Symbols.AtomName(b.Index));
                     if (names != 0)
                     {
                         return names;
@@ -110,7 +110,7 @@ public static class TermOrder
             return arity;
         }
 
-        var name = string.CompareOrdinal(machine.Symbols.AtomName(left.NameAtom), machine.Symbols.AtomName(right.NameAtom));
+        var name = CompareText(machine, machine.Symbols.AtomName(left.NameAtom), machine.Symbols.AtomName(right.NameAtom));
         if (name != 0)
         {
             return name;
@@ -124,6 +124,35 @@ public static class TermOrder
 
         return 0;
     }
+
+    /// <summary>
+    /// Compares two texts character by character. Ordinal UTF-16 order is code-point order except
+    /// where a supplementary character, stored as a surrogate pair, meets a character from U+E000 up:
+    /// when characters are code points, the first differing units are remapped so the surrogates
+    /// sort above them. Interned text is well-formed then, so both differing units are surrogates of
+    /// the same kind or neither is. Strict ISO mode keeps plain code-unit order.
+    /// </summary>
+    private static int CompareText(Machine machine, string left, string right)
+    {
+        var common = left.AsSpan().CommonPrefixLength(right);
+        if (common == left.Length || common == right.Length)
+        {
+            return left.Length.CompareTo(right.Length);
+        }
+
+        int a = left[common],
+            b = right[common];
+        if (a >= 0xD800 && b >= 0xD800 && machine.Symbols.CodePoints)
+        {
+            a = CodePointOrder(a);
+            b = CodePointOrder(b);
+        }
+
+        return a.CompareTo(b);
+    }
+
+    // Moves the surrogates, U+D800..U+DFFF, above U+E000..U+FFFF.
+    private static int CodePointOrder(int unit) => unit >= 0xE000 ? unit - 0x800 : unit + 0x2000;
 
     private static int CompareNumbers(Machine machine, Cell a, Cell b)
     {

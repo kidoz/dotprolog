@@ -110,6 +110,18 @@ public sealed class CodePointCharacterTests
         Assert.Equal(expected, PrologTestHost.RunGoal(goal));
 
     [Theory]
+    [InlineData(
+        "msort(['\\x1F600\\', '\\xFFFD\\', a, '\\xE000\\'], L), maplist(char_code, L, C), write(C)",
+        "[97,57344,65533,128512]"
+    )]
+    [InlineData("atom_string('😀', S), atom_string('\uFFFD', R), compare(O, S, R), write(O)", ">")]
+    [InlineData("compare(O, 'a😀'(x), 'a\uE000'(x)), write(O)", ">")]
+    [InlineData("compare(O, '😀', '😁'), write(O)", "<")]
+    [InlineData("sort(0, @>=, ['\uFFFD', '😀', '\uFFFD'], L), maplist(char_code, L, C), write(C)", "[128512,65533,65533]")]
+    public void StandardOrderComparesCodePoints(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Theory]
     [InlineData("writeq('𝑎bc')", "'𝑎bc'")]
     [InlineData("atom_length('a😀b', N), write(N)", "4")]
     [InlineData("atom_codes('😀', L), write(L)", "[55357,56832]")]
@@ -117,6 +129,7 @@ public sealed class CodePointCharacterTests
     [InlineData("findall(B-L, sub_atom('a😀b', B, L, _, _), All), All = [_|_], write(done)", "done")]
     [InlineData("catch(put_code(65536), error(E, _), true), writeq(E)", "representation_error(character_code)")]
     [InlineData("catch(get_code(65536), error(E, _), true), writeq(E)", "representation_error(in_character_code)")]
+    [InlineData("sort(['\uE000', '😀'], [F|_]), atom_length(F, N), write(N)", "2")]
     public void StrictModeKeepsCodeUnitCharacters(string goal, string expected)
     {
         var output = new StringWriter();
