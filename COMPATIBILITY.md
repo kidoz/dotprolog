@@ -265,6 +265,7 @@ samples and exercise NativeAOT.
 | Clause selection | First-argument indexed in the bytecode VM; linear in build-time generated C# | Indexed |
 | Arithmetic extensions | Evaluable `integer/1`, `e/0`, `inf/0`, `nan/0`, and several utility functions remain available in Modern mode and are rejected in strict mode | Not part of the ISO core |
 | Initial `double_quotes` | ISO leaves it implementation defined. `chars` in the default `Modern` mode, `codes` in `StrictIso`; any mode may be seeded with another ISO value through the `DotPrologFlags` project property or `dotnet prolog --flag`, and `double_quotes=codes` keeps a program written for code lists unchanged | Scryer, Trealla, ichiban, Flowlog, and Trilog default to `chars`; GNU Prolog and SICStus to `codes`; SWI to its own string type |
+| `[]` as text | `[]` is an atom, and `""` is `[]` under `chars`. Where a string predicate reads lists as text, `[]` is empty text, so `string_length('[]', N)` gives 0; where it does not, `[]` is the text `"[]"`; the term parsers read it as the atom and parse the empty list | SWI 7 makes `[]` a distinct constant that is not an atom: empty text where lists are text, `type_error(atom, [])` elsewhere |
 | `double_quotes` scope | Scoped to the load unit: a directive governs the rest of its own file, and the entering value is restored afterwards | SWI and Scryer also scope it per file |
 
 ## Platforms

@@ -17,8 +17,42 @@ All notable changes to DotProlog are recorded here. The format follows
   that fails silently rather than raising an error. Both help move code-list programs to the
   `chars` default.
 
+- The SWI-aligned string predicates read text the way SWI-Prolog does, predicate by predicate,
+  through one shared reader. Character and code lists are text for `string_length/2`,
+  `split_string/4`, `string_code/3`, `atom_string/2`, `string_to_atom/2`, `string_chars/2` and
+  `string_codes/2`, `number_string/2`, the term converters, the `format` template, and `~s` — so
+  `split_string("a,b", ",", "", P)` and `term_string(T, "f(a)")` work on double-quoted text under
+  the `chars` default — while `string_concat/3`, `sub_string/5`, the case mappings, and
+  `atomic_list_concat/2,3` reject lists as SWI's do. Rejected text raises SWI's errors:
+  `type_error(text, X)`, `type_error(list, X)`, `type_error(character, E)`,
+  `type_error(character_code, E)`, `format_argument_type(Directive, X)`, and `instantiation_error`
+  for a partial list. A bound output is compared by text, so `atom_string(abc, [a,b,c])` succeeds.
+  The ISO atom predicates are unchanged, and none of this reaches `StrictIso`, which has no string
+  library.
+- `text_to_string/2` and `term_string/3`, and the `codes/2` and `chars/2` output sinks for
+  `with_output_to/2` and `format/3`, which also accept a stream or alias.
+
+### Changed
+
+- `term_to_atom/2` and `term_string/2` write the term with `quoted(true)`, as SWI does, rather than
+  in canonical form: `term_to_atom(1+2, A)` gives `'1+2'`.
+- `with_output_to/2` and `format/3` check their sink before running the goal or the format, with
+  SWI's errors — `instantiation_error`, `type_error(output, Sink)`, `existence_error(stream, Sink)` —
+  instead of `domain_error(output_sink, Sink)`, and an unbound sink is no longer bound after the goal.
+- `number_string/2` reads only strings and character or code lists as its text, and fails rather
+  than trimming when the number is surrounded by layout, as SWI does; `string_code/3` raises
+  `type_error(integer, I)` and `domain_error(not_less_than_zero, I)` for a bad index.
+- `must_be(text, X)` raises `instantiation_error` for a partial or non-ground list.
+- Under the `chars` default, `""` is `[]`, and where lists are text `[]` is empty text:
+  `string_length("", N)` gives 0 and `format("", [])` prints nothing. The term converters read `[]`
+  as the atom, so `read_term_from_atom('[]', T, [])` still gives `[]`.
+
 ### Fixed
 
+- `atomic_list_concat/2,3`, `upcase_atom/2`, `downcase_atom/2`, and `format`'s `~a` accept strings;
+  they rejected them with a self-contradictory `type_error(atomic, "…")`.
+- `with_output_to(string(S), write([]))` gives `"[]"`; the captured text no longer passes through an
+  atom that could be taken for the empty list.
 - `string_concat/3` raises `type_error(atomic, Culprit)` for a bound argument that is not atomic —
   a character list, say — checking left to right as SWI-Prolog does. It raised
   `instantiation_error`, as if the argument were unbound.

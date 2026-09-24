@@ -343,9 +343,11 @@ outright, so a program is free to write its own `member/2` without inheriting ex
 Strings are a distinct term type: `string(S)` is true of one, `atom/1` is false, and the standard
 order places them between numbers and atoms as SWI-Prolog 10 does. A string is interned beside the
 atom text it shares, so unification is integer identity and a string survives every detached copy.
-Double-quoted text reads as a list of characters by default (see [Language modes](#language-modes));
-reading it as strings is `set_prolog_flag(double_quotes, string)` — or the `DotPrologFlags` project
-property — away, outside strict ISO mode.
+Double-quoted text reads as a list of characters by default (see [Language modes](#language-modes)),
+and the string library reads such lists as text wherever SWI-Prolog's does, so
+`split_string("a,b", ",", "", Parts)` works on it directly. Reading `"..."` as strings instead is
+`set_prolog_flag(double_quotes, string)` — or the `DotPrologFlags` project property — away, outside
+strict ISO mode.
 
 `bagof/3` and `setof/3` group their solutions by whichever of the goal's variables are free —
 those the caller can still see — and offer one group per binding of them. A variable is made
