@@ -11,6 +11,13 @@ All notable changes to DotProlog are recorded here. The format follows
 - `\uXXXX` and `\UXXXXXXXX` escapes in quoted text in `Modern`, with exactly four and eight
   hexadecimal digits, as SWI-Prolog reads them. A surrogate escape is a syntax error rather than half
   of a pair, and `StrictIso` rejects both forms, which ISO does not have.
+- In `Modern`, a symbol or punctuation character outside ASCII reads as a one-character atom, as
+  SWI-Prolog reads it: `f(😀)` is `f('😀')`, `[€, ∀]` is a list of two atoms, and `writeq/1` writes
+  such an atom bare. Like SWI-Prolog 10.1, it never joins its neighbours, so `😀😀` is a syntax error
+  and `- 😀` is the prefix operator applied to `😀`. Brackets and quotation marks outside ASCII, such
+  as `«`, stay syntax errors. Unquoted names follow Unicode's identifier properties: any letter or
+  letter number that is not uppercase starts an atom, as in `中文` and `Ⅰ`, and combining marks and
+  superscript digits continue one, as in `x́` and `x²`.
 
 ### Changed
 
@@ -40,12 +47,25 @@ All notable changes to DotProlog are recorded here. The format follows
 - `CharacterConversionTable` takes and returns character codes as `int` rather than `char`, so it
   can hold a supplementary character: `Convert(int)`, `Set(int, int)`, and `All()` returning
   `(int Input, int Output)` pairs. Hosts that call it directly need recompiling.
+- `char_type/2` and `code_type/2` classify characters outside ASCII from the Unicode data, the way
+  SWI-Prolog does since 10.1, rather than by rules that put unassigned code points in `graph`,
+  `print`, and `punct`. Now an unassigned code point has no type, a format character such as U+200B
+  is `cntrl`, and `alpha`, `upper`, and `lower` follow Unicode's Alphabetic, Uppercase, and Lowercase
+  properties, so `ª` is `lower`, `Ⅰ` is `upper`, and the Devanagari vowel signs are `alpha`. A number
+  such as `²` is `alnum` rather than `punct`. ASCII characters keep their types.
+- `writeq/1` leaves a `Modern` atom bare when it starts with any letter that is not uppercase, so
+  `中文` and `x́` are no longer quoted.
 
 ### Fixed
 
 - `format`'s `~c` no longer truncates a code silently: a negative code raises
   `format_argument_type(c, Code)`, and a code past Unicode or in the surrogate range raises
   `representation_error(code_point)`, as SWI-Prolog does.
+- `code_type/2`'s `end_of_line` holds for vertical tab and form feed, as in SWI-Prolog, and for
+  U+0085, U+2028, and U+2029.
+- A quoted atom or string holding a layout character other than the space, such as U+00A0 or U+2028,
+  is written with a `\xHEX\` escape, because the reader rejects the raw character between quotes;
+  such an atom now reads back.
 
 ## [0.9.0] — 2026-09-24
 
