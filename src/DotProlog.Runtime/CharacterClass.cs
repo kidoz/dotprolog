@@ -60,6 +60,52 @@ internal static class CharacterClass
         || UnicodeProperties.Contains(UnicodeProperties.OtherLowercase, code);
 
     /// <summary>
+    /// Whether a code outside ASCII may start an identifier: the Unicode <c>ID_Start</c> property of
+    /// UAX #31, which is every letter and letter number. An uppercase letter starts a variable.
+    /// </summary>
+    internal static bool IsIdentifierStart(int code) =>
+        CategoryOf(code)
+            is UnicodeCategory.UppercaseLetter
+                or UnicodeCategory.LowercaseLetter
+                or UnicodeCategory.TitlecaseLetter
+                or UnicodeCategory.ModifierLetter
+                or UnicodeCategory.OtherLetter
+                or UnicodeCategory.LetterNumber
+        || UnicodeProperties.Contains(UnicodeProperties.OtherIdentifierStart, code);
+
+    /// <summary>
+    /// Whether a code outside ASCII may continue an identifier: the Unicode <c>ID_Continue</c>
+    /// property, which adds combining marks, decimal digits, and connector punctuation to the
+    /// starts, and the superscript and subscript digits besides, as SWI-Prolog adds them.
+    /// </summary>
+    internal static bool IsIdentifierContinue(int code) =>
+        IsIdentifierStart(code)
+        || CategoryOf(code)
+            is UnicodeCategory.NonSpacingMark
+                or UnicodeCategory.SpacingCombiningMark
+                or UnicodeCategory.DecimalDigitNumber
+                or UnicodeCategory.ConnectorPunctuation
+        || UnicodeProperties.Contains(UnicodeProperties.OtherIdentifierContinue, code)
+        || code is 0xB2 or 0xB3 or 0xB9 or 0x2070 or (>= 0x2074 and <= 0x2079) or (>= 0x2080 and <= 0x2089);
+
+    /// <summary>
+    /// Whether a code outside ASCII is a solo character, an atom by itself that never joins its
+    /// neighbours: a symbol, or punctuation other than a bracket or quotation mark, as SWI-Prolog
+    /// reads them. 😀, €, and ∀ are each a one-character atom.
+    /// </summary>
+    internal static bool IsSolo(int code) =>
+        code >= 0x80
+        && CategoryOf(code)
+            is UnicodeCategory.MathSymbol
+                or UnicodeCategory.CurrencySymbol
+                or UnicodeCategory.ModifierSymbol
+                or UnicodeCategory.OtherSymbol
+                or UnicodeCategory.ConnectorPunctuation
+                or UnicodeCategory.DashPunctuation
+                or UnicodeCategory.OtherPunctuation
+        && !IsIdentifierStart(code);
+
+    /// <summary>
     /// The character starting at code unit <paramref name="index"/> and how many code units it takes:
     /// a surrogate pair is one character when characters are code points, and two otherwise.
     /// </summary>

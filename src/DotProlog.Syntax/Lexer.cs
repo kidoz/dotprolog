@@ -45,6 +45,7 @@ internal sealed class Lexer
         int start;
         char c;
         int code;
+        int width;
 
         // Loop rather than recurse so a long run of invalid characters cannot exhaust the stack.
         while (true)
@@ -58,13 +59,14 @@ internal sealed class Lexer
             }
 
             c = InputAt(_position);
-            (code, var width) = CharacterAt(_position);
+            (code, width) = CharacterAt(_position);
             if (
                 c is '_' or '\'' or '"' or '`'
-                || CharacterClass.IsLetter(code)
+                || IsAtomStart(code)
                 || char.IsAsciiDigit(c)
                 || IsStructural(c)
                 || SymbolCharacters.Contains(c, StringComparison.Ordinal)
+                || IsSolo(code)
             )
             {
                 break;
@@ -101,22 +103,28 @@ internal sealed class Lexer
 
         if (c == '_' || CharacterClass.IsUpper(code))
         {
-            while (_position < _text.Length && IsAlphanumericAt(_position, out var width))
+            while (_position < _text.Length && IsAlphanumericAt(_position, out var step))
             {
-                Advance(width);
+                Advance(step);
             }
 
             return new Token(TokenKind.Variable, ConvertedText(start, _position - start), SpanFrom(start), layout);
         }
 
-        if (CharacterClass.IsLetter(code))
+        if (IsAtomStart(code))
         {
-            while (_position < _text.Length && IsAlphanumericAt(_position, out var width))
+            while (_position < _text.Length && IsAlphanumericAt(_position, out var step))
             {
-                Advance(width);
+                Advance(step);
             }
 
             return new Token(TokenKind.Atom, ConvertedText(start, _position - start), SpanFrom(start), layout);
+        }
+
+        if (IsSolo(code))
+        {
+            Advance(width);
+            return new Token(TokenKind.Atom, ConvertedText(start, width), SpanFrom(start), layout);
         }
 
         if (c == '\'')
@@ -187,8 +195,21 @@ internal sealed class Lexer
     private bool IsAlphanumericAt(int position, out int width)
     {
         (var code, width) = CharacterAt(position);
-        return code == '_' || CharacterClass.IsLetterOrDigit(code);
+        return code == '_'
+            || CharacterClass.IsLetterOrDigit(code)
+            || (CodePoints && code >= 0x80 && CharacterClass.IsIdentifierContinue(code));
     }
+
+    /// <summary>
+    /// Whether <paramref name="code"/> starts an atom made of letters. A character outside ASCII
+    /// starts one when it may start an identifier — every letter, and in <c>Modern</c> the letter
+    /// numbers too — and is not an uppercase letter, which starts a variable.
+    /// </summary>
+    private bool IsAtomStart(int code) =>
+        CharacterClass.IsLetter(code) || (CodePoints && code >= 0x80 && CharacterClass.IsIdentifierStart(code));
+
+    /// <summary>Whether <paramref name="code"/> is a one-character atom by itself: a symbol outside ASCII in <c>Modern</c>.</summary>
+    private bool IsSolo(int code) => CodePoints && CharacterClass.IsSolo(code);
 
     private static bool IsLayout(char c) => char.IsWhiteSpace(c);
 

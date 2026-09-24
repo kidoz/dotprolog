@@ -99,6 +99,21 @@ internal static class UnicodeProperties
         0x10783, 0x10785, 0x10787, 0x107B0, 0x107B2, 0x107BA, 0x1E030, 0x1E06D,
     ];
 
+    /// <summary><c>Other_ID_Start</c>: the few characters kept as identifier starts for backward compatibility.</summary>
+    // csharpier-ignore
+    internal static ReadOnlySpan<int> OtherIdentifierStart =>
+    [
+        0x1885, 0x1886, 0x2118, 0x2118, 0x212E, 0x212E, 0x309B, 0x309C,
+    ];
+
+    /// <summary><c>Other_ID_Continue</c>: the few characters kept as identifier continuations for backward compatibility.</summary>
+    // csharpier-ignore
+    internal static ReadOnlySpan<int> OtherIdentifierContinue =>
+    [
+        0x00B7, 0x00B7, 0x0387, 0x0387, 0x1369, 0x1371, 0x19DA, 0x19DA,
+        0x200C, 0x200D, 0x30FB, 0x30FB, 0xFF65, 0xFF65,
+    ];
+
     /// <summary>Whether <paramref name="code"/> lies in one of the <paramref name="ranges"/>.</summary>
     internal static bool Contains(ReadOnlySpan<int> ranges, int code)
     {

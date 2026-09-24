@@ -530,7 +530,7 @@ public static class TermWriter
                 '\r' => quotedText.Append("\\r"),
                 '\t' => quotedText.Append("\\t"),
                 '\v' => quotedText.Append("\\v"),
-                _ when char.IsControl(c) => quotedText
+                _ when IsEscapedLayout(c) => quotedText
                     .Append("\\x")
                     .Append(((int)c).ToString("x", CultureInfo.InvariantCulture))
                     .Append('\\'),
@@ -540,6 +540,8 @@ public static class TermWriter
 
         return quotedText.Append('"').ToString();
     }
+
+    private static bool IsEscapedLayout(char c) => char.IsControl(c) || (c != ' ' && char.IsWhiteSpace(c));
 
     private static string QuotedAtomText(string name, bool quoted, bool codePoints)
     {
@@ -564,9 +566,9 @@ public static class TermWriter
                 '\r' => quotedText.Append("\\r"),
                 '\t' => quotedText.Append("\\t"),
                 '\v' => quotedText.Append("\\v"),
-                // The reader rejects a raw control character between quotes, so the rest of them
-                // leave as the delimited hexadecimal escape it accepts back.
-                _ when char.IsControl(c) => quotedText
+                // The reader rejects a raw control or layout character other than the space between
+                // quotes, so the rest of them leave as the delimited hexadecimal escape it accepts back.
+                _ when IsEscapedLayout(c) => quotedText
                     .Append("\\x")
                     .Append(((int)c).ToString("x", CultureInfo.InvariantCulture))
                     .Append('\\'),
@@ -581,6 +583,8 @@ public static class TermWriter
     /// Whether an atom needs quotes to read back. A letter-led name is bare only when every character
     /// is a letter, digit, or underscore, judged per character as the reader judges it: per code point
     /// in <c>Modern</c>, so a supplementary letter needs no quotes, and per code unit in strict ISO mode.
+    /// <c>Modern</c> also reads what Unicode calls identifiers — any letter that is not uppercase
+    /// may lead, and combining marks may follow — and a lone symbol outside ASCII, such as 😀, bare.
     /// </summary>
     private static bool NeedsQuotes(string name, bool codePoints)
     {
@@ -599,12 +603,18 @@ public static class TermWriter
             return false;
         }
 
-        if (CharacterClass.IsLower(CharacterClass.At(name, 0, codePoints).Code))
+        var (first, firstWidth) = CharacterClass.At(name, 0, codePoints);
+        if (codePoints && firstWidth == name.Length && CharacterClass.IsSolo(first))
+        {
+            return false;
+        }
+
+        if (CharacterClass.IsLower(first) || (codePoints && IsUnicodeAtomStart(first)))
         {
             for (var index = 0; index < name.Length; )
             {
                 var (code, width) = CharacterClass.At(name, index, codePoints);
-                if (code != '_' && !CharacterClass.IsLetterOrDigit(code))
+                if (!IsIdentifierContinue(code, codePoints))
                 {
                     return true;
                 }
@@ -625,6 +635,15 @@ public static class TermWriter
 
         return false;
     }
+
+    private static bool IsUnicodeAtomStart(int code) =>
+        code >= 0x80 && CharacterClass.IsIdentifierStart(code) && !CharacterClass.IsUpper(code);
+
+    /// <summary>Whether <paramref name="code"/> may continue a letter-led atom or a variable name, as the reader decides.</summary>
+    private static bool IsIdentifierContinue(int code, bool codePoints) =>
+        code == '_'
+        || CharacterClass.IsLetterOrDigit(code)
+        || (codePoints && code >= 0x80 && CharacterClass.IsIdentifierContinue(code));
 
     /// <summary>
     /// Writes text while keeping adjacent tokens apart.
@@ -682,7 +701,7 @@ public static class TermWriter
 
         private bool NeedsPrefixSeparator(int next) => (_afterPrefix && next == '(') || (_afterSign && next is >= '0' and <= '9');
 
-        private static bool NeedsSeparator(int last, int next)
+        private bool NeedsSeparator(int last, int next)
         {
             if (last == 0)
             {
@@ -694,7 +713,7 @@ public static class TermWriter
                 return true;
             }
 
-            if (IsAlphanumeric(last) && IsAlphanumeric(next))
+            if (IsIdentifierContinue(last, codePoints) && IsIdentifierContinue(next, codePoints))
             {
                 return true;
             }
@@ -702,9 +721,11 @@ public static class TermWriter
             return false;
         }
 
-        private static bool IsSymbol(int c) => c <= char.MaxValue && SymbolCharacters.Contains((char)c, StringComparison.Ordinal);
-
-        private static bool IsAlphanumeric(int c) => c == '_' || CharacterClass.IsLetterOrDigit(c);
+        // A symbol outside ASCII is an atom by itself here, but SWI-Prolog 10.0 still joins it to
+        // the symbol characters around it, so a space keeps `- 😀` readable by both.
+        private bool IsSymbol(int c) =>
+            (c <= char.MaxValue && SymbolCharacters.Contains((char)c, StringComparison.Ordinal))
+            || (codePoints && CharacterClass.IsSolo(c));
     }
 
     private enum ItemKind

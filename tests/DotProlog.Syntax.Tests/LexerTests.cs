@@ -222,7 +222,7 @@ public sealed class LexerTests
     [Fact]
     public void ReportsAnUnexpectedSupplementaryCharacterOnce()
     {
-        Tokenize("😀.", out List<Diagnostic> diagnostics);
+        Tokenize("\U000F0000.", out List<Diagnostic> diagnostics);
 
         Assert.Equal(DiagnosticIds.UnexpectedCharacter, Assert.Single(diagnostics).Id);
     }
@@ -235,6 +235,28 @@ public sealed class LexerTests
         TokenizeStrict(text, out List<Diagnostic> diagnostics);
 
         Assert.Equal(DiagnosticIds.InvalidEscape, Assert.Single(diagnostics).Id);
+    }
+
+    [Theory]
+    [InlineData("😀", "😀")]
+    [InlineData("€", "€")]
+    [InlineData("x\u0301", "x\u0301")]
+    [InlineData("Ⅰ", "Ⅰ")]
+    public void ReadsUnicodeSymbolsAndIdentifiersAsAtoms(string text, string atom)
+    {
+        List<Token> tokens = Tokenize(text, out List<Diagnostic> diagnostics);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(TokenKind.Atom, tokens[0].Kind);
+        Assert.Equal(atom, tokens[0].Text);
+    }
+
+    [Fact]
+    public void StrictModeRejectsSymbolsOutsideAscii()
+    {
+        TokenizeStrict("a § b", out List<Diagnostic> diagnostics);
+
+        Assert.Equal(DiagnosticIds.UnexpectedCharacter, Assert.Single(diagnostics).Id);
     }
 
     [Fact]
@@ -332,7 +354,7 @@ public sealed class LexerTests
     [Fact]
     public void ReportsUnexpectedCharacterAndKeepsGoing()
     {
-        List<Token> tokens = Tokenize("a § b", out List<Diagnostic> diagnostics);
+        List<Token> tokens = Tokenize("a « b", out List<Diagnostic> diagnostics);
 
         Assert.Equal(DiagnosticIds.UnexpectedCharacter, Assert.Single(diagnostics).Id);
         Assert.Equal(["a", "b", string.Empty], tokens.Select(t => t.Text));

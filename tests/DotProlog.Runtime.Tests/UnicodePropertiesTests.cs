@@ -8,7 +8,8 @@ namespace DotProlog.Runtime.Tests;
 /// </summary>
 public sealed class UnicodePropertiesTests
 {
-    public static TheoryData<string> Tables => ["OtherAlphabetic", "OtherUppercase", "OtherLowercase"];
+    public static TheoryData<string> Tables =>
+        ["OtherAlphabetic", "OtherUppercase", "OtherLowercase", "OtherIdentifierStart", "OtherIdentifierContinue"];
 
     [Theory]
     [MemberData(nameof(Tables))]
@@ -32,7 +33,9 @@ public sealed class UnicodePropertiesTests
     [InlineData("OtherUppercase", 0x24D0, false)]
     [InlineData("OtherLowercase", 0x00AA, true)]
     [InlineData("OtherLowercase", 0x0061, false)]
-    [InlineData("OtherLowercase", 0x10FFFF, false)]
+    [InlineData("OtherIdentifierStart", 0x2118, true)]
+    [InlineData("OtherIdentifierContinue", 0x00B7, true)]
+    [InlineData("OtherIdentifierContinue", 0x10FFFF, false)]
     public void ContainsFindsTheRangeMembers(string table, int code, bool expected) =>
         Assert.Equal(expected, UnicodeProperties.Contains(RangesOf(table), code));
 
@@ -41,6 +44,8 @@ public sealed class UnicodePropertiesTests
         {
             "OtherAlphabetic" => UnicodeProperties.OtherAlphabetic,
             "OtherUppercase" => UnicodeProperties.OtherUppercase,
-            _ => UnicodeProperties.OtherLowercase,
+            "OtherLowercase" => UnicodeProperties.OtherLowercase,
+            "OtherIdentifierStart" => UnicodeProperties.OtherIdentifierStart,
+            _ => UnicodeProperties.OtherIdentifierContinue,
         };
 }

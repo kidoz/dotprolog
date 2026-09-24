@@ -88,7 +88,7 @@ public sealed class CodePointCharacterTests
         {
             File.WriteAllText(path, "a😀😀b.");
             Assert.Equal(
-                "[a,128512,128512,'😀',b]",
+                "[a,128512,128512,😀,b]",
                 PrologTestHost.RunGoal(
                     $"open('{path.Replace("\\", "\\\\", StringComparison.Ordinal)}', read, S), get_char(S, A), peek_code(S, P), get_code(S, C), get_char(S, D), read(S, T), close(S), writeq([A, P, C, D, T])"
                 )
@@ -119,6 +119,31 @@ public sealed class CodePointCharacterTests
     [InlineData("compare(O, '😀', '😁'), write(O)", "<")]
     [InlineData("sort(0, @>=, ['\uFFFD', '😀', '\uFFFD'], L), maplist(char_code, L, C), write(C)", "[128512,65533,65533]")]
     public void StandardOrderComparesCodePoints(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Theory]
+    [InlineData("X = f(😀), arg(1, X, A), atom_length(A, N), write(N)", "1")]
+    [InlineData("X = [€, ∀, ™], length(X, N), write(N)", "3")]
+    [InlineData("X = - 😀, X = -(A), atom(A), write(ok)", "ok")]
+    [InlineData("X = 😀(a), functor(X, N, A), atom_length(N, L), write(L/A)", "1/1")]
+    [InlineData("X = x\u0301y, atom_length(X, N), write(N)", "3")]
+    [InlineData("X = 中文, atom(X), write(ok)", "ok")]
+    [InlineData("X = Ⅰ, atom(X), write(ok)", "ok")]
+    [InlineData("catch(term_to_atom(_, '😀😀'), error(E, _), true), ( var(E) -> write(read) ; write(error) )", "error")]
+    [InlineData("catch(term_to_atom(_, '«a»'), error(E, _), true), ( var(E) -> write(read) ; write(error) )", "error")]
+    public void SymbolsOutsideAsciiReadAsOneCharacterAtoms(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Theory]
+    [InlineData("writeq(['😀', '∀', '中文', 'x\u0301', 'Ⅰx'])", "[😀,∀,中文,x\u0301,Ⅰx]")]
+    [InlineData("writeq(['😀😀', '+😀', 'a😀'])", "['😀😀','+😀','a😀']")]
+    [InlineData("writeq(- '😀'), write(' '), writeq('😀' - '😀')", "- 😀 😀 - 😀")]
+    [InlineData("writeq('a\\x2028\\b'), atom_string('a\\xA0\\b', S), writeq(S)", "'a\\x2028\\b'\"a\\xa0\\b\"")]
+    [InlineData(
+        "forall(member(A, ['😀', '∀x', 'x\u0301', 'a\\xA0\\b', 'Ⅰ', - '😀', '😀' - '😀']), (format(atom(T), '~q', [A]), term_to_atom(B, T), B == A)), write(ok)",
+        "ok"
+    )]
+    public void TheWriterLeavesUnicodeAtomsBareWhereTheyReadBack(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal(goal));
 
     [Theory]
