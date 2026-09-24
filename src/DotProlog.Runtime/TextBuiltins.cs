@@ -540,7 +540,11 @@ internal static class TextBuiltins
     }
 
     /// <summary>Builds a list of characters or codes from text.</summary>
-    internal static Cell BuildText(Machine machine, string text, bool chars)
+    internal static Cell BuildText(Machine machine, string text, bool chars) =>
+        BuildText(machine, text, chars, Cell.Atom(machine.Symbols.EmptyList));
+
+    /// <summary>Builds a list of characters or codes from text, ending in <paramref name="tail"/>.</summary>
+    internal static Cell BuildText(Machine machine, string text, bool chars, Cell tail)
     {
         var items = new Cell[text.Length];
 
@@ -549,7 +553,7 @@ internal static class TextBuiltins
             items[i] = chars ? Cell.Atom(machine.Symbols.InternAtom(text[i].ToString())) : Cell.Integer60(text[i]);
         }
 
-        return TermList.Build(machine, items);
+        return machine.CreateList(items, tail);
     }
 
     /// <summary>

@@ -118,6 +118,73 @@ internal static class StreamBuiltins
         // The two halves of with_output_to/2; see the standard library for how they are used.
         registry.Register("$capture_begin", 0, CaptureBegin);
         registry.Register("$capture_end", 1, CaptureEnd);
+        registry.Register(
+            "$output_sink",
+            2,
+            static machine =>
+                machine.Unify(
+                    machine.Argument(1),
+                    Cell.Atom(machine.Symbols.InternAtom(IsCaptureSink(machine, 0) ? "capture" : "stream"))
+                )
+        );
+        registry.Register(
+            "$deliver_capture",
+            2,
+            static machine =>
+                DeliverCapture(machine, machine.Argument(0), PrologText.Read(machine, machine.Argument(1), TextKinds.String))
+        );
+    }
+
+    /// <summary>
+    /// Classifies the output sink of <c>with_output_to/2</c> or <c>format/3</c> before anything runs,
+    /// with SWI's errors: <see langword="true"/> for a capture term — <c>atom/1</c>, <c>string/1</c>,
+    /// <c>codes/1,2</c>, or <c>chars/1,2</c> — and <see langword="false"/> for an output stream or
+    /// alias, which is resolved here so a missing one fails before the goal or format runs.
+    /// </summary>
+    internal static bool IsCaptureSink(Machine machine, int index)
+    {
+        Cell sink = machine.Argument(index);
+        if (sink.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        if (sink.Tag == CellTag.Structure)
+        {
+            Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(sink.Index).Index);
+            var name = machine.Symbols.AtomName(functor.NameAtom);
+            if (
+                (functor.Arity == 1 && name is "atom" or "string" or "codes" or "chars")
+                || (functor.Arity == 2 && name is "codes" or "chars")
+            )
+            {
+                return true;
+            }
+        }
+
+        if (sink.Tag != CellTag.Atom && !TryStreamHandle(machine, sink, out _))
+        {
+            throw PrologErrors.Type(machine, "output", sink);
+        }
+
+        Resolve(machine, index, input: false);
+        return false;
+    }
+
+    /// <summary>Unifies a capture sink validated by <see cref="IsCaptureSink"/> with captured text.</summary>
+    internal static bool DeliverCapture(Machine machine, Cell sink, string text)
+    {
+        Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(sink.Index).Index);
+        Cell target = machine.HeapAt(sink.Index + 1);
+        var tail = functor.Arity == 2 ? machine.HeapAt(sink.Index + 2) : Cell.Atom(machine.Symbols.EmptyList);
+
+        return machine.Symbols.AtomName(functor.NameAtom) switch
+        {
+            "atom" => machine.Unify(target, Cell.Atom(machine.Symbols.InternAtom(text))),
+            "string" => machine.Unify(target, Cell.String(machine.Symbols.InternAtom(text))),
+            "codes" => machine.Unify(target, TextBuiltins.BuildText(machine, text, chars: false, tail)),
+            _ => machine.Unify(target, TextBuiltins.BuildText(machine, text, chars: true, tail)),
+        };
     }
 
     /// <summary>Builds the term that names <paramref name="stream"/> to a program.</summary>
@@ -1541,6 +1608,10 @@ internal static class StreamBuiltins
         return true;
     }
 
+    /// <summary>
+    /// Ends a capture with its text as a string, so text such as <c>[]</c> never passes through an
+    /// atom that a text reader would take for the empty list.
+    /// </summary>
     private static bool CaptureEnd(Machine machine) =>
-        machine.Unify(machine.Argument(0), Cell.Atom(machine.Symbols.InternAtom(machine.Streams.EndCapture())));
+        machine.Unify(machine.Argument(0), Cell.String(machine.Symbols.InternAtom(machine.Streams.EndCapture())));
 }

@@ -297,25 +297,31 @@ internal static class StandardLibrary
         '$predmerge_step'('=', A, As, _, Bs, P, [A|R]) :- '$predmerge'(As, Bs, P, R).
 
         % --- Output capture ---------------------------------------------------------
-        % with_output_to/2 runs the goal once with output diverted into a buffer, and
-        % restores the previous output however the goal ends: success, failure, or a
-        % thrown ball. Losing the restore would leave every later write in the buffer.
+        % with_output_to/2 checks its sink first, as SWI does, then runs the goal once
+        % with output diverted into a buffer — or into the named stream — and restores
+        % the previous output however the goal ends: success, failure, or a thrown
+        % ball. Losing the restore would leave every later write in the buffer.
 
         with_output_to(Sink, Goal) :-
-            '$capture_begin',
-            (   catch(Goal, Error, true)
-            ->  '$capture_end'(Text),
-                ( nonvar(Error) -> throw(Error) ; true ),
-                '$sink'(Sink, Text)
-            ;   '$capture_end'(_),
-                fail
+            '$output_sink'(Sink, Kind),
+            (   Kind == capture
+            ->  '$capture_begin',
+                (   catch(Goal, Error, true)
+                ->  '$capture_end'(Text),
+                    ( nonvar(Error) -> throw(Error) ; true ),
+                    '$deliver_capture'(Sink, Text)
+                ;   '$capture_end'(_),
+                    fail
+                )
+            ;   current_output(Previous),
+                set_output(Sink),
+                (   catch(Goal, Error, true)
+                ->  set_output(Previous),
+                    ( nonvar(Error) -> throw(Error) ; true )
+                ;   set_output(Previous),
+                    fail
+                )
             ).
-
-        '$sink'(atom(A), Text) :- !, A = Text.
-        '$sink'(codes(C), Text) :- !, atom_codes(Text, C).
-        '$sink'(chars(C), Text) :- !, atom_chars(Text, C).
-        '$sink'(string(S), Text) :- !, atom_string(Text, S).
-        '$sink'(Sink, _) :- throw(error(domain_error(output_sink, Sink), with_output_to/2)).
 
         % --- Formatted output -------------------------------------------------------
         % format/1,2,3 wrap the native '$format' engine so that ~@ can run its goal,
@@ -339,6 +345,7 @@ internal static class StandardLibrary
         '$format_prefix_emit'(Text, Args) :- ( Text == [] -> true ; '$format'(Text, Args) ).
 
         format(Sink, Text, Arguments) :-
+            '$output_sink'(Sink, _),
             '$format_expand'(Text, Arguments, Text2, Arguments2, Status),
             (   Status == ok
             ->  '$format'(Sink, Text2, Arguments2)
@@ -350,7 +357,9 @@ internal static class StandardLibrary
 
         '$format_capture_sink'(Sink) :-
             nonvar(Sink),
-            ( Sink = atom(_) ; Sink = codes(_) ; Sink = chars(_) ; Sink = string(_) ).
+            (   Sink = atom(_) ; Sink = codes(_) ; Sink = chars(_) ; Sink = string(_)
+            ;   Sink = codes(_, _) ; Sink = chars(_, _)
+            ).
 
         '$format_stop'(stopped(fail)) :- fail.
         '$format_stop'(stopped(throw(Ball))) :- throw(Ball).

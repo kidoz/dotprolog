@@ -468,7 +468,7 @@ public sealed class StreamTests : IDisposable
     [Fact]
     public void AnUnknownSinkIsReported() =>
         Assert.Equal(
-            "domain_error(output_sink,file(x))",
+            "type_error(output,file(x))",
             PrologTestHost.RunGoal("catch(with_output_to(file(x), true), error(E, _), write(E))")
         );
 

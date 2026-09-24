@@ -4,7 +4,7 @@ namespace DotProlog.Compiler.Tests;
 
 /// <summary>
 /// The shared text reader behind the SWI-aligned extension predicates: double-quoted text under the
-/// default <c>chars</c> reading, the readings of <c>[]</c>, and the strict mode
+/// default <c>chars</c> reading, the two readings of <c>[]</c>, output sinks, and the strict mode
 /// left untouched. Agreement with SWI-Prolog itself is checked by the differential corpus.
 /// </summary>
 public sealed class TextAcceptanceTests
@@ -33,6 +33,23 @@ public sealed class TextAcceptanceTests
     [InlineData("upcase_atom([], U), writeq(U)", "[]")]
     public void EmptyListIsTheAtomWhereTermsAreParsedOrListsAreNotText(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Theory]
+    [InlineData("with_output_to(string(S), write([])), writeq(S)", "\"[]\"")]
+    [InlineData("with_output_to(codes(C, T), write(ab)), T = [], atom_codes(A, C), writeq(A)", "ab")]
+    [InlineData("format(chars(C, [!]), \"~w\", [ab]), atom_chars(A, C), writeq(A)", "'ab!'")]
+    [InlineData("with_output_to(user_output, write(direct))", "direct")]
+    [InlineData("catch(with_output_to(nowhere, write(x)), error(E, _), true), writeq(E)", "existence_error(stream,nowhere)")]
+    public void OutputSinksFollowSwi(string goal, string expected) => Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Fact]
+    public void ABadSinkFailsBeforeTheGoalRuns()
+    {
+        Assert.Equal(
+            "type_error(output,42)",
+            PrologTestHost.RunGoal("catch(with_output_to(42, write(ran)), error(E, _), true), writeq(E)")
+        );
+    }
 
     [Theory]
     [InlineData("string_upper(abc, 'ABC')")]

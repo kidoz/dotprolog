@@ -106,7 +106,7 @@ public sealed class FormatTests
 
     [Theory]
     [InlineData("format(nowhere, \"x\", [])", "existence_error(stream,nowhere)")]
-    [InlineData("format(7, \"x\", [])", "domain_error(stream_or_alias,7)")]
+    [InlineData("format(7, \"x\", [])", "type_error(output,7)")]
     [InlineData("format(user_input, \"x\", [])", "permission_error(output,stream,user_input)")]
     public void FormatToABadStreamIsReported(string goal, string expected)
     {

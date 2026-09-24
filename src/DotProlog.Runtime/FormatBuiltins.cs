@@ -56,31 +56,19 @@ internal static class FormatBuiltins
     }
 
     /// <summary>
-    /// <c>format(+Sink, +Format, +Arguments)</c>. The sink is <c>atom(A)</c>, <c>codes(C)</c>, or
-    /// <c>chars(C)</c> to capture the text, or a stream or alias to write it — resolved exactly as
-    /// <c>write/2</c> resolves its stream, so <c>user_error</c> reaches the error stream.
+    /// <c>format(+Sink, +Format, +Arguments)</c>. The sink is <c>atom(A)</c>, <c>string(S)</c>,
+    /// <c>codes(C)</c>, <c>codes(C, Tail)</c>, <c>chars(C)</c>, or <c>chars(C, Tail)</c> to capture the
+    /// text, or a stream or alias to write it — resolved exactly as <c>write/2</c> resolves its
+    /// stream, so <c>user_error</c> reaches the error stream. The sink is checked before the format.
     /// </summary>
     private static bool Format3(Machine machine)
     {
-        Cell sink = machine.Argument(0);
+        var capture = StreamBuiltins.IsCaptureSink(machine, 0);
         var text = Render(machine, machine.Argument(1), machine.Argument(2));
 
-        if (sink.Tag == CellTag.Structure && machine.Symbols.ArityOf(machine.HeapAt(sink.Index).Index) == 1)
+        if (capture)
         {
-            Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(sink.Index).Index);
-            Cell target = machine.HeapAt(sink.Index + 1);
-
-            switch (machine.Symbols.AtomName(functor.NameAtom))
-            {
-                case "atom":
-                    return machine.Unify(target, Cell.Atom(machine.Symbols.InternAtom(text)));
-                case "string":
-                    return machine.Unify(target, Cell.String(machine.Symbols.InternAtom(text)));
-                case "codes":
-                    return machine.Unify(target, TextBuiltins.BuildText(machine, text, chars: false));
-                case "chars":
-                    return machine.Unify(target, TextBuiltins.BuildText(machine, text, chars: true));
-            }
+            return StreamBuiltins.DeliverCapture(machine, machine.Argument(0), text);
         }
 
         StreamBuiltins.WriteStreamText(machine, 0, text);
