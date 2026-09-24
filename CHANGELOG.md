@@ -28,6 +28,20 @@ All notable changes to DotProlog are recorded here. The format follows
   U+10FFFF, and a supplementary letter reads and writes like any other letter — `𝑎bc` is an atom,
   `𐐀x` a variable, and `writeq/1` leaves `𝑎bc` unquoted. The layout linter's line-length limit
   counts code points.
+- In `Modern`, streams and `format` work in code points as well. `get_char/1,2`, `peek_char/1,2`,
+  `get_code/1,2`, and `peek_code/1,2` read a supplementary character as one character, a peek
+  included, and `put_char/1,2` and `put_code/1,2` write one. `format/2,3` counts columns in code
+  points, so `~t` padding lines up around a supplementary character, and a supplementary fill
+  character works. `char_conversion/2` maps any character.
+- `CharacterConversionTable` takes and returns character codes as `int` rather than `char`, so it
+  can hold a supplementary character: `Convert(int)`, `Set(int, int)`, and `All()` returning
+  `(int Input, int Output)` pairs. Hosts that call it directly need recompiling.
+
+### Fixed
+
+- `format`'s `~c` no longer truncates a code silently: a negative code raises
+  `format_argument_type(c, Code)`, and a code past Unicode or in the surrogate range raises
+  `representation_error(code_point)`, as SWI-Prolog does.
 
 ## [0.9.0] — 2026-09-24
 
