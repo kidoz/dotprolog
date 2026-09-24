@@ -83,11 +83,14 @@ consumable by C#, F#, and Visual Basic.
 
 Build-time predicates become direct-threaded generated C# blocks and then CLR IL. Runtime-loaded
 source continues to become DotProlog bytecode. Both target the same explicit heap, trail,
-environment, choice-point, and continuation state, so either path can call the other:
+environment, choice-point, and continuation state, so either path can call the other. Both also
+share one front end — the reader, the loader, and the clause compiler — and there is no separate
+intermediate representation: the generated C# is translated from the clause compiler's bytecode
+instructions, emitted without the VM's first-argument index dispatch.
 
 ```text
-Build time : parser -> semantic IR -> generated C# -> Roslyn -> IL
-Runtime    : parser -> semantic IR -> bytecode -> DotProlog VM
+Build time : reader -> loader -> bytecode -> generated C# -> Roslyn -> IL
+Runtime    : reader -> loader -> bytecode -> DotProlog VM
 ```
 
 Generated applications, facades, and Prolog test hosts do not embed or consult their build-time
