@@ -75,7 +75,11 @@ escapes, and a surrogate escape is a syntax error there.
 The required portable characters have their Unicode/ASCII ordinal values. Extended characters are
 classified before tokenization: Unicode uppercase letters and underscore begin variables, other
 Unicode letters begin unquoted atoms, ASCII digits begin numbers, and other supported punctuation
-is classified by the explicit graphic, solo, layout, and meta-character tables. Atom and character
+is classified by the explicit graphic, solo, layout, and meta-character tables. `Modern` extends
+the classes along Unicode's identifier properties: letter numbers also begin atoms, combining marks
+and superscript digits continue them, and a symbol or punctuation character outside ASCII, other
+than a bracket or quotation mark, is a solo character. `StrictIso` keeps the letter classes alone
+and rejects every other character outside ASCII. Atom and character
 collation is by character code: code-point order in `Modern` and code-unit order in `StrictIso`.
 The two orders differ only where a character outside the Basic Multilingual Plane meets one from
 U+E000 to U+FFFF. The byte sequence associated with a character is its UTF-8 encoding for a text
