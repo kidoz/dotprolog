@@ -12,10 +12,12 @@ public sealed class TextAcceptanceTests
     [Theory]
     [InlineData("string_length(\"abc\", N), write(N)", "3")]
     [InlineData("split_string(\"a,b\", \",\", \"\", P), writeq(P)", "[\"a\",\"b\"]")]
+    [InlineData("term_string(T, \"f(a)\"), writeq(T)", "f(a)")]
     [InlineData("string_code(1, \"abc\", C), write(C)", "97")]
     [InlineData("atom_string(A, \"xy\"), writeq(A)", "xy")]
     [InlineData("text_to_string(\"xy\", S), writeq(S)", "\"xy\"")]
     [InlineData("format(\"~s|~a\", [\"ab\", cd])", "ab|cd")]
+    [InlineData("read_term_from_atom(\"g(1)\", T, []), writeq(T)", "g(1)")]
     public void DoubleQuotedTextIsTextUnderTheCharsDefault(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal(goal));
 
@@ -29,6 +31,8 @@ public sealed class TextAcceptanceTests
         Assert.Equal(expected, PrologTestHost.RunGoal(goal));
 
     [Theory]
+    [InlineData("read_term_from_atom('[]', T, []), writeq(T)", "[]")]
+    [InlineData("term_to_atom(T, []), writeq(T)", "[]")]
     [InlineData("string_concat([], a, S), writeq(S)", "\"[]a\"")]
     [InlineData("upcase_atom([], U), writeq(U)", "[]")]
     public void EmptyListIsTheAtomWhereTermsAreParsedOrListsAreNotText(string goal, string expected) =>
@@ -64,7 +68,17 @@ public sealed class TextAcceptanceTests
     [InlineData("catch(format(\"~s\", [f(x)]), error(E, _), true), writeq(E)", "format_argument_type(s,f(x))")]
     [InlineData("catch(format(f(x), []), error(E, _), true), writeq(E)", "type_error(text,f(x))")]
     [InlineData("catch(format([foo], []), error(E, _), true), writeq(E)", "type_error(text,[foo])")]
+    [InlineData("catch(term_to_atom(_, ''), error(E, _), true), writeq(E)", "syntax_error(end_of_string)")]
     public void RejectedTextRaisesSwisError(string goal, string expected) => Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Fact]
+    public void TermsAreWrittenQuoted()
+    {
+        Assert.Equal(
+            "'[a,b]'|\"'x y'\"",
+            PrologTestHost.RunGoal("term_to_atom([a, b], A), term_string('x y', S), writeq(A), write('|'), writeq(S)")
+        );
+    }
 
     [Theory]
     [InlineData("atom_length(\"abc\", _)", "type_error(atom,[a,b,c])")]

@@ -475,8 +475,8 @@ public sealed class StreamTests : IDisposable
     [Theory]
     [InlineData("term_to_atom(foo(a, b), A), writeq(A)", "'foo(a,b)'")]
     [InlineData("term_to_atom(T, 'baz(1)'), writeq(T)", "baz(1)")]
-    [InlineData("term_to_atom(1+2, A), writeq(A)", "'+(1,2)'")]
-    [InlineData("read_term_from_atom('hello(X)', T, []), writeq(T)", "hello(_G2)")]
+    [InlineData("term_to_atom(1+2, A), writeq(A)", "'1+2'")]
+    [InlineData("read_term_from_atom('hello(X)', T, []), numbervars(T, 0, _), writeq(T)", "hello(A)")]
     public void ConvertsBetweenTermsAndAtoms(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal(goal));
 

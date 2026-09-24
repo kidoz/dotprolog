@@ -768,21 +768,33 @@ internal static class StandardLibrary
             sub_atom(Type, 0, 1, _, First),
             ( memberchk(First, [a, e, i, o, u]) -> Article = an ; Article = a ).
 
-        % Reading and writing a term as an atom, which is what with_output_to/2 and
-        % read_term_from_atom/3 make possible without a file anywhere in sight.
+        % Reading and writing a term as text, which is what with_output_to/2 and the
+        % term reader make possible without a file anywhere in sight. As in SWI, a term
+        % is written quoted, and parsed from any text: an atom, a string, a number, or
+        % a character or code list. Empty text is a syntax error for the term
+        % converters and end_of_file for read_term_from_atom/3.
         term_to_atom(Term, Atom) :-
-            var(Atom),
-            !,
-            with_output_to(atom(Atom), write_canonical(Term)).
-        term_to_atom(Term, Atom) :-
-            read_term_from_atom(Atom, Term, []).
+            (   var(Atom)
+            ->  with_output_to(atom(Atom), write_term(Term, [quoted(true)]))
+            ;   '$parse_term_text'(Atom, any, Term, [])
+            ).
 
         read_term_from_atom(Atom, Term, Options) :-
-            atom_concat(Atom, ' .', Text),
-            '$read_from_atom'(Text, Term, Options).
+            '$parse_term_text'(Atom, text, Term, Options).
 
         atom_to_term(Atom, Term, Bindings) :-
-            read_term_from_atom(Atom, Term, [variable_names(Bindings)]).
+            '$parse_term_text'(Atom, any, Term, [variable_names(Bindings)]).
+
+        '$parse_term_text'(Source, Mode, Term, Options) :-
+            '$term_source_text'(Source, Mode, Text),
+            (   Text == ''
+            ->  (   Mode == text
+                ->  Term = end_of_file
+                ;   throw(error(syntax_error(end_of_string), _))
+                )
+            ;   atom_concat(Text, ' .', Clause),
+                '$read_from_atom'(Clause, Term, Options)
+            ).
 
         % --- Strings ------------------------------------------------------
         % The nondeterministic string predicates enumerate through between/3 over the
@@ -832,11 +844,15 @@ internal static class StandardLibrary
             '$string_code'(Index, String, Code).
 
         term_string(Term, String) :-
-            (   '$string_text'(String)
-            ->  string_to_atom(String, Atom),
-                term_to_atom(Term, Atom)
-            ;   term_to_atom(Term, Atom),
-                atom_string(Atom, String)
+            (   var(String)
+            ->  with_output_to(string(String), write_term(Term, [quoted(true)]))
+            ;   '$parse_term_text'(String, any, Term, [])
+            ).
+
+        term_string(Term, String, Options) :-
+            (   var(String)
+            ->  with_output_to(string(String), write_term(Term, [quoted(true)|Options]))
+            ;   '$parse_term_text'(String, text, Term, Options)
             ).
 
         '$string_text'(Text) :- nonvar(Text), ( string(Text) ; atom(Text) ; number(Text) ), !.

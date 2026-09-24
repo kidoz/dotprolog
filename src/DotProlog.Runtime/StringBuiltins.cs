@@ -26,6 +26,33 @@ internal static class StringBuiltins
         registry.Register("$string_concat", 3, StringConcat);
         registry.Register("$string_slice", 4, StringSlice);
         registry.Register("$string_code", 3, StringCode);
+        registry.Register("$term_source_text", 3, TermSourceText);
+    }
+
+    /// <summary>
+    /// <c>'$term_source_text'(+Source, +Mode, -Atom)</c>: the text a term is parsed from, as an atom
+    /// for the reader. Mode <c>any</c> accepts every kind of text, as <c>term_to_atom/2</c>,
+    /// <c>term_string/2</c>, and <c>atom_to_term/3</c> do; mode <c>text</c> accepts atoms, strings,
+    /// and lists but not numbers, as <c>read_term_from_atom/3</c> and <c>term_string/3</c> do.
+    /// </summary>
+    /// <remarks>
+    /// <c>[]</c> is the atom <c>'[]'</c> here, so it parses as the empty list. Elsewhere a list-accepting
+    /// reader takes it for empty text, but empty text is no term, and the atom's own text is the only
+    /// reading a parser can use.
+    /// </remarks>
+    private static bool TermSourceText(Machine machine)
+    {
+        Cell source = machine.Argument(0);
+        Cell mode = machine.Argument(1);
+        var kinds =
+            mode.Tag == CellTag.Atom && machine.Symbols.AtomName(mode.Index) == "any"
+                ? TextKinds.Any
+                : TextKinds.Atom | TextKinds.String | TextKinds.List;
+        var text =
+            source.Tag == CellTag.Atom && source.Index == machine.Symbols.EmptyList
+                ? machine.Symbols.AtomName(source.Index)
+                : PrologText.Read(machine, source, kinds);
+        return machine.Unify(machine.Argument(2), Cell.Atom(machine.Symbols.InternAtom(text)));
     }
 
     private static Cell StringCell(Machine machine, string text) => Cell.String(machine.Symbols.InternAtom(text));
