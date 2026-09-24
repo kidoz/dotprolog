@@ -17,6 +17,12 @@ All notable changes to DotProlog are recorded here. The format follows
   that fails silently rather than raising an error. Both help move code-list programs to the
   `chars` default.
 
+### Fixed
+
+- `string_concat/3` raises `type_error(atomic, Culprit)` for a bound argument that is not atomic —
+  a character list, say — checking left to right as SWI-Prolog does. It raised
+  `instantiation_error`, as if the argument were unbound.
+
 ## [0.8.0] — 2026-09-24
 
 ### Changed

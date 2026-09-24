@@ -175,5 +175,9 @@ public sealed class StringTypeTests
     [InlineData("catch(string_length(_, _), error(E, _), true), writeq(E)", "instantiation_error")]
     [InlineData("catch(string_length(f(x), _), error(E, _), true), writeq(E)", "type_error(string,f(x))")]
     [InlineData("catch(string_concat(_, _, _), error(E, _), true), writeq(E)", "instantiation_error")]
+    [InlineData("catch(string_concat(ab, _, _), error(E, _), true), writeq(E)", "instantiation_error")]
+    [InlineData("catch(string_concat([a, b], [c], _), error(E, _), true), writeq(E)", "type_error(atomic,[a,b])")]
+    [InlineData("catch(string_concat(ab, [c], _), error(E, _), true), writeq(E)", "type_error(atomic,[c])")]
+    [InlineData("catch(string_concat(_, _, f(x)), error(E, _), true), writeq(E)", "type_error(atomic,f(x))")]
     public void StringLibraryValidatesItsArguments(string goal, string expected) => Assert.Equal(expected, RunString(goal));
 }

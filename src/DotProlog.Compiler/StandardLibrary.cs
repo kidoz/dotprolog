@@ -778,7 +778,12 @@ internal static class StandardLibrary
         % native slicing primitives; bound arguments filter by converted content, so
         % an atom or number is accepted wherever SWI accepts one.
 
+        % As in SWI, a bound argument that is not atomic is a type error, checked left to
+        % right before anything else, so a list is never mistaken for a missing binding.
         string_concat(Left, Right, Whole) :-
+            '$must_be_atomic_or_var'(Left),
+            '$must_be_atomic_or_var'(Right),
+            '$must_be_atomic_or_var'(Whole),
             (   '$string_text'(Left), '$string_text'(Right)
             ->  '$string_concat'(Left, Right, Whole)
             ;   '$string_text'(Whole)
@@ -790,6 +795,12 @@ internal static class StandardLibrary
                 '$string_part'(Left, LeftSlice),
                 '$string_part'(Right, RightSlice)
             ;   instantiation_error(Whole)
+            ).
+
+        '$must_be_atomic_or_var'(Term) :-
+            (   var(Term) -> true
+            ;   atomic(Term) -> true
+            ;   type_error(atomic, Term)
             ).
 
         sub_string(String, Before, Length, After, Sub) :-
