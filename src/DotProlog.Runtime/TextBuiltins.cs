@@ -315,19 +315,6 @@ internal static class TextBuiltins
         }
     }
 
-    /// <summary>The text of an argument that must be atomic.</summary>
-    private static string TextArgument(Machine machine, int index)
-    {
-        Cell cell = machine.Argument(index);
-
-        if (cell.Tag == CellTag.Reference)
-        {
-            throw PrologErrors.Instantiation(machine);
-        }
-
-        return TryText(machine, cell, out var text) ? text : throw PrologErrors.Type(machine, "atomic", cell);
-    }
-
     private static string AtomArgument(Machine machine, int index)
     {
         Cell cell = machine.Argument(index);
@@ -407,11 +394,23 @@ internal static class TextBuiltins
         return machine.Unify(character, Cell.Atom(machine.Symbols.InternAtom(text)));
     }
 
+    /// <summary>
+    /// <c>upcase_atom/2</c> and <c>downcase_atom/2</c> read any atomic text. A bound result is compared
+    /// after the mapping, and a result that is not atomic is a type error, as in SWI.
+    /// </summary>
     private static bool ChangeCase(Machine machine, bool upper)
     {
-        var text = TextArgument(machine, 0);
+        var text = PrologText.Read(machine, machine.Argument(0), TextKinds.Atomic);
         var changed = upper ? text.ToUpperInvariant() : text.ToLowerInvariant();
-        return machine.Unify(machine.Argument(1), Cell.Atom(machine.Symbols.InternAtom(changed)));
+        Cell result = machine.Argument(1);
+        if (result.Tag == CellTag.Reference)
+        {
+            return machine.Unify(result, Cell.Atom(machine.Symbols.InternAtom(changed)));
+        }
+
+        return PrologText.TryRead(machine, result, TextKinds.Atomic, out var given)
+            ? string.Equals(given, changed, StringComparison.Ordinal)
+            : throw PrologErrors.Type(machine, "atom", result);
     }
 
     /// <summary>
@@ -750,7 +749,7 @@ internal static class TextBuiltins
     /// <summary><c>atomic_list_concat/3</c>, which joins when the list is proper and splits otherwise.</summary>
     private static bool AtomicListConcat3(Machine machine)
     {
-        var separator = TextArgument(machine, 1);
+        var separator = JoinText(machine, machine.Argument(1));
         Cell list = machine.Argument(0);
 
         if (TermList.IsProper(machine, list))
@@ -763,7 +762,7 @@ internal static class TextBuiltins
             throw PrologErrors.Domain(machine, "non_empty_atom", machine.Argument(1));
         }
 
-        var text = TextArgument(machine, 2);
+        var text = PrologText.Read(machine, machine.Argument(2), TextKinds.Atomic);
         var parts = text.Split(separator, StringSplitOptions.None);
         var items = new Cell[parts.Length];
 
@@ -784,20 +783,28 @@ internal static class TextBuiltins
         {
             Cell element = machine.Dereference(elements[i]);
 
-            if (element.Tag == CellTag.Reference)
-            {
-                throw PrologErrors.Instantiation(machine);
-            }
-
             if (i > 0)
             {
                 text.Append(separator);
             }
 
-            text.Append(TryText(machine, element, out var part) ? part : throw PrologErrors.Type(machine, "atomic", element));
+            text.Append(JoinText(machine, element));
         }
 
         return machine.Unify(machine.Argument(resultIndex), Cell.Atom(machine.Symbols.InternAtom(text.ToString())));
+    }
+
+    /// <summary>A joined element or separator: atomic text, and SWI's <c>type_error(text, X)</c> otherwise.</summary>
+    private static string JoinText(Machine machine, Cell cell)
+    {
+        if (cell.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        return PrologText.TryRead(machine, cell, TextKinds.Atomic, out var text)
+            ? text
+            : throw PrologErrors.Type(machine, "text", cell);
     }
 
     private static Cell SyntaxErrorTerm(Machine machine, string what)
@@ -997,16 +1004,5 @@ internal static class TextBuiltins
         }
 
         return true;
-    }
-
-    /// <summary>
-    /// Reads a list of codes or characters as text, accepting either. Which one it is is decided by
-    /// the first element, so <c>format/2</c>'s <c>~s</c> takes both spellings.
-    /// </summary>
-    internal static string TextOfList(Machine machine, Cell list)
-    {
-        List<Cell> elements = TermList.ReadProper(machine, list);
-        var chars = elements.Count > 0 && machine.Dereference(elements[0]).Tag == CellTag.Atom;
-        return ReadText(machine, elements, chars);
     }
 }

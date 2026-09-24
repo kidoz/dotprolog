@@ -1,103 +1,96 @@
 namespace DotProlog.Runtime;
 
 /// <summary>
-/// The string library over the interned string term. Inputs are text-lenient the way
-/// SWI's are — an atom or a number is accepted wherever a string is — while results are strings.
-/// The atom predicates stay strict about atoms; that phase-3 loosening was deliberately deferred.
+/// The string library over the interned string term. Which kinds of term each predicate reads as
+/// text follows SWI-Prolog predicate by predicate, through <see cref="PrologText"/>: most accept
+/// atoms, strings, numbers, and character or code lists, while <c>string_concat/3</c>,
+/// <c>sub_string/5</c>, and the case mappings reject lists as SWI's do. Results are strings.
 /// </summary>
 internal static class StringBuiltins
 {
     internal static void Register(BuiltinRegistry registry)
     {
         registry.Register("string_length", 2, StringLength);
-        registry.Register("atom_string", 2, AtomString);
-        registry.Register("string_to_atom", 2, StringToAtom);
+        registry.Register("atom_string", 2, static machine => AtomString(machine, atom: 0, text: 1));
+        registry.Register("string_to_atom", 2, static machine => AtomString(machine, atom: 1, text: 0));
         registry.Register("string_chars", 2, static machine => StringList(machine, chars: true));
         registry.Register("string_codes", 2, static machine => StringList(machine, chars: false));
         registry.Register("number_string", 2, NumberString);
         registry.Register("split_string", 4, SplitString);
+        registry.Register("text_to_string", 2, TextToString);
         registry.Register("string_lower", 2, static machine => MapCase(machine, static text => text.ToLowerInvariant()));
         registry.Register("string_upper", 2, static machine => MapCase(machine, static text => text.ToUpperInvariant()));
         registry.Register("$as_string", 2, AsString);
+        registry.Register("$substring_length", 2, SubstringLength);
+        registry.Register("$string_code_length", 2, StringCodeLength);
         registry.Register("$string_concat", 3, StringConcat);
         registry.Register("$string_slice", 4, StringSlice);
         registry.Register("$string_code", 3, StringCode);
-    }
-
-    /// <summary>Any text an SWI string predicate accepts: a string, an atom, or a number.</summary>
-    private static bool TryAnyText(Machine machine, Cell cell, out string text)
-    {
-        if (cell.Tag == CellTag.String)
-        {
-            text = machine.Symbols.AtomName(cell.Index);
-            return true;
-        }
-
-        return TextBuiltins.TryText(machine, cell, out text);
-    }
-
-    private static string RequireText(Machine machine, int argument)
-    {
-        Cell cell = machine.Argument(argument);
-        if (cell.Tag == CellTag.Reference)
-        {
-            throw PrologErrors.Instantiation(machine);
-        }
-
-        return TryAnyText(machine, cell, out var text) ? text : throw PrologErrors.Type(machine, "string", cell);
     }
 
     private static Cell StringCell(Machine machine, string text) => Cell.String(machine.Symbols.InternAtom(text));
 
     private static bool StringLength(Machine machine)
     {
-        var text = RequireText(machine, 0);
+        var text = PrologText.Read(machine, machine.Argument(0), TextKinds.Any);
         return machine.Unify(machine.Argument(1), Cell.Integer60(text.Length));
     }
 
-    private static bool AtomString(Machine machine)
+    /// <summary>
+    /// <c>atom_string(?Atom, ?String)</c> and, with the arguments swapped,
+    /// <c>string_to_atom(?String, ?Atom)</c>. Either side may be any text; the string side is
+    /// checked first, and a bound pair is compared by content.
+    /// </summary>
+    private static bool AtomString(Machine machine, int atom, int text)
     {
-        Cell atom = machine.Argument(0);
-        if (atom.Tag != CellTag.Reference)
+        Cell atomCell = machine.Argument(atom);
+        Cell textCell = machine.Argument(text);
+        string? textValue = null;
+        string? atomValue = null;
+
+        if (textCell.Tag != CellTag.Reference)
         {
-            return TryAnyText(machine, atom, out var text)
-                ? machine.Unify(machine.Argument(1), StringCell(machine, text))
-                : throw PrologErrors.Type(machine, "atom", atom);
+            textValue = PrologText.TryRead(machine, textCell, TextKinds.Any, out var value)
+                ? value
+                : throw PrologErrors.Type(machine, "string", textCell);
         }
 
-        var target = RequireText(machine, 1);
-        return machine.Unify(atom, Cell.Atom(machine.Symbols.InternAtom(target)));
-    }
-
-    private static bool StringToAtom(Machine machine)
-    {
-        Cell text = machine.Argument(0);
-        if (text.Tag != CellTag.Reference)
+        if (atomCell.Tag != CellTag.Reference)
         {
-            return TryAnyText(machine, text, out var value)
-                ? machine.Unify(machine.Argument(1), Cell.Atom(machine.Symbols.InternAtom(value)))
-                : throw PrologErrors.Type(machine, "string", text);
+            atomValue = PrologText.TryRead(machine, atomCell, TextKinds.Any, out var value)
+                ? value
+                : throw PrologErrors.Type(machine, "atom", atomCell);
         }
 
-        var atom = RequireText(machine, 1);
-        return machine.Unify(text, StringCell(machine, atom));
+        if (atomValue is not null)
+        {
+            return textValue is null
+                ? machine.Unify(textCell, StringCell(machine, atomValue))
+                : string.Equals(atomValue, textValue, StringComparison.Ordinal);
+        }
+
+        return textValue is not null
+            ? machine.Unify(atomCell, Cell.Atom(machine.Symbols.InternAtom(textValue)))
+            : throw PrologErrors.Instantiation(machine);
     }
 
     private static bool StringList(Machine machine, bool chars)
     {
-        Cell text = machine.Argument(0);
-        if (text.Tag != CellTag.Reference)
+        Cell source = machine.Argument(0);
+        if (source.Tag != CellTag.Reference)
         {
-            if (!TryAnyText(machine, text, out var value))
-            {
-                throw PrologErrors.Type(machine, "string", text);
-            }
-
-            return machine.Unify(machine.Argument(1), TextBuiltins.BuildText(machine, value, chars));
+            var text = PrologText.Read(machine, source, TextKinds.Any);
+            return PrologText.UnifyOrCompare(
+                machine,
+                machine.Argument(1),
+                TextBuiltins.BuildText(machine, text, chars),
+                text,
+                TextKinds.Any
+            );
         }
 
-        var listText = TextBuiltins.TextOfList(machine, machine.Argument(1));
-        return machine.Unify(text, StringCell(machine, listText));
+        var listText = PrologText.Read(machine, machine.Argument(1), TextKinds.String | TextKinds.List);
+        return machine.Unify(source, StringCell(machine, listText));
     }
 
     private static bool NumberString(Machine machine)
@@ -105,29 +98,30 @@ internal static class StringBuiltins
         Cell text = machine.Argument(1);
         if (text.Tag != CellTag.Reference)
         {
-            if (!TryAnyText(machine, text, out var value))
+            var value = PrologText.Read(machine, text, TextKinds.String | TextKinds.List);
+
+            // SWI fails, rather than trimming, when the number is surrounded by layout.
+            if (value.Length == 0 || char.IsWhiteSpace(value[0]) || char.IsWhiteSpace(value[^1]))
             {
-                throw PrologErrors.Type(machine, "string", text);
+                return false;
             }
 
-            // SWI tolerates surrounding whitespace and fails quietly on text that is not a number.
-            return TextBuiltins.TryParseNumber(machine, value.Trim(), out PrologNumber number)
+            return TextBuiltins.TryParseNumber(machine, value, out PrologNumber number)
                 && machine.Unify(machine.Argument(0), ArithmeticEvaluator.ToCell(machine, number));
         }
 
-        Cell value2 = machine.Argument(0);
-        if (value2.Tag == CellTag.Reference)
+        Cell number2 = machine.Argument(0);
+        if (number2.Tag == CellTag.Reference)
         {
             throw PrologErrors.Instantiation(machine);
         }
 
-        if (value2.Tag is not (CellTag.Integer or CellTag.BigInteger or CellTag.Float))
+        if (number2.Tag is not (CellTag.Integer or CellTag.BigInteger or CellTag.Float or CellTag.Rational))
         {
-            throw PrologErrors.Type(machine, "number", value2);
+            throw PrologErrors.Type(machine, "number", number2);
         }
 
-        TextBuiltins.TryText(machine, value2, out var written);
-        return machine.Unify(text, StringCell(machine, written));
+        return machine.Unify(text, StringCell(machine, PrologText.Read(machine, number2, TextKinds.Number)));
     }
 
     /// <summary>
@@ -138,9 +132,10 @@ internal static class StringBuiltins
     /// </summary>
     private static bool SplitString(Machine machine)
     {
-        var text = RequireText(machine, 0);
-        var separators = RequireText(machine, 1);
-        var pad = RequireText(machine, 2);
+        const TextKinds kinds = TextKinds.Atom | TextKinds.String | TextKinds.List;
+        var text = PrologText.Read(machine, machine.Argument(0), kinds);
+        var separators = PrologText.Read(machine, machine.Argument(1), kinds);
+        var pad = PrologText.Read(machine, machine.Argument(2), kinds);
 
         var start = 0;
         var end = text.Length;
@@ -183,29 +178,71 @@ internal static class StringBuiltins
         return machine.Unify(machine.Argument(3), machine.CreateList([.. fields], Cell.Atom(machine.Symbols.EmptyList)));
     }
 
-    private static bool MapCase(Machine machine, Func<string, string> map)
+    /// <summary><c>text_to_string(+Text, ?String)</c>: there is no reverse mode, as in SWI.</summary>
+    private static bool TextToString(Machine machine)
     {
-        var text = RequireText(machine, 0);
-        return machine.Unify(machine.Argument(1), StringCell(machine, map(text)));
+        var text = PrologText.Read(machine, machine.Argument(0), TextKinds.Atom | TextKinds.String | TextKinds.List);
+        return PrologText.UnifyOrCompare(machine, machine.Argument(1), StringCell(machine, text), text, TextKinds.Any);
     }
 
-    /// <summary>Converts any text to its string, for content comparison in the library's Prolog half.</summary>
-    private static bool AsString(Machine machine)
+    /// <summary>
+    /// <c>string_lower/2</c> and <c>string_upper/2</c>. A bound result is compared after the mapping,
+    /// so <c>string_upper(abc, 'ABC')</c> succeeds, and a result that is not atomic is a type error.
+    /// </summary>
+    private static bool MapCase(Machine machine, Func<string, string> map)
     {
-        var text = RequireText(machine, 0);
-        return machine.Unify(machine.Argument(1), StringCell(machine, text));
+        var mapped = map(PrologText.Read(machine, machine.Argument(0), TextKinds.Atomic));
+        Cell result = machine.Argument(1);
+        if (result.Tag == CellTag.Reference)
+        {
+            return machine.Unify(result, StringCell(machine, mapped));
+        }
+
+        return PrologText.TryRead(machine, result, TextKinds.Atomic, out var given)
+            ? string.Equals(given, mapped, StringComparison.Ordinal)
+            : throw PrologErrors.Type(machine, "string", result);
+    }
+
+    /// <summary>
+    /// The text of a bound <c>sub_string/5</c> or <c>string_concat/3</c> argument, as a string for the
+    /// library's content comparison. As in SWI, only atomic text is accepted there.
+    /// </summary>
+    private static bool AsString(Machine machine) =>
+        machine.Unify(machine.Argument(1), StringCell(machine, SubstringText(machine, machine.Argument(0))));
+
+    /// <summary>The length of the string <c>sub_string/5</c> takes apart.</summary>
+    private static bool SubstringLength(Machine machine) =>
+        machine.Unify(machine.Argument(1), Cell.Integer60(SubstringText(machine, machine.Argument(0)).Length));
+
+    private static string SubstringText(Machine machine, Cell cell)
+    {
+        if (cell.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        return PrologText.TryRead(machine, cell, TextKinds.Atomic, out var text)
+            ? text
+            : throw PrologErrors.Type(machine, "string", cell);
+    }
+
+    /// <summary>The length of the text <c>string_code/3</c> indexes, which may be a list but not a number.</summary>
+    private static bool StringCodeLength(Machine machine)
+    {
+        var text = PrologText.Read(machine, machine.Argument(0), TextKinds.Atom | TextKinds.String | TextKinds.List);
+        return machine.Unify(machine.Argument(1), Cell.Integer60(text.Length));
     }
 
     private static bool StringConcat(Machine machine)
     {
-        var left = RequireText(machine, 0);
-        var right = RequireText(machine, 1);
+        var left = PrologText.Read(machine, machine.Argument(0), TextKinds.Atomic);
+        var right = PrologText.Read(machine, machine.Argument(1), TextKinds.Atomic);
         return machine.Unify(machine.Argument(2), StringCell(machine, left + right));
     }
 
     private static bool StringSlice(Machine machine)
     {
-        var text = RequireText(machine, 0);
+        var text = PrologText.Read(machine, machine.Argument(0), TextKinds.Atomic);
         Cell before = machine.Argument(1);
         Cell length = machine.Argument(2);
         if (
@@ -235,6 +272,10 @@ internal static class StringBuiltins
         return machine.Unify(machine.Argument(3), StringCell(machine, text.Substring(start, count)));
     }
 
+    /// <summary>
+    /// <c>string_code(+Index, +Text, -Code)</c> for a bound index: SWI's index errors, then failure
+    /// for a position outside the text.
+    /// </summary>
     private static bool StringCode(Machine machine)
     {
         Cell index = machine.Argument(0);
@@ -243,12 +284,18 @@ internal static class StringBuiltins
             throw PrologErrors.Type(machine, "integer", index);
         }
 
+        var negative = index.Tag == CellTag.BigInteger ? machine.Symbols.GetBig(index.Index).Sign < 0 : index.Integer < 0;
+        if (negative)
+        {
+            throw PrologErrors.Domain(machine, "not_less_than_zero", index);
+        }
+
         if (index.Tag == CellTag.BigInteger)
         {
             return false;
         }
 
-        var text = RequireText(machine, 1);
+        var text = PrologText.Read(machine, machine.Argument(1), TextKinds.Atom | TextKinds.String | TextKinds.List);
         var position = (int)index.Integer;
         if (position < 1 || position > text.Length)
         {

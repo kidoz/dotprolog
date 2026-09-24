@@ -372,9 +372,11 @@ internal static class StandardLibrary
             ;   fail
             ).
 
+        % A list that is not text fails the scan, leaving the error to the native
+        % format, which reports the whole template as SWI does.
         '$format_list_codes'([], []).
         '$format_list_codes'([H|T], [C|Cs]) :-
-            ( integer(H) -> C = H ; atom(H), char_code(H, C) ),
+            ( integer(H) -> C = H ; atom(H), atom_length(H, 1), char_code(H, C) ),
             '$format_list_codes'(T, Cs).
 
         % The rewritten text and consumed arguments accumulate in reverse, so a
@@ -804,7 +806,7 @@ internal static class StandardLibrary
             ).
 
         sub_string(String, Before, Length, After, Sub) :-
-            string_length(String, Total),
+            '$substring_length'(String, Total),
             between(0, Total, Before),
             Rest is Total - Before,
             between(0, Rest, Length),
@@ -813,8 +815,11 @@ internal static class StandardLibrary
             '$string_part'(Sub, Slice).
 
         string_code(Index, String, Code) :-
-            string_length(String, Length),
-            between(1, Length, Index),
+            '$string_code_length'(String, Length),
+            (   var(Index)
+            ->  between(1, Length, Index)
+            ;   true
+            ),
             '$string_code'(Index, String, Code).
 
         term_string(Term, String) :-
@@ -1325,6 +1330,9 @@ internal static class StandardLibrary
         '$is_not'(codes, X) :- !, '$not_a_list'(codes, X).
         '$is_not'(list_or_partial_list, X) :- !, type_error(list, X).
         '$is_not'(var, X) :- !, uninstantiation_error(X).
+        % As in SWI, text is a ground type: a term that is not text only because it is
+        % not yet fully bound is insufficiently instantiated rather than of the wrong type.
+        '$is_not'(text, X) :- !, ( ground(X) -> type_error(text, X) ; instantiation_error(X) ).
         '$is_not'(Type, X) :-
             (   \+ '$known_type'(Type) -> existence_error(type, Type)
             ;   var(X) -> instantiation_error(X)

@@ -177,7 +177,9 @@ internal static class FormatBuiltins
             {
                 Cell cell = Next(machine, given, ref next, arguments);
                 output.Append(
-                    TextBuiltins.TryText(machine, cell, out var value) ? value : throw PrologErrors.Type(machine, "atomic", cell)
+                    PrologText.TryRead(machine, cell, TextKinds.Atom | TextKinds.String, out var value)
+                        ? value
+                        : throw PrologErrors.FormatArgumentType(machine, 'a', cell)
                 );
                 break;
             }
@@ -202,7 +204,9 @@ internal static class FormatBuiltins
             {
                 Cell cell = Next(machine, given, ref next, arguments);
                 output.Append(
-                    cell.Tag == CellTag.String ? machine.Symbols.AtomName(cell.Index) : TextBuiltins.TextOfList(machine, cell)
+                    PrologText.TryRead(machine, cell, TextKinds.Atom | TextKinds.String | TextKinds.List, out var value)
+                        ? value
+                        : throw PrologErrors.FormatArgumentType(machine, 's', cell)
                 );
                 break;
             }
@@ -397,7 +401,10 @@ internal static class FormatBuiltins
         return cell.Tag == CellTag.Integer ? cell.Integer : throw PrologErrors.Type(machine, "integer", cell);
     }
 
-    /// <summary>The format string, which may be written as an atom or as a list of codes or characters.</summary>
+    /// <summary>
+    /// The format string: an atom, a string, or a list of codes or characters, where <c>[]</c> is the
+    /// empty format. Anything else is SWI's <c>type_error(text, Format)</c>.
+    /// </summary>
     private static string FormatText(Machine machine, Cell format)
     {
         if (format.Tag == CellTag.Reference)
@@ -405,11 +412,9 @@ internal static class FormatBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        return format.Tag switch
-        {
-            CellTag.Atom or CellTag.String => machine.Symbols.AtomName(format.Index),
-            _ => TextBuiltins.TextOfList(machine, format),
-        };
+        return PrologText.TryRead(machine, format, TextKinds.Atom | TextKinds.String | TextKinds.List, out var text)
+            ? text
+            : throw PrologErrors.Type(machine, "text", format);
     }
 
     /// <summary>

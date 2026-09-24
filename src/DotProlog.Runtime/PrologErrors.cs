@@ -183,6 +183,13 @@ public static class PrologErrors
         return Build(machine, formal, "occurs_check: the binding would create a cyclic term");
     }
 
+    /// <summary>
+    /// A <c>format/2,3</c> directive was given an argument it cannot print:
+    /// <c>format_argument_type(Directive, Culprit)</c>, SWI-Prolog's formal for it.
+    /// </summary>
+    internal static PrologException FormatArgumentType(Machine machine, char directive, Cell culprit) =>
+        Binary(machine, "format_argument_type", directive.ToString(), culprit);
+
     private static PrologException Binary(Machine machine, string kind, string first, Cell culprit)
     {
         Cell formal = machine.CreateStructure(

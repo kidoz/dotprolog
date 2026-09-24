@@ -146,7 +146,8 @@ public sealed class StringTypeTests
     [InlineData("string_chars(\"xy\", C), writeq(C)", "[x,y]")]
     [InlineData("string_codes(\"xy\", K), writeq(K)", "[120,121]")]
     [InlineData("number_string(N, \"42\"), writeq(N)", "42")]
-    [InlineData("number_string(N, \" 3.5 \"), writeq(N)", "3.5")]
+    [InlineData("number_string(N, \"3.5\"), writeq(N)", "3.5")]
+    [InlineData("( number_string(_, \" 3.5 \") -> write(y) ; write(fails) )", "fails")]
     [InlineData("( number_string(_, \"abc\") -> write(y) ; write(fails) )", "fails")]
     [InlineData("number_string(3, S), writeq(S)", "\"3\"")]
     [InlineData("term_string(T, \"f(X, 1)\"), functor(T, N, A), writeq(N/A)", "f/2")]
@@ -173,7 +174,7 @@ public sealed class StringTypeTests
 
     [Theory]
     [InlineData("catch(string_length(_, _), error(E, _), true), writeq(E)", "instantiation_error")]
-    [InlineData("catch(string_length(f(x), _), error(E, _), true), writeq(E)", "type_error(string,f(x))")]
+    [InlineData("catch(string_length(f(x), _), error(E, _), true), writeq(E)", "type_error(text,f(x))")]
     [InlineData("catch(string_concat(_, _, _), error(E, _), true), writeq(E)", "instantiation_error")]
     [InlineData("catch(string_concat(ab, _, _), error(E, _), true), writeq(E)", "instantiation_error")]
     [InlineData("catch(string_concat([a, b], [c], _), error(E, _), true), writeq(E)", "type_error(atomic,[a,b])")]
