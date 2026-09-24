@@ -4,6 +4,19 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Lint diagnostics for double-quoted text read one way and used another, judged under the
+  `double_quotes` value in force where the text appears — the mode's or override's initial value,
+  moved by `set_prolog_flag(double_quotes, _)` directives in the file. `DPL3011` reports a literal
+  passed to a conversion that needs another list kind, such as `number_codes(N, "42")` while text
+  reads as characters. `DPL3012` reports text read as characters that reaches, through `phrase/2,3`
+  or a grammar-rule terminal, a grammar in the same file that compares character codes — the case
+  that fails silently rather than raising an error. Both help move code-list programs to the
+  `chars` default.
+
 ## [0.8.0] — 2026-09-24
 
 ### Changed

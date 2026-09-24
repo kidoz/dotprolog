@@ -27,6 +27,14 @@ dotnet run --project src/DotProlog.Tool -- run --flag double_quotes=codes path/t
 The former `extended` mode has been removed. Use `modern` with this flag override for its former
 starting settings.
 
+To find where source still assumes code lists, lint it under the default reading: `DPL3011` marks
+double-quoted text passed to a code conversion, and `DPL3012` marks text reaching a grammar that
+compares character codes. See [double-quoted text diagnostics](../linting.md#double-quoted-text).
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint path/to/program.pl
+```
+
 ## Configure a project
 
 Add a property group to your `.dplproj` to select strict mode:
