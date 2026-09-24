@@ -108,7 +108,7 @@ public static class TermWriter
         bool spacingNextArgument = false
     )
     {
-        var writer = new Emitter(output);
+        var writer = new Emitter(output, machine.Symbols.CodePoints);
         List<Item> work = [Item.OfTerm(term, TopPriority)];
         HashSet<int> active = [];
 
@@ -372,7 +372,7 @@ public static class TermWriter
 
             // Pushed in reverse: right argument, then the operator, then the left.
             work.Add(Item.OfTerm(machine.HeapAt(cell.Index + 2), infix.RightPriority));
-            work.Add(Item.OfText(OperatorText(name, quoted)));
+            work.Add(Item.OfText(OperatorText(name, quoted, output.CodePoints)));
             work.Add(Item.OfTerm(machine.HeapAt(cell.Index + 1), infix.LeftPriority));
             return true;
         }
@@ -388,7 +388,7 @@ public static class TermWriter
 
             work.Add(Item.OfTerm(machine.HeapAt(cell.Index + 1), prefix.RightPriority));
             work.Add(Item.OfPrefixGuard(sign: name is "-" or "+"));
-            work.Add(Item.OfText(OperatorText(name, quoted)));
+            work.Add(Item.OfText(OperatorText(name, quoted, output.CodePoints)));
             return true;
         }
 
@@ -401,7 +401,7 @@ public static class TermWriter
                 work.Add(Item.OfText(")"));
             }
 
-            work.Add(Item.OfText(OperatorText(name, quoted)));
+            work.Add(Item.OfText(OperatorText(name, quoted, output.CodePoints)));
             work.Add(Item.OfTerm(machine.HeapAt(cell.Index + 1), postfix.LeftPriority));
             return true;
         }
@@ -500,9 +500,11 @@ public static class TermWriter
     /// way to pass it as an argument — but as an operator it must be bare, because <c>a','b</c> does
     /// not read back as a conjunction while <c>a,b</c> does.
     /// </remarks>
-    private static string OperatorText(string name, bool quoted) => name == "," ? "," : QuotedAtomText(name, quoted);
+    private static string OperatorText(string name, bool quoted, bool codePoints) =>
+        name == "," ? "," : QuotedAtomText(name, quoted, codePoints);
 
-    private static void WriteAtomText(string name, Emitter output, bool quoted) => output.Write(QuotedAtomText(name, quoted));
+    private static void WriteAtomText(string name, Emitter output, bool quoted) =>
+        output.Write(QuotedAtomText(name, quoted, output.CodePoints));
 
     /// <summary>A string writes its bare text, or <c>"..."</c> with the ISO escapes when quoted.</summary>
     private static string StringText(string text, bool quoted)
@@ -539,9 +541,9 @@ public static class TermWriter
         return quotedText.Append('"').ToString();
     }
 
-    private static string QuotedAtomText(string name, bool quoted)
+    private static string QuotedAtomText(string name, bool quoted, bool codePoints)
     {
-        if (!quoted || !NeedsQuotes(name))
+        if (!quoted || !NeedsQuotes(name, codePoints))
         {
             return name;
         }
@@ -575,7 +577,12 @@ public static class TermWriter
         return quotedText.Append('\'').ToString();
     }
 
-    private static bool NeedsQuotes(string name)
+    /// <summary>
+    /// Whether an atom needs quotes to read back. A letter-led name is bare only when every character
+    /// is a letter, digit, or underscore, judged per character as the reader judges it: per code point
+    /// in <c>Modern</c>, so a supplementary letter needs no quotes, and per code unit in strict ISO mode.
+    /// </summary>
+    private static bool NeedsQuotes(string name, bool codePoints)
     {
         if (name.Length == 0)
         {
@@ -592,14 +599,17 @@ public static class TermWriter
             return false;
         }
 
-        if (char.IsLower(name[0]))
+        if (CharacterClass.IsLower(CharacterClass.At(name, 0, codePoints).Code))
         {
-            foreach (var c in name)
+            for (var index = 0; index < name.Length; )
             {
-                if (c != '_' && !char.IsLetterOrDigit(c))
+                var (code, width) = CharacterClass.At(name, index, codePoints);
+                if (code != '_' && !CharacterClass.IsLetterOrDigit(code))
                 {
                     return true;
                 }
+
+                index += width;
             }
 
             return false;
@@ -625,11 +635,14 @@ public static class TermWriter
     /// <c>1--2</c>, which reads back as <c>1</c> and the operator <c>--</c>, and <c>a mod b</c> would
     /// become <c>amodb</c>.
     /// </remarks>
-    private sealed class Emitter(TextWriter output)
+    private sealed class Emitter(TextWriter output, bool codePoints)
     {
-        private char _last;
+        private int _last;
         private bool _afterPrefix;
         private bool _afterSign;
+
+        /// <summary>Whether characters are code points, which decides how adjacent characters are judged.</summary>
+        internal bool CodePoints => codePoints;
 
         internal void Write(string text)
         {
@@ -638,7 +651,8 @@ public static class TermWriter
                 return;
             }
 
-            if (NeedsSeparator(_last, text[0]) || NeedsPrefixSeparator(text[0]))
+            var next = CharacterClass.At(text, 0, codePoints).Code;
+            if (NeedsSeparator(_last, next) || NeedsPrefixSeparator(next))
             {
                 output.Write(' ');
             }
@@ -646,7 +660,7 @@ public static class TermWriter
             _afterPrefix = false;
             _afterSign = false;
             output.Write(text);
-            _last = text[^1];
+            _last = CharacterClass.Last(text, codePoints);
         }
 
         /// <summary>
@@ -666,11 +680,11 @@ public static class TermWriter
             _afterSign = sign;
         }
 
-        private bool NeedsPrefixSeparator(char next) => (_afterPrefix && next == '(') || (_afterSign && char.IsAsciiDigit(next));
+        private bool NeedsPrefixSeparator(int next) => (_afterPrefix && next == '(') || (_afterSign && next is >= '0' and <= '9');
 
-        private static bool NeedsSeparator(char last, char next)
+        private static bool NeedsSeparator(int last, int next)
         {
-            if (last == '\0')
+            if (last == 0)
             {
                 return false;
             }
@@ -688,9 +702,9 @@ public static class TermWriter
             return false;
         }
 
-        private static bool IsSymbol(char c) => SymbolCharacters.Contains(c, StringComparison.Ordinal);
+        private static bool IsSymbol(int c) => c <= char.MaxValue && SymbolCharacters.Contains((char)c, StringComparison.Ordinal);
 
-        private static bool IsAlphanumeric(char c) => c == '_' || char.IsLetterOrDigit(c);
+        private static bool IsAlphanumeric(int c) => c == '_' || CharacterClass.IsLetterOrDigit(c);
     }
 
     private enum ItemKind

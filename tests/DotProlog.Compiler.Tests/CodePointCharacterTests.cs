@@ -63,6 +63,16 @@ public sealed class CodePointCharacterTests
         Assert.Equal(expected, PrologTestHost.RunGoal(goal));
 
     [Theory]
+    [InlineData("X = 0'😀, write(X)", "128512")]
+    [InlineData("atom_codes('\\x1F600\\\\U0001F601', L), write(L)", "[128512,128513]")]
+    [InlineData("X = 𝑎bc, atom(X), atom_length(X, N), write(N)", "3")]
+    [InlineData("writeq(['𝑎bc', 'a😀b', 'x y'])", "[𝑎bc,'a😀b','x y']")]
+    [InlineData("term_to_atom(T, '𝑎bc(𐐀x)'), T = 𝑎bc(V), ( var(V) -> write(var) ; write(bound) )", "var")]
+    public void TheReaderAndWriterUseCodePoints(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Theory]
+    [InlineData("writeq('𝑎bc')", "'𝑎bc'")]
     [InlineData("atom_length('a😀b', N), write(N)", "4")]
     [InlineData("atom_codes('😀', L), write(L)", "[55357,56832]")]
     [InlineData("catch(char_code(_, 128512), error(E, _), true), writeq(E)", "representation_error(character_code)")]

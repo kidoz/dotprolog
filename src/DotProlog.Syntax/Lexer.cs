@@ -44,6 +44,7 @@ internal sealed class Lexer
         var layout = false;
         int start;
         char c;
+        int code;
 
         // Loop rather than recurse so a long run of invalid characters cannot exhaust the stack.
         while (true)
@@ -57,9 +58,10 @@ internal sealed class Lexer
             }
 
             c = InputAt(_position);
+            (code, var width) = CharacterAt(_position);
             if (
                 c is '_' or '\'' or '"' or '`'
-                || char.IsLetter(c)
+                || CharacterClass.IsLetter(code)
                 || char.IsAsciiDigit(c)
                 || IsStructural(c)
                 || SymbolCharacters.Contains(c, StringComparison.Ordinal)
@@ -68,8 +70,9 @@ internal sealed class Lexer
                 break;
             }
 
-            Advance();
-            Report(DiagnosticIds.UnexpectedCharacter, $"Unexpected character '{c}'.", SpanFrom(start));
+            Advance(width);
+            var shown = width == 2 ? _text.Substring(start, 2) : c.ToString();
+            Report(DiagnosticIds.UnexpectedCharacter, $"Unexpected character '{shown}'.", SpanFrom(start));
         }
 
         if (c is '(' or ')' or '[' or ']' or '{' or '}' or ',' or '|')
@@ -96,21 +99,21 @@ internal sealed class Lexer
             return ReadNumber(start, layout);
         }
 
-        if (c == '_' || char.IsUpper(c))
+        if (c == '_' || CharacterClass.IsUpper(code))
         {
-            while (_position < _text.Length && IsAlphanumeric(InputAt(_position)))
+            while (_position < _text.Length && IsAlphanumericAt(_position, out var width))
             {
-                Advance();
+                Advance(width);
             }
 
             return new Token(TokenKind.Variable, ConvertedText(start, _position - start), SpanFrom(start), layout);
         }
 
-        if (char.IsLetter(c))
+        if (CharacterClass.IsLetter(code))
         {
-            while (_position < _text.Length && IsAlphanumeric(InputAt(_position)))
+            while (_position < _text.Length && IsAlphanumericAt(_position, out var width))
             {
-                Advance();
+                Advance(width);
             }
 
             return new Token(TokenKind.Atom, ConvertedText(start, _position - start), SpanFrom(start), layout);
@@ -158,7 +161,23 @@ internal sealed class Lexer
 
     private static bool IsStructural(char c) => c is '(' or ')' or '[' or ']' or '{' or '}' or ',' or '|' or '!' or ';';
 
-    private static bool IsAlphanumeric(char c) => c == '_' || char.IsLetterOrDigit(c);
+    /// <summary>Whether characters are Unicode code points; strict ISO mode keeps UTF-16 code units.</summary>
+    private bool CodePoints => _flags?.CodePointCharacters ?? true;
+
+    /// <summary>
+    /// The character at <paramref name="position"/> and its width in code units: a surrogate pair is
+    /// one character when characters are code points; otherwise it is the converted code unit.
+    /// </summary>
+    private (int Code, int Width) CharacterAt(int position) =>
+        CodePoints && position < _text.Length && CodePointText.IsPairAt(_text, position)
+            ? (char.ConvertToUtf32(_text[position], _text[position + 1]), 2)
+            : (InputAt(position), 1);
+
+    private bool IsAlphanumericAt(int position, out int width)
+    {
+        (var code, width) = CharacterAt(position);
+        return code == '_' || CharacterClass.IsLetterOrDigit(code);
+    }
 
     private static bool IsLayout(char c) => char.IsWhiteSpace(c);
 
@@ -280,12 +299,21 @@ internal sealed class Lexer
             {
                 var builder = new StringBuilder();
                 ReadEscape(builder);
-                code = builder.Length > 0 ? builder[0] : 0;
+                code =
+                    builder.Length == 0 ? 0
+                    : CodePoints && builder.Length == 2 && char.IsHighSurrogate(builder[0])
+                        ? char.ConvertToUtf32(builder[0], builder[1])
+                    : builder[0];
             }
             else if (_text[_position] == '\'' && Peek(1) == '\'')
             {
                 Advance(2);
                 code = '\'';
+            }
+            else if (CodePoints && CodePointText.IsPairAt(_text, _position))
+            {
+                code = char.ConvertToUtf32(_text[_position], _text[_position + 1]);
+                Advance(2);
             }
             else
             {
@@ -553,6 +581,12 @@ internal sealed class Lexer
             case 'o':
                 ReadNumericEscape(builder, start, radix: 8, "octal");
                 return;
+            case 'u' when CodePoints:
+                ReadFixedEscape(builder, start, 'u', digits: 4);
+                return;
+            case 'U' when CodePoints:
+                ReadFixedEscape(builder, start, 'U', digits: 8);
+                return;
             case >= '1' and <= '7':
                 ReadNumericEscape(builder, start, radix: 8, "octal", firstDigit: c - '0');
                 return;
@@ -568,10 +602,11 @@ internal sealed class Lexer
         var digitsStart = _position;
         var value = firstDigit ?? 0;
         var overflow = false;
+        var largest = CodePoints ? 0x10FFFF : char.MaxValue;
         while (_position < _text.Length && IsEscapeDigit(_text[_position], radix))
         {
             var digit = EscapeDigitValue(_text[_position]);
-            if (value > (char.MaxValue - digit) / radix)
+            if (value > (largest - digit) / radix)
             {
                 overflow = true;
             }
@@ -602,7 +637,61 @@ internal sealed class Lexer
             return;
         }
 
-        builder.Append((char)value);
+        AppendEscapedCode(builder, start, value);
+    }
+
+    /// <summary>
+    /// <c>\uXXXX</c> and <c>\UXXXXXXXX</c>: exactly four or eight hexadecimal digits naming a character,
+    /// as SWI-Prolog reads them. ISO has no such escape, so strict ISO mode never reaches here.
+    /// </summary>
+    private void ReadFixedEscape(StringBuilder builder, int start, char letter, int digits)
+    {
+        long value = 0;
+        for (var index = 0; index < digits; index++)
+        {
+            if (_position >= _text.Length || !char.IsAsciiHexDigit(_text[_position]))
+            {
+                Report(
+                    DiagnosticIds.InvalidEscape,
+                    $"Expected {digits} hexadecimal digits in '\\{letter}' escape.",
+                    SpanFrom(start)
+                );
+                return;
+            }
+
+            value = (value * 16) + EscapeDigitValue(_text[_position]);
+            Advance();
+        }
+
+        if (value > 0x10FFFF)
+        {
+            Report(DiagnosticIds.InvalidEscape, "Numeric escape exceeds the supported character range.", SpanFrom(start));
+            return;
+        }
+
+        AppendEscapedCode(builder, start, (int)value);
+    }
+
+    /// <summary>
+    /// Appends an escaped character. When characters are code points a surrogate names no character,
+    /// so an escape can neither produce one nor be joined with another into a pair.
+    /// </summary>
+    private void AppendEscapedCode(StringBuilder builder, int start, int value)
+    {
+        if (CodePoints && value is >= 0xD800 and <= 0xDFFF)
+        {
+            Report(DiagnosticIds.InvalidEscape, "A surrogate code is not a character.", SpanFrom(start));
+            return;
+        }
+
+        if (value <= char.MaxValue)
+        {
+            builder.Append((char)value);
+        }
+        else
+        {
+            builder.Append(char.ConvertFromUtf32(value));
+        }
     }
 
     private static bool IsEscapeDigit(char c, int radix) => radix == 16 ? char.IsAsciiHexDigit(c) : c is >= '0' and <= '7';

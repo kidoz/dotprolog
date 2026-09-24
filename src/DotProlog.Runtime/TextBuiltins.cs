@@ -219,47 +219,27 @@ internal static class TextBuiltins
     private static bool NamedTypeApplies(string name, int character) =>
         name switch
         {
-            "alnum" => IsLetterOrDigit(character),
-            "alpha" => IsLetter(character),
-            "csym" => IsLetterOrDigit(character) || character == '_',
-            "csymf" => IsLetter(character) || character == '_',
+            "alnum" => CharacterClass.IsLetterOrDigit(character),
+            "alpha" => CharacterClass.IsLetter(character),
+            "csym" => CharacterClass.IsLetterOrDigit(character) || character == '_',
+            "csymf" => CharacterClass.IsLetter(character) || character == '_',
             "ascii" => character < 128,
             "white" => character is ' ' or '\t',
-            "space" => IsWhiteSpace(character),
-            "cntrl" => IsControl(character),
-            "graph" => !IsControl(character) && !IsWhiteSpace(character),
-            "print" => !IsControl(character),
-            "punct" => !IsControl(character) && !IsWhiteSpace(character) && !IsLetterOrDigit(character),
-            "upper" => IsUpper(character),
-            "lower" => IsLower(character),
+            "space" => CharacterClass.IsWhiteSpace(character),
+            "cntrl" => CharacterClass.IsControl(character),
+            "graph" => !CharacterClass.IsControl(character) && !CharacterClass.IsWhiteSpace(character),
+            "print" => !CharacterClass.IsControl(character),
+            "punct" => !CharacterClass.IsControl(character)
+                && !CharacterClass.IsWhiteSpace(character)
+                && !CharacterClass.IsLetterOrDigit(character),
+            "upper" => CharacterClass.IsUpper(character),
+            "lower" => CharacterClass.IsLower(character),
             "end_of_line" => character is '\n' or '\r',
             "newline" => character == '\n',
             "period" => character is '.' or '!' or '?',
             "quote" => character is '\'' or '"' or '`',
             _ => false,
         };
-
-    // Classification of a character code. A code below 0x10000 is classified as a UTF-16 code unit,
-    // which also covers the surrogates strict ISO mode keeps as characters; a supplementary code is
-    // classified as the Unicode scalar value it is.
-    private static bool IsLetter(int c) => c <= char.MaxValue ? char.IsLetter((char)c) : Rune.IsLetter(new Rune(c));
-
-    private static bool IsLetterOrDigit(int c) =>
-        c <= char.MaxValue ? char.IsLetterOrDigit((char)c) : Rune.IsLetterOrDigit(new Rune(c));
-
-    private static bool IsWhiteSpace(int c) => c <= char.MaxValue ? char.IsWhiteSpace((char)c) : Rune.IsWhiteSpace(new Rune(c));
-
-    private static bool IsControl(int c) => c <= char.MaxValue ? char.IsControl((char)c) : Rune.IsControl(new Rune(c));
-
-    private static bool IsUpper(int c) => c <= char.MaxValue ? char.IsUpper((char)c) : Rune.IsUpper(new Rune(c));
-
-    private static bool IsLower(int c) => c <= char.MaxValue ? char.IsLower((char)c) : Rune.IsLower(new Rune(c));
-
-    private static int ToUpper(int c) =>
-        c <= char.MaxValue ? char.ToUpperInvariant((char)c) : Rune.ToUpperInvariant(new Rune(c)).Value;
-
-    private static int ToLower(int c) =>
-        c <= char.MaxValue ? char.ToLowerInvariant((char)c) : Rune.ToLowerInvariant(new Rune(c)).Value;
 
     /// <summary>
     /// Whether a parametric type applies to <paramref name="character"/>, and the companion value
@@ -286,31 +266,31 @@ internal static class TextBuiltins
                 return true;
 
             case "to_lower":
-                companionValue = CompanionCell(machine, ToUpper(character), code);
+                companionValue = CompanionCell(machine, CharacterClass.ToUpper(character), code);
                 return true;
 
             case "to_upper":
-                companionValue = CompanionCell(machine, ToLower(character), code);
+                companionValue = CompanionCell(machine, CharacterClass.ToLower(character), code);
                 return true;
 
             case "upper":
-                if (!IsUpper(character))
+                if (!CharacterClass.IsUpper(character))
                 {
                     companionValue = default;
                     return false;
                 }
 
-                companionValue = CompanionCell(machine, ToLower(character), code);
+                companionValue = CompanionCell(machine, CharacterClass.ToLower(character), code);
                 return true;
 
             case "lower":
-                if (!IsLower(character))
+                if (!CharacterClass.IsLower(character))
                 {
                     companionValue = default;
                     return false;
                 }
 
-                companionValue = CompanionCell(machine, ToUpper(character), code);
+                companionValue = CompanionCell(machine, CharacterClass.ToUpper(character), code);
                 return true;
 
             default:

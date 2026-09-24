@@ -1,13 +1,21 @@
+using DotProlog.Runtime;
 using DotProlog.Syntax;
 
 namespace DotProlog.Syntax.Tests;
 
 public sealed class LexerTests
 {
-    private static List<Token> Tokenize(string text, out List<Diagnostic> diagnostics)
+    private static List<Token> Tokenize(string text, out List<Diagnostic> diagnostics) =>
+        Tokenize(text, flags: null, out diagnostics);
+
+    /// <summary>Tokenizes as strict ISO mode does, where a character is a UTF-16 code unit.</summary>
+    private static List<Token> TokenizeStrict(string text, out List<Diagnostic> diagnostics) =>
+        Tokenize(text, new BytecodeProgram(PrologLanguageMode.StrictIso).Flags, out diagnostics);
+
+    private static List<Token> Tokenize(string text, PrologFlags? flags, out List<Diagnostic> diagnostics)
     {
         diagnostics = [];
-        var lexer = new Lexer(text, null, diagnostics);
+        var lexer = new Lexer(text, null, diagnostics, flags: flags);
         List<Token> tokens = [];
         while (true)
         {
@@ -145,12 +153,96 @@ public sealed class LexerTests
     [InlineData(@"'\x41'")]
     [InlineData(@"'\o101'")]
     [InlineData(@"'\101'")]
-    [InlineData(@"'\x10000\'")]
     public void RejectsMalformedIsoNumericEscapes(string text)
     {
         Tokenize(text, out List<Diagnostic> diagnostics);
 
         Assert.Equal(DiagnosticIds.InvalidEscape, Assert.Single(diagnostics).Id);
+    }
+
+    [Theory]
+    [InlineData(@"'\x1F600\'", "😀")]
+    [InlineData(@"'\x10000\'", "\U00010000")]
+    [InlineData(@"'\u00e9'", "é")]
+    [InlineData(@"'\U0001F600'", "😀")]
+    [InlineData("'😀'", "😀")]
+    public void ReadsSupplementaryCharactersAndUnicodeEscapes(string text, string expected)
+    {
+        List<Token> tokens = Tokenize(text, out List<Diagnostic> diagnostics);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(expected, tokens[0].Text);
+    }
+
+    [Theory]
+    [InlineData(@"'\xD800\'")]
+    [InlineData(@"'\x110000\'")]
+    [InlineData(@"'\u12'")]
+    [InlineData(@"'\U0001F60'")]
+    [InlineData(@"'\U00110000'")]
+    public void RejectsEscapesThatNameNoCharacter(string text)
+    {
+        Tokenize(text, out List<Diagnostic> diagnostics);
+
+        Assert.All(diagnostics, diagnostic => Assert.Equal(DiagnosticIds.InvalidEscape, diagnostic.Id));
+        Assert.NotEmpty(diagnostics);
+    }
+
+    [Fact]
+    public void NeverJoinsTwoSurrogateEscapes()
+    {
+        List<Token> tokens = Tokenize(@"'\uD83D\uDE00'", out List<Diagnostic> diagnostics);
+
+        Assert.Equal(2, diagnostics.Count(diagnostic => diagnostic.Id == DiagnosticIds.InvalidEscape));
+        Assert.Equal(string.Empty, tokens[0].Text);
+    }
+
+    [Fact]
+    public void ReadsACharacterCodeLiteralAsOneCodePoint()
+    {
+        List<Token> tokens = Tokenize("0'😀", out List<Diagnostic> diagnostics);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(128512, tokens[0].Integer);
+    }
+
+    [Theory]
+    [InlineData("𝑎bc", false)]
+    [InlineData("𐐨x", false)]
+    [InlineData("𐐀x", true)]
+    public void ClassifiesSupplementaryLettersLikeOtherLetters(string text, bool variable)
+    {
+        List<Token> tokens = Tokenize(text, out List<Diagnostic> diagnostics);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(variable ? TokenKind.Variable : TokenKind.Atom, tokens[0].Kind);
+        Assert.Equal(text, tokens[0].Text);
+    }
+
+    [Fact]
+    public void ReportsAnUnexpectedSupplementaryCharacterOnce()
+    {
+        Tokenize("😀.", out List<Diagnostic> diagnostics);
+
+        Assert.Equal(DiagnosticIds.UnexpectedCharacter, Assert.Single(diagnostics).Id);
+    }
+
+    [Theory]
+    [InlineData(@"'\x10000\'")]
+    [InlineData(@"'\u00e9'")]
+    public void StrictModeKeepsItsCodeUnitEscapes(string text)
+    {
+        TokenizeStrict(text, out List<Diagnostic> diagnostics);
+
+        Assert.Equal(DiagnosticIds.InvalidEscape, Assert.Single(diagnostics).Id);
+    }
+
+    [Fact]
+    public void StrictModeReadsASupplementaryLetterAsTwoCodeUnits()
+    {
+        TokenizeStrict("𝑎bc.", out List<Diagnostic> diagnostics);
+
+        Assert.Equal(2, diagnostics.Count(diagnostic => diagnostic.Id == DiagnosticIds.UnexpectedCharacter));
     }
 
     [Fact]

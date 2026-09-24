@@ -49,19 +49,24 @@ public static class PrologLinter
     /// <param name="initialDoubleQuotes">
     /// The <c>double_quotes</c> value the file starts under; the default mode's <c>chars</c> when omitted.
     /// </param>
+    /// <param name="codePoints">
+    /// Whether a character is a Unicode code point, as in the default mode, or a UTF-16 code unit, as
+    /// in strict ISO mode; the layout rules count characters that way.
+    /// </param>
     public static IReadOnlyList<Diagnostic> AnalyzeSource(
         string source,
         IReadOnlyList<SyntaxTerm> clauses,
         string? fileName = null,
         PrologLintOptions? options = null,
-        DoubleQuotesMode initialDoubleQuotes = DoubleQuotesMode.Chars
+        DoubleQuotesMode initialDoubleQuotes = DoubleQuotesMode.Chars,
+        bool codePoints = true
     )
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(clauses);
 
         List<Diagnostic> diagnostics = [.. Analyze(clauses, fileName, initialDoubleQuotes)];
-        PrologLayoutLinter.Analyze(source, clauses, options ?? PrologLintOptions.SemanticOnly, fileName, diagnostics);
+        PrologLayoutLinter.Analyze(source, clauses, options ?? PrologLintOptions.SemanticOnly, fileName, diagnostics, codePoints);
 
         return [.. diagnostics.OrderBy(diagnostic => diagnostic.Span.Start).ThenBy(diagnostic => diagnostic.Id)];
     }

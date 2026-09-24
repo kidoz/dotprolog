@@ -59,6 +59,27 @@ public sealed class PrologLayoutLinterTests
     }
 
     [Fact]
+    public void LineLengthCountsCodePointsAndReportsInCodeUnits()
+    {
+        // Ten code points, fourteen UTF-16 code units: within the limit when characters are code points.
+        const string source = "a('😀😀😀😀').\n";
+        ParseResult parsed = TermReader.ReadProgram(source, "source.pl");
+        var options = PrologLintOptions.SemanticOnly with { MaxLineLength = 10 };
+
+        Assert.Empty(PrologLinter.AnalyzeSource(source, parsed.Clauses, "source.pl", options));
+
+        Diagnostic diagnostic = Assert.Single(
+            PrologLinter.AnalyzeSource(source, parsed.Clauses, "source.pl", options with { MaxLineLength = 5 })
+        );
+        AssertDiagnostic(diagnostic, LintDiagnosticIds.LineTooLong, new SourceSpan(7, 7, 1, 8));
+
+        Diagnostic codeUnits = Assert.Single(
+            PrologLinter.AnalyzeSource(source, parsed.Clauses, "source.pl", options, codePoints: false)
+        );
+        Assert.Contains("Line has 14 characters", codeUnits.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ReportsTheFirstClauseLinePastTheConfiguredLimit()
     {
         const string source = "rule :-\n    first,\n    second.\n";

@@ -1,3 +1,4 @@
+using DotProlog.Runtime;
 using DotProlog.Syntax;
 
 namespace DotProlog.Compiler;
@@ -10,7 +11,8 @@ internal static class PrologLayoutLinter
         IReadOnlyList<SyntaxTerm> clauses,
         PrologLintOptions options,
         string? fileName,
-        List<Diagnostic> diagnostics
+        List<Diagnostic> diagnostics,
+        bool codePoints = true
     )
     {
         Validate(options);
@@ -20,7 +22,7 @@ internal static class PrologLayoutLinter
         // them can disagree with the others about what is code, quoted text, or a comment.
         SourceRegion[] regions = ClassifyRegions(source);
 
-        AnalyzeLines(source, lines, regions, options, fileName, diagnostics);
+        AnalyzeLines(source, lines, regions, options, fileName, diagnostics, codePoints);
         if (options.RequireSpaceAfterComma)
         {
             AnalyzeCommas(source, lines, regions, fileName, diagnostics);
@@ -35,18 +37,22 @@ internal static class PrologLayoutLinter
         SourceRegion[] regions,
         PrologLintOptions options,
         string? fileName,
-        List<Diagnostic> diagnostics
+        List<Diagnostic> diagnostics,
+        bool codePoints
     )
     {
         foreach (SourceLine line in lines.All)
         {
-            if (options.MaxLineLength is int maximum && line.Length > maximum)
+            // The limit counts characters as the reader counts them; the span stays in code units.
+            CodePointText characters = CodePointText.Of(source.Substring(line.Start, line.Length), codePoints);
+            if (options.MaxLineLength is int maximum && characters.Length > maximum)
             {
+                var excess = characters.UnitIndex(maximum);
                 diagnostics.Add(
                     Warning(
                         LintDiagnosticIds.LineTooLong,
-                        $"Line has {line.Length} characters; the configured maximum is {maximum}.",
-                        lines.Span(line.Start + maximum, line.Length - maximum),
+                        $"Line has {characters.Length} characters; the configured maximum is {maximum}.",
+                        lines.Span(line.Start + excess, line.Length - excess),
                         fileName
                     )
                 );
