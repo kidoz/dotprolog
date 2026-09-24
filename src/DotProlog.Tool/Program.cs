@@ -313,7 +313,7 @@ internal static class Program
             IReadOnlyList<Diagnostic> diagnostics =
             [
                 .. parsed.Diagnostics,
-                .. PrologLinter.AnalyzeSource(source, parsed.Clauses, absolute, lintOptions),
+                .. PrologLinter.AnalyzeSource(source, parsed.Clauses, absolute, lintOptions, program.InitialDoubleQuotes),
             ];
 
             foreach (Diagnostic diagnostic in diagnostics)

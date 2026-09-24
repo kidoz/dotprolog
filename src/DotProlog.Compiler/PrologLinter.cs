@@ -1,3 +1,4 @@
+using DotProlog.Runtime;
 using DotProlog.Syntax;
 
 namespace DotProlog.Compiler;
@@ -5,14 +6,24 @@ namespace DotProlog.Compiler;
 /// <summary>Performs non-executing source analysis over parsed Prolog clauses.</summary>
 /// <remarks>
 /// The linter consumes syntax terms rather than consulting them, so directives are inspected but
-/// never run. Variable scope is one clause, including a directive or grammar rule.
+/// never run. Variable scope is one clause, including a directive or grammar rule. Double-quoted
+/// text is judged under the <c>double_quotes</c> value in force where it appears: the initial value
+/// the caller supplies, moved by <c>:- set_prolog_flag(double_quotes, Value).</c> directives in the
+/// file.
 /// </remarks>
 public static class PrologLinter
 {
     /// <summary>Analyzes <paramref name="clauses"/> and returns warnings in source order.</summary>
     /// <param name="clauses">Parsed clauses and directives in source order.</param>
     /// <param name="fileName">Source file used in diagnostics, when known.</param>
-    public static IReadOnlyList<Diagnostic> Analyze(IReadOnlyList<SyntaxTerm> clauses, string? fileName = null)
+    /// <param name="initialDoubleQuotes">
+    /// The <c>double_quotes</c> value the file starts under; the default mode's <c>chars</c> when omitted.
+    /// </param>
+    public static IReadOnlyList<Diagnostic> Analyze(
+        IReadOnlyList<SyntaxTerm> clauses,
+        string? fileName = null,
+        DoubleQuotesMode initialDoubleQuotes = DoubleQuotesMode.Chars
+    )
     {
         ArgumentNullException.ThrowIfNull(clauses);
 
@@ -22,7 +33,9 @@ public static class PrologLinter
             AnalyzeClause(clause, fileName, diagnostics);
         }
 
-        return diagnostics;
+        DoubleQuotesLinter.Analyze(clauses, initialDoubleQuotes, fileName, diagnostics);
+
+        return [.. diagnostics.OrderBy(diagnostic => diagnostic.Span.Start).ThenBy(diagnostic => diagnostic.Id)];
     }
 
     /// <summary>
@@ -33,17 +46,21 @@ public static class PrologLinter
     /// <param name="clauses">Parsed clauses and directives in source order.</param>
     /// <param name="fileName">Source file used in diagnostics, when known.</param>
     /// <param name="options">Layout policy; semantic-only analysis is used when omitted.</param>
+    /// <param name="initialDoubleQuotes">
+    /// The <c>double_quotes</c> value the file starts under; the default mode's <c>chars</c> when omitted.
+    /// </param>
     public static IReadOnlyList<Diagnostic> AnalyzeSource(
         string source,
         IReadOnlyList<SyntaxTerm> clauses,
         string? fileName = null,
-        PrologLintOptions? options = null
+        PrologLintOptions? options = null,
+        DoubleQuotesMode initialDoubleQuotes = DoubleQuotesMode.Chars
     )
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(clauses);
 
-        List<Diagnostic> diagnostics = [.. Analyze(clauses, fileName)];
+        List<Diagnostic> diagnostics = [.. Analyze(clauses, fileName, initialDoubleQuotes)];
         PrologLayoutLinter.Analyze(source, clauses, options ?? PrologLintOptions.SemanticOnly, fileName, diagnostics);
 
         return [.. diagnostics.OrderBy(diagnostic => diagnostic.Span.Start).ThenBy(diagnostic => diagnostic.Id)];

@@ -32,4 +32,17 @@ public static class LintDiagnosticIds
 
     /// <summary>A source line ends in spaces or tabs.</summary>
     public const string TrailingWhitespace = "DPL3010";
+
+    /// <summary>
+    /// Double-quoted text reads, under the <c>double_quotes</c> flag in force, as a different term
+    /// than the conversion it is passed to expects — characters where codes are needed, or the
+    /// reverse.
+    /// </summary>
+    public const string DoubleQuotedListKindMismatch = "DPL3011";
+
+    /// <summary>
+    /// Double-quoted text reads as a list of characters, but the grammar in the same file that parses
+    /// it compares character codes.
+    /// </summary>
+    public const string CodeGrammarOverCharacters = "DPL3012";
 }

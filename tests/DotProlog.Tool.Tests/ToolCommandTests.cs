@@ -210,6 +210,23 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void LintJudgesDoubleQuotedTextUnderTheSelectedReading()
+    {
+        var path = Source("convert.pl", "digits(N) :- number_codes(N, \"42\").\n");
+
+        (var charsExit, _, var charsError) = Execute("lint", "--warnings-as-errors", path);
+        (var codesExit, _, var codesError) = Execute("lint", "--warnings-as-errors", "--flag", "double_quotes=codes", path);
+        (var strictExit, _, var strictError) = Execute("lint", "--warnings-as-errors", "--mode", "strict-iso", path);
+
+        Assert.Equal(1, charsExit);
+        Assert.Contains($"{path}(1,30): warning DPL3011", charsError, StringComparison.Ordinal);
+        Assert.Equal(0, codesExit);
+        Assert.Empty(codesError);
+        Assert.Equal(0, strictExit);
+        Assert.Empty(strictError);
+    }
+
+    [Fact]
     public void RunDefaultsToModernMode()
     {
         var path = Source("default.pl", ":- initialization((\"ab\" == [a,b], writeln(ok))).\n");
