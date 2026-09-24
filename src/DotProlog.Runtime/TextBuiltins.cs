@@ -14,9 +14,10 @@ namespace DotProlog.Runtime;
 /// accept strings the way SWI's do was deliberately deferred, keeping their ISO errors intact.
 /// </para>
 /// <para>
-/// A character is a one-character atom and a code is its UTF-16 code unit, so a character outside
-/// the Basic Multilingual Plane occupies two codes. That matches how .NET measures a string, and
-/// <c>atom_length/2</c> reports the same count.
+/// A character is a one-character atom, and what counts as one character follows the program's
+/// mode: a Unicode code point in <c>Modern</c>, where a character outside the Basic Multilingual
+/// Plane is one character with one code, and a UTF-16 code unit in strict ISO mode. Lengths and
+/// positions are counted in those characters.
 /// </para>
 /// </remarks>
 internal static class TextBuiltins
@@ -67,7 +68,7 @@ internal static class TextBuiltins
             return EnumerateCharType(machine, code, fromCode);
         }
 
-        char character;
+        int character;
         if (code)
         {
             if (value.Tag is not (CellTag.Integer or CellTag.BigInteger))
@@ -75,21 +76,23 @@ internal static class TextBuiltins
                 throw PrologErrors.Type(machine, "integer", value);
             }
 
-            if (value.Tag == CellTag.BigInteger || value.Integer < 0 || value.Integer > char.MaxValue)
+            // SWI's error for a code no character has, verified against SWI-Prolog 10.
+            if (value.Tag == CellTag.BigInteger || !PrologText.IsCode(machine, value.Integer))
             {
-                throw PrologErrors.Representation(machine, "character_code");
+                throw PrologErrors.Domain(machine, "character", value);
             }
 
-            character = (char)value.Integer;
+            character = (int)value.Integer;
         }
         else
         {
-            if (value.Tag != CellTag.Atom || machine.Symbols.AtomName(value.Index) is not { Length: 1 } name)
+            var name = value.Tag == CellTag.Atom ? machine.Symbols.AtomName(value.Index) : null;
+            if (name is null || !PrologText.IsCharacter(machine, name))
             {
                 throw PrologErrors.Type(machine, "character", value);
             }
 
-            character = name[0];
+            character = PrologText.CodeOf(name);
         }
 
         Cell type = machine.Argument(1);
@@ -110,8 +113,9 @@ internal static class TextBuiltins
     }
 
     /// <summary>
-    /// Enumerates every character (or code) of a bound type on backtracking, in code order. The
-    /// retry state is the next candidate code, so assignments between solutions cannot skew it.
+    /// Enumerates every character (or code) of a bound type on backtracking, in code order: every
+    /// Unicode scalar value in <c>Modern</c>, every UTF-16 code unit in strict ISO mode. The retry
+    /// state is the next candidate code, so assignments between solutions cannot skew it.
     /// </summary>
     private static bool EnumerateCharType(Machine machine, bool code, int fromCode)
     {
@@ -137,13 +141,19 @@ internal static class TextBuiltins
             (parametricName, companion) = ParametricType(machine, type);
         }
 
-        for (var candidate = fromCode; candidate <= char.MaxValue; candidate++)
+        var codePoints = machine.Symbols.CodePoints;
+        var last = codePoints ? 0x10FFFF : char.MaxValue;
+        for (var candidate = fromCode; candidate <= last; candidate++)
         {
-            var character = (char)candidate;
+            if (codePoints && candidate is >= 0xD800 and <= 0xDFFF)
+            {
+                candidate = 0xE000;
+            }
+
             Cell companionValue = default;
             var applies = namedType is not null
-                ? NamedTypeApplies(namedType, character)
-                : TryCompanion(machine, parametricName, character, code, out companionValue);
+                ? NamedTypeApplies(namedType, candidate)
+                : TryCompanion(machine, parametricName, candidate, code, out companionValue);
             if (!applies)
             {
                 continue;
@@ -154,12 +164,14 @@ internal static class TextBuiltins
                 continue;
             }
 
-            if (candidate < char.MaxValue)
+            if (candidate < last)
             {
                 machine.PushRetry(candidate + 1);
             }
 
-            Cell characterCell = code ? Cell.Integer60(candidate) : Cell.Atom(machine.Symbols.InternAtom(character.ToString()));
+            Cell characterCell = code
+                ? Cell.Integer60(candidate)
+                : Cell.Atom(machine.Symbols.InternAtom(PrologText.CharacterOf(candidate)));
             return machine.Unify(machine.Argument(0), characterCell)
                 && (namedType is not null || machine.Unify(companion, companionValue));
         }
@@ -204,22 +216,22 @@ internal static class TextBuiltins
                 or "period"
                 or "quote";
 
-    private static bool NamedTypeApplies(string name, char character) =>
+    private static bool NamedTypeApplies(string name, int character) =>
         name switch
         {
-            "alnum" => char.IsLetterOrDigit(character),
-            "alpha" => char.IsLetter(character),
-            "csym" => char.IsLetterOrDigit(character) || character == '_',
-            "csymf" => char.IsLetter(character) || character == '_',
+            "alnum" => IsLetterOrDigit(character),
+            "alpha" => IsLetter(character),
+            "csym" => IsLetterOrDigit(character) || character == '_',
+            "csymf" => IsLetter(character) || character == '_',
             "ascii" => character < 128,
             "white" => character is ' ' or '\t',
-            "space" => char.IsWhiteSpace(character),
-            "cntrl" => char.IsControl(character),
-            "graph" => !char.IsControl(character) && !char.IsWhiteSpace(character),
-            "print" => !char.IsControl(character),
-            "punct" => !char.IsControl(character) && !char.IsWhiteSpace(character) && !char.IsLetterOrDigit(character),
-            "upper" => char.IsUpper(character),
-            "lower" => char.IsLower(character),
+            "space" => IsWhiteSpace(character),
+            "cntrl" => IsControl(character),
+            "graph" => !IsControl(character) && !IsWhiteSpace(character),
+            "print" => !IsControl(character),
+            "punct" => !IsControl(character) && !IsWhiteSpace(character) && !IsLetterOrDigit(character),
+            "upper" => IsUpper(character),
+            "lower" => IsLower(character),
             "end_of_line" => character is '\n' or '\r',
             "newline" => character == '\n',
             "period" => character is '.' or '!' or '?',
@@ -227,18 +239,40 @@ internal static class TextBuiltins
             _ => false,
         };
 
+    // Classification of a character code. A code below 0x10000 is classified as a UTF-16 code unit,
+    // which also covers the surrogates strict ISO mode keeps as characters; a supplementary code is
+    // classified as the Unicode scalar value it is.
+    private static bool IsLetter(int c) => c <= char.MaxValue ? char.IsLetter((char)c) : Rune.IsLetter(new Rune(c));
+
+    private static bool IsLetterOrDigit(int c) =>
+        c <= char.MaxValue ? char.IsLetterOrDigit((char)c) : Rune.IsLetterOrDigit(new Rune(c));
+
+    private static bool IsWhiteSpace(int c) => c <= char.MaxValue ? char.IsWhiteSpace((char)c) : Rune.IsWhiteSpace(new Rune(c));
+
+    private static bool IsControl(int c) => c <= char.MaxValue ? char.IsControl((char)c) : Rune.IsControl(new Rune(c));
+
+    private static bool IsUpper(int c) => c <= char.MaxValue ? char.IsUpper((char)c) : Rune.IsUpper(new Rune(c));
+
+    private static bool IsLower(int c) => c <= char.MaxValue ? char.IsLower((char)c) : Rune.IsLower(new Rune(c));
+
+    private static int ToUpper(int c) =>
+        c <= char.MaxValue ? char.ToUpperInvariant((char)c) : Rune.ToUpperInvariant(new Rune(c)).Value;
+
+    private static int ToLower(int c) =>
+        c <= char.MaxValue ? char.ToLowerInvariant((char)c) : Rune.ToLowerInvariant(new Rune(c)).Value;
+
     /// <summary>
     /// Whether a parametric type applies to <paramref name="character"/>, and the companion value
     /// it answers when it does. SWI reads to_upper(U) as "Char is U converted to uppercase", so
     /// the companion answered for a bound Char is the lowercase, and to_lower answers the
     /// uppercase — verified against SWI-Prolog 10 rather than the intuitive reading.
     /// </summary>
-    private static bool TryCompanion(Machine machine, string name, char character, bool code, out Cell companionValue)
+    private static bool TryCompanion(Machine machine, string name, int character, bool code, out Cell companionValue)
     {
         switch (name)
         {
             case "digit":
-                if (!char.IsAsciiDigit(character))
+                if (character is < '0' or > '9')
                 {
                     companionValue = default;
                     return false;
@@ -252,31 +286,31 @@ internal static class TextBuiltins
                 return true;
 
             case "to_lower":
-                companionValue = CompanionCell(machine, char.ToUpperInvariant(character), code);
+                companionValue = CompanionCell(machine, ToUpper(character), code);
                 return true;
 
             case "to_upper":
-                companionValue = CompanionCell(machine, char.ToLowerInvariant(character), code);
+                companionValue = CompanionCell(machine, ToLower(character), code);
                 return true;
 
             case "upper":
-                if (!char.IsUpper(character))
+                if (!IsUpper(character))
                 {
                     companionValue = default;
                     return false;
                 }
 
-                companionValue = CompanionCell(machine, char.ToLowerInvariant(character), code);
+                companionValue = CompanionCell(machine, ToLower(character), code);
                 return true;
 
             case "lower":
-                if (!char.IsLower(character))
+                if (!IsLower(character))
                 {
                     companionValue = default;
                     return false;
                 }
 
-                companionValue = CompanionCell(machine, char.ToUpperInvariant(character), code);
+                companionValue = CompanionCell(machine, ToUpper(character), code);
                 return true;
 
             default:
@@ -285,8 +319,8 @@ internal static class TextBuiltins
         }
     }
 
-    private static Cell CompanionCell(Machine machine, char character, bool code) =>
-        code ? Cell.Integer60(character) : Cell.Atom(machine.Symbols.InternAtom(character.ToString()));
+    private static Cell CompanionCell(Machine machine, int character, bool code) =>
+        code ? Cell.Integer60(character) : Cell.Atom(machine.Symbols.InternAtom(PrologText.CharacterOf(character)));
 
     /// <summary>The text of an atomic term: an atom's name, or a number written as the writer writes it.</summary>
     internal static bool TryText(Machine machine, Cell cell, out string text)
@@ -315,7 +349,8 @@ internal static class TextBuiltins
         }
     }
 
-    private static string AtomArgument(Machine machine, int index)
+    /// <summary>The characters of an argument that must be an atom.</summary>
+    private static CodePointText AtomCharacters(Machine machine, int index)
     {
         Cell cell = machine.Argument(index);
 
@@ -324,12 +359,12 @@ internal static class TextBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        return cell.Tag == CellTag.Atom ? machine.Symbols.AtomName(cell.Index) : throw PrologErrors.Type(machine, "atom", cell);
+        return cell.Tag == CellTag.Atom ? machine.Symbols.TextOf(cell.Index) : throw PrologErrors.Type(machine, "atom", cell);
     }
 
     private static bool AtomLength(Machine machine)
     {
-        var actual = AtomArgument(machine, 0).Length;
+        var actual = AtomCharacters(machine, 0).Length;
         Cell length = machine.Argument(1);
 
         if (length.Tag == CellTag.Reference)
@@ -365,8 +400,8 @@ internal static class TextBuiltins
         if (character.Tag == CellTag.Atom)
         {
             var name = machine.Symbols.AtomName(character.Index);
-            return name.Length == 1
-                ? machine.Unify(code, Cell.Integer60(name[0]))
+            return PrologText.IsCharacter(machine, name)
+                ? machine.Unify(code, Cell.Integer60(PrologText.CodeOf(name)))
                 : throw PrologErrors.Type(machine, "character", character);
         }
 
@@ -385,13 +420,12 @@ internal static class TextBuiltins
             throw PrologErrors.Type(machine, "integer", code);
         }
 
-        if (code.Tag == CellTag.BigInteger || code.Integer is < 0 or > char.MaxValue)
+        if (code.Tag == CellTag.BigInteger || !PrologText.IsCode(machine, code.Integer))
         {
             throw PrologErrors.Representation(machine, "character_code");
         }
 
-        var text = ((char)code.Integer).ToString();
-        return machine.Unify(character, Cell.Atom(machine.Symbols.InternAtom(text)));
+        return machine.Unify(character, Cell.Atom(machine.Symbols.InternAtom(PrologText.CharacterOf(code.Integer))));
     }
 
     /// <summary>
@@ -519,7 +553,7 @@ internal static class TextBuiltins
                         ? machine.Symbols.AtomName(cell.Index)
                         : throw PrologErrors.Type(machine, "character", cell);
 
-                text.Append(name.Length == 1 ? name : throw PrologErrors.Type(machine, "character", cell));
+                text.Append(PrologText.IsCharacter(machine, name) ? name : throw PrologErrors.Type(machine, "character", cell));
                 continue;
             }
 
@@ -528,12 +562,12 @@ internal static class TextBuiltins
                 throw PrologErrors.Type(machine, "integer", cell);
             }
 
-            if (cell.Tag == CellTag.BigInteger || cell.Integer is < 0 or > char.MaxValue)
+            if (cell.Tag == CellTag.BigInteger || !PrologText.IsCode(machine, cell.Integer))
             {
                 throw PrologErrors.Representation(machine, "character_code");
             }
 
-            text.Append((char)cell.Integer);
+            PrologText.AppendCode(text, cell.Integer);
         }
 
         return text.ToString();
@@ -546,11 +580,17 @@ internal static class TextBuiltins
     /// <summary>Builds a list of characters or codes from text, ending in <paramref name="tail"/>.</summary>
     internal static Cell BuildText(Machine machine, string text, bool chars, Cell tail)
     {
-        var items = new Cell[text.Length];
+        var codePoints = machine.Symbols.CodePoints;
+        var items = new Cell[PrologText.Characters(machine, text).Length];
+        var unit = 0;
 
-        for (var i = 0; i < text.Length; i++)
+        for (var i = 0; i < items.Length; i++)
         {
-            items[i] = chars ? Cell.Atom(machine.Symbols.InternAtom(text[i].ToString())) : Cell.Integer60(text[i]);
+            var width = codePoints && CodePointText.IsPairAt(text, unit) ? 2 : 1;
+            items[i] = chars
+                ? Cell.Atom(machine.Symbols.InternAtom(text.Substring(unit, width)))
+                : Cell.Integer60(width == 2 ? char.ConvertToUtf32(text[unit], text[unit + 1]) : text[unit]);
+            unit += width;
         }
 
         return machine.CreateList(items, tail);
@@ -589,7 +629,7 @@ internal static class TextBuiltins
             return machine.Unify(whole, Cell.Atom(machine.Symbols.InternAtom(left + right)));
         }
 
-        var text = machine.Symbols.AtomName(whole.Index);
+        CodePointText text = machine.Symbols.TextOf(whole.Index);
 
         var split = (int)state;
         if (split > text.Length)
@@ -604,8 +644,8 @@ internal static class TextBuiltins
             machine.PushRetry(split + 1);
         }
 
-        return machine.Unify(first, Cell.Atom(machine.Symbols.InternAtom(text[..split])))
-            && machine.Unify(second, Cell.Atom(machine.Symbols.InternAtom(text[split..])));
+        return machine.Unify(first, Cell.Atom(machine.Symbols.InternAtom(text.Slice(0, split))))
+            && machine.Unify(second, Cell.Atom(machine.Symbols.InternAtom(text.Slice(split, text.Length - split))));
     }
 
     private static void ValidateAtomOrVariable(Machine machine, Cell cell)
@@ -627,7 +667,7 @@ internal static class TextBuiltins
     /// </param>
     private static bool SubAtom(Machine machine, long state)
     {
-        var text = AtomArgument(machine, 0);
+        CodePointText text = AtomCharacters(machine, 0);
         var before = Constraint(machine, 1);
         var length = Constraint(machine, 2);
         var after = Constraint(machine, 3);
@@ -643,43 +683,51 @@ internal static class TextBuiltins
             throw PrologErrors.Type(machine, "atom", sub);
         }
 
-        return Search(machine, text, machine.Symbols.AtomName(sub.Index), before, after, state);
+        return Search(machine, text, machine.Symbols.TextOf(sub.Index), before, after, state);
     }
 
-    /// <summary>SubAtom is known, so the solutions are its occurrences and nothing else is scanned.</summary>
-    private static bool Search(Machine machine, string text, string wanted, long? before, long? after, long state)
+    /// <summary>
+    /// SubAtom is known, so the solutions are its occurrences and nothing else is scanned. The search
+    /// runs over code units, where a well-formed occurrence can only start on a character boundary,
+    /// and the retry state is the code unit after the character where the last one started.
+    /// </summary>
+    private static bool Search(Machine machine, CodePointText text, CodePointText wanted, long? before, long? after, long state)
     {
+        var units = text.Text;
         var start = (int)state;
 
-        while (start + wanted.Length <= text.Length)
+        while (start + wanted.Text.Length <= units.Length)
         {
-            var found = text.IndexOf(wanted, start, StringComparison.Ordinal);
+            var found = units.IndexOf(wanted.Text, start, StringComparison.Ordinal);
             if (found < 0)
             {
                 return false;
             }
 
-            var tail = text.Length - found - wanted.Length;
-            if ((before is null || before == found) && (after is null || after == tail))
+            var position = text.PositionOf(found);
+            var tail = text.Length - position - wanted.Length;
+            var next =
+                found + (found < units.Length && machine.Symbols.CodePoints && CodePointText.IsPairAt(units, found) ? 2 : 1);
+            if ((before is null || before == position) && (after is null || after == tail))
             {
-                if (found + wanted.Length < text.Length)
+                if (found + wanted.Text.Length < units.Length)
                 {
-                    machine.PushRetry(found + 1);
+                    machine.PushRetry(next);
                 }
 
-                return machine.Unify(machine.Argument(1), Cell.Integer60(found))
+                return machine.Unify(machine.Argument(1), Cell.Integer60(position))
                     && machine.Unify(machine.Argument(2), Cell.Integer60(wanted.Length))
                     && machine.Unify(machine.Argument(3), Cell.Integer60(tail));
             }
 
-            start = found + 1;
+            start = next;
         }
 
         return false;
     }
 
     /// <summary>SubAtom is unbound, so every (Before, Length) pair the bound arguments allow is offered.</summary>
-    private static bool Enumerate(Machine machine, string text, long? before, long? length, long? after, long state)
+    private static bool Enumerate(Machine machine, CodePointText text, long? before, long? length, long? after, long state)
     {
         long span = text.Length + 1;
         var candidate = Advance(text.Length, state, before, length, after);
@@ -699,7 +747,7 @@ internal static class TextBuiltins
         return machine.Unify(machine.Argument(1), Cell.Integer60(start))
             && machine.Unify(machine.Argument(2), Cell.Integer60(size))
             && machine.Unify(machine.Argument(3), Cell.Integer60(text.Length - start - size))
-            && machine.Unify(machine.Argument(4), Cell.Atom(machine.Symbols.InternAtom(text.Substring(start, size))));
+            && machine.Unify(machine.Argument(4), Cell.Atom(machine.Symbols.InternAtom(text.Slice(start, size))));
     }
 
     /// <summary>
@@ -853,7 +901,7 @@ internal static class TextBuiltins
             return false;
         }
 
-        if (TryParseRadix(span, out System.Numerics.BigInteger radixValue))
+        if (TryParseRadix(span, machine.Symbols.CodePoints, out System.Numerics.BigInteger radixValue))
         {
             number = PrologNumber.FromBig(negative ? -radixValue : radixValue);
             return true;
@@ -958,7 +1006,7 @@ internal static class TextBuiltins
         return true;
     }
 
-    private static bool TryParseRadix(ReadOnlySpan<char> span, out System.Numerics.BigInteger value)
+    private static bool TryParseRadix(ReadOnlySpan<char> span, bool codePoints, out System.Numerics.BigInteger value)
     {
         value = 0;
 
@@ -970,6 +1018,12 @@ internal static class TextBuiltins
         // 0'c is the code of the character that follows, which is how Prolog spells a character literal.
         if (span[1] == '\'')
         {
+            if (span.Length == 4 && codePoints && char.IsHighSurrogate(span[2]) && char.IsLowSurrogate(span[3]))
+            {
+                value = char.ConvertToUtf32(span[2], span[3]);
+                return true;
+            }
+
             if (span.Length != 3)
             {
                 return false;

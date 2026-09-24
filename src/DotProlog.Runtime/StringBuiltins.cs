@@ -27,6 +27,11 @@ internal static class StringBuiltins
         registry.Register("$string_slice", 4, StringSlice);
         registry.Register("$string_code", 3, StringCode);
         registry.Register("$term_source_text", 3, TermSourceText);
+        registry.Register(
+            "$character_code",
+            1,
+            static machine => machine.Argument(0) is { Tag: CellTag.Integer } code && PrologText.IsCode(machine, code.Integer)
+        );
     }
 
     /// <summary>
@@ -60,7 +65,7 @@ internal static class StringBuiltins
     private static bool StringLength(Machine machine)
     {
         var text = PrologText.Read(machine, machine.Argument(0), TextKinds.Any);
-        return machine.Unify(machine.Argument(1), Cell.Integer60(text.Length));
+        return machine.Unify(machine.Argument(1), Cell.Integer60(PrologText.Characters(machine, text).Length));
     }
 
     /// <summary>
@@ -160,18 +165,18 @@ internal static class StringBuiltins
     private static bool SplitString(Machine machine)
     {
         const TextKinds kinds = TextKinds.Atom | TextKinds.String | TextKinds.List;
-        var text = PrologText.Read(machine, machine.Argument(0), kinds);
-        var separators = PrologText.Read(machine, machine.Argument(1), kinds);
-        var pad = PrologText.Read(machine, machine.Argument(2), kinds);
+        CodePointText text = PrologText.Characters(machine, PrologText.Read(machine, machine.Argument(0), kinds));
+        HashSet<int> separators = CodeSet(machine, PrologText.Read(machine, machine.Argument(1), kinds));
+        HashSet<int> pad = CodeSet(machine, PrologText.Read(machine, machine.Argument(2), kinds));
 
         var start = 0;
         var end = text.Length;
-        while (start < end && pad.Contains(text[start]))
+        while (start < end && pad.Contains(text.CodeAt(start)))
         {
             start++;
         }
 
-        while (end > start && pad.Contains(text[end - 1]))
+        while (end > start && pad.Contains(text.CodeAt(end - 1)))
         {
             end--;
         }
@@ -180,21 +185,21 @@ internal static class StringBuiltins
         var fieldStart = start;
         for (var i = start; i <= end; i++)
         {
-            if (i < end && !separators.Contains(text[i]))
+            if (i < end && !separators.Contains(text.CodeAt(i)))
             {
                 continue;
             }
 
             var fieldEnd = i;
-            while (fieldEnd > fieldStart && pad.Contains(text[fieldEnd - 1]))
+            while (fieldEnd > fieldStart && pad.Contains(text.CodeAt(fieldEnd - 1)))
             {
                 fieldEnd--;
             }
 
-            fields.Add(StringCell(machine, text[fieldStart..fieldEnd]));
+            fields.Add(StringCell(machine, text.Slice(fieldStart, fieldEnd - fieldStart)));
 
             fieldStart = i + 1;
-            while (fieldStart < end && pad.Contains(text[fieldStart]))
+            while (fieldStart < end && pad.Contains(text.CodeAt(fieldStart)))
             {
                 fieldStart++;
             }
@@ -203,6 +208,19 @@ internal static class StringBuiltins
         }
 
         return machine.Unify(machine.Argument(3), machine.CreateList([.. fields], Cell.Atom(machine.Symbols.EmptyList)));
+    }
+
+    /// <summary>The codes of the characters of <paramref name="text"/>, as a set.</summary>
+    private static HashSet<int> CodeSet(Machine machine, string text)
+    {
+        CodePointText characters = PrologText.Characters(machine, text);
+        HashSet<int> codes = [];
+        for (var i = 0; i < characters.Length; i++)
+        {
+            codes.Add(characters.CodeAt(i));
+        }
+
+        return codes;
     }
 
     /// <summary><c>text_to_string(+Text, ?String)</c>: there is no reverse mode, as in SWI.</summary>
@@ -239,7 +257,10 @@ internal static class StringBuiltins
 
     /// <summary>The length of the string <c>sub_string/5</c> takes apart.</summary>
     private static bool SubstringLength(Machine machine) =>
-        machine.Unify(machine.Argument(1), Cell.Integer60(SubstringText(machine, machine.Argument(0)).Length));
+        machine.Unify(
+            machine.Argument(1),
+            Cell.Integer60(PrologText.Characters(machine, SubstringText(machine, machine.Argument(0))).Length)
+        );
 
     private static string SubstringText(Machine machine, Cell cell)
     {
@@ -257,7 +278,7 @@ internal static class StringBuiltins
     private static bool StringCodeLength(Machine machine)
     {
         var text = PrologText.Read(machine, machine.Argument(0), TextKinds.Atom | TextKinds.String | TextKinds.List);
-        return machine.Unify(machine.Argument(1), Cell.Integer60(text.Length));
+        return machine.Unify(machine.Argument(1), Cell.Integer60(PrologText.Characters(machine, text).Length));
     }
 
     private static bool StringConcat(Machine machine)
@@ -269,7 +290,7 @@ internal static class StringBuiltins
 
     private static bool StringSlice(Machine machine)
     {
-        var text = PrologText.Read(machine, machine.Argument(0), TextKinds.Atomic);
+        CodePointText text = PrologText.Characters(machine, PrologText.Read(machine, machine.Argument(0), TextKinds.Atomic));
         Cell before = machine.Argument(1);
         Cell length = machine.Argument(2);
         if (
@@ -296,7 +317,7 @@ internal static class StringBuiltins
             return false;
         }
 
-        return machine.Unify(machine.Argument(3), StringCell(machine, text.Substring(start, count)));
+        return machine.Unify(machine.Argument(3), StringCell(machine, text.Slice(start, count)));
     }
 
     /// <summary>
@@ -322,13 +343,16 @@ internal static class StringBuiltins
             return false;
         }
 
-        var text = PrologText.Read(machine, machine.Argument(1), TextKinds.Atom | TextKinds.String | TextKinds.List);
+        CodePointText text = PrologText.Characters(
+            machine,
+            PrologText.Read(machine, machine.Argument(1), TextKinds.Atom | TextKinds.String | TextKinds.List)
+        );
         var position = (int)index.Integer;
         if (position < 1 || position > text.Length)
         {
             return false;
         }
 
-        return machine.Unify(machine.Argument(2), Cell.Integer60(text[position - 1]));
+        return machine.Unify(machine.Argument(2), Cell.Integer60(text.CodeAt(position - 1)));
     }
 }

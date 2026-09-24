@@ -11,6 +11,7 @@ public sealed class SymbolTable
 {
     private readonly Dictionary<string, int> _atomIds = new(StringComparer.Ordinal);
     private readonly List<string> _atomNames = [];
+    private readonly Dictionary<int, int[]> _supplementary = [];
     private readonly Dictionary<Functor, int> _functorIds = [];
     private readonly List<Functor> _functors = [];
     private readonly Dictionary<double, int> _floatIds = [];
@@ -22,7 +23,15 @@ public sealed class SymbolTable
 
     /// <summary>Creates a table pre-populated with the atoms the runtime itself refers to.</summary>
     public SymbolTable()
+        : this(codePoints: true) { }
+
+    /// <summary>
+    /// Creates a table whose characters are Unicode code points when <paramref name="codePoints"/> is
+    /// set, and UTF-16 code units — the strict ISO model — otherwise.
+    /// </summary>
+    public SymbolTable(bool codePoints)
     {
+        CodePoints = codePoints;
         EmptyList = InternAtom("[]");
         ListName = InternAtom(".");
         True = InternAtom("true");
@@ -49,10 +58,17 @@ public sealed class SymbolTable
     /// <summary>Identifier of the list constructor <c>'.'/2</c>.</summary>
     public int ListFunctor { get; }
 
+    /// <summary>Whether a character is a Unicode code point rather than a UTF-16 code unit.</summary>
+    public bool CodePoints { get; }
+
     /// <summary>Number of distinct functors interned so far.</summary>
     public int FunctorCount => _functors.Count;
 
-    /// <summary>Returns the identifier for <paramref name="name"/>, interning it if necessary.</summary>
+    /// <summary>
+    /// Returns the identifier for <paramref name="name"/>, interning it if necessary. When characters
+    /// are code points, interned text is well-formed: an unpaired surrogate becomes U+FFFD, and the
+    /// positions of the text's supplementary characters are recorded once, here.
+    /// </summary>
     public int InternAtom(string name)
     {
         ArgumentNullException.ThrowIfNull(name);
@@ -62,14 +78,32 @@ public sealed class SymbolTable
             return id;
         }
 
+        int[]? supplementary = null;
+        if (CodePoints && name.AsSpan().ContainsAnyInRange('\uD800', '\uDFFF'))
+        {
+            (name, supplementary) = CodePointText.WellFormed(name);
+            if (_atomIds.TryGetValue(name, out id))
+            {
+                return id;
+            }
+        }
+
         id = _atomNames.Count;
         _atomNames.Add(name);
         _atomIds[name] = id;
+        if (supplementary is not null)
+        {
+            _supplementary[id] = supplementary;
+        }
+
         return id;
     }
 
     /// <summary>Returns the text of atom <paramref name="atomId"/>.</summary>
     public string AtomName(int atomId) => _atomNames[atomId];
+
+    /// <summary>The text of atom <paramref name="atomId"/>, indexed by character.</summary>
+    internal CodePointText TextOf(int atomId) => new(_atomNames[atomId], _supplementary.GetValueOrDefault(atomId));
 
     /// <summary>Returns the identifier for a functor, interning it if necessary.</summary>
     public int InternFunctor(int nameAtom, int arity)

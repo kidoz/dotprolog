@@ -53,8 +53,10 @@ internal sealed class ClauseCompiler
     /// </summary>
     internal int Compile(SyntaxTerm head, SyntaxTerm? body)
     {
-        head = TermNormalizer.Normalize(head, _program.Flags.DoubleQuotes);
-        body = body is null ? null : TermNormalizer.Normalize(body, _program.Flags.DoubleQuotes);
+        head = TermNormalizer.Normalize(head, _program.Flags.DoubleQuotes, _program.Flags.CodePointCharacters);
+        body = body is null
+            ? null
+            : TermNormalizer.Normalize(body, _program.Flags.DoubleQuotes, _program.Flags.CodePointCharacters);
 
         if (head is not (AtomTerm or CompoundTerm))
         {

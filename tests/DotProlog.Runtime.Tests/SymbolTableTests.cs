@@ -18,6 +18,26 @@ public sealed class SymbolTableTests
     }
 
     [Fact]
+    public void CodePointTextIsInternedWellFormed()
+    {
+        var symbols = new SymbolTable(codePoints: true);
+
+        var repaired = symbols.InternAtom("a\uD800b");
+
+        Assert.Equal("a\uFFFDb", symbols.AtomName(repaired));
+        Assert.Equal(repaired, symbols.InternAtom("a\uFFFDb"));
+        Assert.Equal("\uD83D\uDE00", symbols.AtomName(symbols.InternAtom("\uD83D\uDE00")));
+    }
+
+    [Fact]
+    public void CodeUnitTextIsInternedAsGiven()
+    {
+        var symbols = new SymbolTable(codePoints: false);
+
+        Assert.Equal("a\uD800b", symbols.AtomName(symbols.InternAtom("a\uD800b")));
+    }
+
+    [Fact]
     public void FunctorsDifferByArity()
     {
         var symbols = new SymbolTable();

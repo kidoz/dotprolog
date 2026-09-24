@@ -542,6 +542,37 @@ public sealed class GeneratedFacadeTests
     }
 
     [Fact]
+    public void GeneratedCodeSplitsDoubleQuotedTextIntoCodePoints()
+    {
+        ContractReadResult contract = ContractReader.Read(
+            """
+            :- clr_module('Emoji').
+            :- clr_namespace('Generated.Emoji').
+            :- clr_export(check/0, semidet, []).
+            """,
+            "Generated.Emoji",
+            "emoji.dpli"
+        );
+        Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
+
+        var source = FacadeGenerator.Generate(
+            contract.Contract!,
+            """
+            text("😀é").
+            check :- text([E, _]), char_code(E, 128512), atom_length('😀', 1).
+            """,
+            "emoji.pl",
+            Runtime.PrologLanguageMode.Modern
+        );
+
+        Assembly assembly = CompileGenerated(source);
+        Type type = assembly.GetType("Generated.Emoji.EmojiModule")!;
+        object module = type.GetMethod("Create", BindingFlags.Public | BindingFlags.Static, Type.EmptyTypes)!.Invoke(null, null)!;
+
+        Assert.Equal(true, Call(module, type, "Check"));
+    }
+
+    [Fact]
     public void FacadeCarriesStringConstantsThroughGeneratedCode()
     {
         ContractReadResult contract = ContractReader.Read(

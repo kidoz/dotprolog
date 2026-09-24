@@ -78,6 +78,12 @@ public sealed class PrologFlags
     /// </summary>
     public bool RationalLiterals { get; internal set; } = true;
 
+    /// <summary>
+    /// Whether a character is a Unicode code point rather than a UTF-16 code unit. Seeded from the
+    /// language mode — strict ISO keeps its code-unit characters — and not a Prolog flag.
+    /// </summary>
+    public bool CodePointCharacters { get; internal set; } = true;
+
     /// <summary>Creates an independent copy of the current flag values.</summary>
     public PrologFlags Copy() =>
         new()
@@ -88,6 +94,7 @@ public sealed class PrologFlags
             Unknown = Unknown,
             OccursCheck = OccursCheck,
             RationalLiterals = RationalLiterals,
+            CodePointCharacters = CodePointCharacters,
         };
 
     /// <summary>Replaces every mutable flag value with those from another set.</summary>
@@ -100,5 +107,6 @@ public sealed class PrologFlags
         Unknown = source.Unknown;
         OccursCheck = source.OccursCheck;
         RationalLiterals = source.RationalLiterals;
+        CodePointCharacters = source.CodePointCharacters;
     }
 }

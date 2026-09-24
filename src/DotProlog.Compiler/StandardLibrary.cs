@@ -1385,7 +1385,7 @@ internal static class StandardLibrary
         '$has_type'(rational, X) :- rational(X).
         '$has_type'(char, X) :- atom(X), atom_length(X, 1).
         '$has_type'(chars, X) :- '$text_list'(X, char).
-        '$has_type'(code, X) :- integer(X), X >= 0, X =< 65535.
+        '$has_type'(code, X) :- integer(X), '$character_code'(X).
         '$has_type'(codes, X) :- '$text_list'(X, code).
         '$has_type'(compound, X) :- compound(X).
         '$has_type'(constant, X) :- atomic(X).
@@ -1420,7 +1420,7 @@ internal static class StandardLibrary
         '$text_list'([H|T], Kind) :- '$text_element'(Kind, H), '$text_list'(T, Kind).
 
         '$text_element'(char, X) :- atom(X), atom_length(X, 1).
-        '$text_element'(code, X) :- integer(X), X >= 0, X =< 65535.
+        '$text_element'(code, X) :- integer(X), '$character_code'(X).
 
         '$list_or_partial_list'(V) :- var(V), !.
         '$list_or_partial_list'([]) :- !.

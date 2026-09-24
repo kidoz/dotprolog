@@ -16,9 +16,9 @@ namespace DotProlog.Runtime;
 /// character list or <c>type_error(character_code, E)</c> in a code list.
 /// </para>
 /// <para>
-/// A character is a one-character atom and a code is its UTF-16 code unit. <see cref="IsCode"/>,
-/// <see cref="IsCharacter"/>, and <see cref="AppendCode"/> are the only places that representation
-/// is decided here.
+/// What a character is depends on the program's mode: a Unicode code point, or — in strict ISO
+/// mode — a UTF-16 code unit. <see cref="IsCode"/>, <see cref="IsCharacter"/>,
+/// and <see cref="AppendCode"/> are where that model is decided.
 /// </para>
 /// </remarks>
 internal static class PrologText
@@ -53,14 +53,44 @@ internal static class PrologText
         return machine.Unify(target, result);
     }
 
-    /// <summary>Whether <paramref name="code"/> is a character code.</summary>
-    internal static bool IsCode(long code) => code is >= 0 and <= char.MaxValue;
+    /// <summary>
+    /// Whether <paramref name="code"/> is a character code: a Unicode scalar value, or in strict ISO
+    /// mode a UTF-16 code unit.
+    /// </summary>
+    internal static bool IsCode(Machine machine, long code) =>
+        machine.Symbols.CodePoints
+            ? code is >= 0 and <= 0x10FFFF and not (>= 0xD800 and <= 0xDFFF)
+            : code is >= 0 and <= char.MaxValue;
 
     /// <summary>Whether <paramref name="name"/> is the name of a one-character atom.</summary>
-    internal static bool IsCharacter(string name) => name.Length == 1;
+    internal static bool IsCharacter(Machine machine, string name) =>
+        name.Length == 1
+            ? !(machine.Symbols.CodePoints && char.IsSurrogate(name[0]))
+            : name.Length == 2 && machine.Symbols.CodePoints && CodePointText.IsPairAt(name, 0);
+
+    /// <summary>The code of a one-character atom's name.</summary>
+    internal static int CodeOf(string character) =>
+        character.Length == 2 ? char.ConvertToUtf32(character[0], character[1]) : character[0];
+
+    /// <summary>The name of the one-character atom whose code is <paramref name="code"/>.</summary>
+    internal static string CharacterOf(long code) =>
+        code <= char.MaxValue ? ((char)code).ToString() : char.ConvertFromUtf32((int)code);
 
     /// <summary>Appends the character whose code is <paramref name="code"/>.</summary>
-    internal static void AppendCode(StringBuilder text, long code) => text.Append((char)code);
+    internal static void AppendCode(StringBuilder text, long code)
+    {
+        if (code <= char.MaxValue)
+        {
+            text.Append((char)code);
+        }
+        else
+        {
+            text.Append(char.ConvertFromUtf32((int)code));
+        }
+    }
+
+    /// <summary>The text indexed by character, under the program's model.</summary>
+    internal static CodePointText Characters(Machine machine, string text) => CodePointText.Of(text, machine.Symbols.CodePoints);
 
     private static bool TryRead(Machine machine, Cell cell, TextKinds kinds, bool raise, out string text)
     {
@@ -115,7 +145,7 @@ internal static class PrologText
 
             if (codes.Value)
             {
-                if (element.Tag != CellTag.Integer || !IsCode(element.Integer))
+                if (element.Tag != CellTag.Integer || !IsCode(machine, element.Integer))
                 {
                     return raise ? throw PrologErrors.Type(machine, "character_code", element) : false;
                 }
@@ -125,7 +155,7 @@ internal static class PrologText
             else
             {
                 string? name = element.Tag == CellTag.Atom ? machine.Symbols.AtomName(element.Index) : null;
-                if (name is null || !IsCharacter(name))
+                if (name is null || !IsCharacter(machine, name))
                 {
                     return raise ? throw PrologErrors.Type(machine, first ? "character_code" : "character", element) : false;
                 }

@@ -1199,7 +1199,7 @@ public sealed class PrologEngine : IRuntimeCompiler
         List<Cell> variableOrder = [];
         term = TermReifier.ToHeap(
             machine,
-            TermNormalizer.Normalize(parsed.Clauses[0], flags.DoubleQuotes),
+            TermNormalizer.Normalize(parsed.Clauses[0], flags.DoubleQuotes, flags.CodePointCharacters),
             namedVariables,
             variableOrder
         );

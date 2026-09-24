@@ -1045,7 +1045,7 @@ public sealed class ProgramLoader
 
         foreach (SyntaxTerm rawClause in clauses)
         {
-            SyntaxTerm clause = TermNormalizer.Normalize(rawClause, doubleQuotes);
+            SyntaxTerm clause = TermNormalizer.Normalize(rawClause, doubleQuotes, _program.Flags.CodePointCharacters);
             var isFirstTerm = firstTerm;
             firstTerm = false;
 
@@ -1969,12 +1969,20 @@ public sealed class ProgramLoader
     /// </summary>
     private Cell FirstArgumentSyntaxKey(SyntaxTerm head)
     {
-        if (TermNormalizer.Normalize(head, _program.Flags.DoubleQuotes) is not CompoundTerm compound || compound.Arity == 0)
+        if (
+            TermNormalizer.Normalize(head, _program.Flags.DoubleQuotes, _program.Flags.CodePointCharacters)
+                is not CompoundTerm compound
+            || compound.Arity == 0
+        )
         {
             return ClauseIndexing.AnyKey;
         }
 
-        return TermNormalizer.Normalize(compound.Arguments[0], _program.Flags.DoubleQuotes) switch
+        return TermNormalizer.Normalize(
+            compound.Arguments[0],
+            _program.Flags.DoubleQuotes,
+            _program.Flags.CodePointCharacters
+        ) switch
         {
             AtomTerm atom => Cell.Atom(_program.Symbols.InternAtom(atom.Name)),
             IntegerTerm integer when Cell.FitsInteger(integer.Value) => Cell.Integer60(integer.Value),

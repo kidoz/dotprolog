@@ -80,7 +80,8 @@ public sealed class BytecodeProgram
         InitialDoubleQuotes = flagOverrides?.DoubleQuotes ?? InitialDoubleQuotesOf(languageMode);
         Flags.DoubleQuotes = InitialDoubleQuotes;
         Flags.RationalLiterals = languageMode != PrologLanguageMode.StrictIso;
-        Symbols = new SymbolTable();
+        Flags.CodePointCharacters = languageMode != PrologLanguageMode.StrictIso;
+        Symbols = new SymbolTable(Flags.CodePointCharacters);
         Operators = new OperatorTable(includeExtensions: languageMode != PrologLanguageMode.StrictIso);
         Builtins = new BuiltinRegistry(Symbols);
         Array.Fill(_entryPoints, Undefined);
