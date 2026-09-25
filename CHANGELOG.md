@@ -4,6 +4,17 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The `max_integer` and `min_integer` flags have no value, because integers are unbounded:
+  `current_prolog_flag/2` fails for them in both modes, as in SWI-Prolog, and flag enumeration
+  omits them. They used to report the tagged-integer promotion thresholds, which larger integers
+  exceed. `set_prolog_flag/2` raises `domain_error(flag_value, Flag+Value)` for them instead of
+  `permission_error(modify, flag, Flag)`. The `max_tagged_integer` and `min_tagged_integer`
+  evaluables still name the thresholds.
+
 ## [0.14.0] — 2026-09-25
 
 ### Changed
