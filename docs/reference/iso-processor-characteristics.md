@@ -96,7 +96,9 @@ directive governs the rest of the file that issued it, and the entering value is
 that file finishes loading.
 
 The extension flag `occurs_check` (`false`, `true`, `error`) exists in `Modern` only and starts at
-`false`, the ISO behavior; `StrictIso` does not define it. `double_quotes` likewise accepts the
+`false`, the ISO behavior; `StrictIso` does not define it. With `error`, a unification that would
+create a rational tree raises `error(representation_error(term), occurs_check(Var, Term))`, so the
+error still belongs to an ISO error class. `double_quotes` likewise accepts the
 extension value `string` in `Modern` only — a directive, flag call, or project override selecting
 it inside `StrictIso` stays a domain error, so the strict mode keeps the three ISO values.
 
