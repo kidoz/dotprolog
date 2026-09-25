@@ -20,7 +20,7 @@ internal sealed class TermBuffer
 {
     private readonly Dictionary<int, int> _variables = [];
     private readonly List<(Cell Source, int Slot)> _work = [];
-    private readonly HashSet<int> _active = [];
+    private readonly Dictionary<int, int> _active = [];
     private Cell[] _cells = new Cell[32];
     private int _count;
 
@@ -45,8 +45,9 @@ internal sealed class TermBuffer
     /// <summary>
     /// Appends a copy of <paramref name="term"/> and returns the slot its root cell occupies.
     /// Variables are renamed apart from any previous copy in this buffer.
+    /// Exception balls opt into preserving cycles so cyclic error culprits survive unwinding.
     /// </summary>
-    internal int Copy(Machine machine, Cell term)
+    internal int Copy(Machine machine, Cell term, bool allowCycles = false)
     {
         _variables.Clear();
         _work.Clear();
@@ -85,18 +86,24 @@ internal sealed class TermBuffer
 
                 case CellTag.Structure:
                 {
-                    // The machine's unification tolerates rational trees, but every consumer of a
-                    // detached copy — collected solutions, stored clauses, thrown balls — expects a
-                    // finite term, so a cyclic term is rejected with a catchable error.
-                    if (!_active.Add(cell.Index))
+                    if (_active.TryGetValue(cell.Index, out var ancestor))
                     {
-                        throw PrologErrors.Representation(machine, "cyclic_term");
+                        if (!allowCycles)
+                        {
+                            throw PrologErrors.Representation(machine, "cyclic_term");
+                        }
+
+                        // Reconnect to the detached ancestor, never to the source heap that
+                        // catch unwinding will truncate. Materialize relocates this edge too.
+                        _cells[slot] = Cell.Structure(ancestor);
+                        break;
                     }
 
                     _work.Add((cell, -1));
 
                     var arity = machine.Symbols.ArityOf(machine.HeapAt(cell.Index).Index);
                     var structure = Reserve(arity + 1);
+                    _active.Add(cell.Index, structure);
                     _cells[structure] = machine.HeapAt(cell.Index);
                     _cells[slot] = Cell.Structure(structure);
 

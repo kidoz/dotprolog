@@ -110,6 +110,35 @@ public sealed class TermBufferTests
     }
 
     [Fact]
+    public void CyclePreservingCopiesRelocateBackEdgesAndRemainIndependent()
+    {
+        Machine machine = NewMachine();
+        Cell cycle = machine.CreateVariable();
+        Cell variable = machine.CreateVariable();
+        var f = machine.Symbols.InternFunctor("f", 3);
+        Cell term = machine.CreateStructure(f, [variable, cycle, variable]);
+        Assert.True(machine.Unify(cycle, term));
+
+        var buffer = new TermBuffer();
+        var first = buffer.Copy(machine, term, allowCycles: true);
+        var second = buffer.Copy(machine, term, allowCycles: true);
+        var origin = buffer.Materialize(machine);
+        Cell left = machine.HeapAt(origin + first);
+        Cell right = machine.HeapAt(origin + second);
+
+        Assert.NotEqual(term, left);
+        Assert.NotEqual(left, right);
+        Assert.Equal(left, machine.HeapAt(left.Index + 2));
+        Assert.Equal(right, machine.HeapAt(right.Index + 2));
+        Cell leftVariable = machine.Dereference(machine.HeapAt(left.Index + 1));
+        Assert.Equal(leftVariable, machine.Dereference(machine.HeapAt(left.Index + 3)));
+        Assert.NotEqual(variable, leftVariable);
+        Assert.True(machine.Unify(leftVariable, Cell.Integer60(42)));
+        Assert.Equal(CellTag.Reference, machine.Dereference(machine.HeapAt(right.Index + 1)).Tag);
+        Assert.Equal(CellTag.Reference, machine.Dereference(variable).Tag);
+    }
+
+    [Fact]
     public void CopyingASharedSubtermIsNotMistakenForACycle()
     {
         Machine machine = NewMachine();

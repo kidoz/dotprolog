@@ -397,6 +397,20 @@ internal static class Program
                     error(syntax_error(illegal_number), _),
                     NumberCodesCaught = true),
                 NumberCodesCaught == true,
+                catch(
+                    (NativeChars = ['1'|NativeChars], number_chars(_, NativeChars)),
+                    error(type_error(list, CharsCulprit), _),
+                    CyclicCharsCaught = true),
+                CyclicCharsCaught == true,
+                var(NativeChars), nonvar(CharsCulprit),
+                CharsCulprit = ['1'|CharsTail], CharsCulprit == CharsTail,
+                catch(
+                    (NativeCodes = [49|NativeCodes], number_codes(1, NativeCodes)),
+                    error(type_error(list, CodesCulprit), _),
+                    CyclicCodesCaught = true),
+                CyclicCodesCaught == true,
+                var(NativeCodes), nonvar(CodesCulprit),
+                CodesCulprit = [49|CodesTail], CodesCulprit == CodesTail,
                 write(atomic_processing_errors), nl,
 
                 % current_op/3 validates bound ISO filter domains before enumeration.

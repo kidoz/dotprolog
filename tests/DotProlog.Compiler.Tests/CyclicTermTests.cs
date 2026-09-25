@@ -2,8 +2,9 @@ namespace DotProlog.Compiler.Tests;
 
 /// <summary>
 /// Rational terms. Unification builds them, but detaching one from the heap — for
-/// <c>copy_term/2</c>, <c>findall/3</c>, <c>assertz/1</c>, or a thrown ball — raises a catchable
-/// <c>representation_error(cyclic_term)</c>, and writing one cuts the cycle off with an ellipsis.
+/// <c>copy_term/2</c>, <c>findall/3</c>, or <c>assertz/1</c> — raises a catchable
+/// <c>representation_error(cyclic_term)</c>. Thrown balls preserve cycles, and writing a cycle
+/// cuts it off with an ellipsis.
 /// </summary>
 public sealed class CyclicTermTests
 {
@@ -28,9 +29,41 @@ public sealed class CyclicTermTests
     }
 
     [Fact]
-    public void ThrowOfACyclicBallRaisesACatchableError()
+    public void ThrowOfACyclicBallPreservesTheCycleAndVariableSharingAfterUnwinding()
     {
-        Assert.Equal("caught\n", PrologTestHost.RunGoal($"X = f(X), catch(throw(g(X)), {Catcher}, write(caught)), nl"));
+        Assert.Equal(
+            "caught",
+            PrologTestHost.RunGoal(
+                "catch((X = f(V, X), throw(g(X, V))), g(C, W), true), "
+                    + "var(X), var(V), C = f(A, Tail), C == Tail, A == W, var(W), W = kept, "
+                    + "arg(1, C, kept), write(caught)"
+            )
+        );
+    }
+
+    [Fact]
+    public void CyclicBallSurvivesAMismatchingCatcherAndRethrow()
+    {
+        Assert.Equal(
+            "caught",
+            PrologTestHost.RunGoal(
+                "catch(catch(catch((X = f(X), throw(g(X))), g(h(_)), fail), "
+                    + "g(C), throw(again(C))), again(D), true), "
+                    + "var(X), var(C), D = f(Tail), D == Tail, write(caught)"
+            )
+        );
+    }
+
+    [Fact]
+    public void BacktrackingDiscardsACaughtCycleAndRestoresBindings()
+    {
+        Assert.Equal(
+            "caughtrestored",
+            PrologTestHost.RunGoal(
+                "(catch((X = f(X), throw(X)), C, true), C = f(Tail), C == Tail, "
+                    + "write(caught), fail ; var(X), var(C), var(Tail), write(restored))"
+            )
+        );
     }
 
     [Fact]

@@ -706,6 +706,57 @@ public sealed class GeneratedFacadeTests
         Assert.Equal(true, Call(module, type, "Mixed"));
     }
 
+    [Theory]
+    [InlineData(Runtime.PrologLanguageMode.Modern)]
+    [InlineData(Runtime.PrologLanguageMode.StrictIso)]
+    public void CyclicErrorCulpritsSurviveGeneratedAndConsultedCatchers(Runtime.PrologLanguageMode mode)
+    {
+        ContractReadResult contract = ContractReader.Read(
+            """
+            :- clr_module('CyclicErrors').
+            :- clr_namespace('Generated.CyclicErrors').
+            :- clr_export(check/0, semidet, []).
+            :- clr_export(mixed/0, semidet, []).
+            """,
+            "Generated.CyclicErrors",
+            "cyclic_errors.dpli"
+        );
+        Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
+        var source = FacadeGenerator.Generate(
+            contract.Contract!,
+            """
+            raise_chars :- L = ['1'|L], number_chars(_, L).
+            check :-
+                catch(raise_chars, error(type_error(list, C), _), true),
+                nonvar(C), C = ['1'|T], C == T,
+                catch((L = [49|L], number_codes(1, L)), error(type_error(list, D), _), true),
+                var(L), nonvar(D), D = [49|DT], D == DT.
+            mixed :-
+                catch(runtime_raise, error(type_error(list, C), _), true),
+                nonvar(C), C = [49|T], C == T.
+            """,
+            "cyclic_errors.pl",
+            mode
+        );
+        Assembly assembly = CompileGenerated(source);
+        Type type = assembly.GetType("Generated.CyclicErrors.CyclicErrorsModule")!;
+        var engine = new Compiler.PrologEngine(mode);
+        object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
+        engine.ConsultOrThrow(
+            """
+            runtime_raise :- L = [49|L], number_codes(_, L).
+            runtime_catch :-
+                catch(raise_chars, error(type_error(list, C), _), true),
+                nonvar(C), C = ['1'|T], C == T.
+            """,
+            "runtime.pl"
+        );
+
+        Assert.Equal(true, Call(module, type, "Check"));
+        Assert.Equal(true, Call(module, type, "Mixed"));
+        Assert.True(engine.Query("runtime_catch").Prove());
+    }
+
     [Fact]
     public void FacadeCarriesStringConstantsThroughGeneratedCode()
     {

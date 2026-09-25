@@ -17,6 +17,11 @@ All notable changes to DotProlog are recorded here. The format follows
 - Generated constant construction runs in a separate method, avoiding floating-constant
   corruption observed in a large NativeAOT installation on macOS Arm64.
 
+- Exceptions preserve cyclic terms while unwinding to `catch/3`, so `number_chars/2` and
+  `number_codes/2` report `type_error(list, Culprit)` for cyclic lists with the original
+  cyclic structure intact, instead of replacing the error with `representation_error(cyclic_term)`.
+  Explicit `throw/1` balls also retain cycles.
+
 ### Added
 
 - 29 further standard-only review cases covering grammar controls, exception scope, variable

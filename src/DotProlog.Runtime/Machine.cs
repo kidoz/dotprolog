@@ -1351,7 +1351,7 @@ public sealed class Machine
     public PrologException CreateBall(Cell term, string description)
     {
         var ball = new TermBuffer();
-        var root = ball.Copy(this, term);
+        var root = ball.Copy(this, term, allowCycles: true);
         return new PrologException(description, ball, root);
     }
 

@@ -49,6 +49,10 @@ A Prolog call is a jump in one dispatch loop, not a recursive CLR method call. T
 their environments, so deterministic tail recursion runs at constant CLR stack depth. Ordinary
 failure is control state, not an exception.
 
+Thrown balls use a detached `TermBuffer` copy so they survive heap restoration at `catch/3`.
+Exception copies preserve cycles with buffer-relative back edges, which are relocated when
+the ball is rebuilt on the restored heap. Other detached-copy consumers still reject cycles.
+
 Control constructs compile inline in the containing clause. This preserves ISO cut scope. A
 control term reached through `call/1` is lowered at run time with a meta-call barrier so the same
 scope rules apply.

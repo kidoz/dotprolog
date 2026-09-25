@@ -216,6 +216,10 @@ Writing them was worth it immediately: they found these real defects.
   argument too. Only a partial list, or one with a variable in it, lets a bound number decide.
   Every case of the ISO conformity table for `number_chars/2` gives one of its allowed answers; a
   float beyond the finite range is `representation_error(max_float)`, the table's first answer.
+  Cyclic lists now raise `type_error(list, Culprit)` with the cyclic culprit preserved through
+  `catch/3`; previously, copying the exception replaced it with `representation_error(cyclic_term)`.
+  Explicit thrown balls also preserve cycles. Detached copies for `copy_term/2`, `findall/3`,
+  and stored clauses still reject cyclic terms.
 - `atom_number/2` and the number conversions let an oversized float literal become an unprintable
   IEEE infinity and wrapped an oversized radix literal to an arbitrary small integer. They now
   raise an error — `syntax_error(float_overflow)` for `atom_number/2`, as the reader does, and

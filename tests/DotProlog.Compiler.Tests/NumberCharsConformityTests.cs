@@ -1,3 +1,5 @@
+using DotProlog.Runtime;
+
 namespace DotProlog.Compiler.Tests;
 
 /// <summary>
@@ -82,8 +84,37 @@ public sealed class NumberCharsConformityTests
     [InlineData("number_chars(1, [[]|_])", "type_error(character,[])")] // 44
     [InlineData("number_chars(1+1, \"2\")", "type_error(number,1+1)")] // 53
     [InlineData("number_chars(N, \"9.9e999\")", "representation_error(max_float)")] // 82
-    [InlineData("L = ['1'|L], number_chars(_, L)", "representation_error(cyclic_term)")] // 46
     public void ReportsTheErrorsTheTableExpects(string goal, string expected) => Assert.Equal(expected, Outcome(goal));
+
+    [Theory]
+    [InlineData(PrologLanguageMode.Modern)]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    public void CyclicListsRaiseAListTypeErrorWithTheCyclicCulprit(PrologLanguageMode mode)
+    {
+        var engine = new PrologEngine(mode);
+        // Case 46, plus codes, bound numbers, and a cycle reached through a finite prefix.
+        string[] goals =
+        [
+            "L = ['1'|L], number_chars(_, L)",
+            "L = ['1'|L], number_chars(1, L)",
+            "L = [49|L], number_codes(_, L)",
+            "L = [49|L], number_codes(1, L)",
+            "L = ['2', '3'|L], number_chars(_, ['1'|L])",
+            "L = [50, 51|L], number_codes(_, [49|L])",
+        ];
+        foreach (var goal in goals)
+        {
+            Assert.True(
+                engine
+                    .Query(
+                        $"catch(({goal}), error(type_error(list, C), _), Caught = yes), "
+                            + "Caught == yes, nonvar(C), \\+ acyclic_term(C), var(L)"
+                    )
+                    .Prove(),
+                goal
+            );
+        }
+    }
 
     private static string Outcome(string goal) =>
         PrologTestHost.RunGoal(
