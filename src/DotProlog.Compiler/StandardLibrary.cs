@@ -79,6 +79,41 @@ internal static class StandardLibrary
             catch(ignore(Cleanup), _, true),
             throw(Ball).
 
+        % --- Initialization goals ----------------------------------------------------
+        % A loader rewrites the directive initialization(Goal, When) for now, after_load, and
+        % main, so these clauses serve a call at run time and report a When it does not know.
+        % As in SWI-Prolog, a main goal ends the program: status 0 when it succeeds, 1 when it
+        % fails, and 2 when it raises an error it does not catch.
+
+        initialization(Goal, When) :-
+            '$initialization_when'(When),
+            (   When == main
+            ->  '$initialization_main'(Goal)
+            ;   call(Goal)
+            ).
+
+        '$initialization_when'(When) :-
+            var(When), !,
+            throw(error(instantiation_error, (initialization)/2)).
+        '$initialization_when'(When) :-
+            \+ atom(When), !,
+            throw(error(type_error(atom, When), (initialization)/2)).
+        '$initialization_when'(When) :-
+            memberchk(When, [now, after_load, main]), !.
+        '$initialization_when'(When) :-
+            throw(error(domain_error(initialization_type, When), (initialization)/2)).
+
+        '$initialization_main'(Goal) :-
+            (   catch(Goal, Error, '$initialization_main_error'(Error))
+            ->  halt(0)
+            ;   print_message(error, format("~q: false", [Goal])),
+                halt(1)
+            ).
+
+        '$initialization_main_error'(Error) :-
+            print_message(error, Error),
+            halt(2).
+
         % --- Lists -----------------------------------------------------------------
 
         append([], L, L).

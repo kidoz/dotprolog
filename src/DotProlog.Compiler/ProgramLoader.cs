@@ -98,6 +98,7 @@ public sealed class ProgramLoader
         List<Diagnostic> diagnostics = [];
         List<int> directives = [];
         List<int> initialization = [];
+        var main = -1;
 
         // Reading happens in two passes. The first settles which module the unit belongs to and what
         // it defines; only then can a call in a body be told from one to somewhere else.
@@ -182,6 +183,12 @@ public sealed class ProgramLoader
                 continue;
             }
 
+            var isMain = false;
+            if (TimedInitialization(goal, resolver) is { } timed)
+            {
+                (goal, isMain) = timed;
+            }
+
             SyntaxTerm resolvedDirective =
                 forcedModule is not null && goal is CompoundTerm { Name: "initialization", Arity: 1 } initializationGoal
                     ? initializationGoal with
@@ -192,6 +199,12 @@ public sealed class ProgramLoader
             var address = CompileDirective(resolvedDirective, diagnostics, out var deferred, fileName, unitDefinitions);
             if (address < 0)
             {
+                continue;
+            }
+
+            if (isMain)
+            {
+                main = address;
                 continue;
             }
 
@@ -218,6 +231,12 @@ public sealed class ProgramLoader
         if (!halted)
         {
             FlushPredicates();
+        }
+
+        // SWI-Prolog starts the main goal once everything else has loaded and initialized.
+        if (main >= 0)
+        {
+            initialization.Add(main);
         }
 
         PublishExports(unit);
@@ -1854,6 +1873,39 @@ public sealed class ProgramLoader
 
     private static void Report(List<Diagnostic> diagnostics, string id, string message, SourceSpan span, string? fileName) =>
         diagnostics.Add(new Diagnostic(id, DiagnosticSeverity.Error, message, span, fileName));
+
+    /// <summary>
+    /// Rewrites SWI-Prolog's <c>initialization(Goal, When)</c> in <c>Modern</c> when When is one the
+    /// loader acts on: <c>now</c> runs Goal as an ordinary directive, <c>after_load</c> defers it like
+    /// <c>initialization/1</c>, and <c>main</c> defers it to run last, ending the program. Any other
+    /// When is left to the library predicate, which reports it.
+    /// </summary>
+    private (SyntaxTerm Goal, bool IsMain)? TimedInitialization(SyntaxTerm goal, ModuleResolver resolver)
+    {
+        if (
+            _program.LanguageMode == PrologLanguageMode.StrictIso
+            || goal is not CompoundTerm { Name: "initialization", Arity: 2 } timed
+            || timed.Arguments[1] is not AtomTerm { Name: "now" or "after_load" or "main" } when
+        )
+        {
+            return null;
+        }
+
+        SyntaxTerm inner = timed.Arguments[0];
+        return when.Name switch
+        {
+            "now" => (inner, false),
+            "after_load" => (new CompoundTerm("initialization", [inner], timed.Span), false),
+            _ => (
+                new CompoundTerm(
+                    "initialization",
+                    [new CompoundTerm("$initialization_main", [resolver.ResolveGoal(inner)], timed.Span)],
+                    timed.Span
+                ),
+                true
+            ),
+        };
+    }
 
     private int CompileDirective(
         SyntaxTerm goal,

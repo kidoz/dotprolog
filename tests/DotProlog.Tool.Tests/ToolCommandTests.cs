@@ -149,6 +149,22 @@ public sealed class ToolCommandTests : IDisposable
         Assert.Equal("error: existence_error(procedure, nowhere/1)\n", error.ReplaceLineEndings("\n"));
     }
 
+    [Theory]
+    [InlineData("main :- writeln(hello).", 0, "first\nhello\n", "")]
+    [InlineData("main :- fail.", 1, "first\n", "ERROR: main: false")]
+    [InlineData("main :- X is foo + 1, writeln(X).", 2, "first\n", "ERROR: Arithmetic: `foo/0' is not a function")]
+    [InlineData("main :- halt(3).", 3, "first\n", "")]
+    public void RunEndsWithTheInitializationMainGoal(string main, int expectedExit, string expectedOutput, string expectedError)
+    {
+        var path = Source("main.pl", $":- initialization(main, main).\n:- initialization(writeln(first)).\n{main}\n");
+
+        (var exitCode, var output, var error) = Execute("run", path);
+
+        Assert.Equal(expectedExit, exitCode);
+        Assert.Equal(expectedOutput, output.ReplaceLineEndings("\n"));
+        Assert.Equal(expectedError, error.ReplaceLineEndings("\n").TrimEnd('\n'));
+    }
+
     [Fact]
     public void RunRunsTheGoalsOfAFileConsultedAtRunTime()
     {
