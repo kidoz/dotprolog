@@ -287,6 +287,7 @@ samples and exercise NativeAOT.
 |---|---|---|
 | `\+ 4` | `type_error(callable, 4)` — the inner goal | Same |
 | A character in `StrictIso` | A UTF-16 code unit, so a character outside the Basic Multilingual Plane is two codes and `atom_length/2` counts it as two. `Modern` counts code points | SWI counts code points |
+| Character-code numeric lists | `number_chars/2` and `number_codes/2` reject `0''`; use ISO `0'''` or `0'\'`. ISO `0'\0\` denotes zero | SWI 10.0.2 accepts `0''` and rejects the terminated octal-zero form in numeric lists |
 | Two modules exporting the same name | The first loaded gets the unqualified name | SWI reports a conflict |
 | Clause selection | First-argument indexed in the bytecode VM; linear in build-time generated C# | Indexed |
 | Arithmetic extensions | Evaluable `integer/1`, `e/0`, `inf/0`, `nan/0`, and several utility functions remain available in Modern mode and are rejected in strict mode | Not part of the ISO core |

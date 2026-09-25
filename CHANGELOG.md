@@ -4,6 +4,17 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `number_chars/2` and `number_codes/2` reject `0''` and an unterminated octal
+  escape such as `0'\0` with `syntax_error(illegal_number)` in both modes, including
+  when the number argument is bound. Source reading applies the same rules: a quote
+  after `0'` must be doubled or escaped, and zero-prefixed octal escapes require their
+  closing backslash in character-code literals and quoted text. Valid `0'''`, `0'\'`,
+  and `0'\0\` spellings remain accepted.
+
 ## [0.14.1] — 2026-09-25
 
 ### Changed
@@ -759,6 +770,7 @@ binary: a published executable can consult a `.pl` file it has never seen and ru
 
 **Full Changelog**: https://github.com/kidoz/dotprolog/commits/v0.1.0
 
+[Unreleased]: https://github.com/kidoz/dotprolog/compare/v0.14.1...HEAD
 [0.14.1]: https://github.com/kidoz/dotprolog/releases/tag/v0.14.1
 [0.14.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.14.0
 [0.13.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.13.0

@@ -232,6 +232,14 @@ variants.
 | 8.16 | `atom_length/2`, `atom_concat/3`, `sub_atom/5`, `atom_chars/2`, `atom_codes/2`, `char_code/2`, `number_chars/2`, `number_codes/2` | R/D/I/C/A |
 | 8.17 | `set_prolog_flag/2`, `current_prolog_flag/2`, `halt/0`, `halt/1` | R/D/I/A/P |
 
+Character-code literals follow §6.4.2.1 and §6.4.4 in source input and in numeric
+character/code lists: a quote must be doubled or escaped, and an octal escape,
+including one beginning with zero, requires a terminating backslash. The issue #7
+regressions reject `0''` and `0'\0`, preserve the valid `0'''`, `0'\'`, and `0'\0\`
+forms, and check bound and unbound numbers in both modes. Tests cover reader
+diagnostics, runtime parsing, generated/consulted calls in both directions, and the
+Modern NativeAOT sample.
+
 ## Clause 9 evaluable functors
 
 Each row covers operand evaluation, result kind, exceptional values, signatures, errors, and the
