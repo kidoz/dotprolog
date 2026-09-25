@@ -443,7 +443,7 @@ public sealed class GeneratedFacadeTests
         );
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
         string[] names = [.. engine.Query("iso_review_case(Name, _)").Solutions().Select(s => s["Name"].ToString())];
-        Assert.Equal(96, names.Length);
+        Assert.Equal(125, names.Length);
         foreach (var name in names)
         {
             Assert.True((bool)Call(module, type, "RunIsoReviewCase", name)!, name);
@@ -477,6 +477,39 @@ public sealed class GeneratedFacadeTests
         Assert.Contains(Compiler.CompilerDiagnosticIds.StrictIsoViolation, exception.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(Runtime.PrologLanguageMode.StrictIso, "on", "z")]
+    [InlineData(Runtime.PrologLanguageMode.Modern, "off", "q")]
+    public void GeneratedReaderUsesTheModeConversionDefault(Runtime.PrologLanguageMode mode, string flag, string predicate)
+    {
+        ContractReadResult contract = ContractReader.Read(
+            """
+            :- clr_module('Conversion').
+            :- clr_namespace('Generated.Conversion').
+            :- clr_export(check/0, semidet, []).
+            """,
+            "Generated.Conversion",
+            "conversion.dpli"
+        );
+        Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
+        var source = FacadeGenerator.Generate(
+            contract.Contract!,
+            $"""
+            :- char_conversion(q, z).
+            q.
+            check :- {predicate}, current_prolog_flag(char_conversion, {flag}).
+            """,
+            "conversion.pl",
+            mode
+        );
+        Assembly assembly = CompileGenerated(source);
+        Type type = assembly.GetType("Generated.Conversion.ConversionModule")!;
+        var engine = new Compiler.PrologEngine(mode);
+        object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
+        Assert.Equal(true, Call(module, type, "Check"));
+        Assert.Single(engine.Query("check").Solutions());
+    }
+
     [Fact]
     public void GeneratedStrictFacadePreservesIsoModuleContextMetadata()
     {
@@ -493,20 +526,39 @@ public sealed class GeneratedFacadeTests
 
         const string prolog = """
             :- module(contextual).
-            :- export(answer/1).
-            :- set_prolog_flag(double_quotes, chars).
+            :- set_prolog_flag(double_quotes, atom).
+            :- char_conversion(q, z).
+            :- op(500, xfx, export).
+            :- export([answer/1, q/0]).
             :- end_module(contextual).
 
             :- body(contextual).
-            item(one).
-            answer(Value) :- current_prolog_flag(double_quotes, chars), clause(item(Value), true).
+            'q'.
+            q.
+            item("one").
+            answer(Value) :- current_prolog_flag('double_quotes', atom), clause(item(Value), true),
+                z, predicate_property('q', exported), \+ predicate_property(z, exported).
             :- end_body(contextual).
             """;
 
         var source = FacadeGenerator.Generate(contract.Contract!, prolog, "iso-context.pl", Runtime.PrologLanguageMode.StrictIso);
         Assembly assembly = CompileGenerated(source);
         Type type = assembly.GetType("Generated.IsoContext.IsoContextModule")!;
-        object module = type.GetMethod("Create", BindingFlags.Public | BindingFlags.Static, Type.EmptyTypes)!.Invoke(null, null)!;
+        var engine = new Compiler.PrologEngine(Runtime.PrologLanguageMode.StrictIso);
+        object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
+        foreach (
+            var goal in new[]
+            {
+                "current_prolog_flag(double_quotes, atom)",
+                "clause(item(one), true)",
+                "z",
+                "predicate_property('q', exported)",
+                "\\+ predicate_property(z, exported)",
+            }
+        )
+        {
+            Assert.True(engine.Query($"contextual:({goal})").Prove(), goal);
+        }
 
         Assert.Equal("one", Call(module, type, "Answer"));
     }

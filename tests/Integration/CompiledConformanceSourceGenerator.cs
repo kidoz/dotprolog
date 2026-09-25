@@ -95,10 +95,17 @@ internal static class CompiledConformanceSourceGenerator
                     "strict-native.pl",
                     """
                     :- module(strict_native).
-                    :- export([answer/1, named_write/0, module_clause/1, cross_back/0]).
+                    :- set_prolog_flag(double_quotes, atom).
+                    :- char_conversion(q, z).
+                    :- op(500, xfx, export).
+                    :- export([answer/1, named_write/0, module_clause/1, cross_back/0, q/0]).
                     :- end_module(strict_native).
                     :- body(strict_native).
-                    answer(42).
+                    'q'.
+                    q.
+                    reader_text("ok").
+                    answer(42) :- current_prolog_flag(char_conversion, on), z, reader_text(ok),
+                        predicate_property('q', exported), \+ predicate_property(z, exported).
                     named_write :- write_term(f(X), [variable_names(['X'=X])]).
                     local(ok).
                     module_clause(X) :- clause(local(X), true).
@@ -145,6 +152,16 @@ internal static class CompiledConformanceSourceGenerator
                     {
                         Output = output,
                     };
+                    if (!engine.Query("current_prolog_flag(char_conversion, on)").Prove())
+                    {
+                        return 10;
+                    }
+
+                    if (!engine.Query("catch(current_prolog_flag(no_such_flag,_),error(E,_),true), E == domain_error(prolog_flag,no_such_flag)").Prove())
+                    {
+                        return 11;
+                    }
+
                     __StrictCompiled.Install(engine);
                     var host = new global::DotProlog.Runtime.PrologHost(engine.Machine);
                     if (!host.Prove(host.Bind("answer", 1), global::DotProlog.Runtime.PrologInput.Integer(42)))
@@ -167,11 +184,14 @@ internal static class CompiledConformanceSourceGenerator
 
                     global::DotProlog.Compiler.LoadResult runtimeModule = engine.ConsultText(
                         ":- module(runtime_native).\n"
-                            + ":- export(probe/1).\n"
+                            + ":- char_conversion(q, z).\n"
+                            + ":- op(500, xfx, export).\n"
+                            + ":- export([probe/1,q/0]).\n"
                             + ":- end_module(runtime_native).\n"
                             + ":- body(runtime_native).\n"
                             + ":- import(strict_native, answer/1).\n"
-                            + "probe(X) :- answer(X).\n"
+                            + "'q'. q.\n"
+                            + "probe(X) :- answer(X), z, predicate_property('q', exported).\n"
                             + ":- end_body(runtime_native).\n",
                         "runtime-native-module.pl");
                     if (!runtimeModule.Success
@@ -213,7 +233,7 @@ internal static class CompiledConformanceSourceGenerator
 
                         string[] names = review.Query("iso_review_case(Name, _)").Solutions()
                             .Select(solution => solution["Name"].ToString()).ToArray();
-                        if (names.Length != 96)
+                        if (names.Length != 125)
                         {
                             return 8;
                         }
@@ -228,7 +248,7 @@ internal static class CompiledConformanceSourceGenerator
                         }
                     }
 
-                    global::System.Console.WriteLine("strict-iso-review-native: 192/192 passed");
+                    global::System.Console.WriteLine("strict-iso-review-native: 250/250 passed");
                     global::System.Console.WriteLine("strict-iso-native: passed");
                     return 0;
                 }

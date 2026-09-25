@@ -105,7 +105,7 @@ public sealed class StrictIsoReviewTests
         LoadResult loaded = engine.ConsultFile(Path.Combine(AppContext.BaseDirectory, "strict_iso_review.pl"));
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
         string[] names = [.. engine.Query("iso_review_case(Name, _)").Solutions().Select(s => s["Name"].ToString())];
-        Assert.Equal(96, names.Length);
+        Assert.Equal(125, names.Length);
         Assert.Equal(names.Length, names.Distinct(StringComparer.Ordinal).Count());
 
         List<string> failures = [];

@@ -1,4 +1,4 @@
-% Original regression cases for ISO/IEC 13211-1:1995 and Cor.1:2007 / Cor.2:2012.
+% Original regression cases for ISO/IEC 13211-1:1995 and Cor.1:2007 / Cor.2:2012, plus TS 13211-3:2025.
 % This fixture uses only standard predicates and runs with StrictIso enabled.
 % Each goal must succeed exactly once; errors must actually be raised, and cases
 % about nondeterminism collect all answers before checking their order and count.
@@ -134,3 +134,44 @@ iso_review_case(double_quoted_infix, (1 "+" 2 * 3 == 1 + 2 * 3)).
 iso_review_case(double_quoted_prefix, ("-"7 == -(7))).
 iso_review_case(double_quoted_functor, ("pair"(left,right) == pair(left,right))).
 iso_review_case(double_quoted_operator_functor, ("+"(4,5) == +(4,5))).
+
+
+% Part 3 7.13.5 and 8.18.1: nested variables execute after earlier grammar goals.
+review_delayed --> {B=[a]}, B.
+review_unreachable --> {fail}, _.
+review_variable_choice --> {B=[a]}, (B ; [b]).
+review_cut --> ([a] ; [b]), !.
+iso_review_case(phrase_delayed_variable, phrase(({B=[a]}, B), [a])).
+iso_review_case(phrase_delayed_static, phrase(review_delayed, [a])).
+iso_review_case(phrase_unreachable_variable, \+ phrase(({fail}, _), [])).
+iso_review_case(phrase_unreachable_static, \+ phrase(review_unreachable, [])).
+iso_review_case(phrase_unreachable_else, phrase(([] -> [] ; _), [])).
+iso_review_case(phrase_variable_disjunction, phrase(({B=[a]}, (B ; [b])), [a])).
+iso_review_case(phrase_variable_bar, phrase(({B=[a]}, (B | [b])), [a])).
+iso_review_case(phrase_variable_negation, phrase(({B=[a]}, \+ B), [])).
+iso_review_case(phrase_variable_condition, phrase(({B=[a]}, (B -> [b] ; [c])), [a,b])).
+iso_review_case(phrase_variable_then, phrase(({B=[b]}, ([a] -> B ; [c])), [a,b])).
+iso_review_case(phrase_variable_else, phrase(({B=[c]}, ([a] -> [b] ; B)), [c])).
+iso_review_case(phrase_variable_rest, (phrase(({B=[a]}, B), [a,b], R), R == [b])).
+iso_review_case(phrase_variable_answers, (findall(L, phrase(({B=[a]}, (B ; [b])), L), Ls), Ls == [[a],[b]])).
+iso_review_case(phrase_variable_static_answers, (findall(L, phrase(review_variable_choice, L), Ls), Ls == [[a],[b]])).
+iso_review_case(phrase_variable_rollback, (findall(B, phrase(({B=[a]}, B ; {B=[b]}, B), [_]), Bs), Bs == [[a],[b]])).
+iso_review_case(phrase_variable_error, iso_review_error(phrase(([], _), []), instantiation_error)).
+iso_review_case(phrase_top_variable_error, iso_review_error(phrase(_, []), instantiation_error)).
+iso_review_case(phrase_variable_callable_error, iso_review_error(phrase(({B=17}, B), []), type_error(callable,17))).
+iso_review_case(phrase_cut_answers, (findall(L, phrase((([a] ; [b]), !), L), Ls), Ls == [[a]])).
+iso_review_case(phrase_cut_static_answers, (findall(L, phrase(review_cut, L), Ls), Ls == [[a]])).
+iso_review_case(phrase_nested_cut_opaque, (findall(X, ((X=left;X=right), phrase(({B= !}, B), [])), Xs), Xs == [left,right])).
+iso_review_case(phrase_delayed_exception, (catch(phrase(({B= {throw(ball)}}, B), []), Ball, true), Ball == ball)).
+
+% Part 1 7.8, 8.5.4 and 8.10, reconciled with Annex A's execution model.
+iso_review_case(catch_continuation_scope, (catch((catch(true, inner, fail), throw(outer)), E, true), E == outer)).
+iso_review_case(catch_redo_scope, (findall(X, catch((X=first;throw(redo)), redo, X=recovered), Xs), Xs == [first,recovered])).
+iso_review_case(throw_copies_variables, (catch(throw(pair(X,X)), T, true), T=pair(A,B), A == B, X \== A)).
+iso_review_case(copy_term_aliases, (copy_term(pair(X,X), pair(A,B)), A == B, A \== X)).
+iso_review_case(findall_fresh_answers, (findall(X, (true;true), [A,B]), var(X), A \== B, A \== X, B \== X)).
+iso_review_case(bagof_witness_alias, (bagof(X, (X=Y;X=Y), L), L == [Y,Y], var(Y))).
+
+
+% Part 1 8.17.2.1: enumeration retains its initial values while effects persist.
+iso_review_case(flag_snapshot, (set_prolog_flag(debug,off), findall(V, (current_prolog_flag(F,V), set_prolog_flag(debug,on), F==debug), Vs), Vs==[off], current_prolog_flag(debug,on), set_prolog_flag(debug,off))).
