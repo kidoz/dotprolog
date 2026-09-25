@@ -3,9 +3,9 @@ using DotProlog.Runtime;
 namespace DotProlog.Compiler.Tests;
 
 /// <summary>
-/// The occurs_check flag: false is the ISO default, true fails a cycle-creating
-/// general unification, and error raises representation_error(term) — an ISO error class, where
-/// SWI-Prolog 10 raises occurs_check(Var, Term) — with that pair as the error's second argument.
+/// The Modern-only occurs_check flag defaults to false. True rejects cycle creation by failure;
+/// error raises DotProlog's representation_error(term), with the rejected pair as context.
+/// StrictIso rejects the extension flag and retains ISO unify_with_occurs_check/2 behavior.
 /// Write-mode head unification is a documented unchecked window, pinned below.
 /// </summary>
 public sealed class OccursCheckFlagTests
@@ -79,15 +79,28 @@ public sealed class OccursCheckFlagTests
             )
         );
 
-    [Fact]
-    public void UnifyWithOccursCheckIgnoresTheFlag() =>
-        Assert.Equal(
-            "failed-cycled",
-            PrologTestHost.RunGoal(
-                "( unify_with_occurs_check(X, f(X)) -> write(cycled) ; write(failed) ), write(-),"
-                    + " ( Y = f(Y) -> write(cycled) ; write(failed) )"
-            )
+    [Theory]
+    [InlineData("false")]
+    [InlineData("true")]
+    [InlineData("error")]
+    public void UnifyWithOccursCheckFailsRegardlessOfTheModernFlag(string value)
+    {
+        var engine = new PrologEngine(PrologLanguageMode.Modern);
+        Assert.Single(
+            engine
+                .Query(
+                    $"set_prolog_flag(occurs_check, {value}), \\+ unify_with_occurs_check(X, -X), var(X), current_prolog_flag(occurs_check, {value})"
+                )
+                .Solutions()
         );
+    }
+
+    [Fact]
+    public void StrictUnifyWithOccursCheckFailsWithoutRaisingAnError()
+    {
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso);
+        Assert.Single(engine.Query("\\+ unify_with_occurs_check(X, -X), var(X)").Solutions());
+    }
 
     [Fact]
     public void TheFlagEnumeratesInModernMode() =>

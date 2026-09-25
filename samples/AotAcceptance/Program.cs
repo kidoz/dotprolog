@@ -130,6 +130,12 @@ internal static class Program
 
                 % Occurs-check unification is iterative and must survive NativeAOT trimming.
                 \+ unify_with_occurs_check(Cycle, f(Cycle)), var(Cycle),
+                set_prolog_flag(occurs_check, error),
+                catch(-OccursVar = OccursVar, error(OccursError, OccursContext), true),
+                OccursError == representation_error(term), OccursContext = occurs_check(OccursV, OccursT),
+                var(OccursVar), var(OccursV), OccursT == -OccursV,
+                \+ unify_with_occurs_check(CheckedVar, -CheckedVar), var(CheckedVar),
+                set_prolog_flag(occurs_check, false),
                 write(occurs_check), nl,
 
                 % ISO repeat/0 retains its infinite retry point in the native runtime.

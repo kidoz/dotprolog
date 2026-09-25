@@ -709,6 +709,53 @@ public sealed class GeneratedFacadeTests
     [Theory]
     [InlineData(Runtime.PrologLanguageMode.Modern)]
     [InlineData(Runtime.PrologLanguageMode.StrictIso)]
+    public void OccursCheckModeBoundaryHoldsAcrossGeneratedAndConsultedCalls(Runtime.PrologLanguageMode mode)
+    {
+        ContractReadResult contract = ContractReader.Read(
+            """
+            :- clr_module('OccursCheck').
+            :- clr_namespace('Generated.OccursCheck').
+            :- clr_export(check/0, semidet, []).
+            """,
+            "Generated.OccursCheck",
+            "occurs_check.dpli"
+        );
+        Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
+        string behavior =
+            mode == Runtime.PrologLanguageMode.StrictIso
+                ? """
+                    catch(set_prolog_flag(occurs_check, error), error(E, _), true),
+                    E == domain_error(prolog_flag, occurs_check)
+                    """
+                : """
+                    set_prolog_flag(occurs_check, error),
+                    catch(-X = X, error(E, C), true),
+                    E == representation_error(term), C = occurs_check(V, T),
+                    var(V), T == -V, var(X)
+                    """;
+        string body = behavior + ", \\+ unify_with_occurs_check(Y, -Y), var(Y).";
+        var source = FacadeGenerator.Generate(
+            contract.Contract!,
+            "check :- " + body + "\ncompiled_to_runtime :- runtime_check.",
+            "occurs_check.pl",
+            mode
+        );
+        Assembly assembly = CompileGenerated(source);
+        Type type = assembly.GetType("Generated.OccursCheck.OccursCheckModule")!;
+        var engine = new Compiler.PrologEngine(mode);
+        object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
+        engine.ConsultOrThrow("runtime_check :- " + body + "\nruntime_to_compiled :- check.", "runtime.pl");
+
+        Assert.Equal(true, Call(module, type, "Check"));
+        foreach (string goal in new[] { "check", "runtime_check", "compiled_to_runtime", "runtime_to_compiled" })
+        {
+            Assert.Single(engine.Query(goal).Solutions());
+        }
+    }
+
+    [Theory]
+    [InlineData(Runtime.PrologLanguageMode.Modern)]
+    [InlineData(Runtime.PrologLanguageMode.StrictIso)]
     public void CyclicErrorCulpritsSurviveGeneratedAndConsultedCatchers(Runtime.PrologLanguageMode mode)
     {
         ContractReadResult contract = ContractReader.Read(
