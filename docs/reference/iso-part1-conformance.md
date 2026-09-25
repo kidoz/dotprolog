@@ -31,7 +31,7 @@ predefined-predicate and evaluable-functor inventory is also pinned by
 ### Focused strict-mode review
 
 The September 2026 review of the local Part 1 publication and its 2007 and 2012 corrections
-added 96 original cases in `tests/conformance/strict_iso_review.pl`. Unlike the 608-case corpus,
+started with 96 original cases in `tests/conformance/strict_iso_review.pl`. Unlike the 608-case corpus,
 whose harness uses extension predicates and runs in Modern, this fixture uses only standard
 predicates and runs with StrictIso enabled as well as in Modern. It supplements the existing
 inventory; it is not a complete independent certification.
@@ -48,12 +48,57 @@ inventory; it is not a complete independent certification.
 
 `StrictIsoReviewTests` runs the fixture as consulted bytecode and adds host-observable input,
 output, and file-preservation checks. `GeneratedFacadeTests` runs it through generated C# and
-both directions of generated/consulted calls. The strict NativeAOT runner executes all 96 cases
-as generated code and again as runtime-consulted code, for 192 checks.
+both directions of generated/consulted calls. The strict NativeAOT runner executes all 125 cases
+as generated code and again as runtime-consulted code, for 250 checks.
 
 The local reference set contains no Corrigendum 3 publication, so this review does not constitute
 a fresh licensed-text audit of that correction. Part 2 modules and Part 3 grammars retain their
 [separate evidence ledger](iso-parts2-3-conformance.md); they are outside the Part 1 declaration.
+
+### Deep publication review
+
+The follow-up review covered all five standards PDFs supplied locally: Part 1:1995 (212 PDF
+pages, including its informative Annex A), Cor.1:2007 (5), Cor.2:2012 (28), Part 2:2000 (30),
+and TS Part 3:2025 (26). Covers, contents, and blank pages were inventoried; the normative
+clauses and the annex's execution model were read and compared with implementation and tests.
+Two invoice PDFs were excluded from the technical review. No licensed source text is shipped.
+
+The review found and corrected these additional defects:
+
+| Reference | Previous behavior | Corrected behavior and regression evidence |
+|---|---|---|
+| Part 1 7.11.2.1 | StrictIso started with character conversion disabled | StrictIso starts with `char_conversion=on`; Modern retains `off`. Fresh-engine consultation, generated loading, and NativeAOT check the default |
+| Part 1 8.17.2.1, Annex A.5.17.2 | Flag enumeration read mutable values again during redo | Each enumeration preserves its initial values, including nested calls and module contexts; mutations still persist. Managed, generated, and native cases cover the snapshot |
+| Part 1 8.17.2.3 | Reading an unsupported flag silently failed in StrictIso | StrictIso raises `domain_error(prolog_flag, Flag)`; Modern retains ordinary failure. The strict managed and native tests cover this distinction |
+| Part 2 6.2.4.6–8 | Interface reader declarations changed the parsing of subsequent interface directives | Operators, conversions, and flags accumulate for module bodies while interface parsing keeps its entering state. Tests cover interface rejection, body parsing, export metadata, generated installation, and native consultation |
+| Part 3 7.13.5, 8.18.1 | Runtime grammar expansion raised errors for nested variables too early and could bind a variable alternative while recognizing a conditional | Nested variables become delayed `phrase/3` calls; conditional recognition does not instantiate an alternative. Cases cover unreachable branches, variable conditions, solution order, rollback, cut, exceptions, and static/runtime parity |
+
+The shared review fixture now has **125 cases**: the original 96 plus 22 grammar cases and
+7 cases for catch scope, copied variables, all-solutions sharing, and flag snapshots. Separate
+C# tests cover source diagnostics, initial state, module declarations, and mode-specific errors.
+The fixture runs in both managed modes, generated code, both call directions, and the strict
+native generated/consulted runner.
+
+The remaining reviewed areas map to the clause tables below and the
+[Parts 2 and 3 ledger](iso-parts2-3-conformance.md): syntax and operators; unification and term
+order; control and logical database updates; streams and term I/O; atomic conversions;
+arithmetic types and errors; module visibility and calling context; and grammar controls.
+Annex A was used to cross-check observable execution, not as a mechanically executable oracle:
+it is informative, omits several environment operations, and must be read with the corrections.
+No formal equivalence proof or exhaustive enumeration of all Prolog programs is claimed.
+
+The expanded native fixture also exposed corrupted floating constants during a large generated
+installation on `osx-arm64` with .NET 10.0.12; direct calculation and managed generated execution
+were correct. Moving constant construction into a separate non-inlined generated method makes
+the complete native fixture pass. This is an observed workaround; the underlying native compiler
+or linker cause has not been established.
+
+Corrigendum 3 is still absent from the local PDF set. Its existing ledger and tests were
+preserved; a targeted check of the public WG17 working draft
+[N269](https://www.complang.tuwien.ac.at/ulrich/iso-prolog/N269) helped distinguish later
+corrections from obsolete examples. That draft check does not replace an audit of the final
+2017 publication. This review also does not establish results for untested platforms or turn
+the Parts 2 and 3 repository evidence into independent certification.
 
 ## Clauses 5 and 6
 
@@ -233,7 +278,7 @@ the following green:
 3. All 2,304 generated and bidirectional cross-path checks.
 4. The direct and generated NativeAOT runners for every release RID.
 5. The focused parser, compiler, runtime, stream, database, arithmetic, flag, and strict-mode tests.
-6. The 96-case strict review fixture, including its generated, cross-path, and NativeAOT checks.
+6. The 125-case strict review fixture, including its generated, cross-path, and NativeAOT checks.
 
 Any new implementation-defined behavior must be added to the processor-characteristics page and
 covered by an executable test before release.

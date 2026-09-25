@@ -19,7 +19,7 @@ Evidence codes are:
 | 4.4, 6.2.1 module `user` | Unbracketed text is prepared as `user`; an explicit interface may precede its bodies | M/P |
 | 5.1, 6.2.3–6.2.5 module text | Interfaces and multiple bodies are bracketed, paired, ordered per module, non-contiguous, and nestable only through `user` | M/C/A |
 | 5.2.1 module syntax | `:/2` is predefined at priority 600 and module-local operator tables govern reading and writing | M/P |
-| 6.2.4 interface directives | `export/1`, `reexport/1,2`, `metapredicate/1`, `op/3`, `char_conversion/2`, and `set_prolog_flag/2` prepare interface state | M/C |
+| 6.2.4 interface directives | `export/1`, `reexport/1,2`, `metapredicate/1`, `op/3`, `char_conversion/2`, and `set_prolog_flag/2` prepare body state without changing subsequent interface parsing | M/C/A |
 | 6.2.5 body directives | `import/1,2` implement whole and selective import; body reader state accumulates across bodies | M/C |
 | 6.2.6 clauses | Heads belong to their body module; imported definitions and predefined heads are rejected | M |
 | 6.3 visible database | Local definitions, imports, and transitive re-exports resolve without ambiguous visible predicates | M/C |
@@ -48,7 +48,7 @@ the plain-name alias assigned to the first free export are documented compatibil
 | 7.5.1 coexistence choice | Ordinary `Name/(Arity+2)` clauses and `Name//Arity` rules combine in source order | G/P |
 | 7.13.1–7.13.2 rules and semicontexts | Ordinary rules, terminal sequences, empty bodies, pushback, and look-ahead translate at preparation time | G/C |
 | 7.13.4 missing nonterminal | The processor uses the Part 1 `existence_error(procedure, Name/Arity)` representation | G/P |
-| 7.13.5 logical expansion | Static, asserted, and runtime-built grammar bodies share the prescribed expansion semantics | G/C/A |
+| 7.13.5 logical expansion | Static, asserted, and runtime-built grammar bodies defer nested variables until execution; conditional recognition leaves variable alternatives unbound | G/C/A |
 | 7.14.1–7.14.10 required controls | Empty and non-empty terminals, conjunction, alternatives, if-then-else, braces, `call//1`, `phrase//1`, and cut are implemented | G/C/A |
 | 7.14.11–7.14.12 optional controls | `\+//1` and standalone `->//2` are present with the specified behavior | G/P |
 | 8.18.1 `phrase/2,3` | Parsing/generation, re-execution, runtime expansion, error priority, and third-argument steadfastness are covered | G/C/A |
@@ -59,6 +59,11 @@ DotProlog selects both implementation-defined sequence checks for `phrase/2`, pr
 unchecked option for its second and third arguments, while remaining steadfast in the third.
 An invalid semicontext is rejected during source preparation. Modern mode additionally recognizes
 soft cut as a grammar control extension; StrictIso treats it as an ordinary nonterminal.
+
+The [deep publication review](iso-part1-conformance.md#deep-publication-review) records the
+interface-reader and runtime grammar defects found in the local PDFs and their regression paths.
+The shared 125-case fixture includes 22 grammar cases, with complete solution sequences and
+unreachable-variable branches checked through generated and consulted execution.
 
 ## Continuing gate
 

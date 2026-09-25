@@ -105,11 +105,15 @@ The standard order of terms places strings between numbers and atoms:
 behavior; ISO leaves no slot for the type, and the float/integer split remains DotProlog's
 documented divergence.
 
-The initial `char_conversion` flag is `off`.
+The initial `char_conversion` flag is `on` in `StrictIso` (Part 1 7.11.2.1) and `off` in `Modern`.
 Character conversion applies to unquoted lexical input while quoted text, escapes, character-code
 literal payloads, and primitive character input remain unchanged.
 
 The Part 2 `colon_sets_calling_context` flag is fixed and has the value `true`.
+
+`current_prolog_flag/2` preserves the values selected when enumeration begins, even when a
+later goal changes flags before redo. An unsupported flag atom raises
+`domain_error(prolog_flag, Flag)` in `StrictIso`; in `Modern` it fails.
 
 `write_term/2,3` implements the Corrigendum 3 `variable_names/1` option. Its value is a list of
 `Atom=Term` entries; the leftmost entry whose term is the variable being written supplies the
