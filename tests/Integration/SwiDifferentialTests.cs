@@ -174,6 +174,8 @@ public sealed class SwiDifferentialTests
         "findall(T, (member(T, [graph, print, punct, cntrl]), code_type(0x378, T)), L), write(L)",
         "findall(T, (member(T, [graph, print, punct, cntrl]), code_type(0x200B, T)), L), write(L)",
         "findall(C, (between(9, 14, C), code_type(C, end_of_line)), L), write(L)",
+        "( number_chars(1.0e9, ['1', '.', '0', 'E', '9']) -> write(yes) ; write(no) )",
+        "number_chars(N, [' ', '0', '\\'', a]), write(N)",
         "string_to_atom(S, foo), writeq(S), string_to_atom(baz, B), writeq(B)",
         "string_chars(S, [a, b]), writeq(S), string_codes(S2, [99, 100]), writeq(S2)",
         "atom_string('42', T), number_string(N, T), writeq(N), number_string(2.5, S), writeq(S)",

@@ -32,7 +32,7 @@ public sealed class AtomicTermProcessingTests
     [InlineData("char_code(ab, _)", "type_error(character,ab)")]
     [InlineData("char_code(_, a)", "type_error(integer,a)")]
     [InlineData("atom_number('1.0e400', _)", "syntax_error(float_overflow)")]
-    [InlineData("number_chars(_, ['1','.','0','e','4','0','0'])", "syntax_error(float_overflow)")]
+    [InlineData("number_chars(_, ['1','.','0','e','4','0','0'])", "representation_error(max_float)")]
     public void ReportsIsoAtomicProcessingErrors(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
 

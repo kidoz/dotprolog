@@ -74,6 +74,18 @@ public interface IRuntimeCompiler
         out Cell singletons
     );
 
+    /// <summary>
+    /// Reads <paramref name="text"/> as <c>number_chars/2</c> and <c>number_codes/2</c> read their list:
+    /// with the term reader's own number syntax, after optional layout text and a <c>-</c> name token.
+    /// </summary>
+    /// <param name="machine">Machine owning the heap the number is built on.</param>
+    /// <param name="text">The characters of the list.</param>
+    /// <param name="number">The number read.</param>
+    /// <returns><see langword="false"/> when the text is not a number.</returns>
+    /// <exception cref="PrologException">The text is a float beyond the finite range.</exception>
+    bool TryReadNumber(Machine machine, string text, out Cell number) =>
+        TextBuiltins.TryParseNumberCell(machine, text, out number);
+
     /// <summary>Reads one term using an explicitly selected module reader context.</summary>
     bool TryReadTerm(
         Machine machine,

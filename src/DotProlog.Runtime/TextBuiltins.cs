@@ -524,6 +524,11 @@ internal static class TextBuiltins
         Cell list = machine.Argument(1);
         Cell source = machine.Argument(0);
 
+        if (numeric)
+        {
+            return NumberText(machine, source, list, chars);
+        }
+
         if (source.Tag != CellTag.Reference)
         {
             if (numeric && source.Tag is not (CellTag.Integer or CellTag.BigInteger or CellTag.Float))
@@ -536,8 +541,8 @@ internal static class TextBuiltins
                 throw PrologErrors.Type(machine, "atom", source);
             }
 
-            // ISO 8.16.4-8.16.8: a bound first argument decides the direction. It is converted and
-            // the result unified with the list, whatever the list holds — a list of unbound
+            // ISO 8.16.4 and 8.16.5: a bound first argument decides the direction. It is converted
+            // and the result unified with the list, whatever the list holds — a list of unbound
             // elements is filled in, and a list of the wrong length fails.
             var written =
                 source.Tag == CellTag.Atom ? machine.Symbols.AtomName(source.Index)
@@ -563,6 +568,134 @@ internal static class TextBuiltins
         return TryParseNumber(machine, text, out PrologNumber parsed)
             ? machine.Unify(source, ArithmeticEvaluator.ToCell(machine, parsed))
             : throw machine.CreateBall(SyntaxErrorTerm(machine, "illegal_number"), "syntax_error(illegal_number)");
+    }
+
+    /// <summary>
+    /// <c>number_chars/2</c> and <c>number_codes/2</c> (ISO 8.16.7 and 8.16.8). A list that holds the
+    /// whole text decides: it is read as the reader reads a number, and the result is unified with
+    /// the first argument, so <c>number_chars(1.0e9, "1.0E9")</c> holds. Only a partial list, or one
+    /// with a variable in it, leaves a bound number to decide, written out and unified with the list.
+    /// </summary>
+    private static bool NumberText(Machine machine, Cell number, Cell list, bool chars)
+    {
+        if (
+            number.Tag != CellTag.Reference
+            && number.Tag is not (CellTag.Integer or CellTag.BigInteger or CellTag.Float or CellTag.Rational)
+        )
+        {
+            throw PrologErrors.Type(machine, "number", number);
+        }
+
+        List<Cell> elements = [];
+        Cell tail = ReadAcyclic(machine, list, elements);
+        var open = tail.Tag == CellTag.Reference;
+        foreach (Cell element in elements)
+        {
+            Cell cell = machine.Dereference(element);
+            if (cell.Tag == CellTag.Reference)
+            {
+                open = true;
+                continue;
+            }
+
+            CheckElement(machine, cell, chars);
+        }
+
+        if (tail.Tag != CellTag.Reference && !TermList.IsEmpty(machine, tail))
+        {
+            throw PrologErrors.Type(machine, "list", list);
+        }
+
+        if (!open)
+        {
+            return TryReadNumber(machine, ReadText(machine, elements, chars), out Cell parsed)
+                ? machine.Unify(number, parsed)
+                : throw machine.CreateBall(SyntaxErrorTerm(machine, "illegal_number"), "syntax_error(illegal_number)");
+        }
+
+        if (number.Tag == CellTag.Reference)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        var written =
+            number.Tag == CellTag.Rational ? TermWriter.ToDisplayString(machine, number)
+            : TryText(machine, number, out var value) ? value
+            : throw new InvalidOperationException("Validated number has no textual representation.");
+        return machine.Unify(list, BuildText(machine, written, chars));
+    }
+
+    /// <summary>
+    /// Reads a list as <see cref="TermList.Read"/> does, but raises <c>type_error(list, List)</c> for a
+    /// cyclic one instead of looping, finding the cycle by Brent's method.
+    /// </summary>
+    private static Cell ReadAcyclic(Machine machine, Cell list, List<Cell> elements)
+    {
+        Cell cell = machine.Dereference(list);
+        Cell mark = cell;
+        int power = 1,
+            steps = 0;
+
+        while (cell.Tag == CellTag.Structure && machine.HeapAt(cell.Index).Index == machine.Symbols.ListFunctor)
+        {
+            elements.Add(machine.HeapAt(cell.Index + 1));
+            cell = machine.Dereference(machine.HeapAt(cell.Index + 2));
+            if (cell == mark)
+            {
+                throw PrologErrors.Type(machine, "list", list);
+            }
+
+            if (++steps == power)
+            {
+                mark = cell;
+                power *= 2;
+                steps = 0;
+            }
+        }
+
+        return cell;
+    }
+
+    /// <summary>Reads text as a number the way the term reader does, when a compiler is present to read it.</summary>
+    private static bool TryReadNumber(Machine machine, string text, out Cell number) =>
+        machine.Program.RuntimeCompiler is { } compiler
+            ? compiler.TryReadNumber(machine, text, out number)
+            : TryParseNumberCell(machine, text, out number);
+
+    /// <summary>The runtime's own number reader, for when no compiler is present to read with the term reader.</summary>
+    internal static bool TryParseNumberCell(Machine machine, string text, out Cell number)
+    {
+        var read = TryParseNumber(machine, text, out PrologNumber parsed);
+        number = read ? ArithmeticEvaluator.ToCell(machine, parsed) : default;
+        return read;
+    }
+
+    /// <summary>
+    /// Raises the error for a bound list element that is not a character, or not a character code:
+    /// <c>type_error(character, E)</c>, or <c>type_error(integer, E)</c> and
+    /// <c>representation_error(character_code)</c>.
+    /// </summary>
+    private static void CheckElement(Machine machine, Cell cell, bool chars)
+    {
+        if (chars)
+        {
+            if (cell.Tag != CellTag.Atom || !PrologText.IsCharacter(machine, machine.Symbols.AtomName(cell.Index)))
+            {
+                throw PrologErrors.Type(machine, "character", cell);
+            }
+
+            return;
+        }
+
+        if (cell.Tag is not (CellTag.Integer or CellTag.BigInteger))
+        {
+            throw PrologErrors.Type(machine, "integer", cell);
+        }
+
+        if (cell.Tag == CellTag.BigInteger || !PrologText.IsCode(machine, cell.Integer))
+        {
+            throw PrologErrors.Representation(machine, "character_code");
+        }
     }
 
     /// <summary>Reads a proper list of characters or codes as text.</summary>

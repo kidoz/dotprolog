@@ -103,6 +103,65 @@ public sealed class TermReader
         return new ParseResult(clauses, diagnostics);
     }
 
+    /// <summary>
+    /// Reads <paramref name="text"/> as <c>number_chars/2</c> and <c>number_codes/2</c> read their
+    /// list (ISO 8.16.7 and 8.16.8): layout text, which may hold comments, then an optional <c>-</c>
+    /// name token, quoted or not, then one number token, and nothing after it, not even layout. So
+    /// <c>" 1"</c>, <c>"- 1"</c>, and <c>"/**/1"</c> are numbers, and <c>"1 "</c> and <c>"+1"</c> are not.
+    /// </summary>
+    /// <param name="text">The characters of the list.</param>
+    /// <param name="flags">Program-owned flags; character conversion does not apply here.</param>
+    /// <param name="diagnostics">Why the text is not a number, when it is not.</param>
+    /// <returns>
+    /// An <see cref="IntegerTerm"/>, <see cref="BigIntegerTerm"/>, <see cref="RationalTerm"/>, or
+    /// <see cref="FloatTerm"/>; or <see langword="null"/> when the text is not a number or is a float
+    /// beyond the finite range, which a <see cref="DiagnosticIds.FloatOverflow"/> diagnostic reports.
+    /// </returns>
+    public static SyntaxTerm? ReadNumber(string text, PrologFlags? flags, out IReadOnlyList<Diagnostic> diagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+
+        List<Diagnostic> found = [];
+        diagnostics = found;
+        var lexer = new Lexer(text, null, found, conversions: null, flags);
+
+        Token token = lexer.Next();
+        SourceSpan start = token.Span;
+        var negate = token is { Kind: TokenKind.Atom, Text: "-" };
+        if (negate)
+        {
+            token = lexer.Next();
+        }
+
+        Token end = lexer.Next();
+        if (token.Kind is not (TokenKind.Integer or TokenKind.Float) || end.Kind != TokenKind.Eof || end.PrecededByLayout)
+        {
+            found.Add(new Diagnostic(DiagnosticIds.InvalidNumber, DiagnosticSeverity.Error, "The text is not a number.", start));
+            return null;
+        }
+
+        if (found.Count > 0)
+        {
+            return null;
+        }
+
+        SourceSpan span = start.To(token.Span);
+        if (token.Kind == TokenKind.Integer)
+        {
+            return IntegerLiteral(token, negate, span);
+        }
+
+        if (token.FloatOverflow)
+        {
+            found.Add(
+                new Diagnostic(DiagnosticIds.FloatOverflow, DiagnosticSeverity.Error, "The float exceeds the finite range.", span)
+            );
+            return null;
+        }
+
+        return new FloatTerm(negate ? -token.Float : token.Float, span);
+    }
+
     /// <summary>Reads a single term, which may but need not be followed by a clause terminator.</summary>
     /// <param name="text">Prolog source.</param>
     /// <param name="fileName">File name used in diagnostics, when known.</param>
