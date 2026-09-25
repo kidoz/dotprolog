@@ -16,5 +16,6 @@
     <ItemGroup>
         <InternalsVisibleTo Include="DotProlog.Compiler.Tests" />
         <InternalsVisibleTo Include="DotProlog.CodeGen.CSharp" />
+        <InternalsVisibleTo Include="DotProlog.CodeGen.IL" />
     </ItemGroup>
 </Project>
