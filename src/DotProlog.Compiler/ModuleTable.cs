@@ -61,6 +61,8 @@ public sealed class ModuleTable
         DeclareMeta("call", 1, [(0, 0)]);
         DeclareMeta("initialization", 2, [(0, 0)]);
         DeclareMeta("freeze", 2, [(1, 0)]);
+        DeclareMeta("call_nth", 2, [(0, 0)]);
+        DeclareMeta("countall", 2, [(0, 0)]);
 
         // The database predicates take clauses rather than goals, and a clause names a predicate
         // just as much as a call does: assertz(fact(x)) inside a module is that module's fact/1.
@@ -76,7 +78,7 @@ public sealed class ModuleTable
             DeclareMeta("call", extra + 1, [(0, extra)]);
         }
 
-        for (var lists = 1; lists <= 4; lists++)
+        for (var lists = 1; lists <= 7; lists++)
         {
             DeclareMeta("maplist", lists + 1, [(0, lists)]);
         }

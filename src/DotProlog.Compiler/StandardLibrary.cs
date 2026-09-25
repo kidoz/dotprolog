@@ -222,17 +222,44 @@ internal static class StandardLibrary
         '$reverse'([], R, R).
         '$reverse'([H|T], A, R) :- '$reverse'(T, [H|A], R).
 
-        nth0(I, L, E) :- integer(I), !, I >= 0, '$nth'(I, L, E).
-        nth0(I, L, E) :- '$nth_search'(L, E, 0, I).
+        % nth0/3,4 and nth1/3,4 as the Prolog prologue has them: an index that is not an integer is a
+        % type error and a negative one a domain error, and nth1/3,4 fail for index 0. The /4 forms
+        % also give the list without that element.
+        nth0(I, L, E) :- integer(I), !, '$nth_index'(I, nth0/3), '$nth'(I, L, E).
+        nth0(I, L, E) :- var(I), !, '$nth_search'(L, E, 0, I).
+        nth0(I, _, _) :- throw(error(type_error(integer, I), nth0/3)).
 
-        nth1(I, L, E) :- integer(I), !, I >= 1, J is I - 1, '$nth'(J, L, E).
-        nth1(I, L, E) :- '$nth_search'(L, E, 1, I).
+        nth1(I, L, E) :- integer(I), !, '$nth_index'(I, nth1/3), I > 0, J is I - 1, '$nth'(J, L, E).
+        nth1(I, L, E) :- var(I), !, '$nth_search'(L, E, 1, I).
+        nth1(I, _, _) :- throw(error(type_error(integer, I), nth1/3)).
+
+        nth0(I, L, E, R) :- integer(I), !, '$nth_index'(I, nth0/4), '$nth_rest'(I, L, E, R).
+        nth0(I, L, E, R) :- var(I), !, '$nth_search_rest'(L, E, R, 0, I).
+        nth0(I, _, _, _) :- throw(error(type_error(integer, I), nth0/4)).
+
+        nth1(I, L, E, R) :- integer(I), !, '$nth_index'(I, nth1/4), I > 0, J is I - 1, '$nth_rest'(J, L, E, R).
+        nth1(I, L, E, R) :- var(I), !, '$nth_search_rest'(L, E, R, 1, I).
+        nth1(I, _, _, _) :- throw(error(type_error(integer, I), nth1/4)).
+
+        '$nth_index'(I, Context) :-
+            (   I >= 0
+            ->  true
+            ;   throw(error(domain_error(not_less_than_zero, I), Context))
+            ).
 
         '$nth'(0, [E|_], E) :- !.
         '$nth'(N, [_|T], E) :- N > 0, M is N - 1, '$nth'(M, T, E).
 
         '$nth_search'([E|_], E, I, I).
         '$nth_search'([_|T], E, I0, I) :- I1 is I0 + 1, '$nth_search'(T, E, I1, I).
+
+        '$nth_rest'(0, L, E, R) :- !, L = [E|R].
+        '$nth_rest'(N, [X|Xs], E, [X|R]) :- M is N - 1, '$nth_rest'(M, Xs, E, R).
+
+        '$nth_search_rest'([E|R], E, R, I, I).
+        '$nth_search_rest'([X|Xs], E, [X|R], I0, I) :-
+            I1 is I0 + 1,
+            '$nth_search_rest'(Xs, E, R, I1, I).
 
         last([H|T], Last) :- '$last'(T, H, Last).
 
@@ -294,6 +321,21 @@ internal static class StandardLibrary
         maplist(G, [A|As], [B|Bs], [C|Cs], [D|Ds]) :-
             call(G, A, B, C, D),
             maplist(G, As, Bs, Cs, Ds).
+
+        maplist(_, [], [], [], [], []).
+        maplist(G, [A|As], [B|Bs], [C|Cs], [D|Ds], [E|Es]) :-
+            call(G, A, B, C, D, E),
+            maplist(G, As, Bs, Cs, Ds, Es).
+
+        maplist(_, [], [], [], [], [], []).
+        maplist(G, [A|As], [B|Bs], [C|Cs], [D|Ds], [E|Es], [F|Fs]) :-
+            call(G, A, B, C, D, E, F),
+            maplist(G, As, Bs, Cs, Ds, Es, Fs).
+
+        maplist(_, [], [], [], [], [], [], []).
+        maplist(G, [A|As], [B|Bs], [C|Cs], [D|Ds], [E|Es], [F|Fs], [H|Hs]) :-
+            call(G, A, B, C, D, E, F, H),
+            maplist(G, As, Bs, Cs, Ds, Es, Fs, Hs).
 
         foldl(G, L, V0, V) :- '$foldl'(L, G, V0, V).
 
@@ -1168,6 +1210,54 @@ internal static class StandardLibrary
         findall(Template, Goal, Bag, Tail) :-
             findall(Template, Goal, Solutions),
             append(Solutions, Tail, Bag).
+
+        % --- Counting solutions (call_nth/2, countall/2) ---------------------------------
+        % As the Prolog prologue has them. The count lives in a term updated with nb_setarg/3, so it
+        % survives backtracking into the goal. A bound Nth is checked before the goal is called:
+        % 0 fails without calling it, and the goal is not called past the Nth solution.
+
+        call_nth(Goal, Nth) :-
+            integer(Nth), !,
+            (   Nth > 0
+            ->  '$call_nth'(Goal, Count),
+                Count =:= Nth, !
+            ;   Nth < 0
+            ->  throw(error(domain_error(not_less_than_zero, Nth), call_nth/2))
+            ).
+        call_nth(Goal, Nth) :-
+            var(Nth), !,
+            '$call_nth'(Goal, Nth).
+        call_nth(_, Nth) :-
+            throw(error(type_error(integer, Nth), call_nth/2)).
+
+        '$call_nth'(Goal, Nth) :-
+            State = count(0),
+            call(Goal),
+            arg(1, State, Count0),
+            Count is Count0 + 1,
+            nb_setarg(1, State, Count),
+            Nth = Count.
+
+        countall(Goal, N) :-
+            must_be(callable, Goal),
+            (   var(N)
+            ->  true
+            ;   integer(N)
+            ->  (   N >= 0
+                ->  true
+                ;   throw(error(domain_error(not_less_than_zero, N), countall/2))
+                )
+            ;   throw(error(type_error(integer, N), countall/2))
+            ),
+            State = count(0),
+            (   call(Goal),
+                arg(1, State, Count0),
+                Count is Count0 + 1,
+                nb_setarg(1, State, Count),
+                fail
+            ;   arg(1, State, Total)
+            ),
+            N = Total.
 
         % --- Aggregation -----------------------------------------------------------
 
