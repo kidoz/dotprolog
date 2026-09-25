@@ -2,15 +2,15 @@
 
 ## Supported versions
 
-The current release is 0.12.1, published on NuGet.org and as a GitHub release carrying the packages,
+The current release is 0.13.0, published on NuGet.org and as a GitHub release carrying the packages,
 native sample binaries, an SBOM, and checksums. 0.1.0 was released on GitHub only and never
 reached NuGet.org. The latest released minor version is the one that receives security fixes;
 older ones do not.
 
 | Version | Supported |
 |---|---|
-| 0.12.x | Latest release only |
-| 0.11.x and earlier | Unsupported |
+| 0.13.x | Latest release only |
+| 0.12.x and earlier | Unsupported |
 
 ## Reporting a vulnerability
 
