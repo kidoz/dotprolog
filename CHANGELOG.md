@@ -4,6 +4,17 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- With the `occurs_check` flag set to `error`, a unification that would create a rational tree
+  raises `error(representation_error(term), occurs_check(Var, Term))` instead of
+  `error(occurs_check(Var, Term), _)`. `occurs_check` is not an ISO error class, while a
+  representation error is the class for a result no term can represent; the unification that
+  failed moves to the error's second argument, and the printed message is unchanged. A handler
+  that catches `error(occurs_check(_, _), _)`, SWI-Prolog's form, needs updating.
+
 ## [0.13.0] — 2026-09-25
 
 ### Added
