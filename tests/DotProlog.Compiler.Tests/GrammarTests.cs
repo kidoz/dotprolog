@@ -8,6 +8,22 @@ namespace DotProlog.Compiler.Tests;
 /// </summary>
 public sealed class GrammarTests
 {
+    [Theory]
+    [InlineData("phrase(({B=[a]}, B), [a])", true)]
+    [InlineData("phrase(({fail}, _), [])", false)]
+    [InlineData("phrase(([] -> [] ; _), [])", true)]
+    [InlineData("phrase(({B=[a]}, (B ; [b])), [a])", true)]
+    [InlineData("phrase(({B=[a]}, (B | [b])), [a])", true)]
+    [InlineData("phrase(({B=[a]}, \\+ B), [])", true)]
+    public void RuntimeGrammarVariablesAreCalledAtTheirExecutionPoint(string goal, bool succeeds)
+    {
+        foreach (var mode in new[] { PrologLanguageMode.StrictIso, PrologLanguageMode.Modern })
+        {
+            var engine = new PrologEngine(mode);
+            Assert.Equal(succeeds, engine.Query(goal).Prove());
+        }
+    }
+
     private const string Grammar = """
         % The digit rules compare character codes, so this unit reads double-quoted text as codes.
         :- set_prolog_flag(double_quotes, codes).

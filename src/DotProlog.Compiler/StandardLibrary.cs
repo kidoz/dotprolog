@@ -1024,22 +1024,24 @@ internal static class StandardLibrary
 
         % Rest is unified only after the grammar body has completed. Keeping the body's
         % output argument fresh makes phrase/3 steadfast when Rest is already instantiated.
+        phrase(Body, _, _) :- var(Body), !, throw(error(instantiation_error, phrase/3)).
         phrase(Body, List, Rest) :-
             '$phrase_goal'(Body, List, ActualRest, Goal),
             call(Goal),
             Rest = ActualRest.
 
-        '$phrase_goal'(Body, _, _, _) :- var(Body), !, throw(error(instantiation_error, phrase/3)).
+        '$phrase_goal'(Body, S0, S, phrase(Body, S0, S)) :- var(Body), !.
         '$phrase_goal'((A, B), S0, S, (GA, GB)) :- !,
             '$phrase_goal'(A, S0, S1, GA),
             '$phrase_goal'(B, S1, S, GB).
         % An if-then-else is one construct, not a disjunction of two goals, so it is matched
         % before the plain (A ; B) clause can split it.
-        '$phrase_goal'((C -> T ; E), S0, S, (GC -> GT ; GE)) :- !,
+        '$phrase_goal'((If ; E), S0, S, (GC -> GT ; GE)) :- nonvar(If), If = (C -> T), !,
             '$phrase_goal'(C, S0, S1, GC),
             '$phrase_goal'(T, S1, S, GT),
             '$phrase_goal'(E, S0, S, GE).
-        '$phrase_goal'((C *-> T ; E), S0, S, (GC *-> GT ; GE)) :- '$grammar_soft_cut', !,
+        '$phrase_goal'((If ; E), S0, S, (GC *-> GT ; GE)) :-
+            nonvar(If), If = (C *-> T), '$grammar_soft_cut', !,
             '$phrase_goal'(C, S0, S1, GC),
             '$phrase_goal'(T, S1, S, GT),
             '$phrase_goal'(E, S0, S, GE).
