@@ -106,7 +106,7 @@ public sealed class PrologLayoutLinterTests
     // lexer accepts is covered: plain, escaped, and the doubled quote that denotes ' itself.
     [InlineData("c(0'a).\nd(X,Y).\n")]
     [InlineData("c(0'\\n).\nd(X,Y).\n")]
-    [InlineData("c(0'').\nd(X,Y).\n")]
+    [InlineData("c(0'\\0\\).\nd(X,Y).\n")]
     [InlineData("c(0''').\nd(X,Y).\n")]
     [InlineData("c(0'\\').\nd(X,Y).\n")]
     public void CommaSpacingSurvivesCharacterCodeLiterals(string source)

@@ -804,6 +804,48 @@ public sealed class GeneratedFacadeTests
         Assert.True(engine.Query("runtime_catch").Prove());
     }
 
+    [Theory]
+    [InlineData(Runtime.PrologLanguageMode.Modern)]
+    [InlineData(Runtime.PrologLanguageMode.StrictIso)]
+    public void NumericCharacterSyntaxErrorsCrossGeneratedAndConsultedCalls(Runtime.PrologLanguageMode mode)
+    {
+        ContractReadResult contract = ContractReader.Read(
+            """
+            :- clr_module('NumericSyntax').
+            :- clr_namespace('Generated.NumericSyntax').
+            :- clr_export(check/0, semidet, []).
+            """,
+            "Generated.NumericSyntax",
+            "numeric_syntax.dpli"
+        );
+        Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
+        const string body = """
+            atom_codes(A, [48,39,39]), atom_chars(A, Chars),
+            catch(number_chars(N, Chars), error(syntax_error(_), _), Quote = yes),
+            Quote == yes, var(N),
+            catch(number_codes(0, [48,39,92,48]), error(syntax_error(_), _), Zero = yes),
+            Zero == yes,
+            number_codes(39, [48,39,39,39]), number_codes(0, [48,39,92,48,92]).
+            """;
+        var source = FacadeGenerator.Generate(
+            contract.Contract!,
+            "check :- " + body + "\ncompiled_to_runtime :- runtime_check.",
+            "numeric_syntax.pl",
+            mode
+        );
+        Assembly assembly = CompileGenerated(source);
+        Type type = assembly.GetType("Generated.NumericSyntax.NumericSyntaxModule")!;
+        var engine = new Compiler.PrologEngine(mode);
+        object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
+        engine.ConsultOrThrow("runtime_check :- " + body + "\nruntime_to_compiled :- check.", "runtime.pl");
+
+        Assert.Equal(true, Call(module, type, "Check"));
+        foreach (string goal in new[] { "check", "runtime_check", "compiled_to_runtime", "runtime_to_compiled" })
+        {
+            Assert.Single(engine.Query(goal).Solutions());
+        }
+    }
+
     [Fact]
     public void FacadeCarriesStringConstantsThroughGeneratedCode()
     {

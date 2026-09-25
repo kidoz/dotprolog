@@ -250,6 +250,12 @@ internal static class Program
                 NativeEscapedCode =:= 65,
                 atom_codes(NativeEscapedSource, [39, 92, 120, 52, 49, 92, 39]),
                 read_term_from_atom(NativeEscapedSource, 'A', []),
+                atom_codes(NativeQuoteText, [48,39,39]), atom_chars(NativeQuoteText, NativeQuoteChars),
+                catch(number_chars(_, NativeQuoteChars), error(syntax_error(_), _), NativeQuoteCaught = yes),
+                NativeQuoteCaught == yes,
+                catch(number_codes(0, [48,39,92,48]), error(syntax_error(_), _), NativeZeroCaught = yes),
+                NativeZeroCaught == yes,
+                number_codes(39, [48,39,39,39]), number_codes(0, [48,39,92,48,92]),
                 write(numeric_escape_syntax), nl,
 
                 % ISO backquoted names and quoted control-character rules remain catchable.

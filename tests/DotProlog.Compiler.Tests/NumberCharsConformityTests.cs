@@ -51,6 +51,8 @@ public sealed class NumberCharsConformityTests
     [InlineData("number_chars(N, \"3 \")")] // 16
     [InlineData("number_chars(N, \"3.\")")] // 17
     [InlineData("number_chars(N, \"0'\")")] // 58
+    [InlineData("number_chars(N, \"0''\")")]
+    [InlineData("number_chars(N, \"0'\\\\0\")")]
     [InlineData("number_chars(N, \"0'\\n\")")] // 59
     [InlineData("number_chars(N, \"0'\\\\7\")")] // 71
     [InlineData("number_chars(N, \"-/**/1\")")] // 24
@@ -113,6 +115,48 @@ public sealed class NumberCharsConformityTests
                     .Prove(),
                 goal
             );
+        }
+    }
+
+    [Theory]
+    [InlineData(PrologLanguageMode.Modern)]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    public void CharacterCodeQuotesAndOctalEscapesFollowIsoGrammar(PrologLanguageMode mode)
+    {
+        var engine = new PrologEngine(mode);
+        string[] malformed = ["[48,39,39]", "[48,39,92,48]", "[48,39,92,48,56]", "[48,39,92,48,120]"];
+        foreach (string codes in malformed)
+        {
+            foreach (string predicate in new[] { "number_chars", "number_codes" })
+            {
+                string list = predicate == "number_chars" ? "Chars" : codes;
+                foreach (string number in new[] { "N", "0", "39" })
+                {
+                    string goal =
+                        $"atom_codes(A, {codes}), atom_chars(A, Chars), "
+                        + $"catch({predicate}({number}, {list}), error(syntax_error(_), _), Caught = yes), "
+                        + "Caught == yes, var(N)";
+                    Assert.True(engine.Query(goal).Prove(), goal);
+                }
+            }
+        }
+
+        foreach (
+            (string codes, int expected) in new (string, int)[]
+            {
+                ("[48,39,39,39]", 39),
+                ("[48,39,92,39]", 39),
+                ("[48,39,92,48,92]", 0),
+                ("[48,39,92,48,55,92]", 7),
+                ("[48,39,92,92]", 92),
+            }
+        )
+        {
+            string goal =
+                $"atom_codes(A, {codes}), atom_chars(A, Chars), "
+                + $"number_chars(N, Chars), N == {expected}, number_chars({expected}, Chars), "
+                + $"number_codes(M, {codes}), M == {expected}, number_codes({expected}, {codes})";
+            Assert.True(engine.Query(goal).Prove(), goal);
         }
     }
 

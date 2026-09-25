@@ -137,6 +137,23 @@ public sealed class LexerTests
     }
 
     [Theory]
+    [InlineData("0''", DiagnosticIds.InvalidQuotedCharacter, 2, 1)]
+    [InlineData(@"0'\0", DiagnosticIds.InvalidEscape, 2, 2)]
+    [InlineData(@"'\0'", DiagnosticIds.InvalidEscape, 1, 2)]
+    [InlineData("\"\\0\"", DiagnosticIds.InvalidEscape, 1, 2)]
+    [InlineData(@"`\0`", DiagnosticIds.InvalidEscape, 1, 2)]
+    public void RejectsUndoubledCharacterCodeQuotesAndUnterminatedZeroEscapes(string text, string id, int start, int length)
+    {
+        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        {
+            Tokenize(text, new BytecodeProgram(mode).Flags, out List<Diagnostic> diagnostics);
+            Diagnostic diagnostic = Assert.Single(diagnostics);
+            Assert.Equal(id, diagnostic.Id);
+            Assert.Equal(new SourceSpan(start, length, 1, start + 1), diagnostic.Span);
+        }
+    }
+
+    [Theory]
     [InlineData(@"0'\x41\")]
     [InlineData(@"0'\o101\")]
     [InlineData(@"0'\101\")]

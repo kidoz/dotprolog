@@ -215,14 +215,6 @@ internal static class NumberReader
             case 'd':
                 builder.Append('\u007f');
                 return true;
-            case '0':
-                if (position < text.Length && (text[position] == '\\' || IsEscapeDigit(text[position], 8)))
-                {
-                    return TryReadNumericEscape(text, ref position, codePoints, 8, firstDigit: 0, builder);
-                }
-
-                builder.Append('\0');
-                return true;
             case '\\' or '\'' or '"' or '`':
                 builder.Append(c);
                 return true;
@@ -236,7 +228,7 @@ internal static class NumberReader
                 return TryReadFixedEscape(text, ref position, digits: 4, builder);
             case 'U' when codePoints:
                 return TryReadFixedEscape(text, ref position, digits: 8, builder);
-            case >= '1' and <= '7':
+            case >= '0' and <= '7':
                 return TryReadNumericEscape(text, ref position, codePoints, 8, firstDigit: c - '0', builder);
             default:
                 return false;
@@ -466,8 +458,13 @@ internal static class NumberReader
             return true;
         }
 
-        if (text[position] == '\'' && position + 1 < text.Length && text[position + 1] == '\'')
+        if (text[position] == '\'')
         {
+            if (position + 1 >= text.Length || text[position + 1] != '\'')
+            {
+                return false;
+            }
+
             position += 2;
             code = '\'';
             return true;

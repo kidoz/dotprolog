@@ -370,9 +370,23 @@ internal sealed class Lexer
                         ? char.ConvertToUtf32(builder[0], builder[1])
                     : builder[0];
             }
-            else if (_text[_position] == '\'' && Peek(1) == '\'')
+            else if (_text[_position] == '\'')
             {
-                Advance(2);
+                var quoteStart = _position;
+                Advance();
+                if (_position < _text.Length && _text[_position] == '\'')
+                {
+                    Advance();
+                }
+                else
+                {
+                    Report(
+                        DiagnosticIds.InvalidQuotedCharacter,
+                        "A single quote in a character-code literal must be doubled or escaped.",
+                        SpanFrom(quoteStart)
+                    );
+                }
+
                 code = '\'';
             }
             else if (CodePoints && CodePointText.IsPairAt(_text, _position))
@@ -636,17 +650,6 @@ internal sealed class Lexer
             case 'd':
                 builder.Append('\u007f');
                 return;
-            case '0':
-                if (_position < _text.Length && (_text[_position] == '\\' || IsEscapeDigit(_text[_position], 8)))
-                {
-                    ReadNumericEscape(builder, start, radix: 8, "octal", firstDigit: 0);
-                }
-                else
-                {
-                    builder.Append('\0');
-                }
-
-                return;
             case '\\' or '\'' or '"' or '`':
                 builder.Append(c);
                 return;
@@ -664,7 +667,7 @@ internal sealed class Lexer
             case 'U' when CodePoints:
                 ReadFixedEscape(builder, start, 'U', digits: 8);
                 return;
-            case >= '1' and <= '7':
+            case >= '0' and <= '7':
                 ReadNumericEscape(builder, start, radix: 8, "octal", firstDigit: c - '0');
                 return;
 

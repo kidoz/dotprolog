@@ -179,6 +179,8 @@ public sealed class SwiDifferentialTests
         "catch((L = [49|L], number_codes(1, L)), error(type_error(list, C), _), true), nonvar(C), C = [49|T], C == T, write(caught)",
         "catch((X = f(X), throw(X)), C, true), nonvar(C), C = f(T), C == T, write(caught)",
         "number_chars(N, [' ', '0', '\\'', a]), write(N)",
+        "catch(number_codes(_, [48,39,92,48]), error(syntax_error(_), _), Caught = yes), Caught == yes, write(caught)",
+        "number_codes(N, [48,39,39,39]), write(N)",
         "( length([_|L], 0) -> write(yes) ; write(no) )",
         "freeze(X, write(a)), X = 1, write(b)",
         "freeze(X, write(a)), X = Y, write(b), Y = 1",
