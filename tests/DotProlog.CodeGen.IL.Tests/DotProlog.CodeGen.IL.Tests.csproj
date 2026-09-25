@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <ItemGroup>
+        <ProjectReference Include="../../src/DotProlog.Compiler.Cli/DotProlog.Compiler.Cli.csproj" />
+        <None Include="../conformance/strict_iso_review.pl" Link="strict_iso_review.pl" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+</Project>

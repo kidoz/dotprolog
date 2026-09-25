@@ -49,5 +49,6 @@
     <ItemGroup>
         <ProjectReference Include="..\..\src\DotProlog.CodeGen.CSharp\DotProlog.CodeGen.CSharp.csproj" />
         <ProjectReference Include="..\..\src\DotProlog.Compiler\DotProlog.Compiler.csproj" />
+        <ProjectReference Include="../../src/DotProlog.CodeGen.IL/DotProlog.CodeGen.IL.csproj" />
     </ItemGroup>
 </Project>

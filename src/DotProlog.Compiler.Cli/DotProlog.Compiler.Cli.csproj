@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <AssemblyName>plc</AssemblyName>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="../DotProlog.CodeGen.IL/DotProlog.CodeGen.IL.csproj" />
+        <InternalsVisibleTo Include="DotProlog.CodeGen.IL.Tests" />
+    </ItemGroup>
+</Project>
