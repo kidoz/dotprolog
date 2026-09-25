@@ -11,5 +11,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\DotProlog.CodeGen.CSharp\DotProlog.CodeGen.CSharp.csproj" />
+        <None Include="..\conformance\strict_iso_review.pl" Link="strict_iso_review.pl" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 </Project>

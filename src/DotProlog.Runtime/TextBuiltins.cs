@@ -529,45 +529,45 @@ internal static class TextBuiltins
             return NumberText(machine, source, list, chars);
         }
 
-        if (source.Tag != CellTag.Reference)
+        if (source.Tag is not (CellTag.Reference or CellTag.Atom))
         {
-            if (numeric && source.Tag is not (CellTag.Integer or CellTag.BigInteger or CellTag.Float))
+            throw PrologErrors.Type(machine, "atom", source);
+        }
+
+        List<Cell> elements = [];
+        Cell tail = ReadAcyclic(machine, list, elements);
+        var open = tail.Tag == CellTag.Reference;
+        foreach (Cell element in elements)
+        {
+            Cell cell = machine.Dereference(element);
+            if (cell.Tag == CellTag.Reference)
             {
-                throw PrologErrors.Type(machine, "number", source);
+                open = true;
+                continue;
             }
 
-            if (!numeric && source.Tag != CellTag.Atom)
-            {
-                throw PrologErrors.Type(machine, "atom", source);
-            }
-
-            // ISO 8.16.4 and 8.16.5: a bound first argument decides the direction. It is converted
-            // and the result unified with the list, whatever the list holds — a list of unbound
-            // elements is filled in, and a list of the wrong length fails.
-            var written =
-                source.Tag == CellTag.Atom ? machine.Symbols.AtomName(source.Index)
-                : TryText(machine, source, out var value) ? value
-                : throw new InvalidOperationException("Validated text source has no textual representation.");
-            return machine.Unify(list, BuildText(machine, written, chars));
+            CheckElement(machine, cell, chars);
         }
 
-        if (!TermList.IsProper(machine, list))
+        if (tail.Tag != CellTag.Reference && !TermList.IsEmpty(machine, tail))
         {
-            List<Cell> elements = [];
-            Cell tail = TermList.Read(machine, list, elements);
-            throw tail.Tag == CellTag.Reference ? PrologErrors.Instantiation(machine) : PrologErrors.Type(machine, "list", list);
+            throw PrologErrors.Type(machine, "list", list);
         }
 
-        var text = ReadText(machine, list, chars);
-
-        if (!numeric)
+        if (source.Tag == CellTag.Atom)
         {
-            return machine.Unify(source, Cell.Atom(machine.Symbols.InternAtom(text)));
+            // Cor.2 requires validation even for a bound atom. Only a valid list or partial
+            // list reaches unification, which may fill variables or fail on a mismatch.
+            return machine.Unify(list, BuildText(machine, machine.Symbols.AtomName(source.Index), chars));
         }
 
-        return TryParseNumber(machine, text, out PrologNumber parsed)
-            ? machine.Unify(source, ArithmeticEvaluator.ToCell(machine, parsed))
-            : throw machine.CreateBall(SyntaxErrorTerm(machine, "illegal_number"), "syntax_error(illegal_number)");
+        if (open)
+        {
+            throw PrologErrors.Instantiation(machine);
+        }
+
+        var text = ReadText(machine, elements, chars);
+        return machine.Unify(source, Cell.Atom(machine.Symbols.InternAtom(text)));
     }
 
     /// <summary>

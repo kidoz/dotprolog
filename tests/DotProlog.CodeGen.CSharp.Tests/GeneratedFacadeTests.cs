@@ -410,6 +410,47 @@ public sealed class GeneratedFacadeTests
         Assert.Contains("requires StrictIso language mode", mismatch.InnerException!.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StrictIsoReviewCasesRunThroughGeneratedAndConsultedCode(bool consultInvoker)
+    {
+        ContractReadResult contract = ContractReader.Read(
+            """
+            :- clr_module('IsoReview').
+            :- clr_namespace('Generated.IsoReview').
+            :- clr_export(run_iso_review_case/1, semidet, [in(name, atom)]).
+            """,
+            "Generated.IsoReview",
+            "iso-review.dpli"
+        );
+        Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
+        var prolog = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "strict_iso_review.pl"));
+        const string invoker = "iso_review_invoke(Goal) :- call(Goal).";
+        if (consultInvoker)
+        {
+            Assert.Contains(invoker, prolog, StringComparison.Ordinal);
+            prolog = prolog.Replace(invoker, "", StringComparison.Ordinal);
+        }
+
+        var source = FacadeGenerator.Generate(contract.Contract!, prolog, "iso-review.pl", Runtime.PrologLanguageMode.StrictIso);
+        Assembly assembly = CompileGenerated(source);
+        Type type = assembly.GetType("Generated.IsoReview.IsoReviewModule")!;
+        var engine = new Compiler.PrologEngine(Runtime.PrologLanguageMode.StrictIso);
+        object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
+        Compiler.LoadResult loaded = engine.ConsultText(
+            "bytecode_review(Name) :- run_iso_review_case(Name).\n" + (consultInvoker ? invoker : "")
+        );
+        Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
+        string[] names = [.. engine.Query("iso_review_case(Name, _)").Solutions().Select(s => s["Name"].ToString())];
+        Assert.Equal(96, names.Length);
+        foreach (var name in names)
+        {
+            Assert.True((bool)Call(module, type, "RunIsoReviewCase", name)!, name);
+            Assert.Single(engine.Query($"bytecode_review({name})").Solutions());
+        }
+    }
+
     [Fact]
     public void StrictFacadeRejectsAnExtensionAtBuildTime()
     {
