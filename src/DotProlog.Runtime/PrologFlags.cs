@@ -25,7 +25,9 @@ public enum OccursCheckMode
     /// <summary>A cycle-creating unification fails.</summary>
     True,
 
-    /// <summary>A cycle-creating unification raises <c>occurs_check(Var, Term)</c>.</summary>
+    /// <summary>
+    /// A cycle-creating unification raises <c>error(representation_error(term), occurs_check(Var, Term))</c>.
+    /// </summary>
     Error,
 }
 

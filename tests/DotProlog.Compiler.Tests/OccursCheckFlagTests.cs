@@ -4,7 +4,8 @@ namespace DotProlog.Compiler.Tests;
 
 /// <summary>
 /// The occurs_check flag: false is the ISO default, true fails a cycle-creating
-/// general unification, and error raises occurs_check(Var, Term) the way SWI-Prolog 10 does.
+/// general unification, and error raises representation_error(term) — an ISO error class, where
+/// SWI-Prolog 10 raises occurs_check(Var, Term) — with that pair as the error's second argument.
 /// Write-mode head unification is a documented unchecked window, pinned below.
 /// </summary>
 public sealed class OccursCheckFlagTests
@@ -19,12 +20,10 @@ public sealed class OccursCheckFlagTests
         Assert.Equal(expected, PrologTestHost.RunGoal(goal));
 
     [Fact]
-    public void ErrorModeRaisesTheSwiErrorTerm() =>
+    public void ErrorModeRaisesARepresentationError() =>
         Assert.Equal(
-            "caught",
-            PrologTestHost.RunGoal(
-                "set_prolog_flag(occurs_check, error), catch(X = f(X), error(occurs_check(_, _), _), write(caught))"
-            )
+            "error(representation_error(term),occurs_check(A,-A))",
+            PrologTestHost.RunGoal("set_prolog_flag(occurs_check, error), catch(-X = X, E, true), numbervars(E, 0, _), writeq(E)")
         );
 
     [Fact]
@@ -33,7 +32,7 @@ public sealed class OccursCheckFlagTests
             "one",
             PrologTestHost.RunGoal(
                 "set_prolog_flag(occurs_check, error),"
-                    + " catch(p(X, a) = p(f(X), b), error(occurs_check(V, T), _), true),"
+                    + " catch(p(X, a) = p(f(X), b), error(representation_error(term), occurs_check(V, T)), true),"
                     + " ( T == f(V) -> write(one) ; write(T) )"
             )
         );

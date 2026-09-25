@@ -172,15 +172,23 @@ public static class PrologErrors
     }
 
     /// <summary>
-    /// The <c>occurs_check</c> flag's error action: <c>occurs_check(Variable, Term)</c>, carrying
-    /// the variable and the term whose binding would have created a cycle. The description leaves
-    /// the term unrendered because it may already be a rational tree.
+    /// The <c>occurs_check</c> flag's error action:
+    /// <c>error(representation_error(term), occurs_check(Variable, Term))</c>. The binding's result
+    /// would be a rational tree, which no term represents, and a representation error is the ISO
+    /// error class for that; the variable and the term it would have been bound to go in the
+    /// implementation-defined second argument. The description leaves the term unrendered because
+    /// it may already be a rational tree.
     /// </summary>
     public static PrologException OccursCheck(Machine machine, Cell variable, Cell term)
     {
         ArgumentNullException.ThrowIfNull(machine);
-        Cell formal = machine.CreateStructure(machine.Symbols.InternFunctor("occurs_check", 2), [variable, term]);
-        return Build(machine, formal, "occurs_check: the binding would create a cyclic term");
+        Cell formal = machine.CreateStructure(
+            machine.Symbols.InternFunctor("representation_error", 1),
+            [Cell.Atom(machine.Symbols.InternAtom("term"))]
+        );
+        Cell context = machine.CreateStructure(machine.Symbols.InternFunctor("occurs_check", 2), [variable, term]);
+        Cell error = machine.CreateStructure(machine.Symbols.InternFunctor("error", 2), [formal, context]);
+        return machine.CreateBall(error, "representation_error(term): the binding would create a rational tree");
     }
 
     /// <summary>

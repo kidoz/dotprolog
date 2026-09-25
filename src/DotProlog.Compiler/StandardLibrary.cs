@@ -816,6 +816,10 @@ internal static class StandardLibrary
             '$message_write_lines'(T, Prefix).
 
         '$message_lines'(Message, ['Unknown message: ~q'-[Message]]) :- var(Message), !.
+        % The occurs_check flag's error names the unification in its second argument.
+        '$message_lines'(error(representation_error(term), Context), Lines) :-
+            nonvar(Context), Context = occurs_check(V, T), !,
+            '$message_formal'(occurs_check(V, T), Lines).
         '$message_lines'(error(Formal, Context), Lines) :- !,
             '$message_caller'(Context, Caller),
             '$message_formal'(Formal, Body),

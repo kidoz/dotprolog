@@ -137,6 +137,15 @@ public sealed class MessageTests
         );
 
     [Fact]
+    public void TranslatesTheOccursCheckFlagsRepresentationError()
+    {
+        var error = ErrorOf("set_prolog_flag(occurs_check, error), catch(X = f(X), E, print_message(error, E))");
+
+        Assert.StartsWith("ERROR: Cannot unify _", error);
+        Assert.EndsWith(": would create an infinite tree\n", error);
+    }
+
+    [Fact]
     public void TranslatesTheOccursCheckError()
     {
         var error = ErrorOf("print_message(error, error(occurs_check(V, f(V)), context((=)/2, _)))");
