@@ -4,6 +4,28 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `call_nth/2` and `countall/2`, the last two predicates of the Prolog prologue.
+  `call_nth(Goal, Nth)` counts the solutions of `Goal` and, with `Nth` bound, stops at that
+  solution without leaving a choice point; `call_nth(Goal, 0)` fails without calling `Goal`.
+  `countall(Goal, N)` counts every solution without collecting them. Both raise
+  `type_error(integer, N)` and `domain_error(not_less_than_zero, N)` for a bad count, and
+  `countall/2` the instantiation and callable errors for its goal first.
+- `maplist/6..8`, `nth0/4`, and `nth1/4`, which the prologue also lists; the `/4` forms give the
+  list without the element.
+
+### Fixed
+
+- `succ/2` raises `domain_error(not_less_than_zero, N)` for a negative argument, rather than
+  `type_error(not_less_than_zero, N)`, and checks both arguments in the prologue's order, so
+  `succ(1, 1+1)` is `type_error(integer, 1+1)`.
+- `nth0/3` and `nth1/3` raise `type_error(integer, I)` for an index that is not an integer, which
+  used to enumerate the list without end on a partial one, and `domain_error(not_less_than_zero, I)`
+  for a negative index, which used to fail.
+
 ## [0.12.1] — 2026-09-25
 
 ### Fixed
