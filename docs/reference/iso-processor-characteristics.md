@@ -95,11 +95,7 @@ otherwise would. The value is scoped to the load unit: a `set_prolog_flag(double
 directive governs the rest of the file that issued it, and the entering value is restored when
 that file finishes loading.
 
-The extension flag `occurs_check` (`false`, `true`, `error`) exists in `Modern` only and starts at
-`false`, the ISO behavior; `StrictIso` does not define it. With `error`, a unification that would
-create a rational tree raises `error(representation_error(term), occurs_check(Var, Term))`, so the
-error still belongs to an ISO error class. `double_quotes` likewise accepts the
-extension value `string` in `Modern` only — a directive, flag call, or project override selecting
+`double_quotes` accepts the extension value `string` in `Modern` only — a directive, flag call, or project override selecting
 it inside `StrictIso` stays a domain error, so the strict mode keeps the three ISO values.
 
 The standard order of terms places strings between numbers and atoms:
@@ -132,6 +128,51 @@ Variables are ordered by their stable heap identity. The relative order of disti
 therefore implementation-dependent, but it remains constant for the lifetime of a sorting or
 solution-collection operation. Atoms use ordinal name order. Every float precedes every integer,
 including numerically equal cross-kind values.
+
+## Occurs-check and cyclic terms
+
+The extension flag `occurs_check` (`false`, `true`, `error`) exists in `Modern` only and starts at
+`false`. With `error`, a unification that would create a cycle raises
+`error(representation_error(term), occurs_check(Var, Term))`. This is DotProlog's extension
+behavior: neither the flag nor the representation flag `term` is defined by ISO.
+
+`StrictIso` rejects attempts to read or set `occurs_check` with `domain_error(prolog_flag, occurs_check)`.
+In both modes, ISO `unify_with_occurs_check/2` fails when unification would create a cycle;
+Modern's flag does not change that predicate. ISO leaves ordinary cycle-producing unification
+undefined (Part 1 7.3.4), so the new error is not an ISO requirement.
+
+The error shape is a compatibility choice. The implementation comparison made for
+[issue 6](https://github.com/kidoz/dotprolog/issues/6) found:
+
+| Implementation | Error when its occurs-check flag is `error` | Evidence |
+|---|---|---|
+| SWI-Prolog | `error(occurs_check(Var, Term), Context)` | [Flag documentation](https://www.swi-prolog.org/pldoc/man?section=flags); confirmed locally with SWI-Prolog 10.0.2 |
+| Scryer Prolog | `representation_error(term)` as the formal error | [Unifier source](https://github.com/mthom/scryer-prolog/blob/97b85690fbf58e9a794af04a0a8096b7fbe3e216/src/machine/unify.rs#L567-L575) |
+| Trealla Prolog | `representation_error(term)` as the formal error | [Unifier source](https://github.com/trealla-prolog/trealla/blob/58bb70e879072f38a1e57731a9691b2cf61ed486/src/unify.c#L810-L813) |
+
+DotProlog retains the new Modern error: it follows an existing representation-error convention
+and preserves the rejected pair in the context. It does not claim identical contexts across
+these systems. Matching SWI's formal error would instead preserve existing SWI handlers; a
+single exception cannot match both shapes. No additional compatibility flag is introduced.
+
+The distinction between an ISO error class and a standardized error instance matters here.
+Part 1 7.12.2(f) lists neither `term` nor `cyclic_term` as representation flags, and the
+[error-class reference linked from the issue](https://www.complang.tuwien.ac.at/ulrich/iso-prolog/error_k#error_classes)
+lists the same set. The issue's proposed classification is useful extension guidance, not a
+specified result for ordinary cycle-producing unification. Part 1 8.2.2 separately requires
+`unify_with_occurs_check/2` to fail when no finite-term unifier exists.
+
+Existing `representation_error(cyclic_term)` errors are retained for operations that cannot
+handle an already cyclic value. Renaming them would break more handlers without adding cycle
+support. These paths include copying, collecting answers, asserting clauses, measuring detached
+term size, and compiling cyclic control goals. SWI itself uses that error for cyclic clauses;
+its [rational-tree support](https://www.swi-prolog.org/pldoc/man?section=cyclic) also shows that
+copying cycles and rejecting their creation are separate capabilities.
+
+The flag still has a documented gap: write-mode head unification can create a cycle without
+passing through its check. Changing the error class does not close that gap; see the
+[SWI compatibility ledger](swi-compatibility.md). Tests cover the mode boundary, all three Modern
+flag values, generated and consulted calls in both directions, and the new error in NativeAOT.
 
 ## Source preparation and goal delivery
 

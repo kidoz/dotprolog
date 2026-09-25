@@ -8,12 +8,13 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Changed
 
-- With the `occurs_check` flag set to `error`, a unification that would create a rational tree
-  raises `error(representation_error(term), occurs_check(Var, Term))` instead of
-  `error(occurs_check(Var, Term), _)`. `occurs_check` is not an ISO error class, while a
-  representation error is the class for a result no term can represent; the unification that
-  failed moves to the error's second argument, and the printed message is unchanged. A handler
-  that catches `error(occurs_check(_, _), _)`, SWI-Prolog's form, needs updating.
+- In Modern, setting `occurs_check=error` makes a cycle-creating unification raise
+  `error(representation_error(term), occurs_check(Var, Term))` instead of
+  `error(occurs_check(Var, Term), _)`. This is a DotProlog extension choice: ISO defines neither
+  the flag nor `term` as a representation flag. The rejected pair remains in the error's second
+  argument, and the printed message is unchanged. Handlers for SWI-Prolog's form need updating.
+  StrictIso rejects the extension flag. In both modes, ISO `unify_with_occurs_check/2` fails
+  when unification would create a cycle, including when Modern has `occurs_check=error`.
 
 ## [0.13.0] — 2026-09-25
 

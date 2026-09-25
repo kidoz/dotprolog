@@ -19,7 +19,7 @@ public enum DoubleQuotesMode
 /// <summary>What a cycle-creating unification does under the <c>occurs_check</c> flag.</summary>
 public enum OccursCheckMode
 {
-    /// <summary>No check: rational trees may form. The default, and the only ISO behavior.</summary>
+    /// <summary>No check: rational trees may form. The default; ISO leaves cycle-producing ordinary unification undefined.</summary>
     False,
 
     /// <summary>A cycle-creating unification fails.</summary>

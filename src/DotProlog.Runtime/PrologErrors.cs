@@ -172,12 +172,11 @@ public static class PrologErrors
     }
 
     /// <summary>
-    /// The <c>occurs_check</c> flag's error action:
-    /// <c>error(representation_error(term), occurs_check(Variable, Term))</c>. The binding's result
-    /// would be a rational tree, which no term represents, and a representation error is the ISO
-    /// error class for that; the variable and the term it would have been bound to go in the
-    /// implementation-defined second argument. The description leaves the term unrendered because
-    /// it may already be a rational tree.
+    /// The Modern-only <c>occurs_check</c> flag's error action:
+    /// <c>error(representation_error(term), occurs_check(Variable, Term))</c>. This is a
+    /// DotProlog extension: ISO defines neither this flag nor the representation flag
+    /// <c>term</c>. The second argument preserves the rejected unification. The description
+    /// leaves the term unrendered because it may already be a rational tree.
     /// </summary>
     public static PrologException OccursCheck(Machine machine, Cell variable, Cell term)
     {
