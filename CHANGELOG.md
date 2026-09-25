@@ -4,6 +4,22 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `number_chars/2` and `number_codes/2` read a list that holds the whole text the way the term
+  reader reads a number and unify the result with the first argument, so
+  `number_chars(1.0e9, "1.0E9")` holds, as ISO requires; before, a bound number was written out and
+  compared as text. The list may start with layout and comments and a `-` name token, quoted or
+  not, so `" 1"`, `"- 1"`, `"'-'1"`, and `"/**/1"` read as numbers, while `"1 "`, `"+1"`, and
+  `"0X1"` are syntax errors. With a bound first argument, an element that is not a character or a
+  list that is not one raises the ISO error instead of failing. A float beyond the finite range is
+  `representation_error(max_float)`. Every case of the ISO conformity table for `number_chars/2`
+  now gives an allowed answer.
+- A raw control or layout character after `0'`, such as a newline or a tab, is a syntax error, as
+  it is between quotes, in both modes; write `0'\n` or `0'\t` instead.
+
 ## [0.11.0] — 2026-09-25
 
 ### Added
