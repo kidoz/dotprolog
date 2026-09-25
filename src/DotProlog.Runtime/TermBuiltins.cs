@@ -49,9 +49,20 @@ internal static class TermBuiltins
         registry.Register("callable", 1, static machine => machine.Argument(0).Tag is CellTag.Atom or CellTag.Structure);
         registry.Register("string", 1, static machine => machine.Argument(0).Tag == CellTag.String);
         registry.Register("is_list", 1, static machine => TermList.IsProper(machine, machine.Argument(0)));
+        registry.Register("$skip_list", 3, SkipList);
         registry.Register("ground", 1, static machine => IsGround(machine, machine.Argument(0)));
         registry.Register("acyclic_term", 1, static machine => IsAcyclic(machine, machine.Argument(0)));
     }
+
+    /// <summary>
+    /// <c>'$skip_list'(-Count, +List, -Tail)</c>, after SWI-Prolog's helper: the number of list cells
+    /// and what they end in — <c>[]</c>, an unbound tail, or anything else. It fails for a cyclic list,
+    /// which has neither, so <c>length/2</c> fails on one rather than looping.
+    /// </summary>
+    private static bool SkipList(Machine machine) =>
+        TermList.TrySkip(machine, machine.Argument(1), out var count, out Cell tail)
+        && machine.Unify(machine.Argument(0), Cell.Integer60(count))
+        && machine.Unify(machine.Argument(2), tail);
 
     private static void RegisterComparisons(BuiltinRegistry registry, SymbolTable symbols)
     {

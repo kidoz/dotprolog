@@ -76,7 +76,7 @@ public sealed class StandardLibraryTests
 
     [Theory]
     [InlineData("length([a, b, c], N), write(N)", "3")]
-    [InlineData("length(L, 2), write(L)", "[_G2,_G9]")]
+    [InlineData("length(L, 2), L = [A, B], var(A), var(B), A \\== B, write(two)", "two")]
     [InlineData("append([a], [b], L), write(L)", "[a,b]")]
     [InlineData("findall(X-Y, append(X, Y, [a, b]), L), write(L)", "[[]-[a,b],[a]-[b],[a,b]-[]]")]
     [InlineData("reverse([a, b, c], L), write(L)", "[c,b,a]")]

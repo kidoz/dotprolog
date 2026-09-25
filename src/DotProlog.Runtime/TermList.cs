@@ -63,6 +63,41 @@ internal static class TermList
         return IsEmpty(machine, cell);
     }
 
+    /// <summary>
+    /// Counts the cells of <paramref name="list"/> and finds what it ends in, as
+    /// <see cref="Read"/> does but without collecting the elements, and without looping on a cyclic
+    /// list: that is found by Brent's method and answered with <see langword="false"/>.
+    /// </summary>
+    internal static bool TrySkip(Machine machine, Cell list, out long count, out Cell tail)
+    {
+        Cell cell = machine.Dereference(list);
+        Cell mark = cell;
+        long power = 1,
+            steps = 0;
+        count = 0;
+
+        while (cell.Tag == CellTag.Structure && machine.HeapAt(cell.Index).Index == machine.Symbols.ListFunctor)
+        {
+            count++;
+            cell = machine.Dereference(machine.HeapAt(cell.Index + 2));
+            if (cell == mark)
+            {
+                tail = default;
+                return false;
+            }
+
+            if (++steps == power)
+            {
+                mark = cell;
+                power *= 2;
+                steps = 0;
+            }
+        }
+
+        tail = cell;
+        return true;
+    }
+
     /// <summary>Builds a proper list holding <paramref name="items"/>.</summary>
     internal static Cell Build(Machine machine, ReadOnlySpan<Cell> items) =>
         machine.CreateList(items, Cell.Atom(machine.Symbols.EmptyList));

@@ -124,14 +124,40 @@ internal static class StandardLibrary
 
         memberchk(X, [Y|T]) :- ( X = Y -> true ; memberchk(X, T) ).
 
-        % is_list/2 first so that the common call leaves no choice point behind; the
-        % third clause is what makes length(L, N) enumerate lists of growing length.
-        length(L, N) :- is_list(L), !, '$length'(L, 0, N).
-        length(L, N) :- integer(N), !, N >= 0, '$length_make'(N, L).
-        length(L, N) :- '$length'(L, 0, N).
+        % length/2 as the ISO conformity tables have it: the length is checked first, then the
+        % list is walked once, failing rather than looping on a cyclic one. A closed list or a
+        % bound length answers without a choice point; only an open list with an unbound length
+        % enumerates lists of growing length. An open tail that is the length itself has no
+        % finite answer, so it raises the table's resource error rather than loop forever.
+        length(List, N) :-
+            '$length_check'(N),
+            '$skip_list'(Count, List, Tail),
+            '$length'(Tail, Count, N).
 
-        '$length'([], N, N).
-        '$length'([_|T], S0, N) :- S is S0 + 1, '$length'(T, S, N).
+        '$length_check'(N) :- var(N), !.
+        '$length_check'(N) :-
+            integer(N), !,
+            (   N >= 0
+            ->  true
+            ;   throw(error(domain_error(not_less_than_zero, N), length/2))
+            ).
+        '$length_check'(N) :- throw(error(type_error(integer, N), length/2)).
+
+        '$length'(Tail, Count, N) :- Tail == [], !, N = Count.
+        '$length'(Tail, Count, N) :- var(Tail), '$length_open'(Tail, Count, N).
+
+        '$length_open'(Tail, Count, N) :-
+            integer(N), !,
+            N >= Count,
+            Extra is N - Count,
+            '$length_make'(Extra, Tail).
+        '$length_open'(Tail, _, N) :-
+            Tail == N, !,
+            throw(error(resource_error(finite_memory), length/2)).
+        '$length_open'(Tail, Count, N) :- '$length_grow'(Tail, Count, N).
+
+        '$length_grow'([], N, N).
+        '$length_grow'([_|T], C0, N) :- C is C0 + 1, '$length_grow'(T, C, N).
 
         '$length_make'(0, []) :- !.
         '$length_make'(N, [_|T]) :- M is N - 1, '$length_make'(M, T).
