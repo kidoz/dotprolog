@@ -189,6 +189,8 @@ public sealed class SwiDifferentialTests
         "catch((freeze(X, throw(bad)), X = 1), bad, write(caught))",
         "freeze(X, (Y = 1)), freeze(Y, write(y)), X = 0, write(end)",
         "frozen(_, G), write(G)",
+        "catch(succ(-1, _), error(E, _), true), write(E)",
+        "catch(succ(_, -1), error(E, _), true), write(E)",
         "catch(length(L, -1), error(E, _), true), write(E)",
         "catch(length(a, -1), error(E, _), true), write(E)",
         "catch(length(L, 1.0), error(E, _), true), write(E)",

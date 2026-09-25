@@ -165,38 +165,52 @@ public static class CoreBuiltins
         ControlPredicates.Install(program);
     }
 
-    /// <summary><c>succ(?Int, ?Successor)</c> over the natural numbers, in either direction.</summary>
+    /// <summary>
+    /// <c>succ(?Int, ?Successor)</c> over the natural numbers, in either direction, with the Prolog
+    /// prologue's errors in its order: both unbound, then either one not an integer, then either one
+    /// negative.
+    /// </summary>
     private static bool Succ(Machine machine)
     {
         Cell value = machine.Argument(0);
         Cell successor = machine.Argument(1);
 
-        if (value.Tag is CellTag.Integer or CellTag.BigInteger)
-        {
-            System.Numerics.BigInteger number = IntegerValue(machine, value);
-            return number.Sign >= 0
-                ? machine.Unify(successor, IntegerCell(machine, number + 1))
-                : throw PrologErrors.Type(machine, "not_less_than_zero", value);
-        }
-
-        if (value.Tag != CellTag.Reference)
-        {
-            throw PrologErrors.Type(machine, "integer", value);
-        }
-
-        if (successor.Tag == CellTag.Reference)
+        if (value.Tag == CellTag.Reference && successor.Tag == CellTag.Reference)
         {
             throw PrologErrors.Instantiation(machine);
         }
 
-        if (successor.Tag is not (CellTag.Integer or CellTag.BigInteger))
+        RequireNaturalOrVariable(machine, value, checkSign: false);
+        RequireNaturalOrVariable(machine, successor, checkSign: false);
+        RequireNaturalOrVariable(machine, value, checkSign: true);
+        RequireNaturalOrVariable(machine, successor, checkSign: true);
+
+        if (successor.Tag != CellTag.Reference)
         {
-            throw PrologErrors.Type(machine, "integer", successor);
+            // succ(X, 0) has no solution, because 0 is not the successor of a natural number.
+            System.Numerics.BigInteger given = IntegerValue(machine, successor);
+            return given.Sign > 0 && machine.Unify(value, IntegerCell(machine, given - 1));
         }
 
-        // succ(X, 0) has no solution, because 0 is not the successor of a natural number.
-        System.Numerics.BigInteger given = IntegerValue(machine, successor);
-        return given.Sign > 0 && machine.Unify(value, IntegerCell(machine, given - 1));
+        return machine.Unify(successor, IntegerCell(machine, IntegerValue(machine, value) + 1));
+    }
+
+    private static void RequireNaturalOrVariable(Machine machine, Cell cell, bool checkSign)
+    {
+        if (cell.Tag == CellTag.Reference)
+        {
+            return;
+        }
+
+        if (cell.Tag is not (CellTag.Integer or CellTag.BigInteger))
+        {
+            throw PrologErrors.Type(machine, "integer", cell);
+        }
+
+        if (checkSign && IntegerValue(machine, cell).Sign < 0)
+        {
+            throw PrologErrors.Domain(machine, "not_less_than_zero", cell);
+        }
     }
 
     /// <summary><c>plus(?A, ?B, ?Sum)</c>: any one of the three may be the unbound one.</summary>
