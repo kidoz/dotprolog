@@ -183,19 +183,6 @@ public sealed class PrologLayoutLinterTests
     }
 
     [Fact]
-    public void TabsInQuotedTextAreTheirTokensValueRatherThanLayout()
-    {
-        // The reader rejects a raw tab inside a quoted atom, so the reachable case is a character
-        // code whose payload is the tab itself. Reporting it would ask for an unmakeable edit.
-        const string source = "q(0'\t).\n";
-
-        Assert.DoesNotContain(
-            Lint(source, PrologLintOptions.Covington),
-            diagnostic => diagnostic.Id == LintDiagnosticIds.TabCharacter
-        );
-    }
-
-    [Fact]
     public void TabsInCommentsRemainReportable()
     {
         const string source = "q(a).  % comment\twith tab\n";

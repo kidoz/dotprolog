@@ -370,6 +370,18 @@ internal sealed class Lexer
             else
             {
                 code = _text[_position];
+
+                // The character is a single quoted character, so the rule for quoted text holds:
+                // a control or layout character other than the space has to be written as an escape.
+                if (code != ' ' && (char.IsControl((char)code) || IsLayout((char)code)))
+                {
+                    Report(
+                        DiagnosticIds.InvalidQuotedCharacter,
+                        "Control and layout characters in a character-code literal must use an escape sequence.",
+                        SpanFrom(_position)
+                    );
+                }
+
                 Advance();
             }
 

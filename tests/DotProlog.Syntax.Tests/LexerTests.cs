@@ -251,6 +251,26 @@ public sealed class LexerTests
         Assert.Equal(atom, tokens[0].Text);
     }
 
+    [Theory]
+    [InlineData("0'\t")]
+    [InlineData("0'\n")]
+    [InlineData("0'\u0007")]
+    public void RejectsARawControlOrLayoutCharacterAfterACharacterCodeQuote(string text)
+    {
+        Tokenize(text, out List<Diagnostic> diagnostics);
+
+        Assert.Equal(DiagnosticIds.InvalidQuotedCharacter, Assert.Single(diagnostics).Id);
+    }
+
+    [Fact]
+    public void ReadsASpaceAfterACharacterCodeQuote()
+    {
+        List<Token> tokens = Tokenize("0' ", out List<Diagnostic> diagnostics);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(32, tokens[0].Integer);
+    }
+
     [Fact]
     public void StrictModeRejectsSymbolsOutsideAscii()
     {
