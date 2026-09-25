@@ -1161,29 +1161,6 @@ public sealed class PrologEngine : IRuntimeCompiler
         );
 
     /// <inheritdoc />
-    /// <remarks>
-    /// A float beyond the finite range raises <c>representation_error(max_float)</c>, the answer the
-    /// ISO conformity tables list for <c>number_chars(N, "9.9e999")</c>, rather than a syntax error.
-    /// </remarks>
-    public bool TryReadNumber(Machine machine, string text, out Cell number)
-    {
-        ArgumentNullException.ThrowIfNull(machine);
-        ArgumentNullException.ThrowIfNull(text);
-
-        SyntaxTerm? parsed = TermReader.ReadNumber(text, machine.Program.Flags, out IReadOnlyList<Diagnostic> diagnostics);
-        if (parsed is null)
-        {
-            number = default;
-            return diagnostics.Any(diagnostic => diagnostic.Id == DiagnosticIds.FloatOverflow)
-                ? throw PrologErrors.Representation(machine, "max_float")
-                : false;
-        }
-
-        number = TermReifier.ToHeap(machine, parsed, []);
-        return true;
-    }
-
-    /// <inheritdoc />
     public bool TryReadTerm(
         Machine machine,
         TextReader input,

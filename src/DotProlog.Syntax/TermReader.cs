@@ -109,6 +109,11 @@ public sealed class TermReader
     /// name token, quoted or not, then one number token, and nothing after it, not even layout. So
     /// <c>" 1"</c>, <c>"- 1"</c>, and <c>"/**/1"</c> are numbers, and <c>"1 "</c> and <c>"+1"</c> are not.
     /// </summary>
+    /// <remarks>
+    /// The runtime reads these lists with its own <c>NumberReader</c>, since it cannot depend on this
+    /// assembly. This is the reader's view of the same text, built from the lexer itself, and the
+    /// tests hold the two to the same answers.
+    /// </remarks>
     /// <param name="text">The characters of the list.</param>
     /// <param name="flags">Program-owned flags; character conversion does not apply here.</param>
     /// <param name="diagnostics">Why the text is not a number, when it is not.</param>
@@ -117,7 +122,7 @@ public sealed class TermReader
     /// <see cref="FloatTerm"/>; or <see langword="null"/> when the text is not a number or is a float
     /// beyond the finite range, which a <see cref="DiagnosticIds.FloatOverflow"/> diagnostic reports.
     /// </returns>
-    public static SyntaxTerm? ReadNumber(string text, PrologFlags? flags, out IReadOnlyList<Diagnostic> diagnostics)
+    internal static SyntaxTerm? ReadNumber(string text, PrologFlags? flags, out IReadOnlyList<Diagnostic> diagnostics)
     {
         ArgumentNullException.ThrowIfNull(text);
 

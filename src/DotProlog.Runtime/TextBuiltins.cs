@@ -572,8 +572,8 @@ internal static class TextBuiltins
 
     /// <summary>
     /// <c>number_chars/2</c> and <c>number_codes/2</c> (ISO 8.16.7 and 8.16.8). A list that holds the
-    /// whole text decides: it is read as the reader reads a number, and the result is unified with
-    /// the first argument, so <c>number_chars(1.0e9, "1.0E9")</c> holds. Only a partial list, or one
+    /// whole text decides: <see cref="NumberReader"/> reads it as the term reader reads a number, and
+    /// the result is unified with the first argument, so <c>number_chars(1.0e9, "1.0E9")</c> holds. Only a partial list, or one
     /// with a variable in it, leaves a bound number to decide, written out and unified with the list.
     /// </summary>
     private static bool NumberText(Machine machine, Cell number, Cell list, bool chars)
@@ -608,9 +608,18 @@ internal static class TextBuiltins
 
         if (!open)
         {
-            return TryReadNumber(machine, ReadText(machine, elements, chars), out Cell parsed)
-                ? machine.Unify(number, parsed)
-                : throw machine.CreateBall(SyntaxErrorTerm(machine, "illegal_number"), "syntax_error(illegal_number)");
+            NumberReader.Outcome outcome = NumberReader.Read(
+                ReadText(machine, elements, chars),
+                machine.Symbols.CodePoints,
+                machine.Program.Flags.RationalLiterals,
+                out PrologNumber parsed
+            );
+            return outcome switch
+            {
+                NumberReader.Outcome.Number => machine.Unify(number, ArithmeticEvaluator.ToCell(machine, parsed)),
+                NumberReader.Outcome.FloatOverflow => throw PrologErrors.Representation(machine, "max_float"),
+                _ => throw machine.CreateBall(SyntaxErrorTerm(machine, "illegal_number"), "syntax_error(illegal_number)"),
+            };
         }
 
         if (number.Tag == CellTag.Reference)
@@ -654,20 +663,6 @@ internal static class TextBuiltins
         }
 
         return cell;
-    }
-
-    /// <summary>Reads text as a number the way the term reader does, when a compiler is present to read it.</summary>
-    private static bool TryReadNumber(Machine machine, string text, out Cell number) =>
-        machine.Program.RuntimeCompiler is { } compiler
-            ? compiler.TryReadNumber(machine, text, out number)
-            : TryParseNumberCell(machine, text, out number);
-
-    /// <summary>The runtime's own number reader, for when no compiler is present to read with the term reader.</summary>
-    internal static bool TryParseNumberCell(Machine machine, string text, out Cell number)
-    {
-        var read = TryParseNumber(machine, text, out PrologNumber parsed);
-        number = read ? ArithmeticEvaluator.ToCell(machine, parsed) : default;
-        return read;
     }
 
     /// <summary>

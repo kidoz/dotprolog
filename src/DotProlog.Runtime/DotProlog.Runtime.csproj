@@ -13,5 +13,6 @@
         <InternalsVisibleTo Include="DotProlog.CodeGen.CSharp" />
         <InternalsVisibleTo Include="DotProlog.Runtime.Tests" />
         <InternalsVisibleTo Include="DotProlog.Syntax" />
+        <InternalsVisibleTo Include="DotProlog.Syntax.Tests" />
     </ItemGroup>
 </Project>
