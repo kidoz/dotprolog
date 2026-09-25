@@ -134,7 +134,7 @@ internal static class CompiledProgramEmitter
         text.AppendLine("        global::DotProlog.Runtime.SymbolTable symbols = runtime.Symbols;");
         AppendFunctors(text, model);
         AppendBuiltins(text, model);
-        AppendConstants(text, model);
+        text.AppendLine("        global::DotProlog.Runtime.Cell[] constants = CreateConstants(symbols);");
         text.AppendLine(
             CultureInfo.InvariantCulture,
             $"        var compiled = new global::DotProlog.Runtime.CompiledProgram(functors, builtins, constants, {model.Instructions.Count});"
@@ -251,6 +251,19 @@ internal static class CompiledProgramEmitter
             text.AppendLine(CultureInfo.InvariantCulture, $"        {Operation(model, i)};");
         }
 
+        // Keep constant construction out of large registration methods. The expanded strict
+        // corpus exposed incorrect floating constants in a monolithic NativeAOT installation.
+        text.AppendLine();
+        text.AppendLine(
+            "    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]"
+        );
+        text.AppendLine(
+            "    private static global::DotProlog.Runtime.Cell[] CreateConstants(global::DotProlog.Runtime.SymbolTable symbols)"
+        );
+        text.AppendLine("    {");
+        AppendConstants(text, model);
+        text.AppendLine("        return constants;");
+        text.AppendLine("    }");
         text.AppendLine("}");
         return text.ToString();
     }
