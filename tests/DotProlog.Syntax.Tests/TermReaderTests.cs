@@ -31,6 +31,38 @@ public sealed class TermReaderTests
         Assert.Equal("greeting(Hello! World!)", ReadSingle("greeting('Hello! World!')."));
     }
 
+    [Theory]
+    [InlineData("1 \"+\" 2 * 3", "+(1,*(2,3))")]
+    [InlineData("\"-\"7", "-(7)")]
+    [InlineData("\"pair\"(a,b)", "pair(a,b)")]
+    public void AtomValuedDoubleQuotesUseAtomGrammar(string source, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var flags = new PrologFlags();
+        flags.SetDoubleQuotes(DoubleQuotesMode.Atom);
+        ParseResult parsed = TermReader.ReadTerm(source, flags: flags);
+
+        Assert.Empty(parsed.Diagnostics);
+        SyntaxTerm term = Assert.Single(parsed.Clauses);
+        Assert.Equal(expected, Canonical(term));
+        Assert.Equal(0, term.Span.Start);
+        Assert.Equal(source.Length, term.Span.Length);
+    }
+
+    [Fact]
+    public void AtomValuedDoubleQuotedOperatorsStillEnforceAssociativity()
+    {
+        var flags = new PrologFlags();
+        flags.SetDoubleQuotes(DoubleQuotesMode.Atom);
+        ParseResult parsed = TermReader.ReadTerm("a \"=\" b \"=\" c", "quoted.pl", flags: flags);
+
+        Diagnostic diagnostic = Assert.Single(parsed.Diagnostics);
+        Assert.Equal(DiagnosticIds.UnexpectedToken, diagnostic.Id);
+        Assert.Equal("quoted.pl", diagnostic.FileName);
+        Assert.Equal(8, diagnostic.Span.Start);
+        Assert.Equal(3, diagnostic.Span.Length);
+    }
+
     [Fact]
     public void ReadsBackquotedAtom()
     {

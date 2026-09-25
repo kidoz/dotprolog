@@ -39,7 +39,7 @@ public sealed class TermReader
         _conversions = conversions;
         _flags = flags;
         _lexer = new Lexer(text, fileName, diagnostics, conversions, flags);
-        _current = _lexer.Next();
+        _current = ReadToken();
     }
 
     /// <summary>Reads every clause and directive in <paramref name="text"/>.</summary>
@@ -694,7 +694,7 @@ public sealed class TermReader
 
     private Token Peek()
     {
-        _lookahead ??= _lexer.Next();
+        _lookahead ??= ReadToken();
         return _lookahead.Value;
     }
 
@@ -707,7 +707,21 @@ public sealed class TermReader
             return;
         }
 
-        _current = _lexer.Next();
+        _current = ReadToken();
+    }
+
+    private Token ReadToken()
+    {
+        Token token = _lexer.Next();
+        // Atom-valued double quotes have the same grammatical role and operator priority
+        // as other quoted atoms. Normalizing them after parsing is too late (Cor.1 6.3.7).
+        return token.Kind == TokenKind.String && _flags?.DoubleQuotes == DoubleQuotesMode.Atom
+            ? token with
+            {
+                Kind = TokenKind.Atom,
+                Quoted = true,
+            }
+            : token;
     }
 
     private void Report(string id, string message, SourceSpan span) =>
