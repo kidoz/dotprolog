@@ -198,14 +198,26 @@ Writing them was worth it immediately: they found these real defects.
 - Integer `0/0` raised `evaluation_error(undefined)`. An integer zero divisor now always raises
   `evaluation_error(zero_divisor)`; only the float `0.0/0.0`, whose IEEE result is NaN, stays
   `undefined`. `/2` on two integers keeps its documented processor choice of float division.
-- `atom_chars/2`, `atom_codes/2`, `number_chars/2`, and `number_codes/2` parsed the list even
-  when the first argument was bound, so `atom_chars(abc, [X, Y, Z])` raised
-  `instantiation_error`. A bound first argument now decides the direction: it is converted and
-  the result unified with the list, filling unbound elements and failing on a wrong-length list.
+- `atom_chars/2` and `atom_codes/2` parsed the list even when the first argument was bound, so
+  `atom_chars(abc, [X, Y, Z])` raised `instantiation_error`. A bound first argument now decides
+  the direction: it is converted and the result unified with the list, filling unbound elements
+  and failing on a wrong-length list.
+- `number_chars/2` and `number_codes/2` wrote a bound number out and compared the text, so
+  `number_chars(1.0e9, "1.0E9")` failed, and they read the list with a smaller number syntax of
+  their own. A list holding the whole text now decides: it is read with the term reader's number
+  syntax — leading layout and comments, a `-` name token, quoted or not, then one number token and
+  nothing after it — and the result unified with the first argument, with the table's
+  `syntax_error`, `type_error(character, C)`, and `type_error(list, L)` answers for a bound first
+  argument too. Only a partial list, or one with a variable in it, lets a bound number decide.
+  Every case of the ISO conformity table for `number_chars/2` gives one of its allowed answers; a
+  float beyond the finite range is `representation_error(max_float)`, the table's first answer.
 - `atom_number/2` and the number conversions let an oversized float literal become an unprintable
   IEEE infinity and wrapped an oversized radix literal to an arbitrary small integer. They now
-  raise the reader path's `syntax_error(float_overflow)`, and integer conversions of any length
-  answer their exact unbounded value.
+  raise an error — `syntax_error(float_overflow)` for `atom_number/2`, as the reader does, and
+  `representation_error(max_float)` for `number_chars/2` and `number_codes/2` — and integer
+  conversions of any length answer their exact unbounded value.
+- A raw control or layout character after `0'`, such as a newline, is a syntax error, as it is
+  between quotes; `0'\n` is the escape to write instead.
 - `format/3` accepted only the `user_output` and `user_error` aliases and routed both through the
   current output, so `with_output_to/2` captured error text. Stream arguments now resolve through
   the same handle and alias path as `write/2` — real `'$stream'(N)` handles and user aliases
