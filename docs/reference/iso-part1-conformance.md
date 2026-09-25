@@ -28,6 +28,33 @@ gate rejects count drift, unsupported declarations, and changed upstream sources
 predefined-predicate and evaluable-functor inventory is also pinned by
 `IsoPartOneInventoryTests`.
 
+### Focused strict-mode review
+
+The September 2026 review of the local Part 1 publication and its 2007 and 2012 corrections
+added 96 original cases in `tests/conformance/strict_iso_review.pl`. Unlike the 608-case corpus,
+whose harness uses extension predicates and runs in Modern, this fixture uses only standard
+predicates and runs with StrictIso enabled as well as in Modern. It supplements the existing
+inventory; it is not a complete independent certification.
+
+| Reviewed requirements | Implementation and new evidence |
+|---|---|
+| Cor.1 6.3.7, atom-valued double quotes | `TermReader` recognizes their atom grammar before parsing operators and functional notation; reader, source-loading, runtime `read/1`, and generated-code regressions |
+| Cor.1 8.16.4–5 and Cor.2 8.16.4–8, text conversions | `TextBuiltins` validates bound output lists and their elements before unification; partial lists, mismatches, rollback, alternative number spellings, and error terms |
+| Cor.2 8.2.4, 8.4, 8.5.5 | Non-binding subsumption, stable key sorting, output aliasing, and first-occurrence variable order |
+| Cor.1 8.8.1 and 8.14.4 | Clause inspection preserves variable sharing and fresh variables; operator enumeration binds its outputs |
+| Cor.2 7.8.3, 7.8.9, 8.15.4–5 | Meta-goal validation before side effects, caught goal errors, appended arguments, nested calls, full disjunction answer order, and condition commitment |
+| Cor.2 8.9.3–5, 8.11.5, 8.14.3 | Static database permissions, retained empty dynamic procedures, bound stream rejection before truncation, and reserved operator restrictions |
+| Cor.1 and Cor.2 clause 9 | Arithmetic result types, signed division, evaluated error culprits, trigonometric boundaries, and exceptional domains |
+
+`StrictIsoReviewTests` runs the fixture as consulted bytecode and adds host-observable input,
+output, and file-preservation checks. `GeneratedFacadeTests` runs it through generated C# and
+both directions of generated/consulted calls. The strict NativeAOT runner executes all 96 cases
+as generated code and again as runtime-consulted code, for 192 checks.
+
+The local reference set contains no Corrigendum 3 publication, so this review does not constitute
+a fresh licensed-text audit of that correction. Part 2 modules and Part 3 grammars retain their
+[separate evidence ledger](iso-parts2-3-conformance.md); they are outside the Part 1 declaration.
+
 ## Clauses 5 and 6
 
 | Requirement | Covered contract | Evidence |
@@ -206,6 +233,7 @@ the following green:
 3. All 2,304 generated and bidirectional cross-path checks.
 4. The direct and generated NativeAOT runners for every release RID.
 5. The focused parser, compiler, runtime, stream, database, arithmetic, flag, and strict-mode tests.
+6. The 96-case strict review fixture, including its generated, cross-path, and NativeAOT checks.
 
 Any new implementation-defined behavior must be added to the processor-characteristics page and
 covered by an executable test before release.

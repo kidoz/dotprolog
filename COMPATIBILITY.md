@@ -201,7 +201,12 @@ Writing them was worth it immediately: they found these real defects.
 - `atom_chars/2` and `atom_codes/2` parsed the list even when the first argument was bound, so
   `atom_chars(abc, [X, Y, Z])` raised `instantiation_error`. A bound first argument now decides
   the direction: it is converted and the result unified with the list, filling unbound elements
-  and failing on a wrong-length list.
+  and failing on a wrong-length list. The complete list and its bound elements are validated
+  first, including with a bound atom: malformed tails, non-characters, and invalid character
+  codes raise the errors required by Technical Corrigendum 2 rather than merely failing.
+- With `double_quotes=atom`, double-quoted names were normalized after parsing and could not
+  be used as operators or functors. They now use quoted-atom grammar while the term is read,
+  in both source preparation and runtime term input, as Technical Corrigendum 1 requires.
 - `number_chars/2` and `number_codes/2` wrote a bound number out and compared the text, so
   `number_chars(1.0e9, "1.0E9")` failed, and they read the list with a smaller number syntax of
   their own. A list holding the whole text now decides: it is read with the term reader's number

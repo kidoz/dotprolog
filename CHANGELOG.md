@@ -4,6 +4,22 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `atom_chars/2` and `atom_codes/2` validate lists and bound elements even when the atom is
+  already bound, as required by ISO Technical Corrigendum 2. Invalid list tails, characters,
+  and codes raise their ISO errors instead of failing; valid partial lists still unify.
+- With `double_quotes=atom`, double-quoted names participate in operator and functional
+  notation during parsing, as required by ISO Technical Corrigendum 1. This applies to
+  prepared source and runtime term input.
+
+### Added
+
+- 96 standard-only review cases for StrictIso and Modern, with generated C#, bidirectional
+  generated/consulted calls, and NativeAOT coverage, plus reader and side-effect regressions.
+
 ## [0.11.2] — 2026-09-25
 
 ### Fixed
