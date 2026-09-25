@@ -101,13 +101,34 @@ intermediate representation: the generated C# is translated from the clause comp
 instructions, emitted without the VM's first-argument index dispatch.
 
 ```text
-Build time : reader -> loader -> bytecode -> generated C# -> Roslyn -> IL
+SDK build  : reader -> loader -> bytecode -> generated C# -> Roslyn -> IL
+plc build  : reader -> loader -> bytecode -> direct IL emission
 Runtime    : reader -> loader -> bytecode -> DotProlog VM
 ```
 
 Generated applications, facades, and Prolog test hosts do not embed or consult their build-time
 source. Runtime `consult/1`, `ensure_loaded/1`, and database updates remain available and are never
 converted into new CLR IL inside the process.
+
+## Direct IL compiler
+
+`DotProlog.Compiler.Cli` provides `plc`, which uses `DotProlog.CodeGen.IL` to serialize a managed
+PE assembly with `System.Reflection.Metadata`. It emits no C# source. Both build-time backends
+use the portable compilation model in `DotProlog.Compiler/CodeGeneration`.
+
+Each IL block statically calls the same `Machine.CompiledExecution` operation as the corresponding
+C# block. Static delegates register these blocks with the explicit machine. The installation
+image holds only portable symbols, constants, module metadata, and registration/initialization
+order; predicate instructions are IL methods, not serialized bytecode interpreted at startup.
+Runtime consult/assert and the existing standard-library initialization retain their bytecode path.
+
+The generated SDK publishing project replaces `CoreCompile` with a copy of the emitted assembly.
+NativeAOT and the system linker produce the final target-specific executable. This project opts
+out of surrounding `Directory.Build.props` and targets so an unrelated parent build cannot change
+its input assembly. The compiler stages outputs in a sibling directory and publishes the complete
+managed artifact set with a directory move, rejecting existing destinations.
+
+See the [standalone compiler commands](../how-to/publish-nativeaot.md#compile-a-standalone-prolog-file).
 
 ## NativeAOT constraints
 

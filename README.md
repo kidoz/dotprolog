@@ -12,7 +12,8 @@ Russian whose examples all run on DotProlog.
 **Status: early, but usable.** `dotnet new prolog-console` through `dotnet publish -p:PublishAot=true`
 works today, and `dotnet test` discovers Prolog tests under Microsoft.Testing.Platform. `.dplproj`
 predicate bodies compile to generated C# and ordinary CLR IL at build time; source consulted at run
-time compiles to bytecode for an AOT-safe VM. The standalone `plc` compiler is not implemented yet.
+time compiles to bytecode for an AOT-safe VM. The standalone `plc` compiler in this checkout emits
+IL directly and can publish a native executable with NativeAOT. It is not yet a published tool package.
 The packages have been on NuGet.org since 0.2.0 and the current release is 0.14.2: see
 [CHANGELOG.md](CHANGELOG.md) and [COMPATIBILITY.md](COMPATIBILITY.md).
 
@@ -137,6 +138,47 @@ bundles of [widget, gadget]:
   []
 ```
 
+## Standalone compiler: Prolog → IL → NativeAOT
+
+The `plc` project emits an executable .NET assembly directly, without generating C# or invoking
+Roslyn. Run it from this checkout with the .NET 10 SDK:
+
+```sh
+# Emit managed IL and an isolated publishing project.
+dotnet run --project src/DotProlog.Compiler.Cli -- \
+  samples/HelloProlog/hello.pl --output artifacts/hello-il
+
+dotnet artifacts/hello-il/PrologProgram.dll
+
+# Or compile and publish native code in one command (host platform by default).
+dotnet run --project src/DotProlog.Compiler.Cli -- \
+  samples/HelloProlog/hello.pl --output artifacts/hello-native --aot
+```
+
+The native executable is `artifacts/hello-native/native/PrologProgram` (`PrologProgram.exe` on
+Windows). Publishing needs the .NET SDK and the platform's NativeAOT prerequisites. Running the
+published executable needs neither an installed .NET runtime nor Prolog. Cross-OS publishing is
+not supported by this command; use a build host for each target OS.
+
+- Pass source files in load order. Applications start with their `:- initialization(...)` goals.
+- `--mode modern|strict-iso` and `--flag double_quotes=codes|chars|atom|string` select source semantics.
+- `--rid <RID>` chooses the native target with `--aot`; it defaults to the host RID.
+- `--output` must name a new directory. Existing outputs are never overwritten.
+- The managed output includes the required DotProlog DLLs and `PrologProgram.csproj`. Its overridden
+  `CoreCompile` target supplies the already-emitted IL to the SDK. You can publish it later with
+  `dotnet publish artifacts/hello-il/PrologProgram.csproj -c Release -r <RID>`.
+- Compiled predicates are static IL methods sharing the existing machine. Runtime `consult/1`
+  and assertions continue to use its bytecode path. The bundled standard library also retains
+  its existing runtime initialization; this is not a bytecode-free runtime.
+- This compiler builds console applications from `.pl` files. `.dplproj`, `.dpli` facades, and
+  Prolog test projects continue to use the existing SDK backend. Portable PDBs are not emitted yet.
+
+Compiler exit codes are 64 for usage errors, 65 for source diagnostics, 70 for I/O or host errors,
+and 130 for cancellation or publishing timeout. Native publishing failures propagate `dotnet`'s
+exit code and retain the emitted managed artifacts. Generated applications return 0 on success,
+1 when initialization fails, the requested `halt/1` code, or 70 for an uncaught Prolog exception.
+The native publishing timeout is 15 minutes; Ctrl+C terminates the child process tree.
+
 ## Repository layout
 
 | Path | What it is |
@@ -145,6 +187,8 @@ bundles of [widget, gadget]:
 | `src/DotProlog.Runtime` | Tagged terms, heap, trail, choice points, bytecode VM, builtins |
 | `src/DotProlog.Compiler` | Clause analysis, source linting, bytecode lowering, consult and embedding API |
 | `src/DotProlog.CodeGen.CSharp` | `.dpli` contract reader, facade and entry-point generators, and the Prolog-to-C# predicate emitter |
+| `src/DotProlog.CodeGen.IL` | Direct managed PE/IL emission and static program installation |
+| `src/DotProlog.Compiler.Cli` | Standalone `plc` compiler and NativeAOT publishing driver |
 | `src/DotProlog.Build.Tasks` | MSBuild task that runs the generator |
 | `src/DotProlog.Sdk` | The `DotProlog.Sdk` MSBuild SDK package |
 | `src/DotProlog.Templates` | `dotnet new prolog-console`, `prolog-lib`, and `prolog-test` |
@@ -185,16 +229,17 @@ See the `justfile` for the underlying `dotnet` and `uv` commands.
 
 ## How it executes
 
-Two paths share one reader, loader, and clause compiler, and deliberately end differently:
+Build-time backends and runtime consultation share one reader, loader, and clause compiler:
 
 ```text
-Build-time Prolog        : reader -> loader -> bytecode -> generated C# -> Roslyn -> IL -> JIT/NativeAOT
+SDK build-time Prolog    : reader -> loader -> bytecode -> generated C# -> Roslyn -> IL -> JIT/NativeAOT
+Standalone plc          : reader -> loader -> bytecode -> direct IL emission -> JIT/NativeAOT
 Runtime consult / assert : reader -> loader -> bytecode -> AOT-compatible bytecode VM
 ```
 
 A `.dplproj` takes the first path: its predicates become direct-threaded C# blocks at build time, so
-generated applications, facades, and test hosts neither embed nor consult their source. The second
-path never emits CLR IL, so it stays valid inside a NativeAOT process — runtime-loaded predicates
+generated applications, facades, and test hosts neither embed nor consult their source. `plc` lowers
+the same portable compiler model directly into IL blocks. Runtime consultation never emits CLR IL, so it stays valid inside a NativeAOT process — runtime-loaded predicates
 execute as bytecode and are not turned into new machine code. Both drive the same heap, trail, and
 choice-point state, so compiled and consulted predicates call each other freely.
 

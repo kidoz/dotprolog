@@ -26,6 +26,28 @@ On Windows, run `HelloProlog.exe` from the corresponding publish directory. Conf
 application produces the same results as its managed build, and investigate any trimming or AOT
 warnings before distributing it.
 
+## Compile a standalone Prolog file
+
+From a repository checkout, `plc` translates Prolog directly into .NET IL and optionally invokes
+NativeAOT. It is currently a checkout tool, not a published .NET tool package.
+
+```console
+dotnet run --project src/DotProlog.Compiler.Cli -- samples/HelloProlog/hello.pl --output artifacts/hello-native --aot
+./artifacts/hello-native/native/PrologProgram
+```
+
+The output directory must not already exist. The native target defaults to the current host;
+use `--rid` to select another target supported by your build toolchain. Windows produces
+`PrologProgram.exe`. Use `:- initialization(main).` in the source to select the startup goal.
+
+Omit `--aot` to emit the managed assembly and its publishing assets only, then run it with
+`dotnet artifacts/hello-native/PrologProgram.dll`. Multiple input files are compiled in argument
+order. The compiler also accepts `--mode strict-iso` and `--flag double_quotes=chars`.
+
+This path emits no C# source and requires no `.dplproj`. NativeAOT consumes the emitted assembly
+through a generated SDK publishing project. Runtime consultation and standard-library startup
+use the existing bytecode engine; build-time predicates execute the emitted IL blocks.
+
 ## Verify runtime consultation
 
 From the DotProlog repository root, the opt-in integration suite publishes and runs acceptance
