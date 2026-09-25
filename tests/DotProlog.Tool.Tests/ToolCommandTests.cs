@@ -150,6 +150,22 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void RunRunsTheGoalsOfAFileConsultedAtRunTime()
+    {
+        var inner = Source("inner.pl", ":- writeln(inner_directive).\n:- initialization(writeln(inner_init)).\n");
+        var outer = Source(
+            "outer.pl",
+            $":- initialization(main).\n:- initialization(writeln(second)).\nmain :- consult('{inner.Replace('\\', '/')}'), writeln(done).\n"
+        );
+
+        (var exitCode, var output, var error) = Execute("run", outer);
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("done\ninner_directive\ninner_init\nsecond\n", output.ReplaceLineEndings("\n"));
+        Assert.Empty(error);
+    }
+
+    [Fact]
     public void MissingLintInputIsAUsageError()
     {
         (var exitCode, _, var error) = Execute("lint");

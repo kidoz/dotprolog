@@ -592,6 +592,11 @@ public sealed class PrologEngine : IRuntimeCompiler
     /// clearing the queue. A goal that merely fails produces a warning and does not stop the rest;
     /// <c>halt/0</c> and <c>halt/1</c> stop immediately.
     /// </summary>
+    /// <remarks>
+    /// A goal that consults a file queues that file's directives and initialization goals, since the
+    /// machine cannot run them while it is busy. They run as soon as the goal ends, ahead of the goals
+    /// already waiting, which is as close as a queue gets to running them inside the consult.
+    /// </remarks>
     public RunResult RunPendingGoals()
     {
         if (_preparationHalted)
@@ -602,14 +607,37 @@ public sealed class PrologEngine : IRuntimeCompiler
             return RunResult.Halted;
         }
 
-        RunResult result = RunQueue(_pendingDirectives, "directive");
-        if (result == RunResult.Halted)
+        while (_pendingDirectives.Count > 0 || _pendingInitialization.Count > 0)
         {
-            _pendingInitialization.Clear();
-            return result;
+            var directive = _pendingDirectives.Count > 0;
+            List<int> queue = directive ? _pendingDirectives : _pendingInitialization;
+            var address = queue[0];
+            queue.RemoveAt(0);
+            var waiting = _pendingInitialization.Count;
+
+            RunResult result = Machine.Run(address);
+            if (result == RunResult.Halted)
+            {
+                _pendingDirectives.Clear();
+                _pendingInitialization.Clear();
+                return result;
+            }
+
+            if (result == RunResult.Failure)
+            {
+                Output.Write(directive ? "Warning: directive failed.\n" : "Warning: initialization goal failed.\n");
+            }
+
+            var queued = _pendingInitialization.Count - waiting;
+            if (queued > 0)
+            {
+                List<int> consulted = _pendingInitialization.GetRange(waiting, queued);
+                _pendingInitialization.RemoveRange(waiting, queued);
+                _pendingInitialization.InsertRange(0, consulted);
+            }
         }
 
-        return RunQueue(_pendingInitialization, "initialization goal");
+        return RunResult.Success;
     }
 
     private RunResult ExecutePreparationDirective(int address)
@@ -1275,26 +1303,5 @@ public sealed class PrologEngine : IRuntimeCompiler
 
         Cell error = machine.CreateStructure(machine.Symbols.InternFunctor("error", 2), [formal, machine.CreateVariable()]);
         return machine.CreateBall(error, $"existence_error({kind}, {TermWriter.ToDisplayString(machine, culprit)})");
-    }
-
-    private RunResult RunQueue(List<int> queue, string description)
-    {
-        foreach (var address in queue)
-        {
-            RunResult result = Machine.Run(address);
-            if (result == RunResult.Halted)
-            {
-                queue.Clear();
-                return result;
-            }
-
-            if (result == RunResult.Failure)
-            {
-                Output.Write($"Warning: {description} failed.\n");
-            }
-        }
-
-        queue.Clear();
-        return RunResult.Success;
     }
 }
