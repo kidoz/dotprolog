@@ -19,6 +19,20 @@ All notable changes to DotProlog are recorded here. The format follows
 
 - 96 standard-only review cases for StrictIso and Modern, with generated C#, bidirectional
   generated/consulted calls, and NativeAOT coverage, plus reader and side-effect regressions.
+- `freeze/2` and `frozen/2` in `Modern`. A goal frozen on a variable runs as soon as the variable
+  is bound — at the next call, return, builtin, cut, disjunction, or catch frame, the points where
+  SWI-Prolog runs it — so `( freeze(X, fail), X = 1 -> A ; B )` takes `B`, and a woken goal can
+  fail, throw, or leave choice points to backtrack into. Unifying a frozen variable with an unbound
+  one moves its goal there without running it, goals frozen on one variable run in the order they
+  were frozen, freezing is undone on backtracking, and `copy_term/2` freezes copies of the goals on
+  the copy's variables. It works the same in consulted code and in generated C#. `StrictIso`
+  rejects both predicates as extensions.
+
+### Changed
+
+- `length/2` enumerates an open list whose tail has a goal frozen on it instead of raising
+  `resource_error(finite_memory)` for `length(L, L)`, and counts what a woken goal bound, so the
+  `freeze/2` cases of the ISO conformity table for `length/2` fail as the table expects.
 
 ## [0.11.2] — 2026-09-25
 
