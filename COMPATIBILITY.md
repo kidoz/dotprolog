@@ -135,6 +135,10 @@ Writing them was worth it immediately: they found these real defects.
 - Runtime term input validated the bounded tagged-integer range with catchable
   `representation_error(max_integer|min_integer)` while integers were bounded; now
   literals of any length read to their exact unbounded value.
+- The `max_integer` and `min_integer` flags kept reporting the tagged-integer thresholds after
+  integers became unbounded, though `bounded` was `false`. With no integer limits they now have
+  no value: `current_prolog_flag/2` fails for them, as in SWI-Prolog, so the prologue's
+  `current_prolog_flag(max_integer, MI), succ(MI, S)` answers false.
 - Runtime term input enforces the advertised `max_arity` of 255. Reading a compound with 256 or
   more arguments raises catchable `representation_error(max_arity)`, including when the compound
   is nested, without discarding the following stream term.

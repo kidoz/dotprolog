@@ -21,8 +21,8 @@ mode is `Modern`, which keeps the documented extensions.
 | Characteristic | DotProlog choice |
 |---|---|
 | Integer model | Unbounded, promoted from 60-bit tagged fixnums |
-| `min_integer` | −576460752303423488 (the fixnum promotion threshold) |
-| `max_integer` | 576460752303423487 (the fixnum promotion threshold) |
+| `min_integer` | No value; `current_prolog_flag/2` fails |
+| `max_integer` | No value; `current_prolog_flag/2` fails |
 | `bounded` | `false` |
 | Maximum predicate and compound arity | 255 |
 | Float model | Finite IEEE 754 binary64 |
@@ -30,9 +30,11 @@ mode is `Modern`, which keeps the documented extensions.
 
 Integer arithmetic is unbounded: results outside the tagged fixnum range promote to an interned
 big-integer representation, results that re-enter the range normalize back, and source literals of
-any length read to their exact value. The `max_integer` and `min_integer` flags report the fixnum
-bounds the way SWI-Prolog reports its word-size bounds beside GMP; the `max_tagged_integer` and
-`min_tagged_integer` evaluables name the same threshold. Interned big integers live for the
+any length read to their exact value. With no largest or smallest integer, the `max_integer` and
+`min_integer` flags have no value: `current_prolog_flag/2` fails for them in both modes, as it does
+in SWI-Prolog, and `set_prolog_flag/2` raises `domain_error(flag_value, Flag+Value)` for any
+value. The `max_tagged_integer` and `min_tagged_integer` evaluables name the fixnum promotion
+thresholds, 576460752303423487 and −576460752303423488. Interned big integers live for the
 program's lifetime, an embedding consideration beside atom growth. Converting a big integer to a
 float that overflows binary64 raises `evaluation_error(float_overflow)`; a shift count or exponent
 whose result would exceed the big-integer representation raises `resource_error(memory)`. Float

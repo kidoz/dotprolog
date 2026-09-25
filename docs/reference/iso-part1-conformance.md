@@ -195,7 +195,7 @@ certification or proof of correctness for every program and platform.
 | 7.10.3 read options | `variables`, `variable_names`, and `singletons` preserve identity and first-occurrence order | R/D/I/C/A |
 | 7.10.4 write options | `quoted`, `ignore_ops`, `numbervars`, and Corrigendum 3 `variable_names` obey rightmost precedence | R/D/I/C/A |
 | 7.10.5 term writing | Variables, atoms, numbers, compounds, operators, lists, quoting, and canonical form round-trip | R/D/I/C/A |
-| 7.11 integer flags | `bounded`, limits, rounding, and maximum arity expose the documented immutable values | R/D/I/A/P |
+| 7.11 integer flags | `bounded`, rounding, and maximum arity expose the documented immutable values; the unbounded integer limits have none | R/D/I/A/P |
 | 7.11 mutable flags | Character conversion, debug, double quotes, and unknown validate and take effect as documented | R/D/I/A/P |
 | 7.12.1 error effect | Engine-raised errors are catchable `error(Formal, Context)` terms on every execution path | R/D/I/C/CB/BC/A/P |
 | 7.12.2 error classes | Instantiation, type, domain, existence, permission, representation, evaluation, resource, syntax, and system errors are distinguished | R/D/I/C/A |
