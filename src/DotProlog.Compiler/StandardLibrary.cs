@@ -79,6 +79,52 @@ internal static class StandardLibrary
             catch(ignore(Cleanup), _, true),
             throw(Ball).
 
+        % --- Coroutining (freeze/2) -----------------------------------------------------
+        % A goal frozen on a variable runs when the variable is bound: the machine records the
+        % binding and, at the next call, return, builtin, disjunction, or catch frame, calls
+        % '$wakeup'/1 with the Var-Goal pairs it recorded. A variable that was only aliased to
+        % another unbound one passes its goal on to that variable instead of running it. Several
+        % goals frozen on one variable are joined as '$and'(Earlier, Later) and run in that order.
+
+        freeze(Var, Goal) :- var(Var), !, '$freeze'(Var, Goal).
+        freeze(_, Goal) :- call(Goal).
+
+        frozen(Term, Goal) :-
+            term_variables(Term, Vars),
+            '$frozen_goals'(Vars, Goals),
+            '$frozen_conjunction'(Goals, Goal).
+
+        '$frozen_goals'([], []).
+        '$frozen_goals'([Var|Vars], Goals) :-
+            (   '$frozen_goal'(Var, Goal)
+            ->  '$frozen_split'(Goal, Var, Goals, Rest)
+            ;   Goals = Rest
+            ),
+            '$frozen_goals'(Vars, Rest).
+
+        '$frozen_split'('$and'(Earlier, Later), Var, Goals, Rest) :- !,
+            '$frozen_split'(Earlier, Var, Goals, Middle),
+            '$frozen_split'(Later, Var, Middle, Rest).
+        '$frozen_split'(Goal, Var, [freeze(Var, Goal)|Rest], Rest).
+
+        '$frozen_conjunction'([], true).
+        '$frozen_conjunction'([Goal], Goal) :- !.
+        '$frozen_conjunction'([Goal|Goals], (Goal, Conjunction)) :-
+            '$frozen_conjunction'(Goals, Conjunction).
+
+        '$wakeup'([]).
+        '$wakeup'([Var-Goal|Pairs]) :-
+            (   var(Var)
+            ->  '$freeze'(Var, Goal)
+            ;   '$call_frozen'(Goal)
+            ),
+            '$wakeup'(Pairs).
+
+        '$call_frozen'('$and'(Earlier, Later)) :- !,
+            '$call_frozen'(Earlier),
+            '$call_frozen'(Later).
+        '$call_frozen'(Goal) :- call(Goal).
+
         % --- Initialization goals ----------------------------------------------------
         % A loader rewrites the directive initialization(Goal, When) for now, after_load, and
         % main, so these clauses serve a call at run time and report a When it does not know.
@@ -152,14 +198,23 @@ internal static class StandardLibrary
             Extra is N - Count,
             '$length_make'(Extra, Tail).
         '$length_open'(Tail, _, N) :-
-            Tail == N, !,
+            Tail == N,
+            \+ '$frozen_goal'(Tail, _), !,
             throw(error(resource_error(finite_memory), length/2)).
         '$length_open'(Tail, Count, N) :- '$length_grow'(Tail, Count, N).
 
+        % A goal frozen on the tail can bind the rest of the list when the tail is bound, so what
+        % it bound is counted again rather than assumed to be a fresh cell.
+        '$length_grow'(Tail, Count, N) :-
+            nonvar(Tail), !,
+            '$skip_list'(More, Tail, Rest),
+            Total is Count + More,
+            '$length'(Rest, Total, N).
         '$length_grow'([], N, N).
         '$length_grow'([_|T], C0, N) :- C is C0 + 1, '$length_grow'(T, C, N).
 
-        '$length_make'(0, []) :- !.
+        '$length_make'(0, List) :- !, List = [].
+        '$length_make'(N, List) :- nonvar(List), !, length(List, N).
         '$length_make'(N, [_|T]) :- M is N - 1, '$length_make'(M, T).
 
         reverse(L, R) :- '$reverse'(L, [], R).

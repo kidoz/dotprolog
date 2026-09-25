@@ -614,6 +614,47 @@ public sealed class GeneratedFacadeTests
     }
 
     [Fact]
+    public void FrozenGoalsWakeInGeneratedCodeAndAcrossTheBoundary()
+    {
+        ContractReadResult contract = ContractReader.Read(
+            """
+            :- clr_module('Frozen').
+            :- clr_namespace('Generated.Frozen').
+            :- clr_export(check/0, semidet, []).
+            :- clr_export(mixed/0, semidet, []).
+            """,
+            "Generated.Frozen",
+            "frozen.dpli"
+        );
+        Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
+
+        var source = FacadeGenerator.Generate(
+            contract.Contract!,
+            """
+            bind(1).
+            check :-
+                freeze(X, Y = woke), X = go, Y == woke,
+                freeze(A, fail), \+ bind(A),
+                freeze(B, C = done), bind(B), C == done,
+                freeze(D, member(Z, [1, 2])), D = x, Z == 2, !,
+                ( freeze(E, fail), E = 1 -> fail ; true ).
+            mixed :- freeze(X, Y = woke), runtime_bind(X), Y == woke.
+            """,
+            "frozen.pl",
+            Runtime.PrologLanguageMode.Modern
+        );
+
+        Assembly assembly = CompileGenerated(source);
+        Type type = assembly.GetType("Generated.Frozen.FrozenModule")!;
+        var engine = new Compiler.PrologEngine();
+        object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
+        engine.ConsultOrThrow("runtime_bind(1).", "runtime.pl");
+
+        Assert.Equal(true, Call(module, type, "Check"));
+        Assert.Equal(true, Call(module, type, "Mixed"));
+    }
+
+    [Fact]
     public void FacadeCarriesStringConstantsThroughGeneratedCode()
     {
         ContractReadResult contract = ContractReader.Read(

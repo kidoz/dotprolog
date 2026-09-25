@@ -29,6 +29,12 @@ public sealed class BytecodeProgram
     /// <summary>The address an indexed static predicate's choice point resumes at.</summary>
     public const int NextStaticClauseAddress = 5;
 
+    /// <summary>
+    /// The address the goals of bound frozen variables return to, which runs again the instruction
+    /// that found them pending.
+    /// </summary>
+    public const int WakeReturnAddress = 6;
+
     private const int Undefined = -1;
 
     private int[] _code = new int[1024];
@@ -91,7 +97,8 @@ public sealed class BytecodeProgram
         _code[NextClauseAddress] = (int)OpCode.NextClause;
         _code[RedoBuiltinAddress] = (int)OpCode.RedoBuiltin;
         _code[NextStaticClauseAddress] = (int)OpCode.NextStaticClause;
-        CodeLength = 6;
+        _code[WakeReturnAddress] = (int)OpCode.WakeReturn;
+        CodeLength = 7;
     }
 
     /// <summary>The immutable language profile selected before source preparation.</summary>

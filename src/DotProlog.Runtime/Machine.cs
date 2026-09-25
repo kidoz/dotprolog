@@ -37,6 +37,17 @@ public sealed class Machine
     private ValueUndo[] _valueUndo = new ValueUndo[8];
     private int _valueUndoTop;
 
+    // Frozen goals by the heap address of their unbound variable, restored through the trail like
+    // global variables; and the addresses of frozen variables bound since the last wake point.
+    private readonly Dictionary<int, Cell> _frozen = [];
+    private FrozenUndo[] _frozenUndo = new FrozenUndo[8];
+    private int _frozenUndoTop;
+    private bool _hasFrozen;
+    private int[] _woken = new int[16];
+    private int _wokenCount;
+    private readonly HashSet<int> _wakeSeen = [];
+    private readonly List<int> _wakeAddresses = [];
+
     private Cell[] _stack = new Cell[1 << 14];
     private int _stackTop;
     private int _e = -1;
@@ -68,6 +79,9 @@ public sealed class Machine
     private bool _solutionPending;
     private int _currentBuiltin = -1;
     private readonly int _callFunctor;
+    private readonly int _wakeupFunctor;
+    private readonly int _wakePairFunctor;
+    private readonly int _frozenAndFunctor;
     private readonly List<Collection> _collections = [];
     private int _collectDepth;
 
@@ -78,6 +92,9 @@ public sealed class Machine
         _program = program;
         _symbols = program.Symbols;
         _callFunctor = _symbols.InternFunctor("call", 1);
+        _wakeupFunctor = _symbols.InternFunctor("$wakeup", 1);
+        _wakePairFunctor = _symbols.InternFunctor("-", 2);
+        _frozenAndFunctor = _symbols.InternFunctor("$and", 2);
     }
 
     /// <summary>The streams this program has open.</summary>
@@ -330,6 +347,11 @@ public sealed class Machine
 
                 case OpCode.Call:
                 {
+                    if (_wokenCount != 0 && Wake(_pc - 1, code[_pc + 1]))
+                    {
+                        break;
+                    }
+
                     var functorId = code[_pc++];
                     _argumentCount = code[_pc++];
                     _continuation = _pc;
@@ -340,6 +362,11 @@ public sealed class Machine
 
                 case OpCode.Execute:
                 {
+                    if (_wokenCount != 0 && Wake(_pc - 1, code[_pc + 1]))
+                    {
+                        break;
+                    }
+
                     var functorId = code[_pc++];
                     _argumentCount = code[_pc++];
                     _b0 = _b;
@@ -349,6 +376,11 @@ public sealed class Machine
 
                 case OpCode.CallBuiltin:
                 {
+                    if (_wokenCount != 0 && Wake(_pc - 1, code[_pc + 1]))
+                    {
+                        break;
+                    }
+
                     var builtinId = code[_pc++];
                     _argumentCount = code[_pc++];
                     _currentBuiltin = builtinId;
@@ -362,19 +394,43 @@ public sealed class Machine
                 }
 
                 case OpCode.Proceed:
+                    if (_wokenCount != 0 && Wake(_pc - 1, 0))
+                    {
+                        break;
+                    }
+
                     _pc = _continuation;
                     break;
 
+                case OpCode.WakeReturn:
+                    ReturnFromWake();
+                    break;
+
                 case OpCode.Cut:
+                    if (_wokenCount != 0 && Wake(_pc - 1, 0))
+                    {
+                        break;
+                    }
+
                     CutTo((int)_stack[_e + FrameCutBarrier].Integer);
                     break;
 
                 case OpCode.CutTo:
+                    if (_wokenCount != 0 && Wake(_pc - 1, 0))
+                    {
+                        break;
+                    }
+
                     CutTo((int)_stack[_e + FrameHeaderSize + code[_pc++]].Integer);
                     break;
 
                 case OpCode.SoftCut:
                 {
+                    if (_wokenCount != 0 && Wake(_pc - 1, 0))
+                    {
+                        break;
+                    }
+
                     var barrier = (int)_stack[_e + FrameHeaderSize + code[_pc++]].Integer;
                     if (barrier < _b)
                     {
@@ -385,6 +441,11 @@ public sealed class Machine
                 }
 
                 case OpCode.MarkBarrier:
+                    if (_wokenCount != 0 && Wake(_pc - 1, 0))
+                    {
+                        break;
+                    }
+
                     _stack[_e + FrameHeaderSize + code[_pc++]] = Cell.Integer60(_b);
                     break;
 
@@ -394,6 +455,11 @@ public sealed class Machine
 
                 case OpCode.TryBranch:
                 {
+                    if (_wokenCount != 0 && Wake(_pc - 1, 0))
+                    {
+                        break;
+                    }
+
                     // A branch barrier needs no argument registers: each branch reloads its own.
                     _stack[_e + FrameHeaderSize + code[_pc++]] = Cell.Integer60(_b);
                     var savedArity = _argumentCount;
@@ -404,6 +470,11 @@ public sealed class Machine
                 }
 
                 case OpCode.MetaCall:
+                    if (_wokenCount != 0 && Wake(_pc - 1, 1))
+                    {
+                        break;
+                    }
+
                     proved = MetaCall();
                     code = _program.Code;
                     constants = _program.Constants;
@@ -486,6 +557,11 @@ public sealed class Machine
 
                 case OpCode.PushCatch:
                 {
+                    if (_wokenCount != 0 && Wake(_pc - 1, 0))
+                    {
+                        break;
+                    }
+
                     var catcherSlot = code[_pc++];
                     var recovery = code[_pc++];
                     var savedArity = _argumentCount;
@@ -504,6 +580,11 @@ public sealed class Machine
 
                 case OpCode.PopCatch:
                 {
+                    if (_wokenCount != 0 && Wake(_pc - 1, 0))
+                    {
+                        break;
+                    }
+
                     var index = (int)_stack[_e + FrameHeaderSize + code[_pc++]].Integer;
                     var reactivate = code[_pc++];
 
@@ -773,7 +854,17 @@ public sealed class Machine
     {
         private readonly Machine _machine;
 
-        internal CompiledExecution(Machine machine) => _machine = machine;
+        // A generated instruction is a block of its own, so the program counter it was entered at is
+        // its address: where a wake-up returns to run it again.
+        private readonly int _step;
+
+        internal CompiledExecution(Machine machine)
+        {
+            _machine = machine;
+            _step = machine._pc;
+        }
+
+        private bool Woke(int liveArguments) => _machine._wokenCount != 0 && _machine.Wake(_step, liveArguments);
 
         /// <summary>Returns successfully to the current continuation.</summary>
         public bool Stop()
@@ -801,6 +892,11 @@ public sealed class Machine
         /// <summary>Calls a predicate and saves <paramref name="next"/> as its continuation.</summary>
         public bool Call(int functorId, int arity, int next)
         {
+            if (Woke(arity))
+            {
+                return true;
+            }
+
             _machine._argumentCount = arity;
             _machine._continuation = next;
             _machine._b0 = _machine._b;
@@ -810,6 +906,11 @@ public sealed class Machine
         /// <summary>Tail-calls a predicate without changing the continuation.</summary>
         public bool Execute(int functorId, int arity)
         {
+            if (Woke(arity))
+            {
+                return true;
+            }
+
             _machine._argumentCount = arity;
             _machine._b0 = _machine._b;
             return _machine.TryEntryPoint(functorId, out _machine._pc);
@@ -818,6 +919,11 @@ public sealed class Machine
         /// <summary>Calls a native predicate and continues at <paramref name="next"/>.</summary>
         public bool CallBuiltin(int builtinId, int arity, int next)
         {
+            if (Woke(arity))
+            {
+                return true;
+            }
+
             _machine._argumentCount = arity;
             _machine._currentBuiltin = builtinId;
             _machine._pc = next;
@@ -827,6 +933,11 @@ public sealed class Machine
         /// <summary>Returns to the saved continuation.</summary>
         public bool Proceed()
         {
+            if (Woke(0))
+            {
+                return true;
+            }
+
             _machine._pc = _machine._continuation;
             return true;
         }
@@ -834,6 +945,11 @@ public sealed class Machine
         /// <summary>Applies the current predicate's cut and continues.</summary>
         public bool Cut(int next)
         {
+            if (Woke(0))
+            {
+                return true;
+            }
+
             _machine.CutTo((int)_machine._stack[_machine._e + FrameCutBarrier].Integer);
             _machine._pc = next;
             return true;
@@ -842,6 +958,11 @@ public sealed class Machine
         /// <summary>Creates a branch choice point and continues.</summary>
         public bool TryBranch(int slot, int alternative, int next)
         {
+            if (Woke(0))
+            {
+                return true;
+            }
+
             _machine._stack[_machine._e + FrameHeaderSize + slot] = Cell.Integer60(_machine._b);
             var savedArity = _machine._argumentCount;
             _machine._argumentCount = 0;
@@ -854,6 +975,11 @@ public sealed class Machine
         /// <summary>Records the current cut barrier in an environment slot.</summary>
         public bool MarkBarrier(int slot, int next)
         {
+            if (Woke(0))
+            {
+                return true;
+            }
+
             _machine._stack[_machine._e + FrameHeaderSize + slot] = Cell.Integer60(_machine._b);
             _machine._pc = next;
             return true;
@@ -869,6 +995,11 @@ public sealed class Machine
         /// <summary>Cuts to the barrier stored in a slot.</summary>
         public bool CutTo(int slot, int next)
         {
+            if (Woke(0))
+            {
+                return true;
+            }
+
             _machine.CutTo((int)_machine._stack[_machine._e + FrameHeaderSize + slot].Integer);
             _machine._pc = next;
             return true;
@@ -877,6 +1008,11 @@ public sealed class Machine
         /// <summary>Applies soft cut to the branch stored in a slot.</summary>
         public bool SoftCut(int slot, int next)
         {
+            if (Woke(0))
+            {
+                return true;
+            }
+
             var barrier = (int)_machine._stack[_machine._e + FrameHeaderSize + slot].Integer;
             if (barrier < _machine._b)
             {
@@ -890,6 +1026,11 @@ public sealed class Machine
         /// <summary>Calls the callable term in argument register zero.</summary>
         public bool MetaCall(int next)
         {
+            if (Woke(1))
+            {
+                return true;
+            }
+
             _machine._pc = next;
             return _machine.MetaCall();
         }
@@ -897,6 +1038,11 @@ public sealed class Machine
         /// <summary>Pushes a Prolog exception frame.</summary>
         public bool PushCatch(int catcherSlot, int recovery, int next)
         {
+            if (Woke(0))
+            {
+                return true;
+            }
+
             var savedArity = _machine._argumentCount;
             _machine._argumentCount = 0;
             _machine.PushChoicePoint(BytecodeProgram.PopAndFailAddress);
@@ -913,6 +1059,11 @@ public sealed class Machine
         /// <summary>Removes or deactivates a successful Prolog exception frame.</summary>
         public bool PopCatch(int slot, int reactivate, int next)
         {
+            if (Woke(0))
+            {
+                return true;
+            }
+
             var index = (int)_machine._stack[_machine._e + FrameHeaderSize + slot].Integer;
             if (index < _machine._b)
             {
@@ -1352,6 +1503,7 @@ public sealed class Machine
             _continuation = frame.Continuation;
             _b0 = frame.CutBarrier;
             _collectDepth = frame.CollectDepth;
+            _wokenCount = 0;
 
             // Rebuild the ball above the restored heap top, then try the catcher against it.
             var origin = error.Ball!.Materialize(this);
@@ -1725,6 +1877,8 @@ public sealed class Machine
         _solutionPending = false;
         _currentBuiltin = -1;
         _collectDepth = 0;
+        _hasFrozen = false;
+        _wokenCount = 0;
         ExitCode = 0;
     }
 
@@ -1837,6 +1991,13 @@ public sealed class Machine
     {
         _heap[address] = value;
 
+        // Only recorded here: the goal runs at the next wake point, since a binding can happen while
+        // a structure is still being written and must not allocate.
+        if (_hasFrozen && _frozen.ContainsKey(address))
+        {
+            RecordWoken(address);
+        }
+
         // Only bindings older than the newest choice point need undoing; younger cells vanish with the
         // heap. A tentative unification suspends that reasoning and trails everything.
         if (_forceTrail || (_b > 0 && address < _choicePoints[_b - 1].HeapTop))
@@ -1893,6 +2054,21 @@ public sealed class Machine
             else
             {
                 _globals.Remove(undo.KeyAtom);
+            }
+        }
+
+        // Frozen goals unwind the same way, and a trial unification never freezes, so the same
+        // reasoning about tentative marks holds.
+        while (_frozenUndoTop > 0 && _frozenUndo[_frozenUndoTop - 1].TrailMark > mark)
+        {
+            ref FrozenUndo undo = ref _frozenUndo[--_frozenUndoTop];
+            if (undo.HadGoal)
+            {
+                _frozen[undo.Address] = undo.Previous;
+            }
+            else
+            {
+                _frozen.Remove(undo.Address);
             }
         }
     }
@@ -2030,6 +2206,144 @@ public sealed class Machine
         public GlobalVariable Previous;
     }
 
+    /// <summary>
+    /// Freezes <paramref name="goal"/> on the unbound variable at <paramref name="address"/>, after any
+    /// goal already frozen there. Backtracking past this undoes it, through its own sentinel trail
+    /// entry the way a backtrackable global assignment is undone.
+    /// </summary>
+    internal void Freeze(int address, Cell goal)
+    {
+        var hadGoal = _frozen.TryGetValue(address, out Cell previous);
+        Cell frozen = hadGoal ? CreateStructure(_frozenAndFunctor, [previous, goal]) : goal;
+
+        Cell sentinel = NewVariable();
+        if (_tr == _trail.Length)
+        {
+            Array.Resize(ref _trail, _trail.Length * 2);
+        }
+
+        _trail[_tr++] = sentinel.Index;
+
+        if (_frozenUndoTop == _frozenUndo.Length)
+        {
+            Array.Resize(ref _frozenUndo, _frozenUndo.Length * 2);
+        }
+
+        ref FrozenUndo undo = ref _frozenUndo[_frozenUndoTop++];
+        undo.TrailMark = _tr;
+        undo.Address = address;
+        undo.HadGoal = hadGoal;
+        undo.Previous = previous;
+
+        _frozen[address] = frozen;
+        _hasFrozen = true;
+    }
+
+    /// <summary>Whether any variable has a goal frozen on it, which is all a copy needs to know to skip looking.</summary>
+    internal bool HasFrozen => _frozen.Count != 0;
+
+    /// <summary>The goal frozen on the unbound variable at <paramref name="address"/>, if any.</summary>
+    internal bool TryGetFrozen(int address, out Cell goal) => _frozen.TryGetValue(address, out goal);
+
+    private void RecordWoken(int address)
+    {
+        if (_wokenCount == _woken.Length)
+        {
+            Array.Resize(ref _woken, _woken.Length * 2);
+        }
+
+        _woken[_wokenCount++] = address;
+    }
+
+    /// <summary>
+    /// At a wake point, runs the goals of the frozen variables bound since the last one before the
+    /// instruction at <paramref name="resume"/> does its work. A frame keeps the instruction's
+    /// address, the <paramref name="liveArguments"/> registers it still needs, and the caller's
+    /// continuation and cut barrier; <c>'$wakeup'/1</c> then runs the goals and returns through
+    /// <see cref="BytecodeProgram.WakeReturnAddress"/>, which restores all of it and runs the
+    /// instruction again.
+    /// </summary>
+    /// <returns>
+    /// Whether the wake-up was set up; <see langword="false"/> when every recorded binding has since
+    /// been undone, which leaves the instruction to proceed as usual.
+    /// </returns>
+    private bool Wake(int resume, int liveArguments)
+    {
+        _wakeSeen.Clear();
+        _wakeAddresses.Clear();
+        for (var index = 0; index < _wokenCount; index++)
+        {
+            var address = _woken[index];
+
+            // A record can outlive its binding: a trial unification undoes what it bound, and
+            // backtracking undoes the rest without touching this array, which keeps the backtracking
+            // path free of it. Either way the variable is unbound again, or its heap cell was
+            // discarded, and there is nothing to wake.
+            if (
+                address < _h
+                && _heap[address] != Cell.Reference(address)
+                && _frozen.ContainsKey(address)
+                && _wakeSeen.Add(address)
+            )
+            {
+                _wakeAddresses.Add(address);
+            }
+        }
+
+        _wokenCount = 0;
+        if (_wakeAddresses.Count == 0)
+        {
+            return false;
+        }
+
+        Allocate(2 + liveArguments);
+        _stack[_e + FrameHeaderSize] = Cell.Integer60(resume);
+        _stack[_e + FrameHeaderSize + 1] = Cell.Integer60(liveArguments);
+        for (var i = 0; i < liveArguments; i++)
+        {
+            _stack[_e + FrameHeaderSize + 2 + i] = _x[i];
+        }
+
+        Cell pairs = Cell.Atom(_symbols.EmptyList);
+        for (var i = _wakeAddresses.Count - 1; i >= 0; i--)
+        {
+            var address = _wakeAddresses[i];
+            Cell pair = CreateStructure(_wakePairFunctor, [Cell.Reference(address), _frozen[address]]);
+            pairs = CreateList([pair], pairs);
+        }
+
+        _x[0] = pairs;
+        _argumentCount = 1;
+        _continuation = BytecodeProgram.WakeReturnAddress;
+        _b0 = _b;
+        return TryEntryPoint(_wakeupFunctor, out _pc) ? true : throw PrologErrors.UndefinedProcedure(this, _wakeupFunctor);
+    }
+
+    /// <summary>Restores what <see cref="Wake"/> saved and runs its instruction again.</summary>
+    private void ReturnFromWake()
+    {
+        var frame = _e;
+        var resume = (int)_stack[frame + FrameHeaderSize].Integer;
+        var liveArguments = (int)_stack[frame + FrameHeaderSize + 1].Integer;
+        for (var i = 0; i < liveArguments; i++)
+        {
+            _x[i] = _stack[frame + FrameHeaderSize + 2 + i];
+        }
+
+        _argumentCount = liveArguments;
+        _b0 = (int)_stack[frame + FrameCutBarrier].Integer;
+        Deallocate();
+        _pc = resume;
+    }
+
+    private struct FrozenUndo
+    {
+        public int TrailMark;
+        public int Address;
+        public bool HadGoal;
+        public Cell Previous;
+    }
+
     private void PushChoicePoint(int alternative)
     {
         if (_b == _choicePoints.Length)
@@ -2087,6 +2401,7 @@ public sealed class Machine
         _continuation = point.Continuation;
         _b0 = point.CutBarrier;
         _collectDepth = point.CollectDepth;
+
         _pc = point.Alternative;
         return true;
     }

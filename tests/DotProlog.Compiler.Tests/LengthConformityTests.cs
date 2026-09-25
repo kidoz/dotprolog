@@ -6,8 +6,8 @@ namespace DotProlog.Compiler.Tests;
 /// <c>length/2</c> against the ISO conformity table at
 /// https://www.complang.tuwien.ac.at/ulrich/iso-prolog/length, whose case numbers the comments cite.
 /// The length is checked before the list is walked, the walk fails rather than loops on a cyclic
-/// list, and a list with too many elements for a bound length fails at once. The cases that need
-/// <c>freeze/2</c> are left out, since attributed variables are not supported.
+/// list, and a list with too many elements for a bound length fails at once. A goal frozen on the
+/// open tail is woken as the list grows, and what it binds is counted rather than looped over.
 /// </summary>
 public sealed class LengthConformityTests
 {
@@ -21,6 +21,9 @@ public sealed class LengthConformityTests
     [InlineData("L = [a|L], length(L, N)")] // 26
     [InlineData("L = [a|L], length(L, 0)")] // 27
     [InlineData("L = [a|L], length(L, 7)")] // 28
+    [InlineData("freeze(L, L = []), length(L, L)")] // 29
+    [InlineData("freeze(L, L = [_|L]), length(L, N)")] // 30
+    [InlineData("freeze(L, L = [_|L]), N is 2^64, length(L, N)")] // 31
     public void Fails(string goal) => Assert.Equal("false", Outcome(goal));
 
     [Theory]

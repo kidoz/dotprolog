@@ -50,6 +50,8 @@ internal static class TermBuiltins
         registry.Register("string", 1, static machine => machine.Argument(0).Tag == CellTag.String);
         registry.Register("is_list", 1, static machine => TermList.IsProper(machine, machine.Argument(0)));
         registry.Register("$skip_list", 3, SkipList);
+        registry.Register("$freeze", 2, Freeze);
+        registry.Register("$frozen_goal", 2, FrozenGoal);
         registry.Register("ground", 1, static machine => IsGround(machine, machine.Argument(0)));
         registry.Register("acyclic_term", 1, static machine => IsAcyclic(machine, machine.Argument(0)));
     }
@@ -63,6 +65,34 @@ internal static class TermBuiltins
         TermList.TrySkip(machine, machine.Argument(1), out var count, out Cell tail)
         && machine.Unify(machine.Argument(0), Cell.Integer60(count))
         && machine.Unify(machine.Argument(2), tail);
+
+    /// <summary>
+    /// <c>'$freeze'(+Var, +Goal)</c>: freezes <c>Goal</c> on the unbound variable <c>Var</c>, after any
+    /// goal already frozen there. <c>freeze/2</c> in the library calls a bound variable's goal at once.
+    /// </summary>
+    private static bool Freeze(Machine machine)
+    {
+        Cell variable = machine.Argument(0);
+        if (variable.Tag != CellTag.Reference)
+        {
+            throw PrologErrors.Uninstantiation(machine, variable);
+        }
+
+        machine.Freeze(variable.Index, machine.Argument(1));
+        return true;
+    }
+
+    /// <summary>
+    /// <c>'$frozen_goal'(+Var, -Goal)</c>: the goal frozen on an unbound variable, several joined as
+    /// <c>'$and'(Earlier, Later)</c>. Fails for a bound variable or one with nothing frozen on it.
+    /// </summary>
+    private static bool FrozenGoal(Machine machine)
+    {
+        Cell variable = machine.Argument(0);
+        return variable.Tag == CellTag.Reference
+            && machine.TryGetFrozen(variable.Index, out Cell goal)
+            && machine.Unify(machine.Argument(1), goal);
+    }
 
     private static void RegisterComparisons(BuiltinRegistry registry, SymbolTable symbols)
     {
@@ -110,10 +140,48 @@ internal static class TermBuiltins
     /// </remarks>
     private static bool CopyTerm(Machine machine)
     {
-        var buffer = new TermBuffer();
-        var root = buffer.Copy(machine, machine.Argument(0));
-        var origin = buffer.Materialize(machine);
-        return machine.Unify(machine.Argument(1), machine.HeapAt(origin + root));
+        Cell original = machine.Argument(0);
+        Cell frozen = machine.HasFrozen ? FrozenPairs(machine, original) : Cell.Atom(machine.Symbols.EmptyList);
+        if (TermList.IsEmpty(machine, frozen))
+        {
+            var buffer = new TermBuffer();
+            var root = buffer.Copy(machine, original);
+            var origin = buffer.Materialize(machine);
+            return machine.Unify(machine.Argument(1), machine.HeapAt(origin + root));
+        }
+
+        // As in SWI-Prolog, the copy's variables carry copies of the goals frozen on the original's,
+        // so the term and its goals are copied together and the copied goals frozen again.
+        var pairFunctor = machine.Symbols.InternFunctor("-", 2);
+        var together = new TermBuffer();
+        var joined = together.Copy(machine, machine.CreateStructure(pairFunctor, [original, frozen]));
+        var start = together.Materialize(machine);
+        Cell copy = machine.HeapAt(start + joined);
+        List<Cell> pairs = [];
+        TermList.Read(machine, machine.HeapAt(copy.Index + 2), pairs);
+        foreach (Cell pair in pairs)
+        {
+            Cell structure = machine.Dereference(pair);
+            machine.Freeze(machine.Dereference(machine.HeapAt(structure.Index + 1)).Index, machine.HeapAt(structure.Index + 2));
+        }
+
+        return machine.Unify(machine.Argument(1), machine.HeapAt(copy.Index + 1));
+    }
+
+    /// <summary>The <c>Var-Goal</c> pairs of the frozen variables in <paramref name="term"/>, as a list.</summary>
+    private static Cell FrozenPairs(Machine machine, Cell term)
+    {
+        var pairFunctor = machine.Symbols.InternFunctor("-", 2);
+        List<Cell> pairs = [];
+        foreach (var address in CollectVariables(machine, term))
+        {
+            if (machine.TryGetFrozen(address, out Cell goal))
+            {
+                pairs.Add(machine.CreateStructure(pairFunctor, [Cell.Reference(address), goal]));
+            }
+        }
+
+        return TermList.Build(machine, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(pairs));
     }
 
     /// <summary>

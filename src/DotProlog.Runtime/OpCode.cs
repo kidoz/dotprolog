@@ -169,4 +169,11 @@ public enum OpCode
     /// through that choice point's alternative.
     /// </summary>
     NextStaticClause,
+
+    /// <summary>
+    /// Return from running the goals of frozen variables that were bound: restore the argument
+    /// registers the wake frame saved, drop the frame, and run again the instruction that found the
+    /// goals pending. Reached only as the continuation of <c>'$wakeup'/1</c>.
+    /// </summary>
+    WakeReturn,
 }
