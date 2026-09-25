@@ -278,7 +278,7 @@ A `.dplproj` selects its mode with `<DotPrologLanguageMode>`. See the
 | Streams | `open/3,4` text and binary streams, `close/1,2`, configurable EOF actions, `current_stream/1`, `stream_property/2`, `set_stream_position/2`, current-stream selection, EOF inspection, flushing |
 | Reading | term, character, character-code, and byte input/output; `read_term_from_atom/3`, `term_to_atom/2`, `atom_to_term/3`; `char_conversion/2`, `current_char_conversion/2` |
 | Modules | ISO interfaces and bodies with `module/1`, `body/1`, export/import/re-export, `metapredicate/1`, reflection, and `Module:Goal`; Quintus-style declarations in Modern mode |
-| Directives | `:- Goal`, `:- initialization(Goal)`, `halt/0`, `halt/1` |
+| Directives | `:- Goal`, `:- initialization(Goal)`, SWI's `:- initialization(Goal, When)` in Modern mode, `halt/0`, `halt/1` |
 
 Control constructs are compiled in place inside a clause body, so cut scopes the way ISO specifies: opaque in the condition of if-then-else, transparent in its branches, clause-scoped elsewhere. A bootstrap library written in Prolog makes the same constructs reachable when a goal is assembled at run time and passed to `call/1`.
 

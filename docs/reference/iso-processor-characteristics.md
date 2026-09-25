@@ -138,7 +138,9 @@ as host results, while bindings are exposed as solution values.
 file, and shares the containing reader's operator, flag, and character-conversion state.
 `ensure_loaded/1` also acts at its directive position, but canonical file identity ensures that a
 source unit is prepared only once. Initialization goals execute in source order after successful
-preparation. A failing ordinary directive stops preparation; `initialization/1` remains deferred.
+preparation. A failing ordinary directive prints a warning and preparation continues; an error it
+raises and does not catch stops preparation and reaches the host, and `dotnet prolog run` reports
+it with exit status 70. `initialization/1` remains deferred.
 
 Operator and character-conversion directives affect the rest of their load unit and later runtime
 term reading by the same program. Their program-owned tables remain in force for subsequently
