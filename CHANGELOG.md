@@ -4,6 +4,17 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `length/2` no longer loops on a partial list with too many elements for a bound length, such as
+  `length([_|L], 0)`, or with a length that is not a non-negative integer: it fails, or raises
+  `type_error(integer, N)` or `domain_error(not_less_than_zero, N)`, checking the length before
+  the list, as the ISO conformity table for `length/2` has it. A cyclic list fails rather than
+  looping, and `length(L, L)`, which has no finite answer, raises `resource_error(finite_memory)`.
+  A closed list or a bound length still answers without leaving a choice point.
+
 ## [0.11.1] — 2026-09-25
 
 ### Fixed
