@@ -16,9 +16,10 @@ All notable changes to DotProlog are recorded here. The format follows
   `"0X1"` are syntax errors. With a bound first argument, an element that is not a character or a
   list that is not one raises the ISO error instead of failing. A float beyond the finite range is
   `representation_error(max_float)`. Every case of the ISO conformity table for `number_chars/2`
-  now gives an allowed answer.
+  now gives an allowed answer, and a program runs them the same with or without a compiler attached.
 - A raw control or layout character after `0'`, such as a newline or a tab, is a syntax error, as
-  it is between quotes, in both modes; write `0'\n` or `0'\t` instead.
+  it is between quotes, in both modes; write `0'\n` or `0'\t` instead. So is `0'` followed by a
+  line continuation, which denotes no character and was read as 0.
 
 ## [0.11.0] — 2026-09-25
 
