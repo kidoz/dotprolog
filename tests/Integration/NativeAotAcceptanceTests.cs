@@ -68,6 +68,7 @@ public sealed class NativeAotAcceptanceTests
             (var runExit, var runLog) = await RunAsync(executable, [], RepositoryLayout.Root);
             Assert.True(runExit == 0, $"Strict ISO executable failed:\n{runLog}");
             Assert.Contains("strict-iso-native: passed", runLog, StringComparison.Ordinal);
+            Assert.Contains("strict-iso-review-native: 192/192 passed", runLog, StringComparison.Ordinal);
         }
         finally
         {

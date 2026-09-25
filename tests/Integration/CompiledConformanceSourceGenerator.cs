@@ -76,6 +76,19 @@ internal static class CompiledConformanceSourceGenerator
 
     internal static string GenerateStrictIsoSmoke()
     {
+        var reviewSource = File.ReadAllText(Path.Combine(RepositoryLayout.Root, "tests", "conformance", "strict_iso_review.pl"));
+        var reviewCompiled = CompiledProgramEmitter.Generate(
+            [("strict-iso-review.pl", reviewSource)],
+            "__StrictReviewCompiled",
+            [],
+            DotProlog.Runtime.PrologLanguageMode.StrictIso,
+            out IReadOnlyList<Diagnostic> reviewDiagnostics
+        );
+        if (reviewDiagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
+        {
+            throw new InvalidOperationException(string.Join("; ", reviewDiagnostics));
+        }
+
         var compiled = CompiledProgramEmitter.Generate(
             [
                 (
@@ -185,11 +198,43 @@ internal static class CompiledConformanceSourceGenerator
                         return 6;
                     }
 
+                    for (int mode = 0; mode < 2; mode++)
+                    {
+                        var review = new global::DotProlog.Compiler.PrologEngine(
+                            global::DotProlog.Runtime.PrologLanguageMode.StrictIso);
+                        if (mode == 0)
+                        {
+                            __StrictReviewCompiled.Install(review);
+                        }
+                        else if (!review.ConsultText({{Literal(reviewSource)}}, "strict-iso-review.pl").Success)
+                        {
+                            return 7;
+                        }
+
+                        string[] names = review.Query("iso_review_case(Name, _)").Solutions()
+                            .Select(solution => solution["Name"].ToString()).ToArray();
+                        if (names.Length != 96)
+                        {
+                            return 8;
+                        }
+
+                        foreach (string name in names)
+                        {
+                            if (review.Query($"run_iso_review_case({name})").Solutions().Count() != 1)
+                            {
+                                global::System.Console.Error.WriteLine($"strict review mode {mode}: {name}");
+                                return 9;
+                            }
+                        }
+                    }
+
+                    global::System.Console.WriteLine("strict-iso-review-native: 192/192 passed");
                     global::System.Console.WriteLine("strict-iso-native: passed");
                     return 0;
                 }
 
             {{compiled}}
+            {{reviewCompiled}}
             }
             """;
     }
