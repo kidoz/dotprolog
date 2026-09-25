@@ -9,5 +9,10 @@
 
     <ItemGroup>
         <None Include="..\..\samples\HelloProlog\hello.pl" Link="hello.pl" CopyToOutputDirectory="PreserveNewest" />
+        <None
+            Include="..\..\samples\GreymereAdventure\*.pl;..\..\samples\GreymereAdventure\winning_path.txt"
+            Link="GreymereAdventure\%(Filename)%(Extension)"
+            CopyToOutputDirectory="PreserveNewest"
+        />
     </ItemGroup>
 </Project>

@@ -3,6 +3,8 @@
 
 :- module(greymere_adventure, [main/0]).
 
+:- use_module(greymere_art).
+
 :- dynamic here/1.
 :- dynamic player_hp/1.
 :- dynamic holding/1.
@@ -186,35 +188,39 @@ banner :-
     writeln('the keep and stolen the Ember Crown that once guarded Greymere.'),
     nl,
     writeln('Type help. for commands. Every command ends with a period.'),
+    writeln('Type graphics(on). for ANSI art, or graphics(ascii). for uncolored art.'),
     nl.
 
 look :-
     here(Room),
     room_title(Room, Title),
     nl,
-    format('--- ~w ---~n', [Title]),
+    styled(title, '--- ~w ---~n', [Title]),
+    artwork(Room),
     room_description(Room, Description),
     writeln(Description),
     show_enemy(Room),
     show_items(Room),
-    show_exits(Room).
+    show_exits(Room),
+    show_health.
 
 show_enemy(Room) :-
     (   enemy_here(Room, Enemy)
     ->  enemy_name(Enemy, Name),
         enemy_hp(Enemy, Health),
-        format('DANGER: ~w is here (health ~d).~n', [Name, Health])
+        artwork(Enemy),
+        styled(danger, 'DANGER: ~w is here (health ~d).~n', [Name, Health])
     ;   true
     ).
 
 show_items(Room) :-
     forall(
         at(Item, Room),
-        (item_name(Item, Name), format('You see the ~w here.~n', [Name]))
+        (item_name(Item, Name), styled(ember, 'You see the ~w here.~n', [Name]))
     ).
 
 show_exits(Room) :-
-    write('Exits:'),
+    styled(title, 'Exits:', []),
     forall(exit(Room, Direction, _), format(' ~w', [Direction])),
     nl.
 
@@ -231,6 +237,9 @@ help :-
     writeln('  use(healing_draught). use a carried item'),
     writeln('  inventory.            list your equipment'),
     writeln('  status.               show health and combat strength'),
+    writeln('  graphics(on).         enable ANSI colors and illustrations'),
+    writeln('  graphics(ascii).      show illustrations without colors'),
+    writeln('  graphics(off).        return to plain text'),
     writeln('  help.                  show these commands'),
     writeln('  quit.                  leave the story').
 
@@ -251,9 +260,22 @@ status :-
     shield_reduction(Protection),
     format('Health: ~d/14. Weapon damage: ~d. Shield protection: ~d.~n',
         [Health, BaseDamage, Protection]),
+    show_health,
     (   holding(sun_medallion)
     ->  writeln('The sun medallion adds 2 damage against undead creatures.')
     ;   true
+    ).
+
+show_health :-
+    player_hp(Health),
+    health_bar(Health, 14).
+
+graphics(Mode) :-
+    (   set_graphics(Mode)
+    ->  format('Graphics: ~w.~n', [Mode]),
+        artwork(gloamwatch),
+        look
+    ;   writeln('Choose graphics(on)., graphics(ascii)., or graphics(off).')
     ).
 
 % ---------------------------------------------------------------------------
@@ -407,7 +429,7 @@ player_attack(Room, Enemy) :-
     enemy_hp(Enemy, OldHealth),
     NewHealth is OldHealth - Damage,
     enemy_name(Enemy, Name),
-    format('You strike the ~w for ~d damage.~n', [Name, Damage]),
+    styled(ember, 'You strike the ~w for ~d damage.~n', [Name, Damage]),
     retract(enemy_hp(Enemy, OldHealth)),
     (   NewHealth =< 0
     ->  assertz(enemy_hp(Enemy, 0)),
@@ -437,14 +459,15 @@ enemy_turn(Enemy) :-
     player_hp(OldHealth),
     NewHealth is OldHealth - Damage,
     enemy_name(Enemy, Name),
-    format('The ~w hits you for ~d damage.~n', [Name, Damage]),
+    styled(danger, 'The ~w hits you for ~d damage.~n', [Name, Damage]),
     retract(player_hp(OldHealth)),
     (   NewHealth =< 0
     ->  assertz(player_hp(0)),
         assertz(flag(dead))
     ;   assertz(player_hp(NewHealth)),
         format('You have ~d health remaining.~n', [NewHealth])
-    ).
+    ),
+    show_health.
 
 % ---------------------------------------------------------------------------
 % Useful items and endings
@@ -462,8 +485,9 @@ use(healing_draught) :-
     retract(player_hp(OldHealth)),
     assertz(player_hp(NewHealth)),
     retract(holding(healing_draught)),
-    format('Warmth floods your limbs. Your health rises from ~d to ~d.~n',
-        [OldHealth, NewHealth]).
+    styled(life, 'Warmth floods your limbs. Your health rises from ~d to ~d.~n',
+        [OldHealth, NewHealth]),
+    show_health.
 use(sun_medallion) :-
     holding(sun_medallion),
     !,
@@ -483,6 +507,7 @@ use(Item) :-
 ending_victory :-
     assertz(flag(victory)),
     nl,
+    artwork(victory),
     writeln('Elowen lifts the Ember Crown with both hands. Its coal becomes a'),
     writeln('golden flame, and the red star above Gloamwatch goes dark. Across'),
     writeln('Greymere, hearths awaken and the first clean snow begins to fall.'),
@@ -490,14 +515,17 @@ ending_victory :-
     writeln('"You entered the keep as one brave soul," the reeve says.'),
     writeln('"You return as the shield of Greymere."'),
     nl,
-    writeln('                    *** YOU ARE VICTORIOUS ***').
+    styled(ember, '                    *** YOU ARE VICTORIOUS ***', []),
+    nl.
 
 ending_death :-
     nl,
+    artwork(death),
     writeln('Your strength fails, and the dark of Gloamwatch closes over you.'),
     writeln('The red star burns on. Greymere must await another hero.'),
     nl,
-    writeln('                         *** THE END ***').
+    styled(danger, '                         *** THE END ***', []),
+    nl.
 
 farewell :-
     nl,
@@ -519,6 +547,9 @@ do(inventory) :-
 do(status) :-
     !,
     status.
+do(graphics(Mode)) :-
+    !,
+    graphics(Mode).
 do(go(Direction)) :-
     !,
     go(Direction).
@@ -546,7 +577,7 @@ do(Command) :-
 
 loop :-
     nl,
-    write('What do you do? > '),
+    styled(title, 'What do you do? > ', []),
     flush_output,
     read(Command),
     (   Command == quit
