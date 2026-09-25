@@ -7,6 +7,53 @@ namespace DotProlog.Compiler.Tests;
 /// </summary>
 public sealed class ModuleTests : IDisposable
 {
+    [Theory]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    [InlineData(PrologLanguageMode.Modern)]
+    public void InterfaceReaderDirectivesOnlyAffectBodies(PrologLanguageMode mode)
+    {
+        var engine = new PrologEngine(mode);
+        LoadResult loaded = engine.ConsultText(
+            """
+            :- module(words).
+            :- set_prolog_flag(double_quotes, atom).
+            :- set_prolog_flag(char_conversion, on).
+            :- char_conversion(a, b).
+            :- export(a/0).
+            :- op(500, xfx, export).
+            :- end_module(words).
+            :- body(words).
+            'a'.
+            a.
+            text("ok").
+            :- end_body(words).
+            """,
+            "interface-reader.pl"
+        );
+        Assert.Empty(loaded.Diagnostics);
+        Assert.True(engine.Query("predicate_property(words:a, exported)").Prove());
+        Assert.False(engine.Query("predicate_property(words:b, exported)").Prove());
+        Assert.True(engine.Query("words:b, words:text(ok)").Prove());
+    }
+
+    [Theory]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    [InlineData(PrologLanguageMode.Modern)]
+    public void InterfaceOperatorsCannotParseLaterInterfaceTerms(PrologLanguageMode mode)
+    {
+        var engine = new PrologEngine(mode);
+        LoadResult loaded = engine.ConsultText(
+            """
+            :- module(words).
+            :- op(500, xfy, join).
+            :- export(a join b).
+            :- end_module(words).
+            """,
+            "interface-operator.pl"
+        );
+        Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id.StartsWith("DPL0", StringComparison.Ordinal));
+    }
+
     private readonly string _directory = Directory.CreateTempSubdirectory("dotprolog-modules-").FullName;
 
     public void Dispose() => Directory.Delete(_directory, recursive: true);

@@ -602,8 +602,8 @@ public sealed class ProgramLoader
                         is { Name: "op", Arity: 3 }
                             or { Name: "char_conversion", Arity: 2 }
                             or { Name: "set_prolog_flag", Arity: 2 }:
-                    // These directives have already affected lexical preparation at their source
-                    // position. Module-specific reader snapshots are installed by the reader seam.
+                    // The reader seam accumulated these declarations in the module body state
+                    // without changing the syntax of the interface itself.
                     ValidateIsoReaderDirective(readerDirective, diagnostics, fileName, _program.Flags.CodePointCharacters);
                     break;
 

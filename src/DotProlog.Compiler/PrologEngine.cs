@@ -223,7 +223,8 @@ public sealed class PrologEngine : IRuntimeCompiler
                 Program.CharacterConversions,
                 Program.Flags,
                 clause => ExpandInclude(clause, sourceName),
-                moduleReaderState.AtBoundary
+                moduleReaderState.AtBoundary,
+                moduleReaderState.AfterReaderDirective
             );
 
         ParseResult? ExpandInclude(SyntaxTerm clause, string? includingFile)
@@ -300,6 +301,7 @@ public sealed class PrologEngine : IRuntimeCompiler
         private bool _implicitUserActive;
         private bool _moduleText;
         private bool _pendingImplicitUser;
+        private bool _inInterface;
 
         internal IsoModuleReaderState(BytecodeProgram program)
         {
@@ -368,6 +370,7 @@ public sealed class PrologEngine : IRuntimeCompiler
                 }
 
                 Install(startDefinition);
+                _inInterface = marker.Name == "module";
                 _activeModule = startName.Name;
                 return;
             }
@@ -378,7 +381,12 @@ public sealed class PrologEngine : IRuntimeCompiler
                 && _program.Modules.TryGet(endName.Name, out ModuleDefinition? endDefinition)
             )
             {
-                endDefinition!.SeedReaderState(_program.Operators, _program.CharacterConversions, _program.Flags);
+                if (!_inInterface)
+                {
+                    endDefinition!.SeedReaderState(_program.Operators, _program.CharacterConversions, _program.Flags);
+                }
+
+                _inInterface = false;
                 if (_enclosingModules.TryPop(out string? enclosingModule))
                 {
                     ModuleDefinition enclosing = _program.Modules.Declare(enclosingModule);
@@ -402,7 +410,25 @@ public sealed class PrologEngine : IRuntimeCompiler
 
             ObserveImplicitUserTerm();
 
+            if (_inInterface && _activeModule is not null)
+            {
+                // The clause was parsed using the enclosing text state. Apply its declarations
+                // to the future body state, then restore the interface reader before advancing.
+                Install(_program.Modules.Declare(_activeModule));
+            }
+
             ApplyFlagDirective(marker);
+        }
+
+        internal void AfterReaderDirective(SyntaxTerm clause)
+        {
+            if (_inInterface && _activeModule is not null)
+            {
+                _program
+                    .Modules.Declare(_activeModule)
+                    .SeedReaderState(_program.Operators, _program.CharacterConversions, _program.Flags);
+                Restore();
+            }
         }
 
         internal void Restore()

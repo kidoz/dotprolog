@@ -58,6 +58,7 @@ public sealed class TermReader
     /// Optional state transition run after a clause is parsed and before its reader directives or
     /// the first token of the next clause. ISO module interfaces and bodies use this seam.
     /// </param>
+    /// <param name="readerDirectiveApplied">Optional state transition after reader directives and before lexing resumes.</param>
     public static ParseResult ReadProgram(
         string text,
         string? fileName = null,
@@ -65,7 +66,8 @@ public sealed class TermReader
         CharacterConversionTable? characterConversions = null,
         PrologFlags? flags = null,
         Func<SyntaxTerm, ParseResult?>? directiveExpansion = null,
-        Action<SyntaxTerm>? clauseBoundary = null
+        Action<SyntaxTerm>? clauseBoundary = null,
+        Action<SyntaxTerm>? readerDirectiveApplied = null
     )
     {
         ArgumentNullException.ThrowIfNull(text);
@@ -84,6 +86,7 @@ public sealed class TermReader
                 clauseBoundary?.Invoke(clause);
                 reader.ApplyCharacterConversionDirective(clause);
                 reader.ApplyOperatorDirective(clause);
+                readerDirectiveApplied?.Invoke(clause);
 
                 ParseResult? expanded = directiveExpansion?.Invoke(clause);
                 if (expanded is null)
