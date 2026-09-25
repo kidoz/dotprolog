@@ -60,7 +60,7 @@ unchecked option for its second and third arguments, while remaining steadfast i
 An invalid semicontext is rejected during source preparation. Modern mode additionally recognizes
 soft cut as a grammar control extension; StrictIso treats it as an ordinary nonterminal.
 
-The [deep publication review](iso-part1-conformance.md#deep-publication-review) records the
+The [ISO standards review](iso-part1-conformance.md#iso-standards-review) records the
 interface-reader and runtime grammar defects found in the local PDFs and their regression paths.
 The shared 125-case fixture includes 22 grammar cases, with complete solution sequences and
 unreachable-variable branches checked through generated and consulted execution.
