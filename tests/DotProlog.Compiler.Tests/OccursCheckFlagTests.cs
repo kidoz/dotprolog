@@ -126,13 +126,15 @@ public sealed class OccursCheckFlagTests
                     :- initialization((
                         catch(set_prolog_flag(occurs_check, true), error(E, _), true),
                         write(E),
-                        ( current_prolog_flag(occurs_check, _) -> write(enumerated) ; write(absent) )
+                        catch(current_prolog_flag(occurs_check, _), error(ReadError, _), true),
+                        write(ReadError),
+                        ( (current_prolog_flag(F, _), F == occurs_check) -> write(enumerated) ; write(absent) )
                     )).
                     """
                 )
                 .Success
         );
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
-        Assert.Equal("domain_error(prolog_flag,occurs_check)absent", output.ToString());
+        Assert.Equal("domain_error(prolog_flag,occurs_check)domain_error(prolog_flag,occurs_check)absent", output.ToString());
     }
 }

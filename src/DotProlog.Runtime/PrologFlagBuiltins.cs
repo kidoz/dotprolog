@@ -41,9 +41,29 @@ internal static class PrologFlagBuiltins
         Cell pattern = machine.CreateStructure(machine.Symbols.InternFunctor("-", 2), [flag, machine.Argument(offset + 1)]);
 
         var count = FlagCount(machine);
+        uint snapshot = state == 0 ? CaptureFlags(flags) : (uint)(state >> 32);
+        if (state == 0 && flag.Tag == CellTag.Atom && machine.Program.LanguageMode == PrologLanguageMode.StrictIso)
+        {
+            var flagName = machine.Symbols.AtomName(flag.Index);
+            var known = false;
+            for (var index = 0; index < count; index++)
+            {
+                if (ValueAt(machine, snapshot, index).Name == flagName)
+                {
+                    known = true;
+                    break;
+                }
+            }
+
+            if (!known)
+            {
+                throw PrologErrors.Domain(machine, "prolog_flag", flag);
+            }
+        }
+
         for (var index = (int)state; index < count; index++)
         {
-            (var name, Cell value) = ValueAt(machine, flags, index);
+            (var name, Cell value) = ValueAt(machine, snapshot, index);
             Cell candidate = machine.CreateStructure(
                 machine.Symbols.InternFunctor("-", 2),
                 [Cell.Atom(machine.Symbols.InternAtom(name)), value]
@@ -56,7 +76,7 @@ internal static class PrologFlagBuiltins
 
             if (index + 1 < count)
             {
-                machine.PushRetry(index + 1);
+                machine.PushRetry(((long)snapshot << 32) | (uint)(index + 1));
             }
 
             return machine.Unify(pattern, candidate);
@@ -198,7 +218,16 @@ internal static class PrologFlagBuiltins
         return PrologErrors.Domain(machine, "flag_value", culprit);
     }
 
-    private static (string Name, Cell Value) ValueAt(Machine machine, PrologFlags flags, int index) =>
+    // The retry state keeps the initial mutable values in its upper word and the next index
+    // in its lower word. Each enumeration owns its snapshot, including nested module calls.
+    private static uint CaptureFlags(PrologFlags flags) =>
+        (flags.CharConversion ? 1u : 0u)
+        | (flags.Debug ? 2u : 0u)
+        | ((uint)flags.DoubleQuotes << 8)
+        | ((uint)flags.Unknown << 16)
+        | ((uint)flags.OccursCheck << 24);
+
+    private static (string Name, Cell Value) ValueAt(Machine machine, uint snapshot, int index) =>
         index switch
         {
             0 => ("bounded", Atom(machine, "false")),
@@ -206,12 +235,12 @@ internal static class PrologFlagBuiltins
             2 => ("min_integer", Cell.Integer60(Cell.MinInteger)),
             3 => ("integer_rounding_function", Atom(machine, "toward_zero")),
             4 => ("max_arity", Cell.Integer60(Machine.ArgumentRegisterCount - 1)),
-            5 => ("char_conversion", Atom(machine, flags.CharConversion ? "on" : "off")),
-            6 => ("debug", Atom(machine, flags.Debug ? "on" : "off")),
-            7 => ("double_quotes", Atom(machine, DoubleQuotesName(flags.DoubleQuotes))),
-            8 => ("unknown", Atom(machine, UnknownName(flags.Unknown))),
+            5 => ("char_conversion", Atom(machine, (snapshot & 1) != 0 ? "on" : "off")),
+            6 => ("debug", Atom(machine, (snapshot & 2) != 0 ? "on" : "off")),
+            7 => ("double_quotes", Atom(machine, DoubleQuotesName((DoubleQuotesMode)((snapshot >> 8) & 255)))),
+            8 => ("unknown", Atom(machine, UnknownName((UnknownProcedureAction)((snapshot >> 16) & 255)))),
             9 => ("colon_sets_calling_context", Atom(machine, "true")),
-            _ => ("occurs_check", Atom(machine, OccursCheckName(flags.OccursCheck))),
+            _ => ("occurs_check", Atom(machine, OccursCheckName((OccursCheckMode)(snapshot >> 24)))),
         };
 
     private static Cell Atom(Machine machine, string name) => Cell.Atom(machine.Symbols.InternAtom(name));

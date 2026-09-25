@@ -6,6 +6,24 @@ namespace DotProlog.Compiler.Tests;
 public sealed class StrictIsoReviewTests
 {
     [Theory]
+    [InlineData(PrologLanguageMode.StrictIso, "on", "b")]
+    [InlineData(PrologLanguageMode.Modern, "off", "a")]
+    public void CharacterConversionStartsWithTheModeDefault(PrologLanguageMode mode, string flag, string predicate)
+    {
+        var engine = new PrologEngine(mode);
+        Assert.True(engine.Query($"current_prolog_flag(char_conversion, {flag})").Prove());
+        LoadResult loaded = engine.ConsultText(
+            """
+            :- char_conversion(a, b).
+            a.
+            """,
+            "default-conversion.pl"
+        );
+        Assert.Empty(loaded.Diagnostics);
+        Assert.True(engine.Query(predicate).Prove());
+    }
+
+    [Theory]
     [InlineData("1 \"+\" 2 * 3", "1 + 2 * 3")]
     [InlineData("\"-\" 7", "-(7)")]
     [InlineData("\"pair\"(left,right)", "pair(left,right)")]

@@ -5,6 +5,49 @@ namespace DotProlog.Compiler.Tests;
 /// <summary>ISO Prolog-state enumeration, mutation, reader integration, and undefined calls.</summary>
 public sealed class PrologFlagTests
 {
+    [Theory]
+    [InlineData(PrologLanguageMode.StrictIso, false)]
+    [InlineData(PrologLanguageMode.StrictIso, true)]
+    [InlineData(PrologLanguageMode.Modern, false)]
+    [InlineData(PrologLanguageMode.Modern, true)]
+    public void EnumerationKeepsItsInitialValuesAcrossMutationAndNestedCalls(PrologLanguageMode mode, bool inModule)
+    {
+        const string clause = """
+            snapshot :-
+                findall(F-V, current_prolog_flag(F,V), Before),
+                findall(F-V, (current_prolog_flag(F,V),
+                    set_prolog_flag(char_conversion,off), set_prolog_flag(debug,on),
+                    set_prolog_flag(double_quotes,atom), set_prolog_flag(unknown,fail),
+                    current_prolog_flag(debug,on)), After),
+                Before == After, current_prolog_flag(debug,on), current_prolog_flag(unknown,fail).
+            """;
+        var engine = new PrologEngine(mode);
+        string source = inModule
+            ? ":- module(flags). :- export(snapshot/0). :- end_module(flags). :- body(flags).\n"
+                + clause
+                + "\n:- end_body(flags)."
+            : clause;
+        LoadResult loaded = engine.ConsultText(source);
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Single(engine.Query(inModule ? "flags:snapshot" : "snapshot").Solutions());
+    }
+
+    [Fact]
+    public void StrictUnknownFlagRaisesADomainError()
+    {
+        var engine = new PrologEngine(PrologLanguageMode.StrictIso);
+        Assert.True(
+            engine
+                .Query(
+                    """
+                    catch(current_prolog_flag(no_such_flag, _), error(E,_), true),
+                    E == domain_error(prolog_flag,no_such_flag)
+                    """
+                )
+                .Prove()
+        );
+    }
+
     [Fact]
     public void EnumeratesEveryIsoFlagInStableOrder()
     {
