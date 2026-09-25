@@ -271,7 +271,7 @@ samples and exercise NativeAOT.
 
 | Feature | Why |
 |---|---|
-| Constraint solving, tabling, attributed variables | Later roadmap phases — see the [SWI compatibility ledger](docs/reference/swi-compatibility.md). |
+| Constraint solving, tabling, attributed variables | Later roadmap phases; `freeze/2` is supported — see the [SWI compatibility ledger](docs/reference/swi-compatibility.md). |
 
 ## Known differences
 

@@ -36,7 +36,8 @@ a corpus of ledger goals against SWI-Prolog itself and asserts the outputs agree
 | Clause indexing | First-argument indexing in the bytecode VM; SWI-style multi-argument JITI is not planned as such |
 | `unify_with_occurs_check/2`, the `occurs_check` flag | Supported: `false`, `true`, and `error` with SWI's `occurs_check(Var, Term)` error term, guarding general unification (`=/2`, builtins, read-mode head arguments). Divergence: write-mode head unification — an unbound call argument against a structure head embedding the same variable — is not checked and builds the rational tree |
 | Tabling (`:- table`, SLG, WFS) | Absent; a later roadmap phase |
-| Attributed variables, `dif/2`, `freeze/2`, `when/2` | Absent; a later roadmap phase |
+| `freeze/2`, `frozen/2` | Supported, differential-verified: a goal frozen on a variable runs when the variable is bound, at the next call, return, builtin, cut, disjunction, or catch frame — the points where SWI wakes it, so `( freeze(X, fail), X = 1 -> … ; … )` takes the else branch and a woken goal can be backtracked into or throw. Unifying a frozen variable with an unbound one moves the goal to it without running it, two frozen variables join their goals in freezing order, freezing is undone on backtracking, and `copy_term/2` freezes copies of the goals on the copy's variables. Works the same in consulted and generated C# code. Divergences: `findall/3`, `bagof/3`, and `setof/3` do not copy frozen goals; `\=/2` and the other unifiability tests do not run them; and `frozen/2` reports `freeze(V, Goal)` without SWI's `user:` qualifier |
+| Attributed variables (`put_attr/3`, `get_attr/3`, `attr_unify_hook/2`), `dif/2`, `when/2` | Absent; a later roadmap phase |
 | Constraint solvers CLP(FD), CLP(R,Q), CHR | Absent; follows attributed variables on the roadmap |
 | Single-sided unification rules (`=>`) | Absent; a later roadmap phase |
 | Delimited continuations | Absent; a later roadmap phase |

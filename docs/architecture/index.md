@@ -53,6 +53,14 @@ Control constructs compile inline in the containing clause. This preserves ISO c
 control term reached through `call/1` is lowered at run time with a meta-call barrier so the same
 scope rules apply.
 
+A goal frozen with `freeze/2` is kept in a table keyed by its variable's heap address and undone
+through the trail like a backtrackable global variable. Binding that variable only records its
+address, since a binding can happen while a structure is still being written. The next call,
+return, builtin, cut, disjunction, or catch frame is a wake point: it saves its live argument
+registers in a small frame, runs the recorded goals through the library's `'$wakeup'/1`, and
+returns through a reserved instruction that runs the interrupted instruction again, on the bytecode
+and the generated-C# paths alike.
+
 ## Loading and rewriting
 
 `ProgramLoader` first establishes the unit's module, imports, exports, and defined predicates. A
