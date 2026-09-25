@@ -4,6 +4,25 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- SWI-Prolog's `initialization(Goal, When)` directive in `Modern`: `now` runs Goal where the
+  directive stands, `after_load` is `initialization/1`, and `main` runs Goal after every other
+  initialization goal and ends the program with SWI's status — 0 when Goal succeeds, 1 when it fails,
+  and 2 when it raises an error, with SWI's message — so SWI scripts that start with
+  `:- initialization(main, main).` run unchanged. Another When is a
+  `domain_error(initialization_type, When)`. `StrictIso` rejects the directive as an extension.
+
+### Fixed
+
+- `dotnet prolog run` reports an error a directive raises while its file loads, and exits with status
+  70, rather than crashing with an unhandled .NET exception.
+- Consulting a file that has directives or initialization goals from a running goal no longer
+  crashes `RunPendingGoals`, and so `dotnet prolog run`: the file's goals run as soon as the
+  consulting goal ends, ahead of the goals still waiting.
+
 ## [0.10.0] — 2026-09-25
 
 ### Added
