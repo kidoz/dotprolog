@@ -252,7 +252,7 @@ A `.dplproj` selects its mode with `<DotPrologLanguageMode>`. See the
 | Terms | atoms, variables, unbounded integers, rationals, floats, strings, lists, double-quoted character lists, structures |
 | Control | `,/2`, `;/2`, `->/2`, `*->/2`, `\+/1`, `!/0`, `call/1..8`, `once/1`, `repeat/0`, `ignore/1`, `not/1`, `true/0`, `fail/0` |
 | Exceptions | `throw/1`, `catch/3`, with catchable ISO `error/2` terms |
-| All solutions | `findall/3,4`, `bagof/3`, `setof/3`, `forall/2`, `aggregate_all/3,4` and `aggregate/3,4` (`count`, `bag`, `set`, `sum`, `max`, `min`) |
+| All solutions | `findall/3,4`, `bagof/3`, `setof/3`, `forall/2`, `call_nth/2`, `countall/2`, `aggregate_all/3,4` and `aggregate/3,4` (`count`, `bag`, `set`, `sum`, `max`, `min`) |
 | Database | `assertz/1`, `asserta/1`, `retract/1`, `clause/2`, `retractall/1`, `abolish/1`, `:- dynamic` |
 | Ranges | `between/3`, with `inf` as an open upper bound |
 | Loading | `consult/1`, `ensure_loaded/1` at run time |
@@ -263,8 +263,8 @@ A `.dplproj` selects its mode with `<DotPrologLanguageMode>`. See the
 | Type tests | `var/1`, `nonvar/1`, `atom/1`, `number/1`, `integer/1`, `float/1`, `rational/1`, `string/1`, `atomic/1`, `compound/1`, `callable/1`, `is_list/1`, `ground/1` |
 | Text | `atom_length/2`, `atom_chars/2`, `atom_codes/2`, `number_chars/2`, `number_codes/2`, `char_code/2`, `atom_number/2`, `atom_concat/3`, `sub_atom/5`, `atomic_list_concat/2,3`, `upcase_atom/2`, `downcase_atom/2`, `char_type/2`, `code_type/2` |
 | Strings | `atom_string/2`, `string_chars/2`, `string_codes/2`, `string_concat/3`, `string_length/2`, `number_string/2`, `string_to_atom/2`, `term_string/2`, `sub_string/5`, `split_string/4`, `string_code/3`, `string_lower/2`, `string_upper/2` |
-| Lists | `length/2`, `append/3`, `member/2`, `memberchk/2`, `nth0/3`, `nth1/3`, `last/2`, `reverse/2`, `select/3`, `selectchk/3`, `subtract/3`, `intersection/3`, `union/3`, `delete/3`, `list_to_set/2`, `permutation/2`, `flatten/2`, `numlist/3`, `sum_list/2`, `max_list/2`, `min_list/2`, `max_member/2`, `min_member/2`, `pairs_keys_values/3`, `pairs_keys/2`, `pairs_values/2`, `transpose_pairs/2` |
-| Higher order | `maplist/2..5`, `foldl/4..6`, `include/3`, `exclude/3`, `partition/4` |
+| Lists | `length/2`, `append/3`, `member/2`, `memberchk/2`, `nth0/3,4`, `nth1/3,4`, `last/2`, `reverse/2`, `select/3`, `selectchk/3`, `subtract/3`, `intersection/3`, `union/3`, `delete/3`, `list_to_set/2`, `permutation/2`, `flatten/2`, `numlist/3`, `sum_list/2`, `max_list/2`, `min_list/2`, `max_member/2`, `min_member/2`, `pairs_keys_values/3`, `pairs_keys/2`, `pairs_values/2`, `transpose_pairs/2` |
+| Higher order | `maplist/2..8`, `foldl/4..6`, `include/3`, `exclude/3`, `partition/4` |
 | Sorting | `sort/2`, `sort/4`, `msort/2`, `keysort/2`, `predsort/3` |
 | Ordered sets | `list_to_ord_set/2`, `ord_empty/1`, `ord_memberchk/2`, `ord_subset/2`, `ord_disjoint/2`, `ord_union/2,3`, `ord_intersection/2,3`, `ord_subtract/3`, `ord_add_element/3`, `ord_del_element/3` |
 | Assocs | AVL association lists: `empty_assoc/1`, `put_assoc/4`, `get_assoc/3`, `list_to_assoc/2`, `ord_list_to_assoc/2`, `assoc_to_list/2`, `assoc_to_keys/2`, `assoc_to_values/2`, `min_assoc/3`, `max_assoc/3`, `del_assoc/4` |
