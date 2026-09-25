@@ -217,7 +217,8 @@ Writing them was worth it immediately: they found these real defects.
   `representation_error(max_float)` for `number_chars/2` and `number_codes/2` — and integer
   conversions of any length answer their exact unbounded value.
 - A raw control or layout character after `0'`, such as a newline, is a syntax error, as it is
-  between quotes; `0'\n` is the escape to write instead.
+  between quotes; `0'\n` is the escape to write instead. `0'` followed by a line continuation,
+  which denotes no character, is a syntax error too rather than 0.
 - `format/3` accepted only the `user_output` and `user_error` aliases and routed both through the
   current output, so `with_output_to/2` captured error text. Stream arguments now resolve through
   the same handle and alias path as `write/2` — real `'$stream'(N)` handles and user aliases
