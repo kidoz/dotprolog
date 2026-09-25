@@ -263,6 +263,17 @@ public sealed class LexerTests
     }
 
     [Fact]
+    public void RejectsALineContinuationAsTheCharacterOfACharacterCode()
+    {
+        Tokenize("0'\\\nx", out List<Diagnostic> diagnostics);
+
+        Diagnostic diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(DiagnosticIds.InvalidNumber, diagnostic.Id);
+        Assert.Equal(1, diagnostic.Span.Line);
+        Assert.Equal(1, diagnostic.Span.Column);
+    }
+
+    [Fact]
     public void ReadsASpaceAfterACharacterCodeQuote()
     {
         List<Token> tokens = Tokenize("0' ", out List<Diagnostic> diagnostics);

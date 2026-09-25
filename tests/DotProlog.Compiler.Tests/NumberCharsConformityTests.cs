@@ -61,6 +61,14 @@ public sealed class NumberCharsConformityTests
     [InlineData("number_chars(N, \"'+'1\")")] // 50
     public void TextThatIsNotANumberIsASyntaxError(string goal) => Assert.Equal("syntax_error", Outcome(goal));
 
+    // 0' followed by a line continuation: the escape denotes no character, so there is no code.
+    [Theory]
+    [InlineData("number_chars(N, ['0', '\\'', '\\\\', '\\n'])")]
+    [InlineData("number_chars(N, ['0', '\\'', '\\\\', '\\n', a])")]
+    [InlineData("number_codes(N, [48, 39, 92, 10])")]
+    [InlineData("number_codes(N, [48, 39, 92, 10, 97])")]
+    public void ACharacterCodeLiteralNeedsACharacter(string goal) => Assert.Equal("syntax_error", Outcome(goal));
+
     [Theory]
     [InlineData("number_chars(1, [[]])", "type_error(character,[])")] // 6
     [InlineData("number_chars(1, [' ', []])", "type_error(character,[])")] // 7

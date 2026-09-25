@@ -350,7 +350,20 @@ internal sealed class Lexer
             if (_text[_position] == '\\')
             {
                 var builder = new StringBuilder();
+                var reported = _diagnostics.Count;
+                SourceSpan quote = SpanFrom(start);
                 ReadEscape(builder);
+
+                // A line continuation denotes no character, so it leaves the literal without one.
+                if (builder.Length == 0 && _diagnostics.Count == reported)
+                {
+                    Report(
+                        DiagnosticIds.InvalidNumber,
+                        "A character-code literal needs a character, not a line continuation.",
+                        quote
+                    );
+                }
+
                 code =
                     builder.Length == 0 ? 0
                     : CodePoints && builder.Length == 2 && char.IsHighSurrogate(builder[0])
