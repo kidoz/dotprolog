@@ -1,0 +1,320 @@
+using System.Globalization;
+using System.Reflection;
+using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
+using System.Reflection.PortableExecutable;
+using System.Security.Cryptography;
+using System.Text;
+using DotProlog.Compiler;
+using DotProlog.Runtime;
+using DotProlog.Syntax;
+using Machine = DotProlog.Runtime.Machine;
+
+namespace DotProlog.CodeGen.IL;
+
+/// <summary>Compiles Prolog directly into an executable ECMA-335 assembly without generating C#.</summary>
+public static class IlAssemblyEmitter
+{
+    /// <summary>The generated type exposing Main and Install(PrologEngine).</summary>
+    public const string ProgramTypeName = "DotProlog.Generated.PrologProgram";
+
+    /// <summary>Writes an assembly on success; on source errors returns diagnostics without writing to the stream.</summary>
+    /// <param name="sources">Source units in loading order.</param>
+    /// <param name="assemblyName">Simple managed assembly name.</param>
+    /// <param name="output">Destination stream, left open.</param>
+    /// <param name="languageMode">Language profile used for source and the generated application.</param>
+    /// <param name="flagOverrides">Initial flag overrides.</param>
+    public static IReadOnlyList<Diagnostic> Emit(
+        IReadOnlyList<(string Name, string Text)> sources,
+        string assemblyName,
+        Stream output,
+        PrologLanguageMode languageMode = PrologLanguageMode.Modern,
+        PrologFlagOverrides? flagOverrides = null
+    )
+    {
+        ArgumentNullException.ThrowIfNull(sources);
+        ArgumentException.ThrowIfNullOrWhiteSpace(assemblyName);
+        ArgumentNullException.ThrowIfNull(output);
+        var model = CompiledProgramBuilder.Compile(
+            sources,
+            [],
+            languageMode,
+            flagOverrides ?? PrologFlagOverrides.None,
+            out var diagnostics
+        );
+        if (model is null)
+        {
+            return diagnostics;
+        }
+        WriteAssembly(model, assemblyName, output);
+        return diagnostics;
+    }
+
+    private static void WriteAssembly(CompiledProgramModel model, string name, Stream output)
+    {
+        var metadata = new IlMetadata();
+        var builder = metadata.Builder;
+        var image = InstallationImage.Encode(model);
+        var identity = new StringBuilder(name).Append('\0').Append(image);
+        foreach (var instruction in model.Instructions)
+        {
+            identity.Append(
+                CultureInfo.InvariantCulture,
+                $"|{instruction.OpCode}:{instruction.First}:{instruction.Second}:{instruction.FirstReference}:{instruction.NextAddress}"
+            );
+        }
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(identity.ToString()));
+        builder.AddModule(
+            0,
+            builder.GetOrAddString(name + ".dll"),
+            builder.GetOrAddGuid(new Guid(hash.AsSpan(0, 16))),
+            default,
+            default
+        );
+        builder.AddAssembly(
+            builder.GetOrAddString(name),
+            new Version(1, 0, 0, 0),
+            default,
+            default,
+            default,
+            AssemblyHashAlgorithm.Sha256
+        );
+        builder.AddTypeDefinition(
+            TypeAttributes.NotPublic,
+            default,
+            builder.GetOrAddString("<Module>"),
+            default,
+            MetadataTokens.FieldDefinitionHandle(1),
+            MetadataTokens.MethodDefinitionHandle(1)
+        );
+        builder.AddTypeDefinition(
+            TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed,
+            builder.GetOrAddString("DotProlog.Generated"),
+            builder.GetOrAddString("PrologProgram"),
+            metadata.TypeReference(typeof(object)),
+            MetadataTokens.FieldDefinitionHandle(1),
+            MetadataTokens.MethodDefinitionHandle(1)
+        );
+        var bodies = new MethodBodyStreamEncoder(new BlobBuilder());
+        var blockSignature = metadata.Signature(
+            false,
+            typeof(bool),
+            typeof(Machine.CompiledExecution).MakeByRefType(),
+            typeof(CompiledProgram)
+        );
+        for (var i = 0; i < model.Instructions.Count; i++)
+        {
+            var il = new InstructionEncoder(new BlobBuilder());
+            EmitOperation(metadata, il, model, model.Instructions[i]);
+            AddMethod(metadata, bodies, "Block" + i.ToString(CultureInfo.InvariantCulture), blockSignature, il, isPublic: false);
+        }
+        var createBlocks = EmitBlockArray(metadata, bodies, model.Instructions.Count);
+        var install = new InstructionEncoder(new BlobBuilder());
+        install.LoadArgument(0);
+        install.LoadString(builder.GetOrAddUserString(image));
+        install.Call(createBlocks);
+        install.Call(
+            metadata.Method(
+                typeof(IlProgramHost),
+                nameof(IlProgramHost.Install),
+                false,
+                typeof(int[]),
+                typeof(PrologEngine),
+                typeof(string),
+                typeof(CompiledPredicateBlock[])
+            )
+        );
+        install.OpCode(ILOpCode.Ret);
+        AddMethod(metadata, bodies, "Install", metadata.Signature(false, typeof(int[]), typeof(PrologEngine)), install);
+        var main = new InstructionEncoder(new BlobBuilder());
+        main.LoadString(builder.GetOrAddUserString(image));
+        main.Call(createBlocks);
+        main.Call(
+            metadata.Method(
+                typeof(IlProgramHost),
+                nameof(IlProgramHost.Run),
+                false,
+                typeof(int),
+                typeof(string),
+                typeof(CompiledPredicateBlock[])
+            )
+        );
+        main.OpCode(ILOpCode.Ret);
+        var entry = AddMethod(metadata, bodies, "Main", metadata.Signature(false, typeof(int)), main);
+        var pe = new ManagedPEBuilder(
+            PEHeaderBuilder.CreateExecutableHeader(),
+            new MetadataRootBuilder(builder),
+            bodies.Builder,
+            entryPoint: entry,
+            flags: CorFlags.ILOnly,
+            deterministicIdProvider: blobs =>
+                BlobContentId.FromHash(SHA256.HashData(blobs.SelectMany(blob => blob.GetBytes()).ToArray()))
+        );
+        var content = new BlobBuilder();
+        pe.Serialize(content);
+        content.WriteContentTo(output);
+    }
+
+    private static MethodDefinitionHandle AddMethod(
+        IlMetadata metadata,
+        MethodBodyStreamEncoder bodies,
+        string name,
+        BlobHandle signature,
+        InstructionEncoder il,
+        bool isPublic = true
+    ) =>
+        metadata.Builder.AddMethodDefinition(
+            (isPublic ? MethodAttributes.Public : MethodAttributes.Private)
+                | MethodAttributes.Static
+                | MethodAttributes.HideBySig,
+            MethodImplAttributes.IL,
+            metadata.Builder.GetOrAddString(name),
+            signature,
+            bodies.AddMethodBody(il, maxStack: 8),
+            MetadataTokens.ParameterHandle(1)
+        );
+
+    private static MethodDefinitionHandle EmitBlockArray(IlMetadata metadata, MethodBodyStreamEncoder bodies, int count)
+    {
+        var il = new InstructionEncoder(new BlobBuilder());
+        il.LoadConstantI4(count);
+        il.OpCode(ILOpCode.Newarr);
+        il.Token(metadata.TypeReference(typeof(CompiledPredicateBlock)));
+        var constructor = metadata.Method(
+            typeof(CompiledPredicateBlock),
+            ".ctor",
+            true,
+            typeof(void),
+            typeof(object),
+            typeof(nint)
+        );
+        for (var i = 0; i < count; i++)
+        {
+            il.OpCode(ILOpCode.Dup);
+            il.LoadConstantI4(i);
+            il.OpCode(ILOpCode.Ldnull);
+            il.OpCode(ILOpCode.Ldftn);
+            il.Token(MetadataTokens.MethodDefinitionHandle(i + 1));
+            il.OpCode(ILOpCode.Newobj);
+            il.Token(constructor);
+            il.OpCode(ILOpCode.Stelem_ref);
+        }
+        il.OpCode(ILOpCode.Ret);
+        return AddMethod(
+            metadata,
+            bodies,
+            "CreateBlocks",
+            metadata.Signature(false, typeof(CompiledPredicateBlock[])),
+            il,
+            isPublic: false
+        );
+    }
+
+    private static void EmitOperation(
+        IlMetadata metadata,
+        InstructionEncoder il,
+        CompiledProgramModel model,
+        CompiledInstruction instruction
+    )
+    {
+        List<Type> parameters = [];
+        il.LoadArgument(0);
+        void Integer(int value)
+        {
+            il.LoadConstantI4(value);
+            parameters.Add(typeof(int));
+        }
+        void Reference(string method, int value, Type result)
+        {
+            il.LoadArgument(1);
+            il.LoadConstantI4(value);
+            il.Call(metadata.Method(typeof(CompiledProgram), method, true, result, typeof(int)));
+            parameters.Add(result);
+        }
+        void Target(int address)
+        {
+            if (model.InstructionByAddress.TryGetValue(address, out var index))
+            {
+                Reference(nameof(CompiledProgram.Target), index, typeof(int));
+            }
+            else
+            {
+                Integer(address);
+            }
+        }
+        var op = instruction.OpCode;
+        switch (op)
+        {
+            case OpCode.Stop:
+            case OpCode.Proceed:
+            case OpCode.Fail:
+                break;
+            case OpCode.Call:
+            case OpCode.Execute:
+            case OpCode.CallBuiltin:
+            case OpCode.GetStructureArgument:
+            case OpCode.GetStructureSlot:
+            case OpCode.PutStructureArgument:
+            case OpCode.PutStructureSlot:
+                Reference(
+                    op == OpCode.CallBuiltin ? nameof(CompiledProgram.Builtin) : nameof(CompiledProgram.Functor),
+                    instruction.FirstReference,
+                    typeof(int)
+                );
+                Integer(instruction.Second);
+                break;
+            case OpCode.EnterDynamic:
+                Reference(nameof(CompiledProgram.Functor), instruction.FirstReference, typeof(int));
+                break;
+            case OpCode.GetConstant:
+            case OpCode.PutConstant:
+                Reference(nameof(CompiledProgram.Constant), instruction.FirstReference, typeof(Cell));
+                Integer(instruction.Second);
+                break;
+            case OpCode.UnifyConstant:
+                Reference(nameof(CompiledProgram.Constant), instruction.FirstReference, typeof(Cell));
+                break;
+            case OpCode.TryBranch:
+            case OpCode.PushCatch:
+            case OpCode.PopCatch:
+                Integer(instruction.First);
+                Target(instruction.Second);
+                break;
+            case OpCode.Jump:
+            case OpCode.TryMeElse:
+            case OpCode.RetryMeElse:
+                Target(instruction.First);
+                break;
+            case OpCode.GetVariable:
+            case OpCode.GetValue:
+            case OpCode.PutVariable:
+            case OpCode.PutValue:
+                Integer(instruction.First);
+                Integer(instruction.Second);
+                break;
+            case OpCode.Allocate:
+            case OpCode.MarkBarrier:
+            case OpCode.CutTo:
+            case OpCode.SoftCut:
+            case OpCode.ReactivateCatch:
+            case OpCode.UnifyVariable:
+            case OpCode.UnifyValue:
+            case OpCode.InitVariable:
+                Integer(instruction.First);
+                break;
+            case OpCode.Deallocate:
+            case OpCode.Cut:
+            case OpCode.MetaCall:
+            case OpCode.TrustMe:
+                break;
+            default:
+                throw new InvalidOperationException($"Opcode {op} cannot be emitted as IL.");
+        }
+        if (op is not (OpCode.Stop or OpCode.Proceed or OpCode.Fail or OpCode.Execute or OpCode.EnterDynamic or OpCode.Jump))
+        {
+            Target(instruction.NextAddress);
+        }
+        il.Call(metadata.Method(typeof(Machine.CompiledExecution), op.ToString(), true, typeof(bool), [.. parameters]));
+        il.OpCode(ILOpCode.Ret);
+    }
+}

@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <ItemGroup>
+        <ProjectReference Include="../DotProlog.Compiler/DotProlog.Compiler.csproj" />
+        <InternalsVisibleTo Include="DotProlog.CodeGen.IL.Tests" />
+    </ItemGroup>
+</Project>
