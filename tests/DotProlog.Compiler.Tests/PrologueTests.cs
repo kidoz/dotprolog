@@ -3,8 +3,7 @@ namespace DotProlog.Compiler.Tests;
 /// <summary>
 /// The predicates of the Prolog prologue, https://www.complang.tuwien.ac.at/ulrich/iso-prolog/prologue,
 /// against the examples of its drafts, including those for <c>call_nth/2</c> and <c>countall/2</c>. Each
-/// goal's solutions are collected, or its error reported, and compared with the draft's answer; the
-/// cases that assume bounded integers are left out, since integers are unbounded here.
+/// goal's solutions are collected, or its error reported, and compared with the draft's answer.
 /// </summary>
 public sealed class PrologueTests
 {
@@ -37,6 +36,7 @@ public sealed class PrologueTests
     [InlineData("succ(1, 1+1)", "error(type_error(integer,1+1))")]
     [InlineData("succ(X, 0)", "[]")]
     [InlineData("succ(-1, S)", "error(domain_error(not_less_than_zero,-1))")]
+    [InlineData("current_prolog_flag(max_integer, MI), succ(MI, S)", "[]")]
     [InlineData("maplist(>(3), [1, 2])", "[maplist(>(3),[1,2])]")]
     [InlineData("maplist(>(3), [1, 2, 3])", "[]")]
     [InlineData("nth0(1, [a,b,c], E)", "[nth0(1,[a,b,c],b)]")]

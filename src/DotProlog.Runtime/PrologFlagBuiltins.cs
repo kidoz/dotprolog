@@ -3,11 +3,15 @@ namespace DotProlog.Runtime;
 /// <summary>ISO predicates that inspect and change Prolog execution flags.</summary>
 internal static class PrologFlagBuiltins
 {
-    private const int IsoFlagCount = 10;
+    private const int IsoFlagCount = 8;
 
     // occurs_check sits past the ISO flags, so the strict mode's count simply excludes it.
     private static int FlagCount(Machine machine) =>
         machine.Program.LanguageMode == PrologLanguageMode.StrictIso ? IsoFlagCount : IsoFlagCount + 1;
+
+    // Integers are unbounded, so the ISO flags max_integer and min_integer name no value:
+    // reading one fails, as in SWI-Prolog, and no value is appropriate to set.
+    private static bool IsIntegerLimit(string name) => name is "max_integer" or "min_integer";
 
     internal static void Register(BuiltinRegistry registry)
     {
@@ -45,7 +49,7 @@ internal static class PrologFlagBuiltins
         if (state == 0 && flag.Tag == CellTag.Atom && machine.Program.LanguageMode == PrologLanguageMode.StrictIso)
         {
             var flagName = machine.Symbols.AtomName(flag.Index);
-            var known = false;
+            var known = IsIntegerLimit(flagName);
             for (var index = 0; index < count; index++)
             {
                 if (ValueAt(machine, snapshot, index).Name == flagName)
@@ -122,8 +126,7 @@ internal static class PrologFlagBuiltins
                 value
             ),
             "bounded" => RejectReadOnly(machine, name, value, Cell.Atom(machine.Symbols.InternAtom("false"))),
-            "max_integer" => RejectReadOnly(machine, name, value, Cell.Integer60(Cell.MaxInteger)),
-            "min_integer" => RejectReadOnly(machine, name, value, Cell.Integer60(Cell.MinInteger)),
+            "max_integer" or "min_integer" => throw InvalidValue(machine, name, value),
             "integer_rounding_function" => RejectReadOnly(
                 machine,
                 name,
@@ -231,15 +234,13 @@ internal static class PrologFlagBuiltins
         index switch
         {
             0 => ("bounded", Atom(machine, "false")),
-            1 => ("max_integer", Cell.Integer60(Cell.MaxInteger)),
-            2 => ("min_integer", Cell.Integer60(Cell.MinInteger)),
-            3 => ("integer_rounding_function", Atom(machine, "toward_zero")),
-            4 => ("max_arity", Cell.Integer60(Machine.ArgumentRegisterCount - 1)),
-            5 => ("char_conversion", Atom(machine, (snapshot & 1) != 0 ? "on" : "off")),
-            6 => ("debug", Atom(machine, (snapshot & 2) != 0 ? "on" : "off")),
-            7 => ("double_quotes", Atom(machine, DoubleQuotesName((DoubleQuotesMode)((snapshot >> 8) & 255)))),
-            8 => ("unknown", Atom(machine, UnknownName((UnknownProcedureAction)((snapshot >> 16) & 255)))),
-            9 => ("colon_sets_calling_context", Atom(machine, "true")),
+            1 => ("integer_rounding_function", Atom(machine, "toward_zero")),
+            2 => ("max_arity", Cell.Integer60(Machine.ArgumentRegisterCount - 1)),
+            3 => ("char_conversion", Atom(machine, (snapshot & 1) != 0 ? "on" : "off")),
+            4 => ("debug", Atom(machine, (snapshot & 2) != 0 ? "on" : "off")),
+            5 => ("double_quotes", Atom(machine, DoubleQuotesName((DoubleQuotesMode)((snapshot >> 8) & 255)))),
+            6 => ("unknown", Atom(machine, UnknownName((UnknownProcedureAction)((snapshot >> 16) & 255)))),
+            7 => ("colon_sets_calling_context", Atom(machine, "true")),
             _ => ("occurs_check", Atom(machine, OccursCheckName((OccursCheckMode)(snapshot >> 24)))),
         };
 

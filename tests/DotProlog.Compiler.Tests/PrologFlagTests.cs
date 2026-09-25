@@ -48,12 +48,26 @@ public sealed class PrologFlagTests
         );
     }
 
+    // Integers are unbounded, so the integer limit flags have no value, as in SWI-Prolog, and a
+    // goal guarded by one fails instead of overflowing.
+    [Theory]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    [InlineData(PrologLanguageMode.Modern)]
+    public void IntegerLimitFlagsFailBecauseIntegersAreUnbounded(PrologLanguageMode mode)
+    {
+        var engine = new PrologEngine(mode);
+
+        Assert.True(engine.Query("current_prolog_flag(bounded, false)").Prove());
+        Assert.False(engine.Query("current_prolog_flag(max_integer, _)").Prove());
+        Assert.False(engine.Query("current_prolog_flag(min_integer, _)").Prove());
+        Assert.False(engine.Query("current_prolog_flag(max_integer, MI), _ is MI + 1").Prove());
+    }
+
     [Fact]
     public void EnumeratesEveryIsoFlagInStableOrder()
     {
         Assert.Equal(
-            "[bounded-false,max_integer-576460752303423487,min_integer- -576460752303423488,"
-                + "integer_rounding_function-toward_zero,max_arity-255,char_conversion-off,debug-off,"
+            "[bounded-false,integer_rounding_function-toward_zero,max_arity-255,char_conversion-off,debug-off,"
                 + "double_quotes-chars,unknown-error,colon_sets_calling_context-true,occurs_check-false]\n",
             PrologTestHost.RunGoal("findall(F-V, current_prolog_flag(F, V), Flags), write(Flags), nl")
         );
@@ -76,7 +90,7 @@ public sealed class PrologFlagTests
     public void ModulesSeeOnlyTheSameIsoFlagSet()
     {
         Assert.Equal(
-            "[bounded,max_integer,min_integer,integer_rounding_function,max_arity,char_conversion,debug,double_quotes,unknown,"
+            "[bounded,integer_rounding_function,max_arity,char_conversion,debug,double_quotes,unknown,"
                 + "colon_sets_calling_context,occurs_check]\n",
             PrologTestHost.Run(
                 """
@@ -192,14 +206,8 @@ public sealed class PrologFlagTests
     [InlineData("set_prolog_flag(double_quotes, strings)", "domain_error(flag_value,double_quotes+strings)")]
     [InlineData("set_prolog_flag(bounded, true)", "domain_error(flag_value,bounded+true)")]
     [InlineData("set_prolog_flag(bounded, false)", "permission_error(modify,flag,bounded)")]
-    [InlineData(
-        "current_prolog_flag(max_integer, V), set_prolog_flag(max_integer, V)",
-        "permission_error(modify,flag,max_integer)"
-    )]
-    [InlineData(
-        "current_prolog_flag(min_integer, V), set_prolog_flag(min_integer, V)",
-        "permission_error(modify,flag,min_integer)"
-    )]
+    [InlineData("set_prolog_flag(max_integer, 0)", "domain_error(flag_value,max_integer+0)")]
+    [InlineData("set_prolog_flag(min_integer, 0)", "domain_error(flag_value,min_integer+0)")]
     [InlineData(
         "set_prolog_flag(integer_rounding_function, toward_zero)",
         "permission_error(modify,flag,integer_rounding_function)"

@@ -454,8 +454,9 @@ iso_case('8.17.1', catch(throw(ball), ball, 4), error(type_error(callable, 4))).
 iso_case('8.17.1', catch(true, _, 4), success).
 iso_case('8.17.1', throw(_), error(instantiation_error)).
 iso_case('8.17.2', current_prolog_flag(bounded, false), success).
-iso_case('8.17.2', (current_prolog_flag(max_integer, M1), M1 =:= max_tagged_integer), success).
-iso_case('8.17.2', (current_prolog_flag(min_integer, M2), M2 =:= min_tagged_integer), success).
+% Integers are unbounded, so the integer limit flags have no value.
+iso_case('8.17.2', current_prolog_flag(max_integer, _), failure).
+iso_case('8.17.2', current_prolog_flag(min_integer, _), failure).
 iso_case('8.17.2', current_prolog_flag(integer_rounding_function, toward_zero), success).
 iso_case('8.17.2', current_prolog_flag(max_arity, 255), success).
 iso_case('8.17.2', current_prolog_flag(char_conversion, off), success).
@@ -473,16 +474,8 @@ iso_case('8.17.3', set_prolog_flag(not_a_flag, value), error(domain_error(prolog
 iso_case('8.17.3', set_prolog_flag(double_quotes, strings), error(domain_error(flag_value, double_quotes+strings))).
 iso_case('8.17.3', set_prolog_flag(bounded, true), error(domain_error(flag_value, bounded+true))).
 iso_case('8.17.3', set_prolog_flag(bounded, false), error(permission_error(modify, flag, bounded))).
-iso_case(
-    '8.17.3',
-    (current_prolog_flag(max_integer, M3), set_prolog_flag(max_integer, M3)),
-    error(permission_error(modify, flag, max_integer))
-).
-iso_case(
-    '8.17.3',
-    (current_prolog_flag(min_integer, M4), set_prolog_flag(min_integer, M4)),
-    error(permission_error(modify, flag, min_integer))
-).
+iso_case('8.17.3', set_prolog_flag(max_integer, 0), error(domain_error(flag_value, max_integer+0))).
+iso_case('8.17.3', set_prolog_flag(min_integer, 0), error(domain_error(flag_value, min_integer+0))).
 iso_case(
     '8.17.3',
     set_prolog_flag(integer_rounding_function, toward_zero),

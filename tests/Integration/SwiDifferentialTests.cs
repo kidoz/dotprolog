@@ -264,6 +264,8 @@ public sealed class SwiDifferentialTests
         "succ(99999999999999999999999999, X), write(X)",
         "between(99999999999999999999999999, inf, X), !, write(X)",
         "current_prolog_flag(bounded, B), write(B)",
+        "( current_prolog_flag(max_integer, _) -> write(max) ; write(no_max) )",
+        "( current_prolog_flag(min_integer, _) -> write(min) ; write(no_min) )",
         "X is 10 ^ 21, writeq(X), nl, write(X)",
         // Rationals: exact arithmetic, canonical demotion, and the 1r3 spelling agree with GMP.
         "X is 1 rdiv 3, write(X)",
