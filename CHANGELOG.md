@@ -4,7 +4,7 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.12.1] — 2026-09-25
 
 ### Fixed
 
@@ -16,7 +16,6 @@ All notable changes to DotProlog are recorded here. The format follows
   conditions, and unreachable branches; conditional recognition does not bind variable alternatives.
 - Generated constant construction runs in a separate method, avoiding floating-constant
   corruption observed in a large NativeAOT installation on macOS Arm64.
-
 - Exceptions preserve cyclic terms while unwinding to `catch/3`, so `number_chars/2` and
   `number_codes/2` report `type_error(list, Culprit)` for cyclic lists with the original
   cyclic structure intact, instead of replacing the error with `representation_error(cyclic_term)`.
@@ -715,7 +714,7 @@ binary: a published executable can consult a `.pl` file it has never seen and ru
 
 **Full Changelog**: https://github.com/kidoz/dotprolog/commits/v0.1.0
 
-[Unreleased]: https://github.com/kidoz/dotprolog/compare/v0.12.0...HEAD
+[0.12.1]: https://github.com/kidoz/dotprolog/releases/tag/v0.12.1
 [0.12.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.12.0
 [0.11.2]: https://github.com/kidoz/dotprolog/releases/tag/v0.11.2
 [0.11.1]: https://github.com/kidoz/dotprolog/releases/tag/v0.11.1
