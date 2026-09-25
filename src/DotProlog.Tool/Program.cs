@@ -108,19 +108,21 @@ internal static class Program
 
         var engine = new PrologEngine(languageMode, flagOverrides) { Output = output, Error = error };
 
-        LoadResult loaded = engine.ConsultFile(path);
-        foreach (Diagnostic diagnostic in loaded.Diagnostics)
-        {
-            error.WriteLine(diagnostic.ToString());
-        }
-
-        if (!loaded.Success)
-        {
-            return ExitCompileError;
-        }
-
+        // Directives run while the file loads, so an error one raises surfaces here as it would from
+        // an initialization goal.
         try
         {
+            LoadResult loaded = engine.ConsultFile(path);
+            foreach (Diagnostic diagnostic in loaded.Diagnostics)
+            {
+                error.WriteLine(diagnostic.ToString());
+            }
+
+            if (!loaded.Success)
+            {
+                return ExitCompileError;
+            }
+
             RunResult result = engine.RunPendingGoals();
             output.Flush();
 

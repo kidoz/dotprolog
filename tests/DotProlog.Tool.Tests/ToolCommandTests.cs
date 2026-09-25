@@ -138,6 +138,18 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void RunReportsAnErrorADirectiveRaisesWhileLoading()
+    {
+        var path = Source("directive-error.pl", ":- nowhere(1).\n:- initialization(writeln(never)).\n");
+
+        (var exitCode, var output, var error) = Execute("run", path);
+
+        Assert.Equal(70, exitCode);
+        Assert.Empty(output);
+        Assert.Equal("error: existence_error(procedure, nowhere/1)\n", error.ReplaceLineEndings("\n"));
+    }
+
+    [Fact]
     public void MissingLintInputIsAUsageError()
     {
         (var exitCode, _, var error) = Execute("lint");
