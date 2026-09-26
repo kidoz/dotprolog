@@ -11,7 +11,7 @@
         <None Include="..\conformance\strict_iso_review.pl" Link="strict_iso_review.pl" CopyToOutputDirectory="PreserveNewest" />
         <None Include="..\..\samples\HelloProlog\hello.pl" Link="hello.pl" CopyToOutputDirectory="PreserveNewest" />
         <None
-            Include="..\..\samples\GreymereAdventure\*.pl;..\..\samples\GreymereAdventure\winning_path.txt"
+            Include="..\..\samples\GreymereAdventure\*.pl;..\..\samples\GreymereAdventure\*_path.txt"
             Link="GreymereAdventure\%(Filename)%(Extension)"
             CopyToOutputDirectory="PreserveNewest"
         />

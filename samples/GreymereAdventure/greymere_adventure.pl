@@ -12,6 +12,8 @@
 :- dynamic alive/1.
 :- dynamic enemy_hp/2.
 :- dynamic flag/1.
+:- dynamic visited/1.
+:- dynamic enemy_ready/1.
 
 :- initialization(main).
 
@@ -20,6 +22,7 @@
 % ---------------------------------------------------------------------------
 
 here(village_square).
+visited(village_square).
 player_hp(14).
 holding(hunter_knife).
 
@@ -28,6 +31,10 @@ at(healing_draught, flooded_vault).
 at(steel_sword, old_armory).
 at(iron_shield, old_armory).
 at(lantern, gatehouse).
+at(rope, gatehouse).
+at(moonleaf, herb_garden).
+at(spring_water, well_house).
+at(watch_oath, archive).
 
 alive(mire_goblin).
 alive(oathless_knight).
@@ -55,6 +62,11 @@ room_title(crypt_stair, 'The Lightless Stair').
 room_title(ossuary, 'The Ossuary').
 room_title(flooded_vault, 'The Flooded Vault').
 room_title(inner_sanctum, 'The Ember Sanctum').
+room_title(herb_garden, 'The Moonleaf Garden').
+room_title(well_house, 'The Old Well House').
+room_title(prison, 'The Forgotten Prison').
+room_title(archive, 'The Keep Archive').
+room_title(bell_tower, 'The Three Bells').
 
 room_description(village_square,
     'Rain needles the roofs of Greymere. The villagers have barred their doors, and Reeve Elowen waits beneath the dead ash tree.').
@@ -67,7 +79,7 @@ room_description(outer_courtyard,
 room_description(gatehouse,
     'Splintered bunks and rusted spearheads litter the gatehouse. A brass lantern glows beneath a stolen heap of blankets.').
 room_description(great_hall,
-    'Tattered banners hang above a long stone table. The chapel lies east, the armory west, and cold air rises from stairs below.').
+    'Tattered banners hang above a long stone table. The chapel lies east, the armory west, the archive north, and cold air rises from stairs below.').
 room_description(ruined_chapel,
     'Dawn is painted on the cracked apse, though no sunlight reaches it. A silver medallion rests upon the altar.').
 room_description(old_armory,
@@ -81,6 +93,17 @@ room_description(flooded_vault,
 room_description(inner_sanctum,
     'Embers orbit a basalt throne. Lord Morvane stands before it, neither living nor dead, with Greymere''s stolen crown burning above his hand.').
 
+room_description(herb_garden,
+    'Pale moonleaf grows behind a broken wall. Herbalist Mara in the village knows its healing properties.').
+room_description(well_house,
+    'A stone basin catches the clear spring. Beside it, a broken ladder descends into a prison.').
+room_description(prison,
+    'A narrow cell lies beneath the well. A torn blanket and tally marks tell of a long captivity.').
+room_description(archive,
+    'A watch oath lies on a lectern. A mural shows the bell ritual: birth at DAWN, death at DUSK, rebirth at NOON. Stairs climb to the bells.').
+room_description(bell_tower,
+    'Three bells hang above the valley: dawn, noon, and dusk. Ring them in the order of the life painted in the archive to break the sun seal.').
+
 % Each passage is stated once. exit/3 reasons out the reverse direction.
 passage(village_square, north, old_road).
 passage(old_road, north, keep_gate).
@@ -93,6 +116,11 @@ passage(great_hall, down, crypt_stair).
 passage(crypt_stair, down, ossuary).
 passage(ossuary, east, flooded_vault).
 passage(ossuary, north, inner_sanctum).
+passage(old_road, east, herb_garden).
+passage(outer_courtyard, west, well_house).
+passage(well_house, down, prison).
+passage(great_hall, north, archive).
+passage(archive, up, bell_tower).
 
 opposite(north, south).
 opposite(south, north).
@@ -120,6 +148,25 @@ item_name(iron_shield, 'iron shield').
 item_name(healing_draught, 'healing draught').
 item_name(bone_key, 'bone key').
 item_name(ember_crown, 'Ember Crown').
+item_name(rope, 'coil of rope').
+item_name(moonleaf, 'moonleaf sprig').
+item_name(spring_water, 'bottle of spring water').
+item_name(herbal_tonic, 'moonleaf tonic').
+item_name(watch_oath, 'oath of the watch').
+item_name(ash_ward, 'bellkeeper''s ash ward').
+
+item_description(rope,
+    'A sturdy coil. Use it at the well house to replace the broken ladder.').
+item_description(moonleaf,
+    'A medicinal herb. Mara can teach you to brew it with spring water.').
+item_description(spring_water,
+    'Clean water sealed in a bottle, suitable for a herbal tonic.').
+item_description(herbal_tonic,
+    'A single dose that restores eight health, up to fourteen.').
+item_description(watch_oath,
+    'Stand between the dark and the door. Use this oath before the oathless knight to remind him whom he served.').
+item_description(ash_ward,
+    'Tomas made this charm against Morvane. Carrying it reduces every blow from the wraith by two.').
 
 item_description(hunter_knife,
     'A practical blade. It has dressed more rabbits than monsters, but the edge is honest.').
@@ -199,6 +246,7 @@ look :-
     artwork(Room),
     room_description(Room, Description),
     writeln(Description),
+    show_landmarks(Room),
     show_enemy(Room),
     show_items(Room),
     show_exits(Room),
@@ -234,6 +282,12 @@ help :-
     writeln('  drop(lantern).        put down a carried item'),
     writeln('  examine(lantern).     inspect a visible or carried item'),
     writeln('  attack.               fight the creature in your location'),
+    writeln('  guard.                brace against the next enemy attack'),
+    writeln('  ring(dawn).           ring dawn, noon, or dusk in the bell tower'),
+    writeln('  brew(herbal_tonic).    combine ingredients after learning a recipe'),
+    writeln('  rest.                 recover your health in the village'),
+    writeln('  journal.              review your quests and clues'),
+    writeln('  map.                  list explored places and their paths'),
     writeln('  use(healing_draught). use a carried item'),
     writeln('  inventory.            list your equipment'),
     writeln('  status.               show health and combat strength'),
@@ -264,6 +318,14 @@ status :-
     (   holding(sun_medallion)
     ->  writeln('The sun medallion adds 2 damage against undead creatures.')
     ;   true
+    ),
+    (   holding(ash_ward)
+    ->  writeln('The ash ward reduces damage from Morvane by 2 (minimum damage: 1).')
+    ;   true
+    ),
+    (   flag(counter_ready)
+    ->  writeln('Your next attack gains 2 counterattack damage. Moving away loses this bonus.')
+    ;   true
     ).
 
 show_health :-
@@ -291,8 +353,10 @@ go(Direction) :-
 
 enter(From, To) :-
     (   can_cross(From, To)
-    ->  retract(here(From)),
+    ->  retractall(flag(counter_ready)),
+        retract(here(From)),
         assertz(here(To)),
+        remember_visit(To),
         look
     ;   true
     ).
@@ -314,6 +378,18 @@ can_cross(great_hall, crypt_stair) :-
     ;   writeln('The stair descends into absolute darkness. You will need a light.'),
         fail
     ).
+can_cross(well_house, prison) :-
+    !,
+    (   flag(rope_secured)
+    ->  true
+    ;   writeln('The ladder has rotted away. Use a rope here before climbing down.'),
+        fail
+    ).
+can_cross(ossuary, inner_sanctum) :-
+    \+ flag(bells_awakened),
+    !,
+    writeln('A sun seal burns across the red door. The archive and its bells may hold the answer.'),
+    fail.
 can_cross(ossuary, inner_sanctum) :-
     !,
     (   flag(sanctum_unlocked)
@@ -373,6 +449,15 @@ talk(reeve) :-
     here(village_square),
     !,
     speak_with_reeve.
+talk(herbalist) :-
+    here(village_square),
+    !,
+    remember_flag(tonic_recipe),
+    writeln('Mara says, "Bring moonleaf from the garden east of the road and spring water from the keep well. Brew a herbal_tonic with both."').
+talk(bellkeeper) :-
+    here(prison),
+    !,
+    rescue_bellkeeper.
 talk(Person) :-
     format('There is no ~w here to answer you.~n', [Person]).
 
@@ -383,7 +468,7 @@ speak_with_reeve :-
 speak_with_reeve :-
     flag(quest_begun),
     !,
-    writeln('Elowen says, "The crown lies below Gloamwatch. Take light, steel, and the old sun-blessing with you."').
+    writeln('Elowen says, "Take light, steel, and the sun-blessing. Seek the archive to open the sun seal. Our bellkeeper is missing near the well."').
 speak_with_reeve :-
     assertz(flag(quest_begun)),
     assertz(holding(keep_key)),
@@ -394,6 +479,26 @@ speak_with_reeve :-
 % ---------------------------------------------------------------------------
 % Combat
 % ---------------------------------------------------------------------------
+
+guard :-
+    here(Room),
+    (   enemy_here(Room, Enemy)
+    ->  writeln('You brace for the blow and prepare a counterattack.'),
+        remember_flag(guarding),
+        enemy_turn(Enemy),
+        retractall(flag(guarding)),
+        (flag(dead) -> retractall(flag(counter_ready)) ; remember_flag(counter_ready))
+    ;   writeln('There is no foe here to guard against.')
+    ).
+
+guard_reduction(4) :- flag(guarding), !.
+guard_reduction(0).
+
+ward_reduction(morvane, 2) :- holding(ash_ward), !.
+ward_reduction(_, 0).
+
+counter_bonus(2) :- retract(flag(counter_ready)), !.
+counter_bonus(0).
 
 enemy_here(Room, Enemy) :-
     enemy_location(Enemy, Room),
@@ -425,7 +530,8 @@ attack :-
 player_attack(Room, Enemy) :-
     weapon_damage(WeaponDamage),
     holy_bonus(Enemy, HolyDamage),
-    Damage is WeaponDamage + HolyDamage,
+    counter_bonus(CounterDamage),
+    Damage is WeaponDamage + HolyDamage + CounterDamage,
     enemy_hp(Enemy, OldHealth),
     NewHealth is OldHealth - Damage,
     enemy_name(Enemy, Name),
@@ -440,7 +546,9 @@ player_attack(Room, Enemy) :-
     ).
 
 defeat_enemy(Room, Enemy) :-
+    retractall(flag(counter_ready)),
     retract(alive(Enemy)),
+    retractall(enemy_ready(Enemy)),
     defeat_words(Enemy, Words),
     writeln(Words),
     forall(
@@ -448,10 +556,22 @@ defeat_enemy(Room, Enemy) :-
         (assertz(at(Item, Room)), item_name(Item, Name), format('The ~w lies here.~n', [Name]))
     ).
 
+% Morvane alternates a visible wind-up with a heavy strike. Guarding uses a
+% turn, reduces that strike, and readies a single counterattack.
+enemy_turn(morvane) :-
+    \+ enemy_ready(morvane),
+    !,
+    assertz(enemy_ready(morvane)),
+    writeln('Morvane gathers a storm of cinders. His next blow will be crushing: guard now!').
 enemy_turn(Enemy) :-
-    enemy_damage(Enemy, RawDamage),
-    shield_reduction(Protection),
-    ReducedDamage is RawDamage - Protection,
+    (   retract(enemy_ready(Enemy))
+    ->  RawDamage = 7
+    ;   enemy_damage(Enemy, RawDamage)
+    ),
+    shield_reduction(Shield),
+    ward_reduction(Enemy, Ward),
+    guard_reduction(Guard),
+    ReducedDamage is RawDamage - Shield - Ward - Guard,
     (   ReducedDamage < 1
     ->  Damage = 1
     ;   Damage = ReducedDamage
@@ -473,21 +593,46 @@ enemy_turn(Enemy) :-
 % Useful items and endings
 % ---------------------------------------------------------------------------
 
+drink(Item, Amount) :-
+    player_hp(OldHealth),
+    (   OldHealth >= 14
+    ->  writeln('You are already at full health. Save the medicine for later.')
+    ;   RawHealth is OldHealth + Amount,
+        (RawHealth > 14 -> NewHealth = 14 ; NewHealth = RawHealth),
+        retract(player_hp(OldHealth)),
+        assertz(player_hp(NewHealth)),
+        retract(holding(Item)),
+        styled(life, 'Warmth floods your limbs. Your health rises from ~d to ~d.~n',
+            [OldHealth, NewHealth]),
+        show_health
+    ).
+
+use(rope) :-
+    holding(rope),
+    here(well_house),
+    !,
+    retract(holding(rope)),
+    remember_flag(rope_secured),
+    writeln('You secure the rope to the well beam. The way down is now safe in both directions.').
+use(watch_oath) :-
+    holding(watch_oath),
+    here(old_armory),
+    alive(oathless_knight),
+    !,
+    retractall(flag(counter_ready)),
+    retract(alive(oathless_knight)),
+    retractall(enemy_hp(oathless_knight, _)),
+    assertz(enemy_hp(oathless_knight, 0)),
+    remember_flag(knight_redeemed),
+    writeln('You speak the watch oath. The knight kneels: "I remember. Take my arms, and keep the door." His spirit passes into the dawn.').
+use(herbal_tonic) :-
+    holding(herbal_tonic),
+    !,
+    drink(herbal_tonic, 8).
 use(healing_draught) :-
     holding(healing_draught),
     !,
-    player_hp(OldHealth),
-    RawHealth is OldHealth + 6,
-    (   RawHealth > 14
-    ->  NewHealth = 14
-    ;   NewHealth = RawHealth
-    ),
-    retract(player_hp(OldHealth)),
-    assertz(player_hp(NewHealth)),
-    retract(holding(healing_draught)),
-    styled(life, 'Warmth floods your limbs. Your health rises from ~d to ~d.~n',
-        [OldHealth, NewHealth]),
-    show_health.
+    drink(healing_draught, 6).
 use(sun_medallion) :-
     holding(sun_medallion),
     !,
@@ -515,6 +660,7 @@ ending_victory :-
     writeln('"You entered the keep as one brave soul," the reeve says.'),
     writeln('"You return as the shield of Greymere."'),
     nl,
+    victory_epilogue,
     styled(ember, '                    *** YOU ARE VICTORIOUS ***', []),
     nl.
 
@@ -532,9 +678,184 @@ farewell :-
     writeln('You leave the road to Gloamwatch for another day. Farewell.').
 
 % ---------------------------------------------------------------------------
+% Quests, crafting, and exploration notes
+% ---------------------------------------------------------------------------
+
+remember_flag(Flag) :-
+    (flag(Flag) -> true ; assertz(flag(Flag))).
+
+remember_visit(Room) :-
+    (visited(Room) -> true ; assertz(visited(Room))).
+
+show_landmarks(village_square) :-
+    !,
+    writeln('You can talk to the reeve or the herbalist, and rest here.').
+show_landmarks(well_house) :-
+    \+ flag(bellkeeper_rescued),
+    !,
+    writeln('Someone below calls for help. Secure a rope, climb down, and talk to the bellkeeper.').
+show_landmarks(prison) :-
+    flag(bellkeeper_rescued),
+    !,
+    writeln('Tomas has returned to Greymere. The cell is empty.').
+show_landmarks(prison) :-
+    !,
+    writeln('Tomas, the missing bellkeeper, waits by the ladder. Talk to the bellkeeper.').
+show_landmarks(bell_tower) :-
+    flag(bells_awakened),
+    !,
+    writeln('The bells shine with sunlight. The sun seal is broken.').
+show_landmarks(inner_sanctum) :-
+    enemy_ready(morvane),
+    !,
+    writeln('Cinders gather around Morvane. His next attack is charged: guard!').
+show_landmarks(_).
+
+rescue_bellkeeper :-
+    flag(bellkeeper_rescued),
+    !,
+    writeln('Tomas has already climbed to safety. His thanks still echo in the well.').
+rescue_bellkeeper :-
+    remember_flag(bellkeeper_rescued),
+    assertz(holding(ash_ward)),
+    writeln('Tomas climbs your rope to freedom, leaving you his ash ward.'),
+    writeln('"It softens Morvane''s fire. When he gathers cinders, guard, then counterattack."'),
+    writeln('"The archive records our bells: dawn, dusk, noon. Ring them in that order."').
+
+brew(herbal_tonic) :-
+    !,
+    (   \+ flag(tonic_recipe)
+    ->  writeln('You do not know this recipe. Talk to the herbalist in Greymere.')
+    ;   here(Room), enemy_here(Room, _)
+    ->  writeln('You cannot brew medicine with an enemy watching you.')
+    ;   holding(moonleaf), holding(spring_water)
+    ->  retract(holding(moonleaf)),
+        retract(holding(spring_water)),
+        assertz(holding(herbal_tonic)),
+        remember_flag(tonic_brewed),
+        writeln('You steep moonleaf in spring water and bottle a healing tonic.')
+    ;   writeln('You need both moonleaf and spring_water to brew a herbal_tonic.')
+    ).
+brew(_) :-
+    writeln('The only recipe is brew(herbal_tonic). Ask the village herbalist.').
+
+rest :-
+    (   here(village_square)
+    ->  retractall(player_hp(_)),
+        assertz(player_hp(14)),
+        writeln('Mara tends your wounds beside the village hearth. Health restored to 14.'),
+        show_health
+    ;   writeln('You can rest safely only in Greymere village.')
+    ).
+
+% The first two notes are explicit states. A wrong note clears the partial
+% sequence; the completed ritual is permanent and cannot be undone.
+bell(dawn).
+bell(noon).
+bell(dusk).
+
+ring(Bell) :-
+    (   \+ here(bell_tower)
+    ->  writeln('There are no ritual bells here. Seek the tower above the archive.')
+    ;   \+ bell(Bell)
+    ->  writeln('Choose ring(dawn)., ring(noon)., or ring(dusk).')
+    ;   flag(bells_awakened)
+    ->  writeln('The ritual is complete. The sun seal will remain open.')
+    ;   ring_note(Bell)
+    ).
+
+ring_note(noon) :-
+    flag(bell_dusk),
+    !,
+    clear_notes,
+    remember_flag(bells_awakened),
+    writeln('Dawn, dusk, then noon: the bells sing of life renewed. Far below, the sun seal shatters.').
+ring_note(dusk) :-
+    flag(bell_dawn),
+    !,
+    retract(flag(bell_dawn)),
+    remember_flag(bell_dusk),
+    writeln('Dusk answers dawn. One final note must bring rebirth.').
+ring_note(dawn) :-
+    \+ flag(bell_dawn),
+    \+ flag(bell_dusk),
+    !,
+    remember_flag(bell_dawn),
+    writeln('Dawn rings clear. The first light awaits its ending.').
+ring_note(_) :-
+    clear_notes,
+    writeln('The bells clash and fall silent. Begin again; the archive mural gives the order.').
+
+clear_notes :-
+    retractall(flag(bell_dawn)),
+    retractall(flag(bell_dusk)).
+
+journal :-
+    writeln('--- Your journal ---'),
+    quest_line(quest_begun, 'The reeve entrusted you with the keep key.',
+        'Speak to the reeve in Greymere to begin the search for the crown.'),
+    quest_line(bells_awakened, 'The bell ritual has broken the sun seal.',
+        'Visit the archive north of the great hall. Its mural explains the tower bells.'),
+    quest_line(bellkeeper_rescued, 'Tomas is safe; you earned his protective ash ward.',
+        'Optional: find the missing bellkeeper below the well. Bring a rope.'),
+    (   \+ alive(oathless_knight), \+ flag(knight_redeemed)
+    ->  writeln('[closed] You defeated the knight in battle. His watch is ended.')
+    ;   quest_line(knight_redeemed, 'The watch oath restored the knight to himself.',
+            'Optional: the archive may hold a peaceful answer to the knight in the armory.')
+    ),
+    quest_line(tonic_brewed, 'You brewed a moonleaf tonic.',
+        'Optional: ask the herbalist about moonleaf and spring water.'),
+    (   holding(ember_crown)
+    ->  writeln('Return the Ember Crown to the reeve in Greymere.')
+    ;   writeln('Recover the crown below the keep. Take light and the sun medallion; the warden holds the bone key.')
+    ).
+
+quest_line(Flag, Done, Pending) :-
+    (flag(Flag) -> format('[done] ~w~n', [Done]) ; format('[open] ~w~n', [Pending])).
+
+world_map :-
+    writeln('--- Explored places (paths may still be sealed) ---'),
+    forall(visited(Room), map_room(Room)).
+
+map_room(Room) :-
+    room_title(Room, Title),
+    format('~w~n', [Title]),
+    forall(exit(Room, Direction, To), map_exit(Direction, To)).
+
+map_exit(Direction, To) :-
+    (visited(To) -> room_title(To, Title) ; Title = 'unexplored'),
+    format('  ~w -> ~w~n', [Direction, Title]).
+
+victory_epilogue :-
+    (   flag(bellkeeper_rescued)
+    ->  writeln('Tomas rings the village bell, and families gather to welcome you home.')
+    ;   writeln('The village bell is silent. At dawn, Elowen sends a party to find its missing keeper.')
+    ),
+    (   flag(knight_redeemed)
+    ->  writeln('At the keep, a white wolf banner stirs. The watch can rest at last.')
+    ;   writeln('The broken armor in the keep stands as a memorial to its lost watch.')
+    ),
+    nl.
+
+% ---------------------------------------------------------------------------
 % Command loop
 % ---------------------------------------------------------------------------
 
+% Reject unbound terms before they can select a quest reward or mutate state.
+% Graphics keeps its own validation and explanatory message.
+do(graphics(Mode)) :-
+    !,
+    graphics(Mode).
+do(Command) :-
+    \+ ground(Command),
+    !,
+    writeln('Use a complete command without variables, such as take(rope).').
+do(journal) :- !, journal.
+do(map) :- !, world_map.
+do(rest) :- !, rest.
+do(guard) :- !, guard.
+do(ring(Bell)) :- !, ring(Bell).
+do(brew(Item)) :- !, brew(Item).
 do(look) :-
     !,
     look.
@@ -547,9 +868,6 @@ do(inventory) :-
 do(status) :-
     !,
     status.
-do(graphics(Mode)) :-
-    !,
-    graphics(Mode).
 do(go(Direction)) :-
     !,
     go(Direction).
