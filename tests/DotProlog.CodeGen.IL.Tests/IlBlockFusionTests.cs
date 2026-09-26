@@ -66,6 +66,9 @@ public sealed class IlBlockFusionTests
     [InlineData("bind(a) :- (true -> write(body); fail).", "freeze(X,write(w)), bind(X)", "wbody")]
     [InlineData("bind(a) :- catch(write(body),_,fail).", "freeze(X,write(w)), bind(X)", "wbody")]
     [InlineData("bind(a). bind(b).", "freeze(X,write(X)), findall(X,bind(X),L), write(L)", "ab[a,b]")]
+    [InlineData("bind(a). bind(b).", "freeze(X,(X=b,write(X))), bind(X), write(done)", "bdone")]
+    [InlineData("bind(X) :- !, X=a. bind(b).", "findall(X,bind(X),L), write(L)", "[a]")]
+    [InlineData("bind(_) :- throw(ball). bind(b).", "catch(bind(_),ball,write(caught))", "caught")]
     [InlineData("bind(a).", "catch((freeze(X,throw(ball)),bind(X)),ball,write(caught))", "caught")]
     [InlineData("bind(a).", "freeze(X,member(Y,[1,2])), bind(X), write(Y), Y=2", "12")]
     public void WakeupResumesAtItsOwnInstructionWithoutReplayingTheFusedPrefix(string source, string goal, string expected)

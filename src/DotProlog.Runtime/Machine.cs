@@ -1272,6 +1272,12 @@ public sealed class Machine
         public bool EnterStatic(int tableId, int linearTarget) =>
             _machine.Dereference(_machine._x[0]).IsReference ? Jump(linearTarget) : _machine.EnterStatic(tableId);
 
+        /// <summary>Captures an unbound call's first alternative before dispatching its existing clause head.</summary>
+        public bool EnterStatic(int tableId, int firstClause, int alternative) =>
+            _machine.Dereference(_machine._x[0]).IsReference
+                ? TryMeElse(alternative, firstClause)
+                : _machine.EnterStatic(tableId);
+
         /// <summary>Fails and lets the machine backtrack.</summary>
         public bool Fail()
         {

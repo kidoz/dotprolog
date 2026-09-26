@@ -353,9 +353,11 @@ public static class IlAssemblyEmitter
                 break;
             case OpCode.EnterStatic:
                 Reference(nameof(CompiledProgram.StaticIndex), instruction.FirstReference, typeof(int));
-                if (layout.LinearEntries.Count > 0 && layout.LinearEntries[instruction.FirstReference] >= 0)
+                if (layout.LinearEntries.Count > 0 && layout.LinearEntries[instruction.FirstReference].First >= 0)
                 {
-                    Reference(nameof(CompiledProgram.Target), layout.LinearEntries[instruction.FirstReference], typeof(int));
+                    var entry = layout.LinearEntries[instruction.FirstReference];
+                    Reference(nameof(CompiledProgram.Target), entry.First, typeof(int));
+                    Reference(nameof(CompiledProgram.Target), entry.Alternative, typeof(int));
                 }
                 break;
             case OpCode.GetConstant:

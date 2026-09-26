@@ -8,7 +8,7 @@ internal sealed class IlBlockLayout
 {
     internal List<int> Starts { get; } = [];
     internal int[] BlockByInstruction { get; }
-    internal List<int> LinearEntries { get; } = [];
+    internal List<(int First, int Alternative)> LinearEntries { get; } = [];
     internal List<(int Entry, OpCode Header, int Alternative)> LinearClauses { get; } = [];
     internal int BlockCount => Starts.Count + LinearClauses.Count;
 
@@ -97,18 +97,19 @@ internal sealed class IlBlockLayout
             foreach (var index in model.StaticIndexes)
             {
                 var first = layout.BlockCount;
-                layout.LinearEntries.Add(index.Entries.Length > 1 ? first : -1);
+                layout.LinearEntries.Add(
+                    index.Entries.Length > 1 ? (layout.BlockByInstruction[index.Entries[0]], first) : (-1, -1)
+                );
                 if (index.Entries.Length <= 1)
                 {
                     continue;
                 }
-                for (var clause = 0; clause < index.Entries.Length; clause++)
+                // EnterStatic creates the first alternative and dispatches to the existing
+                // first clause. Only redo needs an alternate clause-entry method.
+                for (var clause = 1; clause < index.Entries.Length; clause++)
                 {
-                    var header =
-                        clause == 0 ? OpCode.TryMeElse
-                        : clause + 1 == index.Entries.Length ? OpCode.TrustMe
-                        : OpCode.RetryMeElse;
-                    layout.LinearClauses.Add((index.Entries[clause], header, first + clause + 1));
+                    var header = clause + 1 == index.Entries.Length ? OpCode.TrustMe : OpCode.RetryMeElse;
+                    layout.LinearClauses.Add((index.Entries[clause], header, first + clause));
                 }
             }
         }
