@@ -10,7 +10,7 @@ internal static class CompilerArtifactMetrics
     internal static void Write()
     {
         Console.WriteLine(
-            "Repetitions,SourceBytes,Instructions,PeBytes,MetadataBytes,Methods,MethodIlBytes,InstallationImageBytes"
+            "Repetitions,SourceBytes,Instructions,PeBytes,MetadataBytes,Methods,MethodIlBytes,InstallationImageBytes,MemberReferences,DistinctMemberReferences"
         );
         foreach (var repetitions in new[] { 1, 20, 100 })
         {
@@ -24,9 +24,21 @@ internal static class CompilerArtifactMetrics
             var ilBytes = metadata.MethodDefinitions.Sum(handle =>
                 pe.GetMethodBody(metadata.GetMethodDefinition(handle).RelativeVirtualAddress).GetILContent().Length
             );
+            var distinctReferences = metadata
+                .MemberReferences.Select(handle =>
+                {
+                    var member = metadata.GetMemberReference(handle);
+                    return (
+                        member.Parent,
+                        Name: metadata.GetString(member.Name),
+                        Signature: Convert.ToHexString(metadata.GetBlobBytes(member.Signature))
+                    );
+                })
+                .Distinct()
+                .Count();
             Console.WriteLine(
                 FormattableString.Invariant(
-                    $"{repetitions},{Encoding.UTF8.GetByteCount(source)},{model.Instructions.Count},{output.Length},{pe.PEHeaders.CorHeader!.MetadataDirectory.Size},{metadata.MethodDefinitions.Count},{ilBytes},{Convert.FromBase64String(InstallationImage.Encode(model)).Length}"
+                    $"{repetitions},{Encoding.UTF8.GetByteCount(source)},{model.Instructions.Count},{output.Length},{pe.PEHeaders.CorHeader!.MetadataDirectory.Size},{metadata.MethodDefinitions.Count},{ilBytes},{Convert.FromBase64String(InstallationImage.Encode(model)).Length},{metadata.MemberReferences.Count},{distinctReferences}"
                 )
             );
         }
