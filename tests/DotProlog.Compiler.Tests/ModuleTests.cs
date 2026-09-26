@@ -1203,6 +1203,25 @@ public sealed class ModuleTests : IDisposable
     }
 
     [Fact]
+    public void MissingImportsPreserveMetaDefaultsAndObserveLaterImports()
+    {
+        var modules = new ModuleTable();
+        var indicator = new PredicateIndicator("apply", 1);
+        modules.DeclareMeta("apply", 1, [(0, 0)]);
+
+        Assert.Null(modules.DefiningModuleOf("consumer", indicator));
+        Assert.Equal([0], Assert.IsType<int[]>(modules.MetaArgumentsOf("consumer", indicator)));
+        Assert.Null(modules.MetaArgumentsOf("consumer", new PredicateIndicator("missing", 1)));
+
+        modules.Define("provider", indicator);
+        modules.DeclareMeta("provider", "apply", 1, [(0, 1)], ":");
+        Assert.True(modules.TryImport("consumer", indicator, "provider", out _));
+
+        Assert.Equal("provider", modules.DefiningModuleOf("consumer", indicator));
+        Assert.Equal([1], Assert.IsType<int[]>(modules.MetaArgumentsOf("consumer", indicator)));
+    }
+
+    [Fact]
     public void CompilerResolutionUsesModuleMetadataInstalledByGeneratedCode()
     {
         var catalog = new ModuleCatalog();

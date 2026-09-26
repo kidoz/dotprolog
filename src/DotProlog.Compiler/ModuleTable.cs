@@ -192,8 +192,13 @@ public sealed class ModuleTable
     public string? DefiningModuleOf(string importer, PredicateIndicator predicate)
     {
         string? current = ImportedFrom(importer, predicate);
+        if (current is null)
+        {
+            return null;
+        }
+
         HashSet<string> visited = [];
-        while (current is not null && visited.Add(current))
+        while (visited.Add(current))
         {
             if (Defines(current, predicate))
             {
