@@ -53,51 +53,48 @@ internal sealed class IlMetadata
         return handle;
     }
 
-    internal BlobHandle Signature(bool instance, Type result, params Type[] parameters)
+    internal BlobHandle Signature(bool instance, Type result, params ReadOnlySpan<Type> parameters)
     {
-        if (_signatures.TryGetValue((instance, result, parameters), out var signature))
+        var lookup = _signatures.GetAlternateLookup<SignatureLookup>();
+        var key = new SignatureLookup(instance, result, parameters);
+        if (lookup.TryGetValue(key, out var signature))
         {
             return signature;
         }
         signature = EncodeSignature(instance, result, parameters);
-        // Callers may reuse or mutate their arrays. Only cache-owned copies survive the call.
-        _signatures.Add((instance, result, parameters.ToArray()), signature);
+        // The comparer copies parameters only on insertion; caller-owned spans never escape.
+        lookup[key] = signature;
         return signature;
     }
 
-    private BlobHandle EncodeSignature(bool instance, Type result, Type[] parameters)
+    private BlobHandle EncodeSignature(bool instance, Type result, ReadOnlySpan<Type> parameters)
     {
         var blob = new BlobBuilder();
         new BlobEncoder(blob)
             .MethodSignature(isInstanceMethod: instance)
-            .Parameters(
-                parameters.Length,
-                returns =>
-                {
-                    if (result == typeof(void))
-                    {
-                        returns.Void();
-                    }
-                    else
-                    {
-                        Encode(returns.Type(), result);
-                    }
-                },
-                arguments =>
-                {
-                    foreach (var parameter in parameters)
-                    {
-                        Encode(
-                            arguments.AddParameter().Type(parameter.IsByRef),
-                            parameter.IsByRef ? parameter.GetElementType()! : parameter
-                        );
-                    }
-                }
-            );
+            .Parameters(parameters.Length, out var returns, out var arguments);
+        if (result == typeof(void))
+        {
+            returns.Void();
+        }
+        else
+        {
+            Encode(returns.Type(), result);
+        }
+        foreach (var parameter in parameters)
+        {
+            Encode(arguments.AddParameter().Type(parameter.IsByRef), parameter.IsByRef ? parameter.GetElementType()! : parameter);
+        }
         return Builder.GetOrAddBlob(blob);
     }
 
-    internal MemberReferenceHandle Method(Type owner, string name, bool instance, Type result, params Type[] parameters)
+    internal MemberReferenceHandle Method(
+        Type owner,
+        string name,
+        bool instance,
+        Type result,
+        params ReadOnlySpan<Type> parameters
+    )
     {
         // Interned signature blobs include the calling convention, return type, and every
         // parameter shape. Handles belong to this builder, so references never cross assemblies.
@@ -147,14 +144,32 @@ internal sealed class IlMetadata
         }
     }
 
-    private sealed class SignatureComparer : IEqualityComparer<(bool Instance, Type Result, Type[] Parameters)>
+    private readonly ref struct SignatureLookup(bool instance, Type result, ReadOnlySpan<Type> parameters)
+    {
+        internal bool Instance { get; } = instance;
+        internal Type Result { get; } = result;
+        internal ReadOnlySpan<Type> Parameters { get; } = parameters;
+    }
+
+    private sealed class SignatureComparer
+        : IEqualityComparer<(bool Instance, Type Result, Type[] Parameters)>,
+            IAlternateEqualityComparer<SignatureLookup, (bool Instance, Type Result, Type[] Parameters)>
     {
         public bool Equals(
             (bool Instance, Type Result, Type[] Parameters) x,
             (bool Instance, Type Result, Type[] Parameters) y
-        ) => x.Instance == y.Instance && x.Result == y.Result && x.Parameters.AsSpan().SequenceEqual(y.Parameters);
+        ) => Equals(new SignatureLookup(x.Instance, x.Result, x.Parameters), y);
 
-        public int GetHashCode((bool Instance, Type Result, Type[] Parameters) signature)
+        public bool Equals(SignatureLookup x, (bool Instance, Type Result, Type[] Parameters) y) =>
+            x.Instance == y.Instance && x.Result == y.Result && x.Parameters.SequenceEqual(y.Parameters);
+
+        public (bool Instance, Type Result, Type[] Parameters) Create(SignatureLookup signature) =>
+            (signature.Instance, signature.Result, signature.Parameters.ToArray());
+
+        public int GetHashCode((bool Instance, Type Result, Type[] Parameters) signature) =>
+            GetHashCode(new SignatureLookup(signature.Instance, signature.Result, signature.Parameters));
+
+        public int GetHashCode(SignatureLookup signature)
         {
             var hash = new HashCode();
             hash.Add(signature.Instance);

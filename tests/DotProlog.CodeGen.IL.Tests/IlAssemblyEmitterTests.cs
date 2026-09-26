@@ -11,6 +11,24 @@ namespace DotProlog.CodeGen.IL.Tests;
 
 public sealed class IlAssemblyEmitterTests
 {
+    [Fact]
+    public void SignatureLookupUsesOnlyItsSpanAndOwnsCachedParameters()
+    {
+        var metadata = new IlMetadata();
+        Type[] scratch = [typeof(string), typeof(int), typeof(bool), typeof(object)];
+        var method = metadata.Method(typeof(CompiledProgram), "M", true, typeof(int), scratch.AsSpan(1, 2));
+        Assert.Equal(method, metadata.Method(typeof(CompiledProgram), "M", true, typeof(int), typeof(int), typeof(bool)));
+        scratch[0] = typeof(nint);
+        scratch[^1] = typeof(int[]);
+        Assert.Equal(method, metadata.Method(typeof(CompiledProgram), "M", true, typeof(int), scratch.AsSpan(1, 2)));
+        scratch[1] = typeof(string);
+        Assert.NotEqual(method, metadata.Method(typeof(CompiledProgram), "M", true, typeof(int), scratch.AsSpan(1, 2)));
+        Assert.Equal(method, metadata.Method(typeof(CompiledProgram), "M", true, typeof(int), typeof(int), typeof(bool)));
+        var noParameters = metadata.Method(typeof(CompiledProgram), "M", true, typeof(int));
+        Assert.Equal(noParameters, metadata.Method(typeof(CompiledProgram), "M", true, typeof(int), scratch.AsSpan(2, 0)));
+        Assert.NotEqual(method, noParameters);
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(4)]

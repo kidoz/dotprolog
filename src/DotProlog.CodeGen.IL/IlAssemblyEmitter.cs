@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using DotProlog.Compiler;
@@ -116,6 +117,7 @@ public static class IlAssemblyEmitter
         var linearHeads = layout.LinearClauses.Select(clause => clause.Entry).ToHashSet();
         var blockCode = new BlobBuilder();
         var blockFlow = new ControlFlowBuilder();
+        List<Type> parameters = new(4);
         for (var i = 0; i < layout.BlockCount; i++)
         {
             // AddMethod copies each completed body into the method stream. Reuse only
@@ -165,7 +167,7 @@ public static class IlAssemblyEmitter
             }
             for (var instruction = start; instruction < end; instruction++)
             {
-                EmitOperation(metadata, il, model, layout, model.Instructions[instruction]);
+                EmitOperation(metadata, il, model, layout, model.Instructions[instruction], parameters);
                 if (instruction + 1 < end)
                 {
                     il.Branch(ILOpCode.Brfalse, failed);
@@ -351,10 +353,11 @@ public static class IlAssemblyEmitter
         InstructionEncoder il,
         CompiledProgramModel model,
         IlBlockLayout layout,
-        CompiledInstruction instruction
+        CompiledInstruction instruction,
+        List<Type> parameters
     )
     {
-        List<Type> parameters = [];
+        parameters.Clear();
         il.LoadArgument(0);
         void Integer(int value)
         {
@@ -474,6 +477,14 @@ public static class IlAssemblyEmitter
         {
             Target(instruction.NextAddress);
         }
-        il.Call(metadata.Method(typeof(Machine.CompiledExecution), op.ToString(), true, typeof(bool), [.. parameters]));
+        il.Call(
+            metadata.Method(
+                typeof(Machine.CompiledExecution),
+                op.ToString(),
+                true,
+                typeof(bool),
+                CollectionsMarshal.AsSpan(parameters)
+            )
+        );
     }
 }
