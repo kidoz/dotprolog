@@ -1,4 +1,5 @@
 using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 using DotProlog.Compiler;
 using DotProlog.Runtime;
@@ -8,6 +9,42 @@ namespace DotProlog.CodeGen.IL.Tests;
 
 public sealed class IlAssemblyEmitterTests
 {
+    [Fact]
+    public void SignatureCachePreservesEncodingAndBuilderOwnership()
+    {
+        var first = new IlMetadata();
+        first.Builder.AddModule(0, default, default, default, default);
+        first.TypeReference(typeof(CompiledProgram));
+        var firstSignature = first.Signature(false, typeof(void), typeof(BytecodeProgram));
+        Assert.Equal(firstSignature, first.Signature(false, typeof(void), typeof(BytecodeProgram)));
+
+        var second = new IlMetadata();
+        second.Builder.AddModule(0, default, default, default, default);
+        var secondSignature = second.Signature(false, typeof(void), typeof(BytecodeProgram));
+        Assert.Equal(secondSignature, second.Signature(false, typeof(void), typeof(BytecodeProgram)));
+        // The referenced type has a different row in each builder, so its encoded token differs.
+        Assert.Equal(["0001011209"], ReadSignatures(first, firstSignature));
+
+        Type[] parameters = [typeof(int[]).MakeByRefType()];
+        var byReference = second.Signature(true, typeof(bool), parameters);
+        parameters[0] = typeof(int[][]);
+        var jaggedArray = second.Signature(true, typeof(bool), parameters);
+        Assert.Equal(byReference, second.Signature(true, typeof(bool), typeof(int[]).MakeByRefType()));
+        Assert.Equal(
+            ["0001011205", "200102101D08", "2001021D1D08"],
+            ReadSignatures(second, secondSignature, byReference, jaggedArray)
+        );
+    }
+
+    private static string[] ReadSignatures(IlMetadata metadata, params BlobHandle[] signatures)
+    {
+        var blob = new BlobBuilder();
+        new MetadataRootBuilder(metadata.Builder).Serialize(blob, methodBodyStreamRva: 0, mappedFieldDataStreamRva: 0);
+        using var provider = MetadataReaderProvider.FromMetadataImage(blob.ToImmutableArray());
+        var reader = provider.GetMetadataReader();
+        return signatures.Select(signature => Convert.ToHexString(reader.GetBlobBytes(signature))).ToArray();
+    }
+
     [Fact]
     public void MethodReferenceIdentityPreservesOwnerNameAndFullSignature()
     {

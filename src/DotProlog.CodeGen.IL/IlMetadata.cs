@@ -10,6 +10,9 @@ internal sealed class IlMetadata
     private readonly Dictionary<string, AssemblyReferenceHandle> _assemblies = new(StringComparer.Ordinal);
     private readonly Dictionary<(EntityHandle Owner, StringHandle Name, BlobHandle Signature), MemberReferenceHandle> _methods =
     [];
+    private readonly Dictionary<(bool Instance, Type Result, Type[] Parameters), BlobHandle> _signatures = new(
+        new SignatureComparer()
+    );
     internal MetadataBuilder Builder { get; } = new();
 
     internal EntityHandle TypeReference(Type type)
@@ -51,6 +54,18 @@ internal sealed class IlMetadata
     }
 
     internal BlobHandle Signature(bool instance, Type result, params Type[] parameters)
+    {
+        if (_signatures.TryGetValue((instance, result, parameters), out var signature))
+        {
+            return signature;
+        }
+        signature = EncodeSignature(instance, result, parameters);
+        // Callers may reuse or mutate their arrays. Only cache-owned copies survive the call.
+        _signatures.Add((instance, result, parameters.ToArray()), signature);
+        return signature;
+    }
+
+    private BlobHandle EncodeSignature(bool instance, Type result, Type[] parameters)
     {
         var blob = new BlobBuilder();
         new BlobEncoder(blob)
@@ -129,6 +144,26 @@ internal sealed class IlMetadata
         else
         {
             encoder.Type(TypeReference(type), type.IsValueType);
+        }
+    }
+
+    private sealed class SignatureComparer : IEqualityComparer<(bool Instance, Type Result, Type[] Parameters)>
+    {
+        public bool Equals(
+            (bool Instance, Type Result, Type[] Parameters) x,
+            (bool Instance, Type Result, Type[] Parameters) y
+        ) => x.Instance == y.Instance && x.Result == y.Result && x.Parameters.AsSpan().SequenceEqual(y.Parameters);
+
+        public int GetHashCode((bool Instance, Type Result, Type[] Parameters) signature)
+        {
+            var hash = new HashCode();
+            hash.Add(signature.Instance);
+            hash.Add(signature.Result);
+            foreach (var parameter in signature.Parameters)
+            {
+                hash.Add(parameter);
+            }
+            return hash.ToHashCode();
         }
     }
 }

@@ -117,6 +117,8 @@ PE assembly with `System.Reflection.Metadata`. It emits no C# source. Both build
 use the portable compilation model in `DotProlog.Compiler/CodeGeneration`.
 Repeated method references share a metadata row within each emitted assembly, keyed by declaring
 type, name, and full signature so overloads and calling conventions remain distinct.
+Encoded signatures are also reused within an emission, with cache-owned parameter sequences
+to preserve identity when callers reuse or mutate their arrays.
 
 Direct IL preserves the loader's first-argument indexes for multi-clause static predicates.
 Installation relocates clause targets and term keys into the receiving engine before running
