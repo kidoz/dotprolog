@@ -127,14 +127,17 @@ public sealed class ExecutionTests
         Assert.Equal("b1\n", output);
     }
 
-    [Fact]
-    public void TailRecursionRunsAtConstantStackDepth()
+    [Theory]
+    [InlineData("count(M)")]
+    [InlineData("count(M), true")]
+    [InlineData("(true, count(M)), true")]
+    public void TailRecursionRunsAtConstantStackDepth(string tail)
     {
         // 200,000 iterations would exhaust the CLR stack if Prolog calls were CLR calls.
         var output = PrologTestHost.Run(
-            """
+            $"""
             count(0) :- !.
-            count(N) :- M is N - 1, count(M).
+            count(N) :- M is N - 1, {tail}.
 
             :- initialization((count(200000), write(done), nl)).
             """

@@ -89,23 +89,28 @@ internal sealed class ClauseCompiler
     /// </summary>
     private void CompileSequence(SyntaxTerm body, bool isTail)
     {
-        List<SyntaxTerm> goals = [];
-        FlattenConjunction(body, goals);
-
-        if (goals.Count == 0)
+        // Walk the right spine without materializing a list, retaining the preceding goal's
+        // tail position when the final term is true.
+        while (body is CompoundTerm { Name: ",", Arity: 2 } conjunction)
         {
-            if (isTail)
+            SyntaxTerm goal = conjunction.Arguments[0];
+            body = conjunction.Arguments[1];
+            if (body is AtomTerm { Name: "true" })
             {
-                _program.Emit(OpCode.Deallocate);
-                _program.Emit(OpCode.Proceed);
+                CompileGoal(goal, isLast: isTail);
+                return;
             }
 
-            return;
+            CompileGoal(goal, isLast: false);
         }
 
-        for (var i = 0; i < goals.Count; i++)
+        if (body is AtomTerm { Name: "true" })
         {
-            CompileGoal(goals[i], isLast: isTail && i == goals.Count - 1);
+            EmitReturnIfLast(isTail);
+        }
+        else
+        {
+            CompileGoal(body, isLast: isTail);
         }
     }
 
@@ -567,23 +572,6 @@ internal sealed class ClauseCompiler
                     break;
             }
         }
-    }
-
-    private static void FlattenConjunction(SyntaxTerm body, List<SyntaxTerm> goals)
-    {
-        // Iterative on the right spine: ','/2 is right-associative, so bodies nest arbitrarily deep.
-        while (body is CompoundTerm { Name: ",", Arity: 2 } conjunction)
-        {
-            goals.Add(conjunction.Arguments[0]);
-            body = conjunction.Arguments[1];
-        }
-
-        if (body is AtomTerm { Name: "true" })
-        {
-            return;
-        }
-
-        goals.Add(body);
     }
 
     private int FunctorOf(CompoundTerm term) => _program.Symbols.InternFunctor(term.Name, term.Arity);

@@ -8,6 +8,41 @@ namespace DotProlog.Compiler.Tests;
 /// </summary>
 public sealed class ControlConstructTests
 {
+    [Theory]
+    [InlineData("choose(X), true", "[a,b]")]
+    [InlineData("(choose(X), true), true", "[a,b]")]
+    [InlineData("true, choose(X), true", "[a,b]")]
+    [InlineData("choose(X), (true, true)", "[a,b]")]
+    [InlineData("(true, choose(X)), true", "[a,b]")]
+    [InlineData("(choose(X); X = c), true", "[a,b,c]")]
+    [InlineData("(choose(X), !), true", "[a]")]
+    [InlineData("(true -> choose(X), true; fail), true", "[a,b]")]
+    [InlineData("(fail -> fail; true), choose(X), true", "[a,b]")]
+    [InlineData("\\+ (fail, true), choose(X), true", "[a,b]")]
+    public void TrailingTruePreservesConjunctionSolutionsAndCutScope(string body, string expected)
+    {
+        string output = PrologTestHost.Run(
+            $"""
+            choose(a).
+            choose(b).
+            p(X) :- {body}.
+            :- initialization((findall(X, p(X), Xs), write(Xs))).
+            """
+        );
+
+        Assert.Equal(expected, output);
+    }
+
+    [Theory]
+    [InlineData("true")]
+    [InlineData("true, true")]
+    [InlineData("(true, true), true")]
+    public void EmptyConjunctionBranchesContinueIntoFollowingGoals(string body)
+    {
+        Assert.Equal("after", PrologTestHost.RunGoal($"({body}; fail), write(after)"));
+        Assert.Equal("after", PrologTestHost.Run($"p :- {body}.\n:- initialization((p, write(after)))."));
+    }
+
     [Fact]
     public void DisjunctionTakesTheFirstBranchThatSucceeds()
     {
