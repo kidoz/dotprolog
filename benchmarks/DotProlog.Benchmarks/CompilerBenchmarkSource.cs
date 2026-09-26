@@ -26,7 +26,8 @@ internal static class CompilerBenchmarkSource
             [],
             PrologLanguageMode.Modern,
             PrologFlagOverrides.None,
-            out var diagnostics
+            out var diagnostics,
+            indexFirstArgument: true
         );
         Check(diagnostics);
         return model ?? throw new InvalidOperationException("Benchmark source produced no model.");

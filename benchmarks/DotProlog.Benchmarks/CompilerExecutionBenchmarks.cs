@@ -16,12 +16,14 @@ public class CompilerExecutionBenchmarks
     private PrologEngine _linearBytecode = null!;
     private PrologEngine _compiled = null!;
     private PrologEngine _unfused = null!;
+    private PrologEngine _linearIl = null!;
     private int _bytecodeGoal;
     private int _linearBytecodeGoal;
     private int _compiledGoal;
     private int _unfusedGoal;
+    private int _linearIlGoal;
 
-    [Params("Reverse30", "Countdown10000", "FactScan20")]
+    [Params("Reverse30", "Countdown10000", "FactScan20", "FactHit20", "FactMiss20")]
     public string Workload { get; set; } = string.Empty;
 
     [GlobalSetup]
@@ -32,6 +34,8 @@ public class CompilerExecutionBenchmarks
             "Reverse30" => (BenchmarkPrograms.NaiveReverse, "mklist(30, L), nrev(L, _)"),
             "Countdown10000" => (BenchmarkPrograms.Countdown, "count(10000)"),
             "FactScan20" => (BenchmarkPrograms.FactTable, "find(_)"),
+            "FactHit20" => (BenchmarkPrograms.FactTable, "item(t)"),
+            "FactMiss20" => (BenchmarkPrograms.FactTable, "\\+ item(missing)"),
             _ => throw new InvalidOperationException("Unknown benchmark workload."),
         };
         _bytecode = new PrologEngine { Output = TextWriter.Null };
@@ -42,15 +46,18 @@ public class CompilerExecutionBenchmarks
         _context = new AssemblyLoadContext(null, isCollectible: true);
         _compiled = Install(source, fuseBlocks: true);
         _unfused = Install(source, fuseBlocks: false);
+        _linearIl = Install(source, fuseBlocks: true, indexFirstArgument: false);
         _bytecodeGoal = CompileGoal(_bytecode, goal);
         _linearBytecodeGoal = CompileGoal(_linearBytecode, goal);
         _compiledGoal = CompileGoal(_compiled, goal);
         _unfusedGoal = CompileGoal(_unfused, goal);
+        _linearIlGoal = CompileGoal(_linearIl, goal);
         if (
             Bytecode() != RunResult.Success
             || LinearBytecode() != RunResult.Success
             || DirectIl() != RunResult.Success
             || InstructionIl() != RunResult.Success
+            || LinearIl() != RunResult.Success
         )
         {
             throw new InvalidOperationException("Benchmark goal must succeed on every execution path.");
@@ -69,19 +76,25 @@ public class CompilerExecutionBenchmarks
     [Benchmark]
     public RunResult InstructionIl() => _unfused.Machine.Run(_unfusedGoal);
 
+    [Benchmark]
+    public RunResult LinearIl() => _linearIl.Machine.Run(_linearIlGoal);
+
     [GlobalCleanup]
     public void Cleanup() => _context.Unload();
 
-    private PrologEngine Install(string source, bool fuseBlocks)
+    private PrologEngine Install(string source, bool fuseBlocks, bool indexFirstArgument = true)
     {
         var engine = new PrologEngine { Output = TextWriter.Null };
         using var output = new MemoryStream();
         CompilerBenchmarkSource.Check(
             IlAssemblyEmitter.Emit(
                 [("execution.pl", source)],
-                fuseBlocks ? "FusedBenchmark" : "InstructionBenchmark",
+                !indexFirstArgument ? "LinearBenchmark"
+                    : fuseBlocks ? "FusedBenchmark"
+                    : "InstructionBenchmark",
                 output,
-                fuseBlocks
+                fuseBlocks,
+                indexFirstArgument: indexFirstArgument
             )
         );
         output.Position = 0;
