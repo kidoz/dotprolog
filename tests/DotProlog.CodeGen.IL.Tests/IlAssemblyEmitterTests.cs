@@ -102,7 +102,7 @@ public sealed class IlAssemblyEmitterTests
         Assert.Equal("before", output.ToString());
         Assert.True(engine.Query("findall(X,value(X),[before,after])").Prove());
         Assert.Equal(RunResult.Success, engine.Machine.Run(Assert.Single(initializers)));
-        Assert.Equal("beforeinitialized" + Environment.NewLine, output.ToString());
+        Assert.Equal("beforeinitialized\n", output.ToString());
     }
 
     [Fact]
