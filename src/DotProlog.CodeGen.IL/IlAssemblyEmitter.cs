@@ -229,12 +229,22 @@ public static class IlAssemblyEmitter
             bodies.Builder,
             entryPoint: entry,
             flags: CorFlags.ILOnly,
-            deterministicIdProvider: blobs =>
-                BlobContentId.FromHash(SHA256.HashData(blobs.SelectMany(blob => blob.GetBytes()).ToArray()))
+            deterministicIdProvider: HashContent
         );
         var content = new BlobBuilder();
         pe.Serialize(content);
         content.WriteContentTo(output);
+    }
+
+    internal static BlobContentId HashContent(IEnumerable<Blob> blobs)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        foreach (var blob in blobs)
+        {
+            // Preserve each slice's offset and length without flattening the PE into an array.
+            hash.AppendData(blob.GetBytes().AsSpan());
+        }
+        return BlobContentId.FromHash(hash.GetHashAndReset());
     }
 
     private static IEnumerable<ReadOnlyMemory<char>> IdentityChunks(

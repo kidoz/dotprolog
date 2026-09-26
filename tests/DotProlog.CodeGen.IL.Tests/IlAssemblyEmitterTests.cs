@@ -12,6 +12,44 @@ namespace DotProlog.CodeGen.IL.Tests;
 public sealed class IlAssemblyEmitterTests
 {
     [Fact]
+    public void ContentHashPreservesBlobSlicesAndOrder()
+    {
+        byte[] expected = [0, 1, 127, 128, 255, 2];
+        var storage = new BlobBuilder(256);
+        storage.WriteBytes(0xcc, 7);
+        var first = storage.ReserveBytes(3);
+        new BlobWriter(first).WriteBytes(expected, 0, 3);
+        storage.WriteBytes(0xdd, 5);
+        var empty = storage.ReserveBytes(0);
+        var last = storage.ReserveBytes(3);
+        new BlobWriter(last).WriteBytes(expected, 3, 3);
+        storage.WriteBytes(0xee, 11);
+        Assert.True(first.GetBytes().Offset > 0);
+        var expectedId = BlobContentId.FromHash(SHA256.HashData(expected));
+        Assert.Equal(expectedId, IlAssemblyEmitter.HashContent([first, empty, last]));
+        Assert.NotEqual(expectedId, IlAssemblyEmitter.HashContent([last, first]));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(4097)]
+    public void ContentHashMatchesFlattenedBuilderBytes(int length)
+    {
+        var content = new BlobBuilder(16);
+        for (var i = 0; i < length; i++)
+        {
+            content.WriteByte((byte)(i % 256));
+        }
+        var expected = BlobContentId.FromHash(SHA256.HashData(content.ToArray()));
+        Assert.Equal(expected, IlAssemblyEmitter.HashContent(content.GetBlobs()));
+        if (length == 0)
+        {
+            Assert.Equal(expected, IlAssemblyEmitter.HashContent([]));
+        }
+    }
+
+    [Fact]
     public void SignatureLookupUsesOnlyItsSpanAndOwnsCachedParameters()
     {
         var metadata = new IlMetadata();
