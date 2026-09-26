@@ -11,7 +11,7 @@ internal static class CompilerExecutionProfile
         if (args.Length != 3 || !int.TryParse(args[2], CultureInfo.InvariantCulture, out var iterations) || iterations <= 0)
         {
             Console.Error.WriteLine(
-                "Usage: --profile-execution Bytecode|LinearBytecode|DirectIl|InstructionIl|LinearIl Reverse30|Countdown10000|FactScan20|FactHit20|FactMiss20 iterations"
+                "Usage: --profile-execution Bytecode|LinearBytecode|DirectIl|InstructionIl|LinearIl|TableIl Reverse30|Countdown10000|FactScan20|FactHit20|FactMiss20 iterations"
             );
             return 2;
         }
@@ -23,6 +23,7 @@ internal static class CompilerExecutionProfile
             "DirectIl" => benchmark.DirectIl,
             "InstructionIl" => benchmark.InstructionIl,
             "LinearIl" => benchmark.LinearIl,
+            "TableIl" => benchmark.TableIl,
             _ => null,
         };
         if (execute is null)

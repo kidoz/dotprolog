@@ -17,11 +17,13 @@ public class CompilerExecutionBenchmarks
     private PrologEngine _compiled = null!;
     private PrologEngine _unfused = null!;
     private PrologEngine _linearIl = null!;
+    private PrologEngine _tableIl = null!;
     private int _bytecodeGoal;
     private int _linearBytecodeGoal;
     private int _compiledGoal;
     private int _unfusedGoal;
     private int _linearIlGoal;
+    private int _tableIlGoal;
 
     [Params("Reverse30", "Countdown10000", "FactScan20", "FactHit20", "FactMiss20")]
     public string Workload { get; set; } = string.Empty;
@@ -47,17 +49,20 @@ public class CompilerExecutionBenchmarks
         _compiled = Install(source, fuseBlocks: true);
         _unfused = Install(source, fuseBlocks: false);
         _linearIl = Install(source, fuseBlocks: true, indexFirstArgument: false);
+        _tableIl = Install(source, fuseBlocks: true, linearVariableFallback: false);
         _bytecodeGoal = CompileGoal(_bytecode, goal);
         _linearBytecodeGoal = CompileGoal(_linearBytecode, goal);
         _compiledGoal = CompileGoal(_compiled, goal);
         _unfusedGoal = CompileGoal(_unfused, goal);
         _linearIlGoal = CompileGoal(_linearIl, goal);
+        _tableIlGoal = CompileGoal(_tableIl, goal);
         if (
             Bytecode() != RunResult.Success
             || LinearBytecode() != RunResult.Success
             || DirectIl() != RunResult.Success
             || InstructionIl() != RunResult.Success
             || LinearIl() != RunResult.Success
+            || TableIl() != RunResult.Success
         )
         {
             throw new InvalidOperationException("Benchmark goal must succeed on every execution path.");
@@ -79,10 +84,18 @@ public class CompilerExecutionBenchmarks
     [Benchmark]
     public RunResult LinearIl() => _linearIl.Machine.Run(_linearIlGoal);
 
+    [Benchmark]
+    public RunResult TableIl() => _tableIl.Machine.Run(_tableIlGoal);
+
     [GlobalCleanup]
     public void Cleanup() => _context.Unload();
 
-    private PrologEngine Install(string source, bool fuseBlocks, bool indexFirstArgument = true)
+    private PrologEngine Install(
+        string source,
+        bool fuseBlocks,
+        bool indexFirstArgument = true,
+        bool linearVariableFallback = true
+    )
     {
         var engine = new PrologEngine { Output = TextWriter.Null };
         using var output = new MemoryStream();
@@ -90,11 +103,13 @@ public class CompilerExecutionBenchmarks
             IlAssemblyEmitter.Emit(
                 [("execution.pl", source)],
                 !indexFirstArgument ? "LinearBenchmark"
+                    : !linearVariableFallback ? "TableBenchmark"
                     : fuseBlocks ? "FusedBenchmark"
                     : "InstructionBenchmark",
                 output,
                 fuseBlocks,
-                indexFirstArgument: indexFirstArgument
+                indexFirstArgument: indexFirstArgument,
+                linearVariableFallback: linearVariableFallback
             )
         );
         output.Position = 0;
