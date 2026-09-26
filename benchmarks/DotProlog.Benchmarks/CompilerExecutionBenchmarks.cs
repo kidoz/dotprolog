@@ -14,8 +14,10 @@ public class CompilerExecutionBenchmarks
     private AssemblyLoadContext _context = null!;
     private PrologEngine _bytecode = null!;
     private PrologEngine _compiled = null!;
+    private PrologEngine _unfused = null!;
     private int _bytecodeGoal;
     private int _compiledGoal;
+    private int _unfusedGoal;
 
     [Params("Reverse30", "Countdown10000", "FactScan20")]
     public string Workload { get; set; } = string.Empty;
@@ -32,20 +34,13 @@ public class CompilerExecutionBenchmarks
         };
         _bytecode = new PrologEngine { Output = TextWriter.Null };
         _bytecode.ConsultOrThrow(source, "execution.pl");
-        _compiled = new PrologEngine { Output = TextWriter.Null };
-        using var output = new MemoryStream();
-        CompilerBenchmarkSource.Check(IlAssemblyEmitter.Emit([("execution.pl", source)], "ExecutionBenchmark", output));
-        output.Position = 0;
         _context = new AssemblyLoadContext(null, isCollectible: true);
-        var assembly = _context.LoadFromStream(output);
-        var install = assembly
-            .GetType(IlAssemblyEmitter.ProgramTypeName)!
-            .GetMethod("Install")!
-            .CreateDelegate<Func<PrologEngine, int[]>>();
-        install(_compiled);
+        _compiled = Install(source, fuseBlocks: true);
+        _unfused = Install(source, fuseBlocks: false);
         _bytecodeGoal = CompileGoal(_bytecode, goal);
         _compiledGoal = CompileGoal(_compiled, goal);
-        if (Bytecode() != RunResult.Success || DirectIl() != RunResult.Success)
+        _unfusedGoal = CompileGoal(_unfused, goal);
+        if (Bytecode() != RunResult.Success || DirectIl() != RunResult.Success || InstructionIl() != RunResult.Success)
         {
             throw new InvalidOperationException("Benchmark goal must succeed on both execution paths.");
         }
@@ -57,8 +52,33 @@ public class CompilerExecutionBenchmarks
     [Benchmark]
     public RunResult DirectIl() => _compiled.Machine.Run(_compiledGoal);
 
+    [Benchmark]
+    public RunResult InstructionIl() => _unfused.Machine.Run(_unfusedGoal);
+
     [GlobalCleanup]
     public void Cleanup() => _context.Unload();
+
+    private PrologEngine Install(string source, bool fuseBlocks)
+    {
+        var engine = new PrologEngine { Output = TextWriter.Null };
+        using var output = new MemoryStream();
+        CompilerBenchmarkSource.Check(
+            IlAssemblyEmitter.Emit(
+                [("execution.pl", source)],
+                fuseBlocks ? "FusedBenchmark" : "InstructionBenchmark",
+                output,
+                fuseBlocks
+            )
+        );
+        output.Position = 0;
+        var assembly = _context.LoadFromStream(output);
+        var install = assembly
+            .GetType(IlAssemblyEmitter.ProgramTypeName)!
+            .GetMethod("Install")!
+            .CreateDelegate<Func<PrologEngine, int[]>>();
+        install(engine);
+        return engine;
+    }
 
     private static int CompileGoal(PrologEngine engine, string goal)
     {
