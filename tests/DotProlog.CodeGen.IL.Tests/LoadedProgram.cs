@@ -14,11 +14,12 @@ internal sealed class LoadedProgram : IDisposable
     internal LoadedProgram(
         string source,
         PrologLanguageMode mode = PrologLanguageMode.Modern,
-        PrologFlagOverrides? overrides = null
+        PrologFlagOverrides? overrides = null,
+        bool fuseBlocks = true
     )
     {
         using var stream = new MemoryStream();
-        var diagnostics = IlAssemblyEmitter.Emit([("test.pl", source)], "TestProgram", stream, mode, overrides);
+        var diagnostics = IlAssemblyEmitter.Emit([("test.pl", source)], "TestProgram", stream, fuseBlocks, mode, overrides);
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
         stream.Position = 0;
         var assembly = _context.LoadFromStream(stream);

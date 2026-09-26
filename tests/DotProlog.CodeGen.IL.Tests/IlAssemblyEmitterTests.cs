@@ -9,6 +9,7 @@ namespace DotProlog.CodeGen.IL.Tests;
 public sealed class IlAssemblyEmitterTests
 {
     [Theory]
+    [InlineData("", 0)]
     [InlineData("p(a).", 0)]
     [InlineData(":- initialization(true).", 0)]
     [InlineData(":- initialization(fail). :- initialization(halt(42)).", 1)]

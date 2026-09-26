@@ -29,8 +29,10 @@ public sealed class DirectIlCompilerTests
                 parent(b,c).
                 count(0).
                 count(N) :- N > 0, M is N-1, count(M).
+                bound(a,b).
                 main :-
                     findall(X,ancestor(a,X),[b,c]), count(10000),
+                    freeze(F, G=woke), bound(F,b), G==woke, \+ bound(a,c),
                     catch(throw(ball(done)),ball(done),true),
                     assertz(value(added)), retract(value(initial)),
                     findall(X,value(X),[added]),

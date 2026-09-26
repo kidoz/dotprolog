@@ -9,7 +9,9 @@ internal static class InstallationImage
     internal const int Magic = 0x44504C49;
     internal const int Version = 1;
 
-    internal static string Encode(CompiledProgramModel model)
+    internal static string Encode(CompiledProgramModel model) => Encode(model, IlBlockLayout.Create(model));
+
+    internal static string Encode(CompiledProgramModel model, IlBlockLayout layout)
     {
         using var stream = new MemoryStream();
         using var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true);
@@ -17,7 +19,7 @@ internal static class InstallationImage
         writer.Write(Version);
         writer.Write((int)model.LanguageMode);
         writer.Write((int)model.InitialDoubleQuotes);
-        writer.Write(model.Instructions.Count);
+        writer.Write(layout.Starts.Count);
         writer.Write(model.Functors.Count);
         foreach ((var name, var arity) in model.Functors)
         {
@@ -87,10 +89,10 @@ internal static class InstallationImage
         writer.Write(model.Preparation.Count);
         foreach (PreparationStep step in model.Preparation)
         {
-            WritePredicates(writer, step.Predicates);
-            writer.Write(step.Directive);
+            WritePredicates(writer, step.Predicates, layout);
+            writer.Write(layout.BlockByInstruction[step.Directive]);
         }
-        WritePredicates(writer, model.Predicates);
+        WritePredicates(writer, model.Predicates, layout);
         writer.Write(model.DynamicPredicates.Count);
         foreach (CompiledDynamicPredicate predicate in model.DynamicPredicates)
         {
@@ -98,13 +100,17 @@ internal static class InstallationImage
             writer.Write(predicate.Clauses.Count);
             foreach (CompiledDynamicClause clause in predicate.Clauses)
             {
-                writer.Write(clause.Entry);
+                writer.Write(layout.BlockByInstruction[clause.Entry]);
                 WriteTerm(writer, clause.Term);
                 writer.Write(clause.Root);
             }
             WriteIntegers(writer, predicate.Aliases);
         }
-        WriteIntegers(writer, model.Initialization);
+        writer.Write(model.Initialization.Count);
+        foreach (var entry in model.Initialization)
+        {
+            writer.Write(layout.BlockByInstruction[entry]);
+        }
         writer.Flush();
         return Convert.ToBase64String(stream.ToArray());
     }
@@ -118,13 +124,13 @@ internal static class InstallationImage
         }
     }
 
-    private static void WritePredicates(BinaryWriter writer, List<CompiledPredicate> predicates)
+    private static void WritePredicates(BinaryWriter writer, List<CompiledPredicate> predicates, IlBlockLayout layout)
     {
         writer.Write(predicates.Count);
         foreach (CompiledPredicate predicate in predicates)
         {
             writer.Write(predicate.Functor);
-            writer.Write(predicate.Entry);
+            writer.Write(layout.BlockByInstruction[predicate.Entry]);
         }
     }
 

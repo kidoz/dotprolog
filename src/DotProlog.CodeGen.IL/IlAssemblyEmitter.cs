@@ -30,6 +30,16 @@ public static class IlAssemblyEmitter
         Stream output,
         PrologLanguageMode languageMode = PrologLanguageMode.Modern,
         PrologFlagOverrides? flagOverrides = null
+    ) => Emit(sources, assemblyName, output, true, languageMode, flagOverrides);
+
+    // Retain the instruction-per-block path as a semantic and performance reference for tests.
+    internal static IReadOnlyList<Diagnostic> Emit(
+        IReadOnlyList<(string Name, string Text)> sources,
+        string assemblyName,
+        Stream output,
+        bool fuseBlocks,
+        PrologLanguageMode languageMode = PrologLanguageMode.Modern,
+        PrologFlagOverrides? flagOverrides = null
     )
     {
         ArgumentNullException.ThrowIfNull(sources);
@@ -46,15 +56,16 @@ public static class IlAssemblyEmitter
         {
             return diagnostics;
         }
-        WriteAssembly(model, assemblyName, output);
+        WriteAssembly(model, assemblyName, output, fuseBlocks);
         return diagnostics;
     }
 
-    internal static void WriteAssembly(CompiledProgramModel model, string name, Stream output)
+    internal static void WriteAssembly(CompiledProgramModel model, string name, Stream output, bool fuseBlocks = true)
     {
         var metadata = new IlMetadata();
         var builder = metadata.Builder;
-        var image = InstallationImage.Encode(model);
+        var layout = IlBlockLayout.Create(model, fuseBlocks);
+        var image = InstallationImage.Encode(model, layout);
         var identity = new StringBuilder(name).Append('\0').Append(image);
         foreach (var instruction in model.Instructions)
         {
@@ -102,13 +113,29 @@ public static class IlAssemblyEmitter
             typeof(Machine.CompiledExecution).MakeByRefType(),
             typeof(CompiledProgram)
         );
-        for (var i = 0; i < model.Instructions.Count; i++)
+        for (var i = 0; i < layout.Starts.Count; i++)
         {
-            var il = new InstructionEncoder(new BlobBuilder());
-            EmitOperation(metadata, il, model, model.Instructions[i]);
+            var il = new InstructionEncoder(new BlobBuilder(), new ControlFlowBuilder());
+            var end = i + 1 < layout.Starts.Count ? layout.Starts[i + 1] : model.Instructions.Count;
+            var failed = il.DefineLabel();
+            for (var instruction = layout.Starts[i]; instruction < end; instruction++)
+            {
+                EmitOperation(metadata, il, model, layout, model.Instructions[instruction]);
+                if (instruction + 1 < end)
+                {
+                    il.Branch(ILOpCode.Brfalse, failed);
+                }
+            }
+            il.OpCode(ILOpCode.Ret);
+            il.MarkLabel(failed);
+            if (end - layout.Starts[i] > 1)
+            {
+                il.LoadConstantI4(0);
+                il.OpCode(ILOpCode.Ret);
+            }
             AddMethod(metadata, bodies, "Block" + i.ToString(CultureInfo.InvariantCulture), blockSignature, il, isPublic: false);
         }
-        var createBlocks = EmitBlockArray(metadata, bodies, model.Instructions.Count);
+        var createBlocks = EmitBlockArray(metadata, bodies, layout.Starts.Count);
         var install = new InstructionEncoder(new BlobBuilder());
         install.LoadArgument(0);
         install.LoadString(builder.GetOrAddUserString(image));
@@ -214,6 +241,7 @@ public static class IlAssemblyEmitter
         IlMetadata metadata,
         InstructionEncoder il,
         CompiledProgramModel model,
+        IlBlockLayout layout,
         CompiledInstruction instruction
     )
     {
@@ -235,7 +263,7 @@ public static class IlAssemblyEmitter
         {
             if (model.InstructionByAddress.TryGetValue(address, out var index))
             {
-                Reference(nameof(CompiledProgram.Target), index, typeof(int));
+                Reference(nameof(CompiledProgram.Target), layout.BlockByInstruction[index], typeof(int));
             }
             else
             {
@@ -315,6 +343,5 @@ public static class IlAssemblyEmitter
             Target(instruction.NextAddress);
         }
         il.Call(metadata.Method(typeof(Machine.CompiledExecution), op.ToString(), true, typeof(bool), [.. parameters]));
-        il.OpCode(ILOpCode.Ret);
     }
 }

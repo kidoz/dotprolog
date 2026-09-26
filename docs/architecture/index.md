@@ -116,8 +116,12 @@ converted into new CLR IL inside the process.
 PE assembly with `System.Reflection.Metadata`. It emits no C# source. Both build-time backends
 use the portable compilation model in `DotProlog.Compiler/CodeGeneration`.
 
-Each IL block statically calls the same `Machine.CompiledExecution` operation as the corresponding
-C# block. Static delegates register these blocks with the explicit machine. The installation
+Each IL block statically calls the same `Machine.CompiledExecution` operations as the corresponding
+C# blocks. The IL backend groups straight-line term, environment, and clause-selection operations
+into one method, returning immediately on failure. Calls, wake-up checks, and other control-flow
+operations remain separate blocks so resumption cannot replay a partially executed prefix. Branches,
+continuations, and installed predicate entries retain explicit targets. Static delegates register
+these blocks with the explicit machine. The installation
 image holds only portable symbols, constants, module metadata, and registration/initialization
 order; predicate instructions are IL methods, not serialized bytecode interpreted at startup.
 Runtime consult/assert and the existing standard-library initialization retain their bytecode path.

@@ -4,6 +4,14 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The direct IL compiler groups straight-line operations into fewer methods, reducing dispatch
+  overhead and generated assembly size. Calls, wake-up checks, and control-flow targets preserve
+  their existing resumption behavior.
+
 ## [0.14.2] — 2026-09-25
 
 ### Fixed
@@ -770,6 +778,7 @@ binary: a published executable can consult a `.pl` file it has never seen and ru
 
 **Full Changelog**: https://github.com/kidoz/dotprolog/commits/v0.1.0
 
+[Unreleased]: https://github.com/kidoz/dotprolog/compare/v0.14.2...HEAD
 [0.14.2]: https://github.com/kidoz/dotprolog/releases/tag/v0.14.2
 [0.14.1]: https://github.com/kidoz/dotprolog/releases/tag/v0.14.1
 [0.14.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.14.0
