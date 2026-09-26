@@ -1945,6 +1945,14 @@ public sealed class ProgramLoader
 
         var entry = _program.CodeLength;
         var pendingAlternative = -1;
+        var compiler = new ClauseCompiler(
+            _program,
+            _constants,
+            diagnostics,
+            fileName,
+            unitDefinitions,
+            trustedImplementation: !_userPredicates
+        );
 
         for (var i = 0; i < clauses.Count; i++)
         {
@@ -1966,14 +1974,6 @@ public sealed class ProgramLoader
                 }
             }
 
-            var compiler = new ClauseCompiler(
-                _program,
-                _constants,
-                diagnostics,
-                fileName,
-                unitDefinitions,
-                trustedImplementation: !_userPredicates
-            );
             compiler.Compile(clauses[i].Head, clauses[i].Body);
         }
 
@@ -1996,17 +1996,17 @@ public sealed class ProgramLoader
         var stub = _program.Emit(OpCode.EnterStatic, 0);
         List<int> addresses = new(clauses.Count);
         List<Cell> keys = new(clauses.Count);
+        var compiler = new ClauseCompiler(
+            _program,
+            _constants,
+            diagnostics,
+            fileName,
+            unitDefinitions,
+            trustedImplementation: !_userPredicates
+        );
 
         foreach ((SyntaxTerm head, SyntaxTerm? body) in clauses)
         {
-            var compiler = new ClauseCompiler(
-                _program,
-                _constants,
-                diagnostics,
-                fileName,
-                unitDefinitions,
-                trustedImplementation: !_userPredicates
-            );
             var address = compiler.Compile(head, body);
             if (address < 0)
             {

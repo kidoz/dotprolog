@@ -53,6 +53,12 @@ internal sealed class ClauseCompiler
     /// </summary>
     internal int Compile(SyntaxTerm head, SyntaxTerm? body)
     {
+        // Keep the variable-table capacity for sibling clauses, but no clause-local state.
+        _slots.Clear();
+        _slotCount = 0;
+        _failed = false;
+        _cutSlot = -1;
+
         head = TermNormalizer.Normalize(head, _program.Flags.DoubleQuotes, _program.Flags.CodePointCharacters);
         body = body is null
             ? null

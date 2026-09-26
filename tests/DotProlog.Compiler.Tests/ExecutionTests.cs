@@ -7,6 +7,68 @@ namespace DotProlog.Compiler.Tests;
 public sealed class ExecutionTests
 {
     [Fact]
+    public void ReusedClauseCompilerResetsSlotsAndFailureState()
+    {
+        var engine = new PrologEngine();
+        List<Diagnostic> diagnostics = [];
+        var compiler = new ClauseCompiler(engine.Program, new ConstantPool(engine.Program), diagnostics, "reuse.pl");
+        SyntaxTerm wideHead = Assert.Single(TermReader.ReadProgram("wide(X, A, B, C, D, E, F, G).").Clauses);
+        SyntaxTerm condition = Assert.Single(TermReader.ReadProgram("(true -> !; fail).").Clauses);
+        Assert.True(compiler.Compile(wideHead, condition) >= 0);
+
+        SyntaxTerm narrowHead = Assert.Single(TermReader.ReadProgram("narrow(X).").Clauses);
+        int narrow = compiler.Compile(narrowHead, null);
+        Assert.True(narrow >= 0);
+        CompiledProgramModel model = CompiledProgramModel.Create(engine.Program, narrow, [], []);
+        Assert.Equal(OpCode.Allocate, model.Instructions[0].OpCode);
+        Assert.Equal(1, model.Instructions[0].First);
+        Assert.Equal(OpCode.GetVariable, model.Instructions[1].OpCode);
+        Assert.Equal(0, model.Instructions[1].First);
+        Assert.Empty(diagnostics);
+
+        Assert.Equal(-1, compiler.Compile(new IntegerTerm(0, SourceSpan.None), null));
+        Assert.Single(diagnostics);
+        int recovered = compiler.Compile(new AtomTerm("recovered", SourceSpan.None), null);
+        Assert.True(recovered >= 0);
+        model = CompiledProgramModel.Create(engine.Program, recovered, [], []);
+        Assert.Equal(OpCode.Allocate, model.Instructions[0].OpCode);
+        Assert.Equal(0, model.Instructions[0].First);
+    }
+
+    [Fact]
+    public void SiblingClausesKeepNamedAndAnonymousVariablesIndependent()
+    {
+        string output = PrologTestHost.Run(
+            """
+            choice(wide(X, A, B, C, D, E, F, G)) :- X = changed, fail.
+            choice(pair(X, X)).
+            choice(pair(_, _)).
+            choice(last).
+            :- initialization((findall(ok, (choice(T), T = pair(a, b)), Distinct),
+                               findall(ok, (choice(T), T = pair(a, a)), Shared),
+                               write(Distinct), write(Shared))).
+            """
+        );
+
+        Assert.Equal("[ok][ok,ok]", output);
+    }
+
+    [Fact]
+    public void ZeroArityClauseChainsResetBodyVariables()
+    {
+        Assert.Equal(
+            "ok",
+            PrologTestHost.Run(
+                """
+                p :- X = rejected, (true -> fail; X = unreachable).
+                p :- X = ok, write(X).
+                :- initialization(p).
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void UnifiesStructuresAndPropagatesBindings()
     {
         Assert.Equal("f(a,b)\n", PrologTestHost.RunGoal("X = f(a, Y), Y = b, write(X), nl"));
