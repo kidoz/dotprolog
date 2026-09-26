@@ -6,6 +6,19 @@ namespace DotProlog.CodeGen.IL.Tests;
 
 public sealed class IlBlockFusionTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FailedPartialHeadMatchDoesNotWakeTheDiscardedBinding(bool fuseBlocks)
+    {
+        using var program = new LoadedProgram("p(f(a),a,a). p(f(b),b,b).", fuseBlocks: fuseBlocks);
+        using var output = new StringWriter();
+        var engine = new PrologEngine { Output = output };
+        program.Install(engine);
+        Assert.True(engine.Query("freeze(X,write(X)), p(f(X),X,b)").Prove());
+        Assert.Equal("b", output.ToString());
+    }
+
     [Fact]
     public void StraightLineInstructionsShareMethodsAndShrinkTheAssembly()
     {
