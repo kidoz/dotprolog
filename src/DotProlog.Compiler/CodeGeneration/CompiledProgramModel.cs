@@ -18,6 +18,7 @@ internal sealed class CompiledProgramModel
     internal List<PreparationStep> Preparation { get; } = [];
     internal List<CompiledDynamicPredicate> DynamicPredicates { get; } = [];
     internal List<CompiledModule> Modules { get; } = [];
+    internal List<(int[] Entries, List<CompiledTermCell> Keys)> StaticIndexes { get; } = [];
 
     internal static CompiledProgramModel Create(
         BytecodeProgram program,
@@ -58,6 +59,18 @@ internal sealed class CompiledProgramModel
         {
             switch (instruction.OpCode)
             {
+                case OpCode.EnterStatic:
+                {
+                    var table = program.StaticIndex(instruction.First);
+                    instruction.FirstReference = model.StaticIndexes.Count;
+                    model.StaticIndexes.Add(
+                        (
+                            [.. table.Addresses.Select(address => model.InstructionByAddress[address])],
+                            DescribeTerm(program, model, functors, termConstants, table.Keys)
+                        )
+                    );
+                    break;
+                }
                 case OpCode.Call:
                 case OpCode.Execute:
                 case OpCode.GetStructureArgument:
@@ -350,7 +363,8 @@ internal sealed class CompiledProgramModel
             or OpCode.UnifyValue
             or OpCode.UnifyConstant
             or OpCode.InitVariable
-            or OpCode.EnterDynamic => 1,
+            or OpCode.EnterDynamic
+            or OpCode.EnterStatic => 1,
             _ => 2,
         };
 

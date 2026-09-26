@@ -10,7 +10,8 @@ internal static class CompiledProgramBuilder
         IReadOnlyList<(string Name, int Arity)> hostBuiltins,
         PrologLanguageMode languageMode,
         PrologFlagOverrides flagOverrides,
-        out IReadOnlyList<Diagnostic> diagnostics
+        out IReadOnlyList<Diagnostic> diagnostics,
+        bool indexFirstArgument = false
     )
     {
         var engine = new PrologEngine(languageMode, flagOverrides)
@@ -20,9 +21,8 @@ internal static class CompiledProgramBuilder
             Input = TextReader.Null,
         };
 
-        // This translator consumes the loader's try/retry/trust clause form; first-argument
-        // indexing stays a bytecode-VM dispatch strategy.
-        engine.Program.EmitFirstArgumentIndexing = false;
+        // Generated C# retains clause chains; direct IL can preserve the loader's indexes.
+        engine.Program.EmitFirstArgumentIndexing = indexFirstArgument;
 
         foreach ((var name, var arity) in hostBuiltins)
         {

@@ -9,6 +9,100 @@ namespace DotProlog.CodeGen.IL.Tests;
 public sealed class IlAssemblyEmitterTests
 {
     [Theory]
+    [InlineData(
+        "p(a,1). p(_,2). p(b,3). p(a,4).",
+        "findall(V,p(a,V),[1,2,4]), findall(V,p(b,V),[2,3]), findall(V,p(c,V),[2]), findall(V,p(_,V),[1,2,3,4])"
+    )]
+    [InlineData("p(a). p(b).", "\\+ p(c), X=b, p(X)")]
+    [InlineData("p(1,int). p(1.0,float).", "findall(V,p(1,V),[int]), findall(V,p(1.0,V),[float])")]
+    [InlineData(
+        "p([],empty). p([_|_],list). p(f(_),f). p(f(_,_),ff). p(atom,atom).",
+        "p([],empty), p([a],list), p(f(a),f), p(f(a,b),ff), p(atom,atom), \\+ p(g(a),_)"
+    )]
+    [InlineData(
+        ":- set_prolog_flag(double_quotes,string). p(\"a\",string). p(a,atom).",
+        "atom_string(a,S), findall(V,p(S,V),[string]), findall(V,p(a,V),[atom])"
+    )]
+    [InlineData(
+        "p(115292150460684697600,big). p(1r3,rational). p(a,atom).",
+        "findall(V,p(115292150460684697600,V),[big]), findall(V,p(1r3,V),[rational])"
+    )]
+    [InlineData(
+        "p(a,1) :- !. p(a,2). p(b,3).",
+        "findall(V,p(a,V),[1]), findall(V,p(b,V),[3]), findall(V,(p(a,V);V=outer),[1,outer])"
+    )]
+    [InlineData("p(f(a),a,a). p(f(b),b,b).", "findall(X,p(f(X),X,b),[b])")]
+    [InlineData("p(a) :- throw(ball). p(b).", "catch(p(a),ball,true), p(b)")]
+    public void IndexedAndLinearIlPreserveClauseSelection(string source, string goal)
+    {
+        foreach (var indexed in new[] { false, true })
+        {
+            foreach (var fused in new[] { false, true })
+            {
+                using var compiled = new LoadedProgram(source, fuseBlocks: fused, indexFirstArgument: indexed);
+                var engine = new PrologEngine();
+                // Relocation must not rely on the compiling engine's symbol or table IDs.
+                engine.ConsultOrThrow("unrelated(z). unrelated(y). extra(q(r)).", "existing.pl");
+                compiled.Install(engine);
+                Assert.True(engine.Query(goal).Prove());
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void IndexedDeterministicCallRunsCleanupBeforeReturning(bool fused)
+    {
+        using var compiled = new LoadedProgram("p(a). p(b). p(c).", fuseBlocks: fused);
+        var engine = new PrologEngine();
+        compiled.Install(engine);
+        Assert.True(engine.Query("setup_call_cleanup(true,p(b),Done=yes), Done==yes").Prove());
+        Assert.True(
+            engine
+                .Query(
+                    "findall(X-D,(setup_call_cleanup(true,p(X),Done=yes),(var(Done)->D=pending;D=Done)),[a-pending,b-pending,c-yes])"
+                )
+                .Prove()
+        );
+    }
+
+    [Fact]
+    public void IndexedPreparationUsesTheSourcePositionSnapshot()
+    {
+        using var compiled = new LoadedProgram(
+            "p(a). p(b). :- findall(X,p(X),L), write(L). p(c). :- findall(X,p(X),L), write(L)."
+        );
+        using var output = new StringWriter();
+        var engine = new PrologEngine { Output = output };
+        compiled.Install(engine);
+        Assert.Equal("[a,b][a,b,c]", output.ToString());
+        Assert.True(engine.Query("findall(X,p(X),[a,b,c])").Prove());
+    }
+
+    [Fact]
+    public void VersionOneInstallationImagesRemainReadable()
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true))
+        {
+            writer.Write(InstallationImage.Magic);
+            writer.Write(1);
+            writer.Write((int)PrologLanguageMode.Modern);
+            writer.Write((int)new PrologEngine().Program.InitialDoubleQuotes);
+            // Version one: blocks, functors, builtins, constants, modules, preparation,
+            // predicates, dynamic predicates, and initialization; no static-index section.
+            for (var i = 0; i < 9; i++)
+            {
+                writer.Write(0);
+            }
+        }
+        var image = Convert.ToBase64String(stream.ToArray());
+        Assert.Empty(IlProgramHost.Install(new PrologEngine(), image, []));
+        Assert.Equal(0, IlProgramHost.Run(image, []));
+    }
+
+    [Theory]
     [InlineData("", 0)]
     [InlineData("p(a).", 0)]
     [InlineData(":- initialization(true).", 0)]

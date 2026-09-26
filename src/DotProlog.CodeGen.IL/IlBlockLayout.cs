@@ -47,6 +47,13 @@ internal sealed class IlBlockLayout
         {
             Entry(entry);
         }
+        foreach (var index in model.StaticIndexes)
+        {
+            foreach (var entry in index.Entries)
+            {
+                Entry(entry);
+            }
+        }
         foreach (var instruction in model.Instructions)
         {
             switch (instruction.OpCode)

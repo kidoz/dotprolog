@@ -8,6 +8,9 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Changed
 
+- Direct IL predicates use first-argument clause indexing, preserving solution order while
+  skipping incompatible heads and avoiding a choice point when only one clause can match.
+  Installation remains compatible with earlier IL images.
 - The direct IL compiler groups straight-line operations into fewer methods, reducing dispatch
   overhead and generated assembly size. Calls, wake-up checks, and control-flow targets preserve
   their existing resumption behavior.

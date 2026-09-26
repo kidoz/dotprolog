@@ -61,7 +61,7 @@ public static class IlProgramHost
         ArgumentNullException.ThrowIfNull(blocks);
         using var stream = new MemoryStream(Convert.FromBase64String(image), writable: false);
         using var reader = new BinaryReader(stream, Encoding.UTF8);
-        ValidateHeader(reader);
+        var version = ValidateHeader(reader);
         var runtime = engine.Program;
         if (
             (PrologLanguageMode)reader.ReadInt32() != runtime.LanguageMode
@@ -107,11 +107,22 @@ public static class IlProgramHost
                 _ => throw new InvalidDataException("Unsupported generated constant tag."),
             };
         }
-        var compiled = new CompiledProgram(functors, builtins, constants, blocks.Length);
+        var indexes = new int[version >= 2 ? ReadCount(reader) : 0];
+        var compiled = new CompiledProgram(functors, builtins, constants, blocks.Length, indexes);
         ReadModules(reader, runtime, compiled);
         for (var i = 0; i < blocks.Length; i++)
         {
             compiled.SetTarget(i, runtime.RegisterCompiledBlock(blocks[i], compiled));
+        }
+        for (var i = 0; i < indexes.Length; i++)
+        {
+            var keys = ReadTerm(reader, compiled);
+            var targets = new int[keys.Length];
+            for (var j = 0; j < targets.Length; j++)
+            {
+                targets[j] = compiled.Target(reader.ReadInt32());
+            }
+            indexes[i] = runtime.AddStaticIndex(targets, keys);
         }
         var preparationCount = ReadCount(reader);
         var enteringQuotes = runtime.Flags.DoubleQuotes;
@@ -172,12 +183,15 @@ public static class IlProgramHost
         );
     }
 
-    private static void ValidateHeader(BinaryReader reader)
+    private static int ValidateHeader(BinaryReader reader)
     {
-        if (reader.ReadInt32() != InstallationImage.Magic || reader.ReadInt32() != InstallationImage.Version)
+        var magic = reader.ReadInt32();
+        var version = reader.ReadInt32();
+        if (magic != InstallationImage.Magic || version is not (1 or InstallationImage.Version))
         {
             throw new InvalidDataException("Unsupported DotProlog IL installation image.");
         }
+        return version;
     }
 
     private static int ReadCount(BinaryReader reader)

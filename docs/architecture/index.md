@@ -116,6 +116,13 @@ converted into new CLR IL inside the process.
 PE assembly with `System.Reflection.Metadata`. It emits no C# source. Both build-time backends
 use the portable compilation model in `DotProlog.Compiler/CodeGeneration`.
 
+Direct IL preserves the loader's first-argument indexes for multi-clause static predicates.
+Installation relocates clause targets and term keys into the receiving engine before running
+directives. Selection and redo reuse the VM's index machinery: candidate clauses retain source
+order, variables match every key, and a single candidate creates no choice point. Generated C#
+continues to use unindexed clause chains. The versioned installation reader also accepts older
+images without index tables.
+
 Each IL block statically calls the same `Machine.CompiledExecution` operations as the corresponding
 C# blocks. The IL backend groups straight-line term, environment, and clause-selection operations
 into one method, returning immediately on failure. Calls, wake-up checks, and other control-flow

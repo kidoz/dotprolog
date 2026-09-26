@@ -39,7 +39,8 @@ public static class IlAssemblyEmitter
         Stream output,
         bool fuseBlocks,
         PrologLanguageMode languageMode = PrologLanguageMode.Modern,
-        PrologFlagOverrides? flagOverrides = null
+        PrologFlagOverrides? flagOverrides = null,
+        bool indexFirstArgument = true
     )
     {
         ArgumentNullException.ThrowIfNull(sources);
@@ -50,7 +51,8 @@ public static class IlAssemblyEmitter
             [],
             languageMode,
             flagOverrides ?? PrologFlagOverrides.None,
-            out var diagnostics
+            out var diagnostics,
+            indexFirstArgument
         );
         if (model is null)
         {
@@ -294,6 +296,9 @@ public static class IlAssemblyEmitter
             case OpCode.EnterDynamic:
                 Reference(nameof(CompiledProgram.Functor), instruction.FirstReference, typeof(int));
                 break;
+            case OpCode.EnterStatic:
+                Reference(nameof(CompiledProgram.StaticIndex), instruction.FirstReference, typeof(int));
+                break;
             case OpCode.GetConstant:
             case OpCode.PutConstant:
                 Reference(nameof(CompiledProgram.Constant), instruction.FirstReference, typeof(Cell));
@@ -338,7 +343,18 @@ public static class IlAssemblyEmitter
             default:
                 throw new InvalidOperationException($"Opcode {op} cannot be emitted as IL.");
         }
-        if (op is not (OpCode.Stop or OpCode.Proceed or OpCode.Fail or OpCode.Execute or OpCode.EnterDynamic or OpCode.Jump))
+        if (
+            op
+            is not (
+                OpCode.Stop
+                or OpCode.Proceed
+                or OpCode.Fail
+                or OpCode.Execute
+                or OpCode.EnterDynamic
+                or OpCode.EnterStatic
+                or OpCode.Jump
+            )
+        )
         {
             Target(instruction.NextAddress);
         }

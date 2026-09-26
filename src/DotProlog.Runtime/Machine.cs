@@ -1265,6 +1265,9 @@ public sealed class Machine
             return _machine.EnterDynamic(functorId);
         }
 
+        /// <summary>Enters a static clause index with relocated compiled targets.</summary>
+        public bool EnterStatic(int tableId) => _machine.EnterStatic(tableId);
+
         /// <summary>Fails and lets the machine backtrack.</summary>
         public bool Fail()
         {

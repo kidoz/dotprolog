@@ -7,7 +7,7 @@ namespace DotProlog.CodeGen.IL;
 internal static class InstallationImage
 {
     internal const int Magic = 0x44504C49;
-    internal const int Version = 1;
+    internal const int Version = 2;
 
     internal static string Encode(CompiledProgramModel model) => Encode(model, IlBlockLayout.Create(model));
 
@@ -35,6 +35,7 @@ internal static class InstallationImage
             writer.Write(constant.Integer);
             writer.Write(constant.Float);
         }
+        writer.Write(model.StaticIndexes.Count);
         writer.Write(model.Modules.Count);
         foreach (CompiledModule module in model.Modules)
         {
@@ -84,6 +85,14 @@ internal static class InstallationImage
                 writer.Write(import.Name);
                 writer.Write(import.Arity);
                 writer.Write(import.From);
+            }
+        }
+        foreach (var index in model.StaticIndexes)
+        {
+            WriteTerm(writer, index.Keys);
+            foreach (var entry in index.Entries)
+            {
+                writer.Write(layout.BlockByInstruction[entry]);
             }
         }
         writer.Write(model.Preparation.Count);
