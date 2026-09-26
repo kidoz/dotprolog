@@ -6,6 +6,11 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- GreymereAdventure reports malformed command input and prompts again instead of exiting
+  with an uncaught syntax error, preserving inventory and quest progress.
+
 ### Changed
 
 - GreymereAdventure now explores seventeen rooms with a bell puzzle, an optional prisoner

@@ -97,6 +97,45 @@ public sealed partial class GreymereAdventureTests
     }
 
     [Fact]
+    public void CorrectedCommandAfterTypoEnablesGraphics()
+    {
+        var output = Play("graphivs(on).\ngraphics(on).\nquit.\n").Output;
+        Assert.Contains("The tale does not understand graphivs(on)", output, StringComparison.Ordinal);
+        Assert.Contains("Graphics: on.", output, StringComparison.Ordinal);
+        Assert.Contains("G L O A M W A T C H", output, StringComparison.Ordinal);
+        Assert.EndsWith("Farewell.\n", output);
+    }
+
+    [Theory]
+    [InlineData("graphics(,).\n")]
+    [InlineData("\u001b[Agraphics(on).\n")]
+    [InlineData("\u200bgraphics(on).\n")]
+    [InlineData("graphics(,). graphics(,).\n")]
+    public void MalformedCommandPreservesProgressAndAllowsRetry(string malformed)
+    {
+        (PrologEngine engine, var output) = Play("talk(reeve).\n" + malformed + "graphics(on).\nstatus.\nquit.\n");
+        Assert.True(
+            engine
+                .Query(
+                    "greymere_adventure:flag(quest_begun), greymere_adventure:holding(keep_key), greymere_adventure:here(village_square), greymere_adventure:player_hp(14)"
+                )
+                .Prove()
+        );
+        Assert.Contains("That input is not a valid Prolog command", output, StringComparison.Ordinal);
+        Assert.Contains("Graphics: on.", output, StringComparison.Ordinal);
+        Assert.Contains("Health: 14/14.", output, StringComparison.Ordinal);
+        Assert.EndsWith("Farewell.\n", output);
+    }
+
+    [Fact]
+    public void IncompleteCommandAtEndOfInputExitsCleanlyAfterReportingError()
+    {
+        var output = Play("graphics(").Output;
+        Assert.Contains("That input is not a valid Prolog command", output, StringComparison.Ordinal);
+        Assert.EndsWith("Farewell.\n", output);
+    }
+
+    [Fact]
     public void DefeatedEnemyPortraitDisappearsOnLook()
     {
         const string commands =

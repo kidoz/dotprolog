@@ -897,7 +897,20 @@ loop :-
     nl,
     styled(title, 'What do you do? > ', []),
     flush_output,
-    read(Command),
+    (   read_command(Command)
+    ->  handle_command(Command)
+    ;   loop
+    ).
+
+% A malformed term must not end the adventure. read/1 consumes the rejected
+% term; retry at the next prompt while preserving inventory and quest state.
+read_command(Command) :-
+    catch(read(Command), error(syntax_error(_), _),
+        (writeln('That input is not a valid Prolog command. Type it again, ending with a period.'),
+         writeln('For graphics, type graphics(on). If you pasted or used arrow keys, try typing it from scratch.'),
+         fail)).
+
+handle_command(Command) :-
     (   Command == quit
     ->  farewell
     ;   Command == end_of_file
