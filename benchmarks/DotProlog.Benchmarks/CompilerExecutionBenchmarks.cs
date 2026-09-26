@@ -13,9 +13,11 @@ public class CompilerExecutionBenchmarks
 {
     private AssemblyLoadContext _context = null!;
     private PrologEngine _bytecode = null!;
+    private PrologEngine _linearBytecode = null!;
     private PrologEngine _compiled = null!;
     private PrologEngine _unfused = null!;
     private int _bytecodeGoal;
+    private int _linearBytecodeGoal;
     private int _compiledGoal;
     private int _unfusedGoal;
 
@@ -34,20 +36,32 @@ public class CompilerExecutionBenchmarks
         };
         _bytecode = new PrologEngine { Output = TextWriter.Null };
         _bytecode.ConsultOrThrow(source, "execution.pl");
+        _linearBytecode = new PrologEngine { Output = TextWriter.Null };
+        _linearBytecode.Program.EmitFirstArgumentIndexing = false;
+        _linearBytecode.ConsultOrThrow(source, "execution.pl");
         _context = new AssemblyLoadContext(null, isCollectible: true);
         _compiled = Install(source, fuseBlocks: true);
         _unfused = Install(source, fuseBlocks: false);
         _bytecodeGoal = CompileGoal(_bytecode, goal);
+        _linearBytecodeGoal = CompileGoal(_linearBytecode, goal);
         _compiledGoal = CompileGoal(_compiled, goal);
         _unfusedGoal = CompileGoal(_unfused, goal);
-        if (Bytecode() != RunResult.Success || DirectIl() != RunResult.Success || InstructionIl() != RunResult.Success)
+        if (
+            Bytecode() != RunResult.Success
+            || LinearBytecode() != RunResult.Success
+            || DirectIl() != RunResult.Success
+            || InstructionIl() != RunResult.Success
+        )
         {
-            throw new InvalidOperationException("Benchmark goal must succeed on both execution paths.");
+            throw new InvalidOperationException("Benchmark goal must succeed on every execution path.");
         }
     }
 
     [Benchmark(Baseline = true)]
     public RunResult Bytecode() => _bytecode.Machine.Run(_bytecodeGoal);
+
+    [Benchmark]
+    public RunResult LinearBytecode() => _linearBytecode.Machine.Run(_linearBytecodeGoal);
 
     [Benchmark]
     public RunResult DirectIl() => _compiled.Machine.Run(_compiledGoal);
