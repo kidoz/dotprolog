@@ -26,6 +26,44 @@ public sealed class ExecutionTests
         Assert.Equal("hello\n", output);
     }
 
+    [Theory]
+    [InlineData("flat(X, Y)", "pair(X, Y)", "flat(one, two)", "[pair(one,two)]")]
+    [InlineData("flat(a, 7, X)", "X", "flat(a, 7, ok)", "[ok]")]
+    [InlineData("outer(inner(deep(X)), side(X))", "X", "outer(inner(deep(ok)), side(ok))", "[ok]")]
+    [InlineData("outer(inner(deep(X)), side(X))", "X", "outer(inner(deep(ok)), side(other))", "[]")]
+    [InlineData(
+        "nested(a(X), b(Y), c(X), d(Z), e(Y), f(Z))",
+        "trio(X, Y, Z)",
+        "nested(a(1), b(2), c(1), d(3), e(2), f(3))",
+        "[trio(1,2,3)]"
+    )]
+    public void StructureHeadsPreserveBindingsAcrossDeferredMatching(string pattern, string result, string input, string expected)
+    {
+        string output = PrologTestHost.Run(
+            $"""
+            match({pattern}, {result}).
+            :- initialization((findall(R, match({input}, R), Rs), write(Rs))).
+            """
+        );
+
+        Assert.Equal(expected, output);
+    }
+
+    [Fact]
+    public void DeferredHeadBindingsAreRestoredBeforeTryingTheNextClause()
+    {
+        string output = PrologTestHost.Run(
+            """
+            pick(tree(left(X), right(Y)), pair(Y, X), rejected) :- X = changed, fail.
+            pick(tree(left(X), right(Y)), pair(Y, X), accepted).
+            :- initialization((findall(pair(Tree, Result), (pick(Tree, Result, Kind), Kind = accepted), Rs),
+                               Rs = [pair(tree(left(a), right(b)), pair(b, a))], write(Rs))).
+            """
+        );
+
+        Assert.Equal("[pair(tree(left(a),right(b)),pair(b,a))]", output);
+    }
+
     [Fact]
     public void RepeatedHeadVariableForcesArgumentsToMatch()
     {
