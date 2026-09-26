@@ -1,6 +1,8 @@
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
+using System.Security.Cryptography;
+using System.Text;
 using DotProlog.Compiler;
 using DotProlog.Runtime;
 using DotProlog.Syntax;
@@ -9,6 +11,35 @@ namespace DotProlog.CodeGen.IL.Tests;
 
 public sealed class IlAssemblyEmitterTests
 {
+    [Theory]
+    [InlineData(1)]
+    [InlineData(4)]
+    [InlineData(4096)]
+    [InlineData(8192)]
+    public void ChunkedIdentityHashPreservesUtf8AcrossBoundaries(int capacity)
+    {
+        var identity = new StringBuilder(capacity);
+        identity.Append('a', capacity - 1).Append('\ud83d').Append('\ude00');
+        identity.Append("中\0é\ud800x\udc00").Append('界', 5000).Append('\ud800');
+        var chunks = identity.GetChunks();
+        Assert.True(chunks.MoveNext());
+        Assert.Equal('\ud83d', chunks.Current.Span[^1]);
+        var expected = SHA256.HashData(Encoding.UTF8.GetBytes(identity.ToString()));
+        List<ReadOnlyMemory<char>> parts = [];
+        foreach (var chunk in identity.GetChunks())
+        {
+            parts.Add(chunk);
+        }
+        Assert.Equal(new Guid(expected.AsSpan(0, 16)), IlAssemblyEmitter.HashIdentity(parts));
+    }
+
+    [Fact]
+    public void EmptyIdentityHashMatchesSha256()
+    {
+        var expected = SHA256.HashData([]);
+        Assert.Equal(new Guid(expected.AsSpan(0, 16)), IlAssemblyEmitter.HashIdentity([]));
+    }
+
     [Fact]
     public void SignatureCachePreservesEncodingAndBuilderOwnership()
     {

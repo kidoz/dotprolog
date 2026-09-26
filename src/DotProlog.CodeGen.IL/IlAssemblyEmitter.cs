@@ -75,19 +75,10 @@ public static class IlAssemblyEmitter
         var builder = metadata.Builder;
         var layout = IlBlockLayout.Create(model, fuseBlocks, linearVariableFallback);
         var image = InstallationImage.Encode(model, layout);
-        var identity = new StringBuilder(name).Append('\0').Append(image);
-        foreach (var instruction in model.Instructions)
-        {
-            identity.Append(
-                CultureInfo.InvariantCulture,
-                $"|{instruction.OpCode}:{instruction.First}:{instruction.Second}:{instruction.FirstReference}:{instruction.NextAddress}"
-            );
-        }
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(identity.ToString()));
         builder.AddModule(
             0,
             builder.GetOrAddString(name + ".dll"),
-            builder.GetOrAddGuid(new Guid(hash.AsSpan(0, 16))),
+            builder.GetOrAddGuid(HashIdentity(IdentityChunks(name, image, model.Instructions))),
             default,
             default
         );
@@ -242,6 +233,61 @@ public static class IlAssemblyEmitter
         var content = new BlobBuilder();
         pe.Serialize(content);
         content.WriteContentTo(output);
+    }
+
+    private static IEnumerable<ReadOnlyMemory<char>> IdentityChunks(
+        string name,
+        string image,
+        IReadOnlyList<CompiledInstruction> instructions
+    )
+    {
+        yield return name.AsMemory();
+        yield return "\0".AsMemory();
+        yield return image.AsMemory();
+        var text = new StringBuilder(4096);
+        foreach (var instruction in instructions)
+        {
+            text.Append(
+                CultureInfo.InvariantCulture,
+                $"|{instruction.OpCode}:{instruction.First}:{instruction.Second}:{instruction.FirstReference}:{instruction.NextAddress}"
+            );
+            if (text.Length >= 4096)
+            {
+                foreach (var chunk in text.GetChunks())
+                {
+                    yield return chunk;
+                }
+                // The hash consumes each chunk before advancing this iterator.
+                text.Clear();
+            }
+        }
+        foreach (var chunk in text.GetChunks())
+        {
+            yield return chunk;
+        }
+    }
+
+    internal static Guid HashIdentity(IEnumerable<ReadOnlyMemory<char>> chunks)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        var encoder = Encoding.UTF8.GetEncoder();
+        Span<byte> bytes = stackalloc byte[4096];
+        // Keep encoder state across chunks: a UTF-16 surrogate pair may straddle them.
+        foreach (var chunk in chunks)
+        {
+            var remaining = chunk.Span;
+            while (!remaining.IsEmpty)
+            {
+                encoder.Convert(remaining, bytes, flush: false, out var charsUsed, out var bytesUsed, out _);
+                hash.AppendData(bytes[..bytesUsed]);
+                remaining = remaining[charsUsed..];
+            }
+        }
+        // Match Encoding.UTF8.GetBytes even when the final character is an unpaired surrogate.
+        encoder.Convert([], bytes, flush: true, out _, out var finalBytes, out _);
+        hash.AppendData(bytes[..finalBytes]);
+        hash.GetHashAndReset(bytes);
+        return new Guid(bytes[..16]);
     }
 
     private static MethodDefinitionHandle AddMethod(
