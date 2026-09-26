@@ -4,8 +4,9 @@ An original, old-school fantasy text adventure written entirely in DotProlog.
 
 The red star above ruined Gloamwatch Keep has awakened Lord Morvane, an oathbreaker who is neither
 living nor dead. He has stolen the Ember Crown, and the farms around Greymere are turning to ash.
-Explore the keep, gather the tools needed to open its sealed crypt, survive its guardians, recover
-the crown, and return it to Reeve Elowen.
+Explore seventeen locations, decipher the keep's bell ritual, survive its guardians, recover
+the crown, and return it to Reeve Elowen. Along the way, rescue a missing bellkeeper, learn
+herbal medicine, and choose whether to fight a restless knight or restore his forgotten oath.
 
 The sample demonstrates:
 
@@ -13,8 +14,9 @@ The sample demonstrates:
 - reverse-path reasoning from one set of `passage/3` facts;
 - mutable game state with dynamic predicates;
 - an interactive `read/1` command loop;
-- inventory, keyed barriers, equipment, healing, and deterministic combat;
-- conditional narration and complete victory and death endings.
+- inventory, crafting, keyed barriers, equipment, healing, and deterministic combat;
+- a recoverable sequence puzzle, optional quests, and an alternative to combat;
+- an exploration map, quest journal, and conditional victory and death endings;
 - optional ANSI illustrations, enemy portraits, and health bars, written in Prolog.
 
 ## Play
@@ -33,6 +35,42 @@ go(north).
 look.
 help.
 ```
+
+## Exploration and choices
+
+The village is a safe base: `talk(herbalist).` teaches a recipe, and `rest.` restores
+your fourteen health. The old road branches into a moonleaf garden. Inside the keep,
+the courtyard leads to a well house, while the great hall leads north to the archive
+and its bell tower. `journal.` lists objectives and clues; `map.` lists visited rooms
+and their exits, marking unseen destinations as unexplored. Listed paths can still be locked.
+
+| Command | Purpose |
+| --- | --- |
+| `talk(bellkeeper).` | Speak to Tomas if you can reach his prison below the well |
+| `use(rope).` | Secure a permanent route down from the well house |
+| `brew(herbal_tonic).` | After learning the recipe, consume moonleaf and spring water to make one tonic |
+| `use(herbal_tonic).` | Heal eight health, capped at fourteen |
+| `use(watch_oath).` | Release the knight peacefully when standing in the armory |
+| `ring(dawn).` | Ring a tower bell; the other names are `noon` and `dusk` |
+| `guard.` | Take an enemy turn with four extra protection, then gain two damage on your next attack |
+
+The archive mural explains the bell sequence. A wrong note resets the sequence so you
+can retry; completing it permanently breaks the sun seal on the final chamber. You
+still need the bone warden's key. The rescue, crafting, and peaceful knight route are
+optional, and the ending remembers the rescue and the knight's fate.
+
+Morvane alternates between gathering cinders and striking for seven damage. When he
+warns of a charged attack, guard before counterattacking. The bellkeeper's ash ward
+reduces Morvane's damage by two while carried; your shield reduces enemy damage by one.
+Protection always leaves at least one damage. Counterattack bonuses do not stack and
+are lost when you leave the room or resolve the encounter.
+
+Only `attack.` and `guard.` advance an enemy's turn. You can inspect clues, manage
+items, heal, or retreat without a timed penalty. Brewing requires a room without a
+live enemy. Ingredients and potions are finite; medicine is kept when you are already
+at full health, and you can return to the village to recover. Equipment bonuses apply
+automatically while you carry the item. Commands must contain concrete names, without
+Prolog variables, and each new process begins a fresh game.
 
 ## Illustrations
 
@@ -80,11 +118,16 @@ adventure, optional ANSI character art is the simpler fit.
 
 ## Verify the winning path
 
-`winning_path.txt` is a full playthrough and doubles as a repeatable smoke test:
+`winning_path.txt` follows the combat route, solves the bells, and guards against Morvane.
+`mercy_path.txt` also explores the garden and prison, crafts a tonic, rescues Tomas, and
+releases the knight peacefully. Both are full playthroughs and repeatable smoke tests:
 
 ```console
 dotnet run --project samples/GreymereAdventure/GreymereAdventure.dplproj \
   < samples/GreymereAdventure/winning_path.txt
+
+dotnet run --project samples/GreymereAdventure/GreymereAdventure.dplproj \
+  < samples/GreymereAdventure/mercy_path.txt
 ```
 
 The final line of output should be:
@@ -100,5 +143,10 @@ To smoke-test the colored version in a POSIX shell:
   dotnet run --project samples/GreymereAdventure/GreymereAdventure.dplproj
 ```
 
-Replace `on` with `ascii` for an illustrated transcript without colors. Compiler tests also
-exercise all three modes, mode switching, invalid settings, defeated enemies, and death.
+Replace `on` with `ascii` for an illustrated transcript without colors. Compiler tests exercise
+both routes in all three modes, bell recovery and barriers, crafting, rescue rewards,
+guarding, rest, the exploration map, invalid commands, defeated enemies, and death:
+
+```console
+dotnet test --project tests/DotProlog.Compiler.Tests --filter-class '*GreymereAdventureTests'
+```

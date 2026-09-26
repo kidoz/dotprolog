@@ -8,6 +8,10 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Changed
 
+- GreymereAdventure now explores seventeen rooms with a bell puzzle, an optional prisoner
+  rescue, herbal crafting, a peaceful knight encounter, and a charged boss attack with guarding.
+  A quest journal, exploration map, new illustrations, and two scripted winning routes accompany
+  the expanded story and its choice-dependent endings.
 - Fused direct IL uses clause chains for unbound first arguments, avoiding indexed retry overhead.
   The alternate entries share existing head blocks; bound calls retain first-argument indexing.
 - Direct IL predicates use first-argument clause indexing, preserving solution order while
