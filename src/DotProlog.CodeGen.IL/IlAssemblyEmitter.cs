@@ -40,7 +40,8 @@ public static class IlAssemblyEmitter
         bool fuseBlocks,
         PrologLanguageMode languageMode = PrologLanguageMode.Modern,
         PrologFlagOverrides? flagOverrides = null,
-        bool indexFirstArgument = true
+        bool indexFirstArgument = true,
+        bool linearVariableFallback = true
     )
     {
         ArgumentNullException.ThrowIfNull(sources);
@@ -58,15 +59,21 @@ public static class IlAssemblyEmitter
         {
             return diagnostics;
         }
-        WriteAssembly(model, assemblyName, output, fuseBlocks);
+        WriteAssembly(model, assemblyName, output, fuseBlocks, linearVariableFallback);
         return diagnostics;
     }
 
-    internal static void WriteAssembly(CompiledProgramModel model, string name, Stream output, bool fuseBlocks = true)
+    internal static void WriteAssembly(
+        CompiledProgramModel model,
+        string name,
+        Stream output,
+        bool fuseBlocks = true,
+        bool linearVariableFallback = true
+    )
     {
         var metadata = new IlMetadata();
         var builder = metadata.Builder;
-        var layout = IlBlockLayout.Create(model, fuseBlocks);
+        var layout = IlBlockLayout.Create(model, fuseBlocks, linearVariableFallback);
         var image = InstallationImage.Encode(model, layout);
         var identity = new StringBuilder(name).Append('\0').Append(image);
         foreach (var instruction in model.Instructions)
@@ -115,12 +122,51 @@ public static class IlAssemblyEmitter
             typeof(Machine.CompiledExecution).MakeByRefType(),
             typeof(CompiledProgram)
         );
-        for (var i = 0; i < layout.Starts.Count; i++)
+        var linearHeads = layout.LinearClauses.Select(clause => clause.Entry).ToHashSet();
+        for (var i = 0; i < layout.BlockCount; i++)
         {
             var il = new InstructionEncoder(new BlobBuilder(), new ControlFlowBuilder());
-            var end = i + 1 < layout.Starts.Count ? layout.Starts[i + 1] : model.Instructions.Count;
+            var linear = i >= layout.Starts.Count;
+            var start = linear ? layout.LinearClauses[i - layout.Starts.Count].Entry : layout.Starts[i];
+            var originalBlock = layout.BlockByInstruction[start];
+            var end = originalBlock + 1 < layout.Starts.Count ? layout.Starts[originalBlock + 1] : model.Instructions.Count;
             var failed = il.DefineLabel();
-            for (var instruction = layout.Starts[i]; instruction < end; instruction++)
+            if (linear)
+            {
+                var clause = layout.LinearClauses[i - layout.Starts.Count];
+                il.LoadArgument(0);
+                if (clause.Header != OpCode.TrustMe)
+                {
+                    il.LoadArgument(1);
+                    il.LoadConstantI4(clause.Alternative);
+                    il.Call(
+                        metadata.Method(typeof(CompiledProgram), nameof(CompiledProgram.Target), true, typeof(int), typeof(int))
+                    );
+                }
+                il.LoadArgument(1);
+                il.LoadConstantI4(originalBlock);
+                il.Call(metadata.Method(typeof(CompiledProgram), nameof(CompiledProgram.Target), true, typeof(int), typeof(int)));
+                il.Call(
+                    metadata.Method(
+                        typeof(Machine.CompiledExecution),
+                        clause.Header.ToString(),
+                        true,
+                        typeof(bool),
+                        clause.Header == OpCode.TrustMe ? [typeof(int)] : [typeof(int), typeof(int)]
+                    )
+                );
+                // Share only a safe fused prefix. A wake-capable entry must resume in its
+                // original block, otherwise waking would replay the choice-point header.
+                end = start;
+                if (IlBlockLayout.CanFuse(model.Instructions[start].OpCode))
+                {
+                    il.OpCode(ILOpCode.Pop);
+                    il.LoadArgument(0);
+                    il.LoadArgument(1);
+                    il.Call(MetadataTokens.MethodDefinitionHandle(originalBlock + 1));
+                }
+            }
+            for (var instruction = start; instruction < end; instruction++)
             {
                 EmitOperation(metadata, il, model, layout, model.Instructions[instruction]);
                 if (instruction + 1 < end)
@@ -130,14 +176,22 @@ public static class IlAssemblyEmitter
             }
             il.OpCode(ILOpCode.Ret);
             il.MarkLabel(failed);
-            if (end - layout.Starts[i] > 1)
+            if (end - start > 1)
             {
                 il.LoadConstantI4(0);
                 il.OpCode(ILOpCode.Ret);
             }
-            AddMethod(metadata, bodies, "Block" + i.ToString(CultureInfo.InvariantCulture), blockSignature, il, isPublic: false);
+            AddMethod(
+                metadata,
+                bodies,
+                "Block" + i.ToString(CultureInfo.InvariantCulture),
+                blockSignature,
+                il,
+                isPublic: false,
+                inline: !linear && linearHeads.Contains(start) && IlBlockLayout.CanFuse(model.Instructions[start].OpCode)
+            );
         }
-        var createBlocks = EmitBlockArray(metadata, bodies, layout.Starts.Count);
+        var createBlocks = EmitBlockArray(metadata, bodies, layout.BlockCount);
         var install = new InstructionEncoder(new BlobBuilder());
         install.LoadArgument(0);
         install.LoadString(builder.GetOrAddUserString(image));
@@ -190,13 +244,14 @@ public static class IlAssemblyEmitter
         string name,
         BlobHandle signature,
         InstructionEncoder il,
-        bool isPublic = true
+        bool isPublic = true,
+        bool inline = false
     ) =>
         metadata.Builder.AddMethodDefinition(
             (isPublic ? MethodAttributes.Public : MethodAttributes.Private)
                 | MethodAttributes.Static
                 | MethodAttributes.HideBySig,
-            MethodImplAttributes.IL,
+            MethodImplAttributes.IL | (inline ? MethodImplAttributes.AggressiveInlining : 0),
             metadata.Builder.GetOrAddString(name),
             signature,
             bodies.AddMethodBody(il, maxStack: 8),
@@ -298,6 +353,10 @@ public static class IlAssemblyEmitter
                 break;
             case OpCode.EnterStatic:
                 Reference(nameof(CompiledProgram.StaticIndex), instruction.FirstReference, typeof(int));
+                if (layout.LinearEntries.Count > 0 && layout.LinearEntries[instruction.FirstReference] >= 0)
+                {
+                    Reference(nameof(CompiledProgram.Target), layout.LinearEntries[instruction.FirstReference], typeof(int));
+                }
                 break;
             case OpCode.GetConstant:
             case OpCode.PutConstant:

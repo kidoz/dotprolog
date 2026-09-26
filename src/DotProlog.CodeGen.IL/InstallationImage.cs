@@ -19,7 +19,7 @@ internal static class InstallationImage
         writer.Write(Version);
         writer.Write((int)model.LanguageMode);
         writer.Write((int)model.InitialDoubleQuotes);
-        writer.Write(layout.Starts.Count);
+        writer.Write(layout.BlockCount);
         writer.Write(model.Functors.Count);
         foreach ((var name, var arity) in model.Functors)
         {

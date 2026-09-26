@@ -8,6 +8,42 @@ namespace DotProlog.Runtime.Tests;
 /// </summary>
 public sealed class MachineTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void IndexedRedoRestoresArgumentsAcrossCompiledAndBytecodeClauses(bool boundArgument)
+    {
+        var program = new BytecodeProgram();
+        var compiled = new CompiledProgram([], [], [], 0);
+        var one = program.RegisterCompiledBlock(
+            static (ref Machine.CompiledExecution execution, CompiledProgram _) =>
+                execution.GetConstant(Cell.Integer60(1), 0, BytecodeProgram.TopLevelReturnAddress),
+            compiled
+        );
+        var two = program.Emit(OpCode.GetConstant, program.AddConstant(Cell.Integer60(2)), 0);
+        program.Emit(OpCode.Stop);
+        var index = program.AddStaticIndex([one, two, one], [Cell.Integer60(1), Cell.Integer60(2), Cell.Integer60(1)]);
+        var predicate = program.Symbols.InternFunctor("indexed", 1);
+        program.DefinePredicate(predicate, program.Emit(OpCode.EnterStatic, index));
+
+        var machine = new Machine(program);
+        machine.BeginCall();
+        var argument = boundArgument ? Cell.Integer60(1) : machine.CreateVariable();
+        Assert.Equal(RunResult.Success, machine.Call(predicate, [argument]));
+        Assert.Equal(Cell.Integer60(1), machine.Argument(0));
+        Assert.True(machine.HasAlternatives);
+        if (!boundArgument)
+        {
+            Assert.Equal(RunResult.Success, machine.Redo());
+            Assert.Equal(Cell.Integer60(2), machine.Argument(0));
+            Assert.True(machine.HasAlternatives);
+        }
+        Assert.Equal(RunResult.Success, machine.Redo());
+        Assert.Equal(Cell.Integer60(1), machine.Argument(0));
+        Assert.False(machine.HasAlternatives);
+        Assert.Equal(RunResult.Failure, machine.Redo());
+    }
+
     private static BytecodeProgram NewProgram()
     {
         var program = new BytecodeProgram();

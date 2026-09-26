@@ -8,6 +8,8 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Changed
 
+- Fused direct IL uses clause chains for unbound first arguments, avoiding indexed retry overhead.
+  The alternate entries share existing head blocks; bound calls retain first-argument indexing.
 - Direct IL predicates use first-argument clause indexing, preserving solution order while
   skipping incompatible heads and avoiding a choice point when only one clause can match.
   Installation remains compatible with earlier IL images.

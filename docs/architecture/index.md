@@ -123,6 +123,11 @@ order, variables match every key, and a single candidate creates no choice point
 continues to use unindexed clause chains. The versioned installation reader also accepts older
 images without index tables.
 
+Fused IL uses an alternate clause chain when the first argument is unbound. Small generated
+try/retry/trust entries share the existing safe head blocks through static calls with inlining
+requested; they do not duplicate the head IL. Wake-capable operations remain separately dispatched,
+so resuming a wake cannot replay a clause-selection header. Bound arguments still use the index.
+
 Each IL block statically calls the same `Machine.CompiledExecution` operations as the corresponding
 C# blocks. The IL backend groups straight-line term, environment, and clause-selection operations
 into one method, returning immediately on failure. Calls, wake-up checks, and other control-flow

@@ -8,10 +8,13 @@ internal sealed class IlBlockLayout
 {
     internal List<int> Starts { get; } = [];
     internal int[] BlockByInstruction { get; }
+    internal List<int> LinearEntries { get; } = [];
+    internal List<(int Entry, OpCode Header, int Alternative)> LinearClauses { get; } = [];
+    internal int BlockCount => Starts.Count + LinearClauses.Count;
 
     private IlBlockLayout(int instructionCount) => BlockByInstruction = new int[instructionCount];
 
-    internal static IlBlockLayout Create(CompiledProgramModel model, bool fuseBlocks = true)
+    internal static IlBlockLayout Create(CompiledProgramModel model, bool fuseBlocks = true, bool linearVariableFallback = true)
     {
         var layout = new IlBlockLayout(model.Instructions.Count);
         var starts = new bool[model.Instructions.Count];
@@ -89,10 +92,30 @@ internal sealed class IlBlockLayout
             }
             layout.BlockByInstruction[index] = layout.Starts.Count - 1;
         }
+        if (fuseBlocks && linearVariableFallback)
+        {
+            foreach (var index in model.StaticIndexes)
+            {
+                var first = layout.BlockCount;
+                layout.LinearEntries.Add(index.Entries.Length > 1 ? first : -1);
+                if (index.Entries.Length <= 1)
+                {
+                    continue;
+                }
+                for (var clause = 0; clause < index.Entries.Length; clause++)
+                {
+                    var header =
+                        clause == 0 ? OpCode.TryMeElse
+                        : clause + 1 == index.Entries.Length ? OpCode.TrustMe
+                        : OpCode.RetryMeElse;
+                    layout.LinearClauses.Add((index.Entries[clause], header, first + clause + 1));
+                }
+            }
+        }
         return layout;
     }
 
-    private static bool CanFuse(OpCode op) =>
+    internal static bool CanFuse(OpCode op) =>
         op
             is OpCode.Allocate
                 or OpCode.Deallocate

@@ -1268,6 +1268,10 @@ public sealed class Machine
         /// <summary>Enters a static clause index with relocated compiled targets.</summary>
         public bool EnterStatic(int tableId) => _machine.EnterStatic(tableId);
 
+        /// <summary>Uses a compiled clause chain when the first argument is unbound.</summary>
+        public bool EnterStatic(int tableId, int linearTarget) =>
+            _machine.Dereference(_machine._x[0]).IsReference ? Jump(linearTarget) : _machine.EnterStatic(tableId);
+
         /// <summary>Fails and lets the machine backtrack.</summary>
         public bool Fail()
         {

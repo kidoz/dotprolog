@@ -16,7 +16,8 @@ internal sealed class LoadedProgram : IDisposable
         PrologLanguageMode mode = PrologLanguageMode.Modern,
         PrologFlagOverrides? overrides = null,
         bool fuseBlocks = true,
-        bool indexFirstArgument = true
+        bool indexFirstArgument = true,
+        bool linearVariableFallback = true
     )
     {
         using var stream = new MemoryStream();
@@ -27,7 +28,8 @@ internal sealed class LoadedProgram : IDisposable
             fuseBlocks,
             mode,
             overrides,
-            indexFirstArgument
+            indexFirstArgument,
+            linearVariableFallback
         );
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
         stream.Position = 0;

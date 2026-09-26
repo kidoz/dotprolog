@@ -33,8 +33,22 @@ public sealed class IlAssemblyEmitterTests
     )]
     [InlineData("p(f(a),a,a). p(f(b),b,b).", "findall(X,p(f(X),X,b),[b])")]
     [InlineData("p(a) :- throw(ball). p(b).", "catch(p(a),ball,true), p(b)")]
+    [InlineData(
+        "p(a,T) :- b_setval(g,changed), setarg(1,T,changed), fail. p(b,T) :- arg(1,T,old), b_getval(g,old).",
+        "b_setval(g,old), T=t(old), p(_,T), arg(1,T,old), b_getval(g,old)"
+    )]
+    [InlineData(
+        "p(a). p(b). choose(X) :- (p(X) *-> true; X=else).",
+        "findall(X,choose(X),[a,b]), findall(X,(choose(X);X=outer),[a,b,outer])"
+    )]
     public void IndexedAndLinearIlPreserveClauseSelection(string source, string goal)
     {
+        using (var table = new LoadedProgram(source, linearVariableFallback: false))
+        {
+            var engine = new PrologEngine();
+            table.Install(engine);
+            Assert.True(engine.Query(goal).Prove());
+        }
         foreach (var indexed in new[] { false, true })
         {
             foreach (var fused in new[] { false, true })
@@ -246,8 +260,8 @@ public sealed class IlAssemblyEmitterTests
     {
         using var first = new MemoryStream();
         using var second = new MemoryStream();
-        IlAssemblyEmitter.Emit([("test.pl", "p(a).")], "Deterministic", first);
-        IlAssemblyEmitter.Emit([("test.pl", "p(a).")], "Deterministic", second);
+        IlAssemblyEmitter.Emit([("test.pl", "p(a). p(b).")], "Deterministic", first);
+        IlAssemblyEmitter.Emit([("test.pl", "p(a). p(b).")], "Deterministic", second);
         Assert.Equal(first.ToArray(), second.ToArray());
         first.Position = 0;
         using var pe = new PEReader(first);

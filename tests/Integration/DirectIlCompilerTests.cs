@@ -32,6 +32,7 @@ public sealed class DirectIlCompilerTests
                 bound(a,b).
                 main :-
                     findall(X,ancestor(a,X),[b,c]), count(10000),
+                    findall(X-Y,parent(X,Y),[a-b,b-c]),
                     setup_call_cleanup(true,parent(b,c),Done=yes), Done==yes,
                     \+ parent(missing,_),
                     freeze(F, G=woke), bound(F,b), G==woke, \+ bound(a,c),
