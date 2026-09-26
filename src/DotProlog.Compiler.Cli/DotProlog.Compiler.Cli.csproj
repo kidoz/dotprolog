@@ -2,6 +2,15 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <AssemblyName>plc</AssemblyName>
+        <ToolCommandName>plc</ToolCommandName>
+        <PackAsTool>true</PackAsTool>
+        <IsPackable>true</IsPackable>
+        <PackageId>DotProlog.Compiler.Cli</PackageId>
+        <Title>DotProlog standalone compiler</Title>
+        <Description>Compiles Prolog directly to .NET IL and publishes standalone executables with NativeAOT.</Description>
+        <!-- Keep managed dependencies alongside plc: they are also inputs to the emitted program. -->
+        <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+        <PublishDocumentationFiles>false</PublishDocumentationFiles>
     </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="../DotProlog.CodeGen.IL/DotProlog.CodeGen.IL.csproj" />
