@@ -275,6 +275,60 @@ public sealed class MachineTests
         Assert.Equal(value, machine.Dereference(variable));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OccursCheckHandlesHeapGrowthBeforeAndAfterItsFirstUse(bool checkBeforeGrowth)
+    {
+        BytecodeProgram program = NewProgram();
+        var machine = new Machine(program);
+        var functor = program.Symbols.InternFunctor("f", 1);
+        Cell earlyVariable = machine.CreateVariable();
+        Cell earlyTerm = machine.CreateStructure(functor, [earlyVariable]);
+        if (checkBeforeGrowth)
+        {
+            Assert.False(machine.UnifyWithOccursCheck(earlyVariable, earlyTerm));
+        }
+
+        // Cross the initial heap capacity before constructing the terms to inspect.
+        for (var i = 0; i < 70_000; i++)
+        {
+            machine.CreateVariable();
+        }
+
+        Cell variable = machine.CreateVariable();
+        Cell recursive = machine.CreateStructure(functor, [variable]);
+        Assert.False(machine.UnifyWithOccursCheck(variable, recursive));
+        Assert.Equal(variable, machine.Dereference(variable));
+
+        // A later traversal must revisit both old and new heap addresses under a fresh epoch.
+        Assert.False(machine.UnifyWithOccursCheck(earlyVariable, earlyTerm));
+        Assert.Equal(earlyVariable, machine.Dereference(earlyVariable));
+        Assert.True(machine.Unify(variable, recursive));
+        Cell independent = machine.CreateVariable();
+        Assert.True(machine.UnifyWithOccursCheck(independent, recursive));
+        Assert.Equal(recursive, machine.Dereference(independent));
+    }
+
+    [Fact]
+    public void FirstHeapReservationCanMaterializeMoreThanTheInitialCapacity()
+    {
+        var machine = new Machine(NewProgram());
+        var cells = new Cell[70_000];
+        for (var i = 0; i < cells.Length; i++)
+        {
+            cells[i] = Cell.Integer60(i);
+        }
+
+        var buffer = TermBuffer.FromCells(cells);
+        var origin = buffer.Materialize(machine);
+        Assert.Equal(0, origin);
+        Cell variable = machine.CreateVariable();
+        Assert.True(machine.Unify(variable, machine.HeapAt(origin + cells.Length - 1)));
+        Assert.Equal(cells[0], machine.HeapAt(origin));
+        Assert.Equal(cells[^1], machine.Dereference(variable));
+    }
+
     [Fact]
     public void OccursCheckRestoresBindingsAfterALaterMismatch()
     {
