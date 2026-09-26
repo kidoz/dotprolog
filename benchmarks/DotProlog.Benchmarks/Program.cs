@@ -8,6 +8,11 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+        if (args.Length > 0 && args[0] == "--profile-execution")
+        {
+            return CompilerExecutionProfile.Run(args.AsSpan(1));
+        }
+
         if (args.Length == 1 && args[0] == "--compiler-metrics")
         {
             CompilerArtifactMetrics.Write();
