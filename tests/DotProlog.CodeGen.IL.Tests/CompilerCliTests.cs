@@ -6,6 +6,20 @@ namespace DotProlog.CodeGen.IL.Tests;
 public sealed class CompilerCliTests
 {
     [Theory]
+    [InlineData("--help", "Usage: plc")]
+    [InlineData("--version", "plc ")]
+    public async Task InformationalOptionsSucceedWithoutSources(string argument, string expectedPrefix)
+    {
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        using var error = new StringWriter(CultureInfo.InvariantCulture);
+        var exit = await Program.ExecuteAsync([argument], output, error, TestContext.Current.CancellationToken);
+        Assert.Equal(0, exit);
+        Assert.StartsWith(expectedPrefix, output.ToString(), StringComparison.Ordinal);
+        Assert.NotEqual(expectedPrefix, output.ToString().TrimEnd());
+        Assert.Empty(error.ToString());
+    }
+
+    [Theory]
     [InlineData("--unknown")]
     [InlineData("--output")]
     [InlineData("--mode", "invalid")]

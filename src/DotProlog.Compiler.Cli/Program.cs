@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Reflection;
 using DotProlog.CodeGen.IL;
 using DotProlog.Runtime;
 using DotProlog.Syntax;
@@ -34,6 +35,14 @@ internal static class Program
         CancellationToken cancellationToken
     )
     {
+        if (args is ["--version"])
+        {
+            var version = typeof(Program)
+                .Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!
+                .InformationalVersion;
+            await output.WriteLineAsync("plc " + version.Split('+')[0]).ConfigureAwait(false);
+            return 0;
+        }
         if (args.Length == 0 || args[0] is "--help" or "-h")
         {
             await output
@@ -44,6 +53,7 @@ internal static class Program
             await output
                 .WriteLineAsync("Writes PrologProgram.dll directly as IL. --aot additionally publishes a native executable.")
                 .ConfigureAwait(false);
+            await output.WriteLineAsync("Use --version to print the compiler version.").ConfigureAwait(false);
             return args.Length == 0 ? 64 : 0;
         }
         List<string> sources = [];
