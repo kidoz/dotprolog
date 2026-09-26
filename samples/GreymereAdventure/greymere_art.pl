@@ -283,3 +283,54 @@ scene(death, [
     row(shadow, '                   ____|_______|____'),
     row(shadow, '                    THE STAR BURNS ON')
 ]).
+
+scene(herb_garden, [
+    row(magic, '                         (  )'),
+    row(stone, '        ___      ___      ___      ___'),
+    row(stone, '       |   |____|   |____|   |____|   |'),
+    row(life, '          .*.      .*.      .*.      .*.'),
+    row(life, '         --|--    --|--    --|--    --|--'),
+    row(stone, '       ____|_______|_______|_______|____'),
+    row(magic, '                  THE MOONLEAF GARDEN')
+]).
+
+scene(well_house, [
+    row(stone, '                   /==========/'),
+    row(stone, '                  /__________/'),
+    row(ember, '                    |--O--|'),
+    row(stone, '                    |     |'),
+    row(magic, '                  .---------.'),
+    row(stone, '                  |  WELL   |'),
+    row(shadow, '                  |_________|')
+]).
+
+scene(prison, [
+    row(stone, '        | | | | | | | | | | | | | | |'),
+    row(stone, '        | | | | | | | | | | | | | | |'),
+    row(shadow, '        |  //// //// //// ////       |'),
+    row(shadow, '        |                           |'),
+    row(stone, '        |___________    ____________|'),
+    row(stone, '                    |  |'),
+    row(shadow, '                 THE FORGOTTEN PRISON')
+]).
+
+scene(archive, [
+    row(ember, '          DAWN        DUSK        NOON'),
+    row(ember, '          _o_         .o.         \\|/'),
+    row(stone, '       |=======|   |=======|   |=======|'),
+    row(stone, '       |IIIIIII|   |IIIIIII|   |IIIIIII|'),
+    row(stone, '       |=======|   |=======|   |=======|'),
+    row(ember, '                   _________'),
+    row(stone, '                  /___/____/'),
+    row(stone, '                     | |')
+]).
+
+scene(bell_tower, [
+    row(stone, '        |===========================|'),
+    row(ember, '            __        __        __'),
+    row(ember, '           /  \\      /  \\      /  \\'),
+    row(ember, '          /____\\    /____\\    /____\\'),
+    row(stone, '            o         o         o'),
+    row(magic, '           DAWN      NOON      DUSK'),
+    row(stone, '        |___________________________|')
+]).
