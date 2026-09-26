@@ -1,4 +1,5 @@
 using DotProlog.Runtime;
+using DotProlog.Syntax;
 
 namespace DotProlog.Compiler.Tests;
 
@@ -7,6 +8,66 @@ namespace DotProlog.Compiler.Tests;
 /// </summary>
 public sealed class ModuleTests : IDisposable
 {
+    [Theory]
+    [InlineData("p.")]
+    [InlineData("p(X).")]
+    [InlineData("p(X), (true; \\+ p(X)).")]
+    [InlineData("p(X) -> p(X); fail.")]
+    [InlineData("p(X) *-> p(X); fail.")]
+    [InlineData("bagof(X, Y^p(X), L).")]
+    [InlineData("maplist(p, Xs).")]
+    [InlineData("assertz((p(X) :- p(X))).")]
+    [InlineData("retractall(p(X)).")]
+    [InlineData("other:p(X).")]
+    public void UserModuleResolutionReusesUnchangedSyntax(string source)
+    {
+        SyntaxTerm term = Assert.Single(TermReader.ReadProgram(source).Clauses);
+        var resolver = new ModuleResolver(new ModuleTable(), ModuleTable.UserModule, [new("p", 0), new("p", 1)]);
+
+        Assert.Same(term, resolver.ResolveGoal(term));
+        Assert.Same(term, resolver.ResolveHead(term));
+    }
+
+    [Fact]
+    public void ResolutionCopiesChangedBranchesWithoutMutatingSharedSyntax()
+    {
+        var term = Assert.IsType<CompoundTerm>(Assert.Single(TermReader.ReadProgram("once((p(X), other:q(X))).").Clauses));
+        var originalGoals = Assert.IsType<CompoundTerm>(term.Arguments[0]);
+        var originalCall = Assert.IsType<CompoundTerm>(originalGoals.Arguments[0]);
+        var resolver = new ModuleResolver(new ModuleTable(), "local", [new("p", 1)]);
+
+        var resolved = Assert.IsType<CompoundTerm>(resolver.ResolveGoal(term));
+        var goals = Assert.IsType<CompoundTerm>(resolved.Arguments[0]);
+        var call = Assert.IsType<CompoundTerm>(goals.Arguments[0]);
+
+        Assert.NotSame(term, resolved);
+        Assert.Equal("once", resolved.Name);
+        Assert.Equal("local:p", call.Name);
+        Assert.Equal(originalCall.Span, call.Span);
+        Assert.Equal(originalGoals.Span, goals.Span);
+        Assert.Equal(term.Span, resolved.Span);
+        Assert.Same(originalCall.Arguments, call.Arguments);
+        Assert.Same(originalGoals.Arguments[1], goals.Arguments[1]);
+        Assert.Equal("p", originalCall.Name);
+        Assert.Same(originalGoals, term.Arguments[0]);
+        Assert.Same(term, new ModuleResolver(new ModuleTable(), ModuleTable.UserModule, [new("p", 1)]).ResolveGoal(term));
+    }
+
+    [Fact]
+    public void MetaArgumentCopyPreservesOrdinaryArgumentsAroundTheChangedGoal()
+    {
+        var term = Assert.IsType<CompoundTerm>(Assert.Single(TermReader.ReadProgram("findall(X, p(X), Results).").Clauses));
+        var resolver = new ModuleResolver(new ModuleTable(), "local", [new("p", 1)]);
+
+        var resolved = Assert.IsType<CompoundTerm>(resolver.ResolveGoal(term));
+
+        Assert.Equal("findall", resolved.Name);
+        Assert.Same(term.Arguments[0], resolved.Arguments[0]);
+        Assert.Equal("local:p", Assert.IsType<CompoundTerm>(resolved.Arguments[1]).Name);
+        Assert.Same(term.Arguments[2], resolved.Arguments[2]);
+        Assert.Equal("p", Assert.IsType<CompoundTerm>(term.Arguments[1]).Name);
+    }
+
     [Theory]
     [InlineData(PrologLanguageMode.StrictIso)]
     [InlineData(PrologLanguageMode.Modern)]
