@@ -6,6 +6,40 @@ namespace DotProlog.CodeGen.IL.Tests;
 
 public sealed class IlBlockFusionTests
 {
+    [Fact]
+    public void LargeAndSmallBlocksKeepIndependentBodiesAndFailureLabels()
+    {
+        var arguments = Enumerable.Range(0, 64).Select(index => $"a{index}").ToArray();
+        var wide = $"f({string.Join(',', arguments)})";
+        arguments[^1] = "mismatch";
+        var mismatch = $"f({string.Join(',', arguments)})";
+        var source = $"p({wide},wide). p(short,small). p(_,fallback).";
+        using var emitted = new MemoryStream();
+        Assert.Empty(IlAssemblyEmitter.Emit([("test.pl", source)], "MixedBlocks", emitted));
+        emitted.Position = 0;
+        using var pe = new PEReader(emitted);
+        var metadata = pe.GetMetadataReader();
+        var blockSizes = metadata
+            .MethodDefinitions.Select(metadata.GetMethodDefinition)
+            .Where(method => metadata.GetString(method.Name).StartsWith("Block", StringComparison.Ordinal))
+            .Select(method => pe.GetMethodBody(method.RelativeVirtualAddress).GetILContent().Length)
+            .ToArray();
+        // Exercise scratch-buffer growth, then reuse with much shorter method bodies.
+        var large = Array.FindIndex(blockSizes, size => size > 256);
+        Assert.True(large >= 0);
+        Assert.Contains(blockSizes.Skip(large + 1), size => size < 64);
+        foreach (var fused in new[] { false, true })
+        {
+            using var program = new LoadedProgram(source, fuseBlocks: fused);
+            var engine = new PrologEngine();
+            program.Install(engine);
+            Assert.True(engine.Query($"findall(V,p({wide},V),[wide,fallback])").Prove());
+            Assert.True(engine.Query($"findall(V,p({mismatch},V),[fallback])").Prove());
+            Assert.True(engine.Query("findall(V,p(short,V),[small,fallback])").Prove());
+            Assert.True(engine.Query("findall(V,p(_,V),[wide,small,fallback])").Prove());
+        }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

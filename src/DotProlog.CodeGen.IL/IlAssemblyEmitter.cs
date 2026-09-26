@@ -123,9 +123,15 @@ public static class IlAssemblyEmitter
             typeof(CompiledProgram)
         );
         var linearHeads = layout.LinearClauses.Select(clause => clause.Entry).ToHashSet();
+        var blockCode = new BlobBuilder();
+        var blockFlow = new ControlFlowBuilder();
         for (var i = 0; i < layout.BlockCount; i++)
         {
-            var il = new InstructionEncoder(new BlobBuilder(), new ControlFlowBuilder());
+            // AddMethod copies each completed body into the method stream. Reuse only
+            // the scratch buffers, resetting both bytes and branch labels between blocks.
+            blockCode.Clear();
+            blockFlow.Clear();
+            var il = new InstructionEncoder(blockCode, blockFlow);
             var linear = i >= layout.Starts.Count;
             var start = linear ? layout.LinearClauses[i - layout.Starts.Count].Entry : layout.Starts[i];
             var originalBlock = layout.BlockByInstruction[start];
