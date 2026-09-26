@@ -8,6 +8,61 @@ namespace DotProlog.CodeGen.IL.Tests;
 
 public sealed class IlAssemblyEmitterTests
 {
+    [Fact]
+    public void MethodReferenceIdentityPreservesOwnerNameAndFullSignature()
+    {
+        var metadata = new IlMetadata();
+        var method = metadata.Method(typeof(CompiledProgram), "M", true, typeof(int), typeof(int), typeof(bool));
+        Assert.Equal(method, metadata.Method(typeof(CompiledProgram), "M", true, typeof(int), typeof(int), typeof(bool)));
+        // Metadata distinguishes all these shapes, including overloads that C# itself forbids.
+        MemberReferenceHandle[] distinct =
+        [
+            method,
+            metadata.Method(typeof(BytecodeProgram), "M", true, typeof(int), typeof(int), typeof(bool)),
+            metadata.Method(typeof(CompiledProgram), "N", true, typeof(int), typeof(int), typeof(bool)),
+            metadata.Method(typeof(CompiledProgram), "M", false, typeof(int), typeof(int), typeof(bool)),
+            metadata.Method(typeof(CompiledProgram), "M", true, typeof(bool), typeof(int), typeof(bool)),
+            metadata.Method(typeof(CompiledProgram), "M", true, typeof(int), typeof(bool), typeof(int)),
+            metadata.Method(typeof(CompiledProgram), "M", true, typeof(int), typeof(int).MakeByRefType(), typeof(bool)),
+            metadata.Method(typeof(CompiledProgram), "M", true, typeof(int), typeof(int[]), typeof(bool)),
+            metadata.Method(typeof(CompiledProgram), "M", true, typeof(int), typeof(int)),
+        ];
+        Assert.Equal(distinct.Length, distinct.Distinct().Count());
+        // Parameter arrays are caller-owned and may be reused or mutated after a lookup.
+        Type[] parameters = [typeof(int), typeof(bool)];
+        Assert.Equal(method, metadata.Method(typeof(CompiledProgram), "M", true, typeof(int), parameters));
+        parameters[0] = typeof(string);
+        Assert.DoesNotContain(metadata.Method(typeof(CompiledProgram), "M", true, typeof(int), parameters), distinct);
+        Assert.Equal(method, metadata.Method(typeof(CompiledProgram), "M", true, typeof(int), typeof(int), typeof(bool)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void EmittedAssemblyContainsNoDuplicateMemberReferences(bool fused)
+    {
+        using var output = new MemoryStream();
+        Assert.Empty(
+            IlAssemblyEmitter.Emit([("test.pl", "p(a). p(b). q(X) :- p(X), p(X).")], "MetadataTest", output, fuseBlocks: fused)
+        );
+        output.Position = 0;
+        using var pe = new PEReader(output);
+        var metadata = pe.GetMetadataReader();
+        var identities = metadata
+            .MemberReferences.Select(handle =>
+            {
+                var member = metadata.GetMemberReference(handle);
+                return (
+                    member.Parent,
+                    metadata.GetString(member.Name),
+                    Convert.ToHexString(metadata.GetBlobBytes(member.Signature))
+                );
+            })
+            .ToArray();
+        Assert.NotEmpty(identities);
+        Assert.Equal(identities.Length, identities.Distinct().Count());
+    }
+
     [Theory]
     [InlineData(
         "p(a,1). p(_,2). p(b,3). p(a,4).",

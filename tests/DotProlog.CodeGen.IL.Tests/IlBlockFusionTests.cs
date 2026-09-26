@@ -22,7 +22,8 @@ public sealed class IlBlockFusionTests
     [Fact]
     public void StraightLineInstructionsShareMethodsAndShrinkTheAssembly()
     {
-        const string source = "p(f(a,b), [a,b], a, b).";
+        // Keep the size difference larger than PE section-alignment padding.
+        var source = string.Join("\n", Enumerable.Range(0, 20).Select(index => $"p{index}(f(a,b), [a,b], a, b)."));
         using var fused = new MemoryStream();
         using var reference = new MemoryStream();
         Assert.Empty(IlAssemblyEmitter.Emit([("test.pl", source)], "BlockTest", fused));

@@ -115,6 +115,8 @@ converted into new CLR IL inside the process.
 `DotProlog.Compiler.Cli` provides `plc`, which uses `DotProlog.CodeGen.IL` to serialize a managed
 PE assembly with `System.Reflection.Metadata`. It emits no C# source. Both build-time backends
 use the portable compilation model in `DotProlog.Compiler/CodeGeneration`.
+Repeated method references share a metadata row within each emitted assembly, keyed by declaring
+type, name, and full signature so overloads and calling conventions remain distinct.
 
 Direct IL preserves the loader's first-argument indexes for multi-clause static predicates.
 Installation relocates clause targets and term keys into the receiving engine before running

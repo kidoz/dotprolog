@@ -8,6 +8,8 @@ internal sealed class IlMetadata
 {
     private readonly Dictionary<Type, EntityHandle> _types = [];
     private readonly Dictionary<string, AssemblyReferenceHandle> _assemblies = new(StringComparer.Ordinal);
+    private readonly Dictionary<(EntityHandle Owner, StringHandle Name, BlobHandle Signature), MemberReferenceHandle> _methods =
+    [];
     internal MetadataBuilder Builder { get; } = new();
 
     internal EntityHandle TypeReference(Type type)
@@ -80,8 +82,23 @@ internal sealed class IlMetadata
         return Builder.GetOrAddBlob(blob);
     }
 
-    internal MemberReferenceHandle Method(Type owner, string name, bool instance, Type result, params Type[] parameters) =>
-        Builder.AddMemberReference(TypeReference(owner), Builder.GetOrAddString(name), Signature(instance, result, parameters));
+    internal MemberReferenceHandle Method(Type owner, string name, bool instance, Type result, params Type[] parameters)
+    {
+        // Interned signature blobs include the calling convention, return type, and every
+        // parameter shape. Handles belong to this builder, so references never cross assemblies.
+        var key = (
+            Owner: TypeReference(owner),
+            Name: Builder.GetOrAddString(name),
+            Signature: Signature(instance, result, parameters)
+        );
+        if (_methods.TryGetValue(key, out var handle))
+        {
+            return handle;
+        }
+        handle = Builder.AddMemberReference(key.Owner, key.Name, key.Signature);
+        _methods.Add(key, handle);
+        return handle;
+    }
 
     private void Encode(SignatureTypeEncoder encoder, Type type)
     {
