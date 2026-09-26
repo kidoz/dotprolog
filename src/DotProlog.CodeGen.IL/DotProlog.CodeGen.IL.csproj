@@ -2,5 +2,6 @@
     <ItemGroup>
         <ProjectReference Include="../DotProlog.Compiler/DotProlog.Compiler.csproj" />
         <InternalsVisibleTo Include="DotProlog.CodeGen.IL.Tests" />
+        <InternalsVisibleTo Include="DotProlog.Benchmarks" />
     </ItemGroup>
 </Project>

@@ -50,7 +50,7 @@ public static class IlAssemblyEmitter
         return diagnostics;
     }
 
-    private static void WriteAssembly(CompiledProgramModel model, string name, Stream output)
+    internal static void WriteAssembly(CompiledProgramModel model, string name, Stream output)
     {
         var metadata = new IlMetadata();
         var builder = metadata.Builder;
