@@ -28,13 +28,29 @@ warnings before distributing it.
 
 ## Compile a standalone Prolog file
 
-From a repository checkout, `plc` translates Prolog directly into .NET IL and optionally invokes
-NativeAOT. It is currently a checkout tool, not a published .NET tool package.
+`plc` translates Prolog directly into .NET IL and optionally invokes NativeAOT. From a repository
+checkout, run:
 
 ```console
 dotnet run --project src/DotProlog.Compiler.Cli -- samples/HelloProlog/hello.pl --output artifacts/hello-native --aot
 ./artifacts/hello-native/native/PrologProgram
 ```
+
+You can also pack and install the compiler as a .NET tool. The new `DotProlog.Compiler.Cli` package
+has not yet been published to NuGet.org; build the local package first:
+
+```console
+dotnet pack src/DotProlog.Compiler.Cli -c Release -o artifacts/compiler
+dotnet tool install DotProlog.Compiler.Cli --add-source artifacts/compiler --tool-path artifacts/compiler-tools --version 0.14.2
+./artifacts/compiler-tools/plc --version
+./artifacts/compiler-tools/plc samples/HelloProlog/hello.pl --output artifacts/installed-hello --aot
+```
+
+Use the version printed by `dotnet pack` if it differs. Replace `--tool-path artifacts/compiler-tools`
+with `--global` to install `plc` on your tool PATH, or use `--local` inside a directory with a tool
+manifest. Run the installed command from any working directory; it includes the required DotProlog
+libraries. The compiler requires .NET 10. Native publishing also needs the SDK and native toolchain.
+The installation options follow the [.NET tool installation reference](https://learn.microsoft.com/dotnet/core/tools/dotnet-tool-install).
 
 The output directory must not already exist. The native target defaults to the current host;
 use `--rid` to select another target supported by your build toolchain. Windows produces
@@ -51,7 +67,8 @@ use the existing bytecode engine; build-time predicates execute the emitted IL b
 ## Verify runtime consultation
 
 From the DotProlog repository root, the opt-in integration suite publishes and runs acceptance
-applications, including runtime consultation and dynamic database changes:
+applications, including runtime consultation, dynamic database changes, and an installed `plc`
+compiling outside the repository:
 
 ```console
 DOTPROLOG_RUN_AOT_TESTS=1 dotnet test --project tests/Integration

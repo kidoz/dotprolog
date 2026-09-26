@@ -13,7 +13,8 @@ Russian whose examples all run on DotProlog.
 works today, and `dotnet test` discovers Prolog tests under Microsoft.Testing.Platform. `.dplproj`
 predicate bodies compile to generated C# and ordinary CLR IL at build time; source consulted at run
 time compiles to bytecode for an AOT-safe VM. The standalone `plc` compiler in this checkout emits
-IL directly and can publish a native executable with NativeAOT. It is not yet a published tool package.
+IL directly and can publish a native executable with NativeAOT. It can be packed and installed as
+`DotProlog.Compiler.Cli`; this new tool has not yet been published to NuGet.org.
 The packages have been on NuGet.org since 0.2.0 and the current release is 0.14.2: see
 [CHANGELOG.md](CHANGELOG.md) and [COMPATIBILITY.md](COMPATIBILITY.md).
 
@@ -155,6 +156,23 @@ dotnet run --project src/DotProlog.Compiler.Cli -- \
   samples/HelloProlog/hello.pl --output artifacts/hello-native --aot
 ```
 
+To install `plc` from a locally built package, run these commands from the repository root:
+
+```sh
+dotnet pack src/DotProlog.Compiler.Cli -c Release -o artifacts/compiler
+dotnet tool install DotProlog.Compiler.Cli --add-source artifacts/compiler \
+  --tool-path artifacts/compiler-tools --version 0.14.2
+./artifacts/compiler-tools/plc --version
+./artifacts/compiler-tools/plc samples/HelloProlog/hello.pl --output artifacts/installed-hello --aot
+```
+
+Use the version produced by `dotnet pack` if you change the repository version. For a global
+installation, replace `--tool-path artifacts/compiler-tools` with `--global`; the command is then
+`plc` from any directory on your tool PATH. A project-local installation also works with
+`dotnet new tool-manifest` followed by `dotnet tool install --local` and the same package, source,
+and version arguments. The package includes all four DotProlog libraries needed by emitted programs;
+the installed compiler needs .NET 10, and `--aot` also needs the SDK and native build tools.
+
 The native executable is `artifacts/hello-native/native/PrologProgram` (`PrologProgram.exe` on
 Windows). Publishing needs the .NET SDK and the platform's NativeAOT prerequisites. Running the
 published executable needs neither an installed .NET runtime nor Prolog. Cross-OS publishing is
@@ -163,6 +181,7 @@ not supported by this command; use a build host for each target OS.
 - Pass source files in load order. Applications start with their `:- initialization(...)` goals.
 - `--mode modern|strict-iso` and `--flag double_quotes=codes|chars|atom|string` select source semantics.
 - `--rid <RID>` chooses the native target with `--aot`; it defaults to the host RID.
+- `--version` prints the compiler package version, including any prerelease suffix.
 - `--output` must name a new directory. Existing outputs are never overwritten.
 - The managed output includes the required DotProlog DLLs and `PrologProgram.csproj`. Its overridden
   `CoreCompile` target supplies the already-emitted IL to the SDK. You can publish it later with
