@@ -1278,6 +1278,17 @@ public sealed class Machine
                 ? TryMeElse(alternative, firstClause)
                 : _machine.EnterStatic(tableId);
 
+        /// <summary>Resolves local fallback block indexes only when the first argument is unbound.</summary>
+        public bool EnterStatic(int tableId, CompiledProgram program, int firstClauseIndex, int alternativeIndex)
+        {
+            if (!_machine.Dereference(_machine._x[0]).IsReference)
+            {
+                return _machine.EnterStatic(tableId);
+            }
+            ArgumentNullException.ThrowIfNull(program);
+            return TryMeElse(program.Target(alternativeIndex), program.Target(firstClauseIndex));
+        }
+
         /// <summary>Fails and lets the machine backtrack.</summary>
         public bool Fail()
         {

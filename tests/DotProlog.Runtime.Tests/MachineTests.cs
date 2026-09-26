@@ -9,6 +9,78 @@ namespace DotProlog.Runtime.Tests;
 public sealed class MachineTests
 {
     [Theory]
+    [InlineData(1, false, RunResult.Success)]
+    [InlineData(1, true, RunResult.Success)]
+    [InlineData(3, false, RunResult.Failure)]
+    [InlineData(3, true, RunResult.Failure)]
+    public void BoundCompiledIndexDoesNotResolveUnusedFallbackTargets(int argument, bool aliased, RunResult expected)
+    {
+        var program = new BytecodeProgram();
+        var first = program.Emit(OpCode.GetConstant, program.AddConstant(Cell.Integer60(1)), 0);
+        program.Emit(OpCode.Stop);
+        var last = program.Emit(OpCode.GetConstant, program.AddConstant(Cell.Integer60(2)), 0);
+        program.Emit(OpCode.Stop);
+        var index = program.AddStaticIndex([first, last], [Cell.Integer60(1), Cell.Integer60(2)]);
+        // Deliberately omit fallback targets: a bound hit or miss must never read them.
+        var compiled = new CompiledProgram([], [], [], 0, [index]);
+        var entry = program.RegisterCompiledBlock(
+            static (ref Machine.CompiledExecution execution, CompiledProgram symbols) =>
+                execution.EnterStatic(symbols.StaticIndex(0), symbols, 0, 1),
+            compiled
+        );
+        var predicate = program.Symbols.InternFunctor("indexed", 1);
+        program.DefinePredicate(predicate, entry);
+        var machine = new Machine(program);
+        machine.BeginCall();
+        var value = Cell.Integer60(argument);
+        if (aliased)
+        {
+            value = machine.CreateVariable();
+            Assert.True(machine.Unify(value, Cell.Integer60(argument)));
+        }
+        Assert.Equal(expected, machine.Call(predicate, [value]));
+        Assert.False(machine.HasAlternatives);
+    }
+
+    [Fact]
+    public void UnboundCompiledIndexResolvesRelocatedTargetsAndRestoresArgumentsOnRedo()
+    {
+        var program = new BytecodeProgram();
+        var compiled = new CompiledProgram([], [], [], 3, [0]);
+        var first = program.RegisterCompiledBlock(
+            static (ref Machine.CompiledExecution execution, CompiledProgram _) =>
+                execution.GetConstant(Cell.Integer60(1), 0, BytecodeProgram.TopLevelReturnAddress),
+            compiled
+        );
+        var last = program.Emit(OpCode.GetConstant, program.AddConstant(Cell.Integer60(2)), 0);
+        program.Emit(OpCode.Stop);
+        Assert.Equal(0, program.AddStaticIndex([first, last], [Cell.Integer60(1), Cell.Integer60(2)]));
+        var alternative = program.RegisterCompiledBlock(
+            static (ref Machine.CompiledExecution execution, CompiledProgram symbols) => execution.TrustMe(symbols.Target(2)),
+            compiled
+        );
+        compiled.SetTarget(0, first);
+        compiled.SetTarget(1, alternative);
+        compiled.SetTarget(2, last);
+        var entry = program.RegisterCompiledBlock(
+            static (ref Machine.CompiledExecution execution, CompiledProgram symbols) =>
+                execution.EnterStatic(symbols.StaticIndex(0), symbols, 0, 1),
+            compiled
+        );
+        var predicate = program.Symbols.InternFunctor("indexed", 1);
+        program.DefinePredicate(predicate, entry);
+        var machine = new Machine(program);
+        machine.BeginCall();
+        Assert.Equal(RunResult.Success, machine.Call(predicate, [machine.CreateVariable()]));
+        Assert.Equal(Cell.Integer60(1), machine.Argument(0));
+        Assert.True(machine.HasAlternatives);
+        Assert.Equal(RunResult.Success, machine.Redo());
+        Assert.Equal(Cell.Integer60(2), machine.Argument(0));
+        Assert.False(machine.HasAlternatives);
+        Assert.Equal(RunResult.Failure, machine.Redo());
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void IndexedRedoRestoresArgumentsAcrossCompiledAndBytecodeClauses(bool boundArgument)

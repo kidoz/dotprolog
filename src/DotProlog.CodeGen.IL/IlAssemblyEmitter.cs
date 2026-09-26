@@ -356,8 +356,11 @@ public static class IlAssemblyEmitter
                 if (layout.LinearEntries.Count > 0 && layout.LinearEntries[instruction.FirstReference].First >= 0)
                 {
                     var entry = layout.LinearEntries[instruction.FirstReference];
-                    Reference(nameof(CompiledProgram.Target), entry.First, typeof(int));
-                    Reference(nameof(CompiledProgram.Target), entry.Alternative, typeof(int));
+                    // Bound calls use the table and do not need either fallback target.
+                    il.LoadArgument(1);
+                    parameters.Add(typeof(CompiledProgram));
+                    Integer(entry.First);
+                    Integer(entry.Alternative);
                 }
                 break;
             case OpCode.GetConstant:
