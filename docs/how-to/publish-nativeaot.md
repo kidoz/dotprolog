@@ -41,7 +41,7 @@ has not yet been published to NuGet.org; build the local package first:
 
 ```console
 dotnet pack src/DotProlog.Compiler.Cli -c Release -o artifacts/compiler
-dotnet tool install DotProlog.Compiler.Cli --add-source artifacts/compiler --tool-path artifacts/compiler-tools --version 0.14.2
+dotnet tool install DotProlog.Compiler.Cli --add-source artifacts/compiler --tool-path artifacts/compiler-tools --version 0.15.0
 ./artifacts/compiler-tools/plc --version
 ./artifacts/compiler-tools/plc samples/HelloProlog/hello.pl --output artifacts/installed-hello --aot
 ```
