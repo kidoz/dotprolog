@@ -310,6 +310,54 @@ public sealed class LexerTests
     [InlineData('\'')]
     [InlineData('"')]
     [InlineData('`')]
+    public void QuotedNewlineRecoveryKeepsTheFollowingTokenPosition(char quote)
+    {
+        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        {
+            List<Token> tokens = Tokenize(
+                $"{quote}a\nb{quote}{quote}c{quote}next",
+                new BytecodeProgram(mode).Flags,
+                out List<Diagnostic> diagnostics
+            );
+
+            Assert.Equal($"ab{quote}c", tokens[0].Text);
+            Diagnostic diagnostic = Assert.Single(diagnostics);
+            Assert.Equal(DiagnosticIds.InvalidQuotedCharacter, diagnostic.Id);
+            Assert.Equal(new SourceSpan(2, 1, 1, 3), diagnostic.Span);
+            Assert.Equal("next", tokens[1].Text);
+            Assert.Equal(new SourceSpan(8, 4, 2, 6), tokens[1].Span);
+            Assert.Equal(TokenKind.Eof, tokens[2].Kind);
+        }
+    }
+
+    [Theory]
+    [InlineData('\'')]
+    [InlineData('"')]
+    [InlineData('`')]
+    public void NewlineConvertedToOpeningQuoteStillAdvancesTheSourceLine(char quote)
+    {
+        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        {
+            var conversions = new CharacterConversionTable();
+            conversions.Set('\n', quote);
+            PrologFlags flags = new BytecodeProgram(mode).Flags;
+            flags.SetCharConversion(true);
+            List<Diagnostic> diagnostics = [];
+            var lexer = new Lexer($"\nhead{quote} next", null, diagnostics, conversions, flags);
+
+            Assert.Equal("head", lexer.Next().Text);
+            Token next = lexer.Next();
+            Assert.Equal("next", next.Text);
+            Assert.Equal(new SourceSpan(7, 4, 2, 7), next.Span);
+            Assert.Equal(TokenKind.Eof, lexer.Next().Kind);
+            Assert.Empty(diagnostics);
+        }
+    }
+
+    [Theory]
+    [InlineData('\'')]
+    [InlineData('"')]
+    [InlineData('`')]
     public void QuotedLineContinuationKeepsPrefixAndFollowingPosition(char quote)
     {
         foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })

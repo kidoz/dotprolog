@@ -583,11 +583,11 @@ internal sealed class Lexer
                 {
                     builder ??= new StringBuilder(_text, contentStart, _position - contentStart, capacity: 0);
                     builder.Append(quote);
-                    Advance(2);
+                    _position += 2;
                     continue;
                 }
 
-                Advance();
+                _position++;
                 terminated = true;
                 break;
             }
@@ -612,7 +612,8 @@ internal sealed class Lexer
             }
 
             builder?.Append(c);
-            Advance();
+            // Classification above excludes newlines, so only the offset changes.
+            _position++;
         }
 
         if (!terminated)
