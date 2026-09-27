@@ -246,7 +246,7 @@ internal static class Program
                 % ISO delimited hexadecimal and octal escapes survive native publication.
                 native_escape('A'),
                 native_octal_escape(aSb),
-                NativeEscapedCode is 0'\o101\,
+                NativeEscapedCode is 0'\101\,
                 NativeEscapedCode =:= 65,
                 atom_codes(NativeEscapedSource, [39, 92, 120, 52, 49, 92, 39]),
                 read_term_from_atom(NativeEscapedSource, 'A', []),
@@ -260,7 +260,7 @@ internal static class Program
 
                 % ISO backquoted names and quoted control-character rules remain catchable.
                 native_backquoted(native),
-                atom_codes(BackquotedDeleteSource, [96, 92, 100, 96]),
+                atom_codes(BackquotedDeleteSource, [96, 92, 49, 55, 55, 92, 96]),
                 read_term_from_atom(BackquotedDeleteSource, DeleteAtom, []),
                 atom_codes(DeleteAtom, [127]),
                 atom_codes(RawQuotedLayoutSource, [96, 114, 97, 119, 9, 108, 97, 121, 111, 117, 116, 96]),
