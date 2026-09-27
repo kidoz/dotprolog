@@ -620,7 +620,12 @@ public sealed class TermReader
 
     private CompoundTerm? ParseArguments(string name, SourceSpan nameSpan)
     {
-        List<SyntaxTerm> arguments = [];
+        // Small compounds need only an array. Defer the growable list until a third
+        // argument arrives, retaining its usual initial capacity for larger compounds.
+        SyntaxTerm? first = null;
+        SyntaxTerm? second = null;
+        List<SyntaxTerm>? arguments = null;
+        var count = 0;
         while (true)
         {
             SyntaxTerm? argument = ParseTerm(ArgumentPriority, out _);
@@ -629,7 +634,19 @@ public sealed class TermReader
                 return null;
             }
 
-            arguments.Add(argument);
+            switch (count++)
+            {
+                case 0:
+                    first = argument;
+                    break;
+                case 1:
+                    second = argument;
+                    break;
+                default:
+                    arguments ??= new List<SyntaxTerm>(4) { first!, second! };
+                    arguments.Add(argument);
+                    break;
+            }
 
             if (_current.IsPunctuation(","))
             {
@@ -638,7 +655,18 @@ public sealed class TermReader
             }
 
             SourceSpan span = nameSpan.To(_current.Span);
-            return Expect(")") ? new CompoundTerm(name, arguments, span) : null;
+            if (!Expect(")"))
+            {
+                return null;
+            }
+
+            IReadOnlyList<SyntaxTerm> parsedArguments = count switch
+            {
+                1 => new[] { first! },
+                2 => new[] { first!, second! },
+                _ => arguments!,
+            };
+            return new CompoundTerm(name, parsedArguments, span);
         }
     }
 

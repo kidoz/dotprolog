@@ -132,6 +132,69 @@ public sealed class TermReaderTests
     }
 
     [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(255)]
+    [InlineData(256)]
+    public void CompoundArgumentsKeepTheirOrderAndSpansAcrossNestedTerms(int arity)
+    {
+        string[] arguments = Enumerable.Range(0, arity).Select(i => $"pair({i},X)").ToArray();
+        string termText = $"outer({string.Join(',', arguments)})";
+        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        {
+            ParseResult result = TermReader.ReadProgram($"{termText}.\nnext(ok).", flags: new BytecodeProgram(mode).Flags);
+
+            Assert.Empty(result.Diagnostics);
+            Assert.Equal(2, result.Clauses.Count);
+            CompoundTerm term = Assert.IsType<CompoundTerm>(result.Clauses[0]);
+            Assert.Equal("outer", term.Name);
+            Assert.Equal(arity, term.Arity);
+            Assert.Equal(new SourceSpan(0, termText.Length, 1, 1), term.Span);
+            for (var i = 0; i < arity; i++)
+            {
+                Assert.Equal(arguments[i], Canonical(term.Arguments[i]));
+                var start = termText.IndexOf(arguments[i], StringComparison.Ordinal);
+                Assert.Equal(new SourceSpan(start, arguments[i].Length, 1, start + 1), term.Arguments[i].Span);
+            }
+
+            Assert.Equal("next(ok)", Canonical(result.Clauses[1]));
+            Assert.Equal(new SourceSpan(termText.Length + 2, 8, 2, 1), result.Clauses[1].Span);
+        }
+    }
+
+    [Theory]
+    [InlineData("broken().", 7)]
+    [InlineData("broken(a,).", 9)]
+    [InlineData("broken(a,b,).", 11)]
+    [InlineData("broken(a,b,c,).", 13)]
+    [InlineData("broken(a b).", 9)]
+    [InlineData("broken(a,b c).", 11)]
+    [InlineData("broken(a,b,c d).", 13)]
+    public void MalformedArgumentsKeepTheDiagnosticAndFollowingClause(string broken, int errorStart)
+    {
+        ArgumentNullException.ThrowIfNull(broken);
+        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        {
+            ParseResult result = TermReader.ReadProgram(
+                $"{broken}\ngood(z).",
+                "arguments.pl",
+                flags: new BytecodeProgram(mode).Flags
+            );
+
+            Diagnostic diagnostic = Assert.Single(result.Diagnostics);
+            Assert.Equal(DiagnosticIds.UnexpectedToken, diagnostic.Id);
+            Assert.Equal(new SourceSpan(errorStart, 1, 1, errorStart + 1), diagnostic.Span);
+            Assert.Equal("arguments.pl", diagnostic.FileName);
+            SyntaxTerm following = Assert.Single(result.Clauses);
+            Assert.Equal("good(z)", Canonical(following));
+            Assert.Equal(new SourceSpan(broken.Length + 1, 7, 2, 1), following.Span);
+        }
+    }
+
+    [Theory]
     [InlineData("left 'is' right.", "is(left,right)")]
     [InlineData("left `is` right.", "is(left,right)")]
     [InlineData("'dynamic' predicate.", "dynamic(predicate)")]
