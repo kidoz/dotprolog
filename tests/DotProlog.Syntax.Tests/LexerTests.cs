@@ -177,6 +177,111 @@ public sealed class LexerTests
     }
 
     [Theory]
+    [InlineData('\'')]
+    [InlineData('"')]
+    [InlineData('`')]
+    public void PlainQuotedTextKeepsContentAndSourceSpan(char quote)
+    {
+        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        {
+            foreach (string value in new[] { string.Empty, "plain", "two words", "λ😀" + new string('a', 128) })
+            {
+                var conversions = new CharacterConversionTable();
+                conversions.Set('a', 'z');
+                PrologFlags flags = new BytecodeProgram(mode).Flags;
+                flags.SetCharConversion(true);
+                List<Diagnostic> diagnostics = [];
+                var lexer = new Lexer($"\n {quote}{value}{quote} next", "quoted.pl", diagnostics, conversions, flags);
+
+                Token token = lexer.Next();
+                Assert.Equal(quote == '"' ? TokenKind.String : TokenKind.Atom, token.Kind);
+                Assert.Equal(value, token.Text);
+                Assert.Equal(quote != '"', token.Quoted);
+                Assert.True(token.PrecededByLayout);
+                Assert.Equal(new SourceSpan(2, value.Length + 2, 2, 2), token.Span);
+                token = lexer.Next();
+                Assert.Equal("next", token.Text);
+                Assert.Equal(new SourceSpan(value.Length + 5, 4, 2, value.Length + 5), token.Span);
+                Assert.Equal(TokenKind.Eof, lexer.Next().Kind);
+                Assert.Empty(diagnostics);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData('\'')]
+    [InlineData('"')]
+    [InlineData('`')]
+    public void QuotedTextKeepsPrefixWhenDecodingStartsLate(char quote)
+    {
+        string prefix = new('p', 80);
+        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        {
+            string source = $"{quote}{prefix}\\nq{quote}{quote}r\\x41\\s{quote} next";
+            List<Token> tokens = Tokenize(source, new BytecodeProgram(mode).Flags, out List<Diagnostic> diagnostics);
+
+            Assert.Empty(diagnostics);
+            Assert.Equal($"{prefix}\nq{quote}rAs", tokens[0].Text);
+            Assert.Equal(new SourceSpan(0, source.Length - 5, 1, 1), tokens[0].Span);
+            Assert.Equal("next", tokens[1].Text);
+            Assert.Equal(TokenKind.Eof, tokens[2].Kind);
+        }
+    }
+
+    [Theory]
+    [InlineData('\'')]
+    [InlineData('"')]
+    [InlineData('`')]
+    public void InvalidQuotedCharactersPreservePrefixAndRecovery(char quote)
+    {
+        List<Diagnostic> diagnostics = [];
+        var lexer = new Lexer($"{quote}prefix\tbad\\qtail{quote} next", "quoted.pl", diagnostics);
+
+        Assert.Equal("prefixbadtail", lexer.Next().Text);
+        Assert.Equal("next", lexer.Next().Text);
+        Assert.Equal(TokenKind.Eof, lexer.Next().Kind);
+        Assert.Equal([DiagnosticIds.InvalidQuotedCharacter, DiagnosticIds.InvalidEscape], diagnostics.Select(d => d.Id));
+        Assert.Equal(new SourceSpan(7, 1, 1, 8), diagnostics[0].Span);
+        Assert.Equal(new SourceSpan(11, 2, 1, 12), diagnostics[1].Span);
+        Assert.All(diagnostics, diagnostic => Assert.Equal("quoted.pl", diagnostic.FileName));
+    }
+
+    [Theory]
+    [InlineData("'prefix", "prefix", DiagnosticIds.UnterminatedQuoted)]
+    [InlineData("'prefix\\", "prefix", DiagnosticIds.InvalidEscape)]
+    [InlineData("'prefix''", "prefix'", DiagnosticIds.UnterminatedQuoted)]
+    public void UnterminatedQuotedTextRetainsItsDecodedPrefix(string source, string expected, string firstDiagnostic)
+    {
+        List<Token> tokens = Tokenize(source, out List<Diagnostic> diagnostics);
+
+        Assert.Equal(expected, tokens[0].Text);
+        Assert.Equal(TokenKind.Eof, tokens[1].Kind);
+        Assert.Equal(firstDiagnostic, diagnostics[0].Id);
+        Assert.Equal(DiagnosticIds.UnterminatedQuoted, diagnostics[^1].Id);
+    }
+
+    [Theory]
+    [InlineData('\'')]
+    [InlineData('"')]
+    [InlineData('`')]
+    public void QuotedLineContinuationKeepsPrefixAndFollowingPosition(char quote)
+    {
+        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        {
+            List<Token> tokens = Tokenize(
+                $"{quote}prefix\\\nsuffix{quote} next",
+                new BytecodeProgram(mode).Flags,
+                out List<Diagnostic> diagnostics
+            );
+
+            Assert.Empty(diagnostics);
+            Assert.Equal("prefixsuffix", tokens[0].Text);
+            Assert.Equal("next", tokens[1].Text);
+            Assert.Equal(new SourceSpan(17, 4, 2, 9), tokens[1].Span);
+        }
+    }
+
+    [Theory]
     [InlineData(@"'\d'", '\u007f')]
     [InlineData(@"""\d""", '\u007f')]
     [InlineData(@"`\d`", '\u007f')]

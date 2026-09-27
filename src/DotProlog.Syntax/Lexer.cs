@@ -568,7 +568,10 @@ internal sealed class Lexer
     {
         var start = _position;
         Advance();
-        var builder = new StringBuilder();
+        var contentStart = _position;
+        // Plain quoted text is already its decoded value. Allocate a builder only when
+        // decoding or diagnostic recovery changes the source characters.
+        StringBuilder? builder = null;
         terminated = false;
 
         while (_position < _text.Length)
@@ -578,6 +581,7 @@ internal sealed class Lexer
             {
                 if (RawPeek(1) == quote)
                 {
+                    builder ??= new StringBuilder(_text, contentStart, _position - contentStart, capacity: 0);
                     builder.Append(quote);
                     Advance(2);
                     continue;
@@ -590,12 +594,14 @@ internal sealed class Lexer
 
             if (c == '\\')
             {
+                builder ??= new StringBuilder(_text, contentStart, _position - contentStart, capacity: 0);
                 ReadEscape(builder);
                 continue;
             }
 
             if (c != ' ' && (char.IsControl(c) || IsLayout(c)))
             {
+                builder ??= new StringBuilder(_text, contentStart, _position - contentStart, capacity: 0);
                 Report(
                     DiagnosticIds.InvalidQuotedCharacter,
                     "Control and layout characters inside quoted text must use an escape sequence.",
@@ -605,7 +611,7 @@ internal sealed class Lexer
                 continue;
             }
 
-            builder.Append(c);
+            builder?.Append(c);
             Advance();
         }
 
@@ -618,7 +624,7 @@ internal sealed class Lexer
             );
         }
 
-        return builder.ToString();
+        return builder?.ToString() ?? _text.Substring(contentStart, _position - contentStart - (terminated ? 1 : 0));
     }
 
     private void ReadEscape(StringBuilder builder)
