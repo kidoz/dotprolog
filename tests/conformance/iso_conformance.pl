@@ -515,7 +515,7 @@ iso_case('6.4.2', reads_as('left `is` right', is(left, right)), success).
 iso_case(
     '6.4.2',
     (
-        atom_codes(BackquotedDeleteSource, [96, 92, 100, 96]),
+        atom_codes(BackquotedDeleteSource, [96, 92, 49, 55, 55, 92, 96]),
         atom_codes(DeleteAtom, [127]),
         reads_as(BackquotedDeleteSource, DeleteAtom)
     ),
@@ -544,7 +544,7 @@ iso_case(
 ).
 iso_case(
     '6.4.2',
-    (atom_codes(OctalStringSource, [34, 92, 111, 49, 48, 49, 92, 34]), reads_as(OctalStringSource, [65])),
+    (atom_codes(OctalStringSource, [34, 92, 49, 48, 49, 92, 34]), reads_as(OctalStringSource, [65])),
     success
 ).
 iso_case(
@@ -554,7 +554,7 @@ iso_case(
 ).
 iso_case(
     '6.4.4',
-    (atom_codes(OctalCharacterCodeSource, [48, 39, 92, 111, 49, 48, 49, 92]), reads_as(OctalCharacterCodeSource, 65)),
+    (atom_codes(OctalCharacterCodeSource, [48, 39, 92, 49, 48, 49, 92]), reads_as(OctalCharacterCodeSource, 65)),
     success
 ).
 iso_case('7.1.4', reads_as('f(a, b)', f(a, b)), success).

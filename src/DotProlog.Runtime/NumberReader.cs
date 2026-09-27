@@ -209,11 +209,8 @@ internal static class NumberReader
             case 'v':
                 builder.Append('\v');
                 return true;
-            case 'e':
+            case 'e' when codePoints:
                 builder.Append('\u001b');
-                return true;
-            case 'd':
-                builder.Append('\u007f');
                 return true;
             case '\\' or '\'' or '"' or '`':
                 builder.Append(c);
@@ -222,8 +219,6 @@ internal static class NumberReader
                 return true;
             case 'x':
                 return TryReadNumericEscape(text, ref position, codePoints, 16, firstDigit: null, builder);
-            case 'o':
-                return TryReadNumericEscape(text, ref position, codePoints, 8, firstDigit: null, builder);
             case 'u' when codePoints:
                 return TryReadFixedEscape(text, ref position, digits: 4, builder);
             case 'U' when codePoints:

@@ -20,13 +20,13 @@ public sealed class QuotedTokenTests
     }
 
     [Fact]
-    public void RuntimeTermInputReadsBackquotedNamesAndDeleteEscapes()
+    public void RuntimeTermInputReadsBackquotedNamesAndOctalEscapes()
     {
         Assert.Equal(
             "yes\n",
             PrologTestHost.RunGoal(
                 "read_term_from_atom('`hello`', hello, []), "
-                    + "atom_codes(DeleteSource, [96,92,100,96]), "
+                    + "atom_codes(DeleteSource, [96,92,49,55,55,92,96]), "
                     + "read_term_from_atom(DeleteSource, Delete, []), "
                     + "atom_codes(Delete, [127]), write(yes), nl"
             )

@@ -124,7 +124,16 @@ public sealed class NumberCharsConformityTests
     public void CharacterCodeQuotesAndOctalEscapesFollowIsoGrammar(PrologLanguageMode mode)
     {
         var engine = new PrologEngine(mode);
-        string[] malformed = ["[48,39,39]", "[48,39,92,48]", "[48,39,92,48,56]", "[48,39,92,48,120]"];
+        // 0'\o0\ and 0'\d: ISO has no \o or \d escape, and neither has SWI-Prolog.
+        string[] malformed =
+        [
+            "[48,39,39]",
+            "[48,39,92,48]",
+            "[48,39,92,48,56]",
+            "[48,39,92,48,120]",
+            "[48,39,92,111,48,92]",
+            "[48,39,92,100]",
+        ];
         foreach (string codes in malformed)
         {
             foreach (string predicate in new[] { "number_chars", "number_codes" })

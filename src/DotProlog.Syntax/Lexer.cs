@@ -664,11 +664,9 @@ internal sealed class Lexer
             case 'v':
                 builder.Append('\v');
                 return;
-            case 'e':
+            // SWI-Prolog's escape character, which ISO does not have.
+            case 'e' when CodePoints:
                 builder.Append('\u001b');
-                return;
-            case 'd':
-                builder.Append('\u007f');
                 return;
             case '\\' or '\'' or '"' or '`':
                 builder.Append(c);
@@ -677,9 +675,6 @@ internal sealed class Lexer
                 return;
             case 'x':
                 ReadNumericEscape(builder, start, radix: 16, "hexadecimal");
-                return;
-            case 'o':
-                ReadNumericEscape(builder, start, radix: 8, "octal");
                 return;
             case 'u' when CodePoints:
                 ReadFixedEscape(builder, start, 'u', digits: 4);

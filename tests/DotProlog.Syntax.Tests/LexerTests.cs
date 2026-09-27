@@ -375,16 +375,43 @@ public sealed class LexerTests
         }
     }
 
+    // Neither ISO nor SWI-Prolog has a \d or \o escape; octal is \101\ alone.
     [Theory]
-    [InlineData(@"'\d'", '\u007f')]
-    [InlineData(@"""\d""", '\u007f')]
-    [InlineData(@"`\d`", '\u007f')]
-    public void ReadsIsoDeleteEscape(string text, char expected)
+    [InlineData(@"'\d'")]
+    [InlineData(@"""\d""")]
+    [InlineData(@"`\d`")]
+    [InlineData(@"0'\d")]
+    [InlineData(@"'\o101'")]
+    [InlineData(@"""\o101""")]
+    [InlineData(@"0'\o101\")]
+    [InlineData(@"0'\o0\")]
+    public void RejectsDeleteAndOctalLetterEscapesInBothModes(string text)
     {
-        List<Token> tokens = Tokenize(text, out List<Diagnostic> diagnostics);
+        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        {
+            Tokenize(text, new BytecodeProgram(mode).Flags, out List<Diagnostic> diagnostics);
 
+            Assert.Equal(DiagnosticIds.InvalidEscape, Assert.Single(diagnostics).Id);
+        }
+    }
+
+    [Theory]
+    [InlineData(@"'\e'")]
+    [InlineData(@"""\e""")]
+    [InlineData(@"0'\e")]
+    public void ReadsTheEscapeCharacterOnlyInModern(string text)
+    {
+        List<Token> tokens = Tokenize(
+            text,
+            new BytecodeProgram(PrologLanguageMode.Modern).Flags,
+            out List<Diagnostic> diagnostics
+        );
         Assert.Empty(diagnostics);
-        Assert.Equal(expected.ToString(), tokens[0].Text);
+        Token token = tokens[0];
+        Assert.Equal(27L, token.Kind == TokenKind.Integer ? token.Integer : token.Text.Single());
+
+        Tokenize(text, new BytecodeProgram(PrologLanguageMode.StrictIso).Flags, out diagnostics);
+        Assert.Equal(DiagnosticIds.InvalidEscape, Assert.Single(diagnostics).Id);
     }
 
     [Theory]
@@ -400,7 +427,7 @@ public sealed class LexerTests
 
     [Theory]
     [InlineData(@"'\x41\'", false)]
-    [InlineData(@"""\o101\""", true)]
+    [InlineData(@"""\101\""", true)]
     [InlineData(@"'\101\'", false)]
     public void ReadsIsoNumericEscapes(string text, bool stringToken)
     {
@@ -430,7 +457,6 @@ public sealed class LexerTests
 
     [Theory]
     [InlineData(@"0'\x41\")]
-    [InlineData(@"0'\o101\")]
     [InlineData(@"0'\101\")]
     public void ReadsIsoNumericEscapesInCharacterCodeLiterals(string text)
     {
