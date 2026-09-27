@@ -250,6 +250,33 @@ public sealed class SourceDirectiveTests : IDisposable
         Assert.Equal("[before,directive,after]", output);
     }
 
+    [Theory]
+    [InlineData(PrologLanguageMode.Modern)]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    public void DynamicStoredRulesSurviveDirectiveFlushesAndRetraction(PrologLanguageMode mode)
+    {
+        var output = new StringWriter();
+        var engine = new PrologEngine(mode) { Output = output, Input = TextReader.Null };
+        LoadResult loaded = engine.ConsultText(
+            """
+            :- dynamic(value/2).
+            value(before, X) :- X = before.
+            :- (clause(value(before, Y), B), B == (Y = before),
+                retract((value(before, Z) :- Z = before)), assertz(value(directive, kept))).
+            value(after, X) :- X = after.
+            :- initialization((
+                clause(value(after, A), Body), Body == (A = after),
+                findall(pair(Tag, Value), value(Tag, Value), Values), write(Values)
+            )).
+            """,
+            "stored-rules.pl"
+        );
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("[pair(directive,kept),pair(after,after)]", output.ToString());
+    }
+
     [Fact]
     public void RuntimeConsultQueuesDirectivesUntilTheMachineReturns()
     {

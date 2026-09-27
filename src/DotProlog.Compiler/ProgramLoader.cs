@@ -116,7 +116,9 @@ public sealed class ProgramLoader
         HashSet<int> dynamicPredicates = DeclareDynamicPredicates(unit, resolver, diagnostics, fileName);
         Dictionary<int, List<(SyntaxTerm Head, SyntaxTerm? Body)>> accumulated = [];
         Dictionary<int, List<(SyntaxTerm Head, SyntaxTerm? Body)>> pending = [];
-        Dictionary<int, List<(SyntaxTerm Head, SyntaxTerm? Body)>> storedPending = [];
+        // ISO module bodies keep source goals for clause/2 and retract/1. Other load units
+        // store the resolved goals already held by pending, so they need no second copy.
+        Dictionary<int, List<(SyntaxTerm Head, SyntaxTerm? Body)>>? storedPending = forcedModule is null ? null : [];
         List<int> dirtyOrder = [];
         HashSet<int> dirty = [];
         var halted = false;
@@ -160,13 +162,16 @@ public sealed class ProgramLoader
                 }
 
                 newClauses.Add((resolvedHead, resolvedBody));
-                if (!storedPending.TryGetValue(functorId, out List<(SyntaxTerm, SyntaxTerm?)>? storedClauses))
+                if (storedPending is not null)
                 {
-                    storedClauses = [];
-                    storedPending[functorId] = storedClauses;
-                }
+                    if (!storedPending.TryGetValue(functorId, out List<(SyntaxTerm, SyntaxTerm?)>? storedClauses))
+                    {
+                        storedClauses = [];
+                        storedPending[functorId] = storedClauses;
+                    }
 
-                storedClauses.Add((resolvedHead, forcedModule is null ? resolvedBody : clause.Body));
+                    storedClauses.Add((resolvedHead, clause.Body));
+                }
                 if (dirty.Add(functorId))
                 {
                     dirtyOrder.Add(functorId);
@@ -252,7 +257,7 @@ public sealed class ProgramLoader
                     EmitDynamicClauses(
                         functorId,
                         pending[functorId],
-                        storedPending[functorId],
+                        storedPending is null ? pending[functorId] : storedPending[functorId],
                         diagnostics,
                         fileName,
                         unitDefinitions
@@ -276,7 +281,7 @@ public sealed class ProgramLoader
             }
 
             pending.Clear();
-            storedPending.Clear();
+            storedPending?.Clear();
             dirty.Clear();
             dirtyOrder.Clear();
         }

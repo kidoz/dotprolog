@@ -1076,6 +1076,30 @@ public sealed class ModuleTests : IDisposable
     }
 
     [Fact]
+    public void ModernDynamicModuleClausesRetainTheirResolvedBodies()
+    {
+        var engine = new PrologEngine();
+        LoadResult loaded = engine.ConsultText(
+            """
+            :- module(memo, [item/1]).
+            :- dynamic item/1.
+            local(one).
+            item(X) :- local(X).
+            """,
+            "modern-stored-clause.pl"
+        );
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(
+            RunResult.Success,
+            engine.RunGoal(
+                "clause('memo:item'(Y), B), B == 'memo:local'(Y), " + "retract(('memo:item'(X) :- 'memo:local'(X))), \\+ item(_)",
+                out _
+            )
+        );
+    }
+
+    [Fact]
     public void DynamicModuleClausesRetainTheirUnqualifiedSourceBodies()
     {
         const string source = """
