@@ -589,7 +589,7 @@ iso_case('7.10.5', writeq_gives(1 + 2, '1+2'), success).
 iso_case('7.10.5', writeq_gives(1 + 2 * 3, '1+2*3'), success).
 iso_case('7.10.5', writeq_gives((1 + 2) * 3, '(1+2)*3'), success).
 iso_case('7.10.5', writeq_gives(1 - (2 - 3), '1-(2-3)'), success).
-iso_case('7.10.5', writeq_gives(-(1), '- 1'), success).
+iso_case('7.10.5', writeq_gives(-(1), '- (1)'), success).
 iso_case('7.10.5', writeq_gives(f(-1), 'f(-1)'), success).
 iso_case('7.10.5', writeq_gives([a, b], '[a,b]'), success).
 iso_case('7.10.5', writeq_gives([a|b], '[a|b]'), success).

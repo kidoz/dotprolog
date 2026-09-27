@@ -25,8 +25,8 @@ public sealed class OperatorWritingTests
     [InlineData("a mod b", "a mod b")]
     [InlineData("Y is 1+2", "_G5 is 1+2")]
     [InlineData("\\+ a", "\\+a")]
-    [InlineData("- (1)", "- 1")]
-    [InlineData("-(-(1))", "- - 1")]
+    [InlineData("- (1)", "- (1)")]
+    [InlineData("-(-(1))", "- - (1)")]
     [InlineData("1 - -2", "1- -2")]
     [InlineData("1 * (2, 3)", "1*(2,3)")]
     [InlineData("f(-)", "f(-)")]
@@ -35,6 +35,46 @@ public sealed class OperatorWritingTests
     // one runs until it exhausts memory. Unification has no occurs check, here as everywhere else.
     public void WritesOperatorNotation(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal($"X = ({goal}), write(X)"));
+
+    // Cor.3 7.10.5: an operator atom is bracketed as an operand and bare as an argument or list
+    // element; a prefix - brackets a non-negative number and an infix or postfix operand, since
+    // - 1 is the integer -1 and - 1^2 is (-1)^2 in ISO; and , and | are bare as operators.
+    [Theory]
+    [InlineData("[:-, -]", "[:-,-]")]
+    [InlineData("f(;, '|', ';;')", "f(;,'|',';;')")]
+    [InlineData("[',']", "[',']")]
+    [InlineData("(-) - (-)", "(-)-(-)")]
+    [InlineData("(*) = (*)", "(*)=(*)")]
+    [InlineData("- (-)", "- (-)")]
+    [InlineData("-(1^2)", "- (1^2)")]
+    [InlineData("-(a^2)", "- (a^2)")]
+    [InlineData("-((1*2)^3)", "- ((1*2)^3)")]
+    [InlineData("+((1*2)^3)", "+ (1*2)^3")]
+    [InlineData("-(-(1))", "- - (1)")]
+    [InlineData("-(-1)", "- -1")]
+    [InlineData("-(1.5)", "- (1.5)")]
+    [InlineData("+(1)", "+1")]
+    [InlineData("-a", "-a")]
+    [InlineData("'/*'", "'/*'")]
+    [InlineData("'/**'", "'/**'")]
+    [InlineData("//*", "//*")]
+    [InlineData("'a b'+'c'", "'a b'+c")]
+    [InlineData("f('a b', 'c d')", "f('a b','c d')")]
+    public void WritesTheBracketsCorrigendum3Requires(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal($"X = ({goal}), writeq(X)"));
+
+    [Theory]
+    [InlineData(":- op(9, fy, fy), op(9, yf, yf).", "yf(fy(1))", "(fy 1)yf")]
+    [InlineData(":- op(9, fy, fy), op(9, yf, yf).", "fy(yf(1))", "fy 1 yf")]
+    [InlineData(":- op(9, fy, fy), op(9, yf, yf).", "yf(fy(yf(fy(1))))", "(fy (fy 1)yf)yf")]
+    [InlineData(":- op(9, fy, fy), op(9, yfx, yfx).", "yfx(fy(1), 2)", "(fy 1)yfx 2")]
+    [InlineData(":- op(9, yf, yf), op(9, xfy, xfy).", "yf(xfy(1, 2))", "(1 xfy 2)yf")]
+    [InlineData(":- op(9, yf, yf), op(9, xfy, xfy).", "xfy(1, yf(2))", "1 xfy 2 yf")]
+    [InlineData(":- op(100, fx, ' op').", "' op'('1')", "' op' '1'")]
+    [InlineData(":- op(100, xf, 'f ').", "'f '(0)", "0 'f '")]
+    [InlineData(":- op(9, xf, '$VAR').", "'$VAR'(-1)", "-1'$VAR'")]
+    public void BracketsAndSpacesWhereAdjacentOperatorsWouldReadDifferently(string declarations, string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.Run($"{declarations}\n:- initialization((X = ({goal}), writeq(X))).\n"));
 
     [Fact]
     public void ClauseBodiesRead() => Assert.Equal("a:-b,c", PrologTestHost.RunGoal("X = (a :- b, c), write(X)"));
@@ -69,6 +109,10 @@ public sealed class OperatorWritingTests
     [InlineData("f(a-(-1))")]
     [InlineData("(a->b;c)")]
     [InlineData("[1, -1, - (1)]")]
+    [InlineData("[:-, -, (-) - (-), - (-)]")]
+    [InlineData("-(1^2) + -((1*2)^3)")]
+    [InlineData("+(1) - +(-1)")]
+    [InlineData("f('/*', //*, '*/')")]
     public void WriteqRoundTripsThroughTheReader(string source)
     {
         var engine = new PrologEngine();

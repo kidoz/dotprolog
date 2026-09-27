@@ -132,7 +132,7 @@ public static class TermWriter
                     break;
 
                 case ItemKind.PrefixGuard:
-                    writer.GuardAfterPrefixOperator(sign: item.MaxPriority != 0);
+                    writer.GuardAfterPrefixOperator();
                     break;
 
                 case ItemKind.Leave:
@@ -205,7 +205,7 @@ public static class TermWriter
                 return;
 
             case CellTag.Atom:
-                WriteAtom(machine, operators, cell.Index, item.MaxPriority, output, quoted, ignoreOperators);
+                WriteAtom(machine, operators, cell.Index, item.Kind == ItemKind.Operand, output, quoted, ignoreOperators);
                 return;
 
             case CellTag.Integer:
@@ -280,7 +280,9 @@ public static class TermWriter
                 return;
             }
 
-            if (TryWriteOperator(machine, operators, cell, functor, name, item.MaxPriority, output, quoted, work))
+            if (
+                TryWriteOperator(machine, operators, cell, functor, name, item.MaxPriority, output, quoted, numberVariables, work)
+            )
             {
                 return;
             }
@@ -324,7 +326,7 @@ public static class TermWriter
         return false;
     }
 
-    private static bool TryWriteNumberVariable(Machine machine, Cell cell, Functor functor, Emitter output)
+    private static bool IsNumberVariable(Machine machine, Cell cell, Functor functor)
     {
         if (functor.Arity != 1 || machine.Symbols.AtomName(functor.NameAtom) != "$VAR")
         {
@@ -332,12 +334,17 @@ public static class TermWriter
         }
 
         Cell number = machine.Dereference(machine.HeapAt(cell.Index + 1));
-        if (number.Tag != CellTag.Integer || number.Integer < 0)
+        return number.Tag == CellTag.Integer && number.Integer >= 0;
+    }
+
+    private static bool TryWriteNumberVariable(Machine machine, Cell cell, Functor functor, Emitter output)
+    {
+        if (!IsNumberVariable(machine, cell, functor))
         {
             return false;
         }
 
-        var value = number.Integer;
+        var value = machine.Dereference(machine.HeapAt(cell.Index + 1)).Integer;
         var letter = (char)('A' + (value % 26));
         var suffix = value / 26;
         output.Write(suffix == 0 ? letter.ToString() : $"{letter}{suffix.ToString(CultureInfo.InvariantCulture)}");
@@ -349,6 +356,13 @@ public static class TermWriter
     /// Writes a compound term in operator notation when its functor has a matching definition, and
     /// reports whether it did.
     /// </summary>
+    /// <remarks>
+    /// Beyond priority, an operand is bracketed where it would not read back (Cor.3 7.10.5 h2): an
+    /// atom that is an operator, which <see cref="WriteAtom"/> brackets; a non-negative number or an
+    /// infix or postfix term after a prefix <c>-</c>, since <c>- 1</c> is the integer -1 and
+    /// <c>- 1^2</c> is <c>(-1)^2</c> in ISO; and a left operand whose operator would take the right
+    /// one's operator as its own operand, as <c>fy 1 yf</c> reads as <c>fy(yf(1))</c>.
+    /// </remarks>
     private static bool TryWriteOperator(
         Machine machine,
         OperatorTable operators,
@@ -358,6 +372,7 @@ public static class TermWriter
         int maxPriority,
         Emitter output,
         bool quoted,
+        bool numberVariables,
         List<Item> work
     )
     {
@@ -371,9 +386,9 @@ public static class TermWriter
             }
 
             // Pushed in reverse: right argument, then the operator, then the left.
-            work.Add(Item.OfTerm(machine.HeapAt(cell.Index + 2), infix.RightPriority));
+            work.Add(Item.OfOperand(machine.HeapAt(cell.Index + 2), infix.RightPriority));
             work.Add(Item.OfText(OperatorText(name, quoted, output.CodePoints)));
-            work.Add(Item.OfTerm(machine.HeapAt(cell.Index + 1), infix.LeftPriority));
+            AddLeftOperand(machine, operators, machine.HeapAt(cell.Index + 1), infix, numberVariables, work);
             return true;
         }
 
@@ -386,8 +401,17 @@ public static class TermWriter
                 work.Add(Item.OfText(")"));
             }
 
-            work.Add(Item.OfTerm(machine.HeapAt(cell.Index + 1), prefix.RightPriority));
-            work.Add(Item.OfPrefixGuard(sign: name is "-" or "+"));
+            Cell operand = machine.HeapAt(cell.Index + 1);
+            if (name == "-" && MinusMustBracket(machine, operators, operand, numberVariables))
+            {
+                AddBracketed(operand, work);
+            }
+            else
+            {
+                work.Add(Item.OfOperand(operand, prefix.RightPriority));
+            }
+
+            work.Add(Item.OfPrefixGuard());
             work.Add(Item.OfText(OperatorText(name, quoted, output.CodePoints)));
             return true;
         }
@@ -402,11 +426,97 @@ public static class TermWriter
             }
 
             work.Add(Item.OfText(OperatorText(name, quoted, output.CodePoints)));
-            work.Add(Item.OfTerm(machine.HeapAt(cell.Index + 1), postfix.LeftPriority));
+            AddLeftOperand(machine, operators, machine.HeapAt(cell.Index + 1), postfix, numberVariables, work);
             return true;
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Adds the left operand of an infix or postfix operator, bracketed when its own operator would
+    /// otherwise absorb this one: that happens when both have the same priority and the left one
+    /// takes a right operand of that priority, as a <c>fy</c> or <c>xfy</c> operator before a
+    /// <c>yf</c> or <c>yfx</c> one does.
+    /// </summary>
+    private static void AddLeftOperand(
+        Machine machine,
+        OperatorTable operators,
+        Cell operand,
+        PrologOperator op,
+        bool numberVariables,
+        List<Item> work
+    )
+    {
+        PrologOperator? inner = WrittenOperator(machine, operators, operand, numberVariables);
+        if (inner is { IsPostfix: false } written && written.Priority <= op.LeftPriority && written.RightPriority >= op.Priority)
+        {
+            AddBracketed(operand, work);
+            return;
+        }
+
+        work.Add(Item.OfOperand(operand, op.LeftPriority));
+    }
+
+    private static bool MinusMustBracket(Machine machine, OperatorTable operators, Cell operand, bool numberVariables)
+    {
+        Cell value = machine.Dereference(operand);
+        switch (value.Tag)
+        {
+            case CellTag.Integer:
+                return value.Integer >= 0;
+            case CellTag.BigInteger:
+                return machine.Symbols.GetBig(value.Index).Sign >= 0;
+            case CellTag.Rational:
+                return machine.Symbols.GetRational(value.Index).Numerator.Sign >= 0;
+            case CellTag.Float:
+                return !double.IsNegative(machine.Symbols.GetFloat(value.Index));
+        }
+
+        return WrittenOperator(machine, operators, value, numberVariables) is { IsPrefix: false };
+    }
+
+    /// <summary>The operator a term is written with, or <see langword="null"/> when it is written otherwise.</summary>
+    private static PrologOperator? WrittenOperator(Machine machine, OperatorTable operators, Cell term, bool numberVariables)
+    {
+        Cell value = machine.Dereference(term);
+        if (value.Tag != CellTag.Structure)
+        {
+            return null;
+        }
+
+        var functorId = machine.HeapAt(value.Index).Index;
+        Functor functor = machine.Symbols.GetFunctor(functorId);
+        if (
+            functorId == machine.Symbols.ListFunctor
+            || (functor.Arity == 1 && functor.NameAtom == machine.Symbols.Curly)
+            || (numberVariables && IsNumberVariable(machine, value, functor))
+        )
+        {
+            return null;
+        }
+
+        var name = machine.Symbols.AtomName(functor.NameAtom);
+        if (functor.Arity == 2 && operators.TryGetInfixOrPostfix(name, out PrologOperator infix) && infix.IsInfix)
+        {
+            return infix;
+        }
+
+        if (functor.Arity == 1 && operators.TryGetPrefix(name, out PrologOperator prefix))
+        {
+            return prefix;
+        }
+
+        return functor.Arity == 1 && operators.TryGetInfixOrPostfix(name, out PrologOperator postfix) && postfix.IsPostfix
+            ? postfix
+            : null;
+    }
+
+    private static void AddBracketed(Cell operand, List<Item> work)
+    {
+        work.Add(Item.OfText(")"));
+        work.Add(Item.OfTerm(operand, TopPriority));
+        work.Add(Item.OfText("("));
     }
 
     private static void WriteListTail(
@@ -447,14 +557,15 @@ public static class TermWriter
     }
 
     /// <summary>
-    /// Writes an atom, bracketing it when it is an operator whose priority exceeds what the position
-    /// allows — which is what makes <c>f((:-))</c> read back as the atom rather than as a syntax error.
+    /// Writes an atom, bracketed when it is an operator and the operand of another: ISO gives such an
+    /// atom priority 1201 there, so <c>- = -</c> does not read, while <c>(-)=(-)</c> does. As an
+    /// argument or list element it stands bare, as in <c>f(:-)</c> and <c>[-]</c> (Cor.3 7.10.5).
     /// </summary>
     private static void WriteAtom(
         Machine machine,
         OperatorTable operators,
         int atomId,
-        int maxPriority,
+        bool operand,
         Emitter output,
         bool quoted,
         bool ignoreOperators
@@ -462,7 +573,7 @@ public static class TermWriter
     {
         var name = machine.Symbols.AtomName(atomId);
 
-        if (!ignoreOperators && operators.MaxPriority(name) > maxPriority)
+        if (!ignoreOperators && operand && operators.MaxPriority(name) > 0)
         {
             output.Write("(");
             WriteAtomText(name, output, quoted);
@@ -496,12 +607,12 @@ public static class TermWriter
     /// An operator's name as it appears between or before its arguments.
     /// </summary>
     /// <remarks>
-    /// The comma is the exception to quoting. As an atom it needs quotes — <c>f(',')</c> is the only
-    /// way to pass it as an argument — but as an operator it must be bare, because <c>a','b</c> does
-    /// not read back as a conjunction while <c>a,b</c> does.
+    /// The comma and the bar are the exceptions to quoting. As atoms they need quotes — <c>f(',')</c>
+    /// is the only way to pass the comma as an argument — but as operators they are bare (Cor.3
+    /// 7.10.5 h1), because <c>a','b</c> does not read back as a conjunction while <c>a,b</c> does.
     /// </remarks>
     private static string OperatorText(string name, bool quoted, bool codePoints) =>
-        name == "," ? "," : QuotedAtomText(name, quoted, codePoints);
+        name is "," or "|" ? name : QuotedAtomText(name, quoted, codePoints);
 
     private static void WriteAtomText(string name, Emitter output, bool quoted) =>
         output.Write(QuotedAtomText(name, quoted, output.CodePoints));
@@ -625,6 +736,12 @@ public static class TermWriter
             return false;
         }
 
+        // A symbol name that begins a comment does not read as a name.
+        if (name.StartsWith("/*", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
         foreach (var c in name)
         {
             if (!SymbolCharacters.Contains(c, StringComparison.Ordinal))
@@ -657,8 +774,8 @@ public static class TermWriter
     private sealed class Emitter(TextWriter output, bool codePoints)
     {
         private int _last;
+        private bool _afterZero;
         private bool _afterPrefix;
-        private bool _afterSign;
 
         /// <summary>Whether characters are code points, which decides how adjacent characters are judged.</summary>
         internal bool CodePoints => codePoints;
@@ -677,29 +794,23 @@ public static class TermWriter
             }
 
             _afterPrefix = false;
-            _afterSign = false;
             output.Write(text);
             _last = CharacterClass.Last(text, codePoints);
+            _afterZero = text == "0";
         }
 
         /// <summary>
         /// Says that what comes next is the argument of a prefix operator, which the characters
         /// alone cannot tell from an infix one.
         /// </summary>
-        /// <param name="sign">Whether the operator was <c>-</c> or <c>+</c>.</param>
         /// <remarks>
-        /// Two things go wrong without this. An operator directly followed by <c>(</c> reads as
-        /// functor notation, so <c>\+(a,b)</c> is the binary term rather than negation applied to a
-        /// conjunction. And a sign directly followed by a digit reads as a negative number, so
-        /// <c>-(1)</c> written as <c>-1</c> comes back as the integer.
+        /// An operator directly followed by <c>(</c> reads as functor notation, so <c>\+(a,b)</c> is
+        /// the binary term rather than negation applied to a conjunction. A <c>-</c> never meets a
+        /// digit here, since it brackets a non-negative number.
         /// </remarks>
-        internal void GuardAfterPrefixOperator(bool sign)
-        {
-            _afterPrefix = true;
-            _afterSign = sign;
-        }
+        internal void GuardAfterPrefixOperator() => _afterPrefix = true;
 
-        private bool NeedsPrefixSeparator(int next) => (_afterPrefix && next == '(') || (_afterSign && next is >= '0' and <= '9');
+        private bool NeedsPrefixSeparator(int next) => _afterPrefix && next == '(';
 
         private bool NeedsSeparator(int last, int next)
         {
@@ -718,7 +829,8 @@ public static class TermWriter
                 return true;
             }
 
-            return false;
+            // Two quoted names run together into one, and the integer 0 before a quote reads as 0'c.
+            return next == '\'' && (last == '\'' || _afterZero);
         }
 
         // A symbol outside ASCII is an atom by itself here, but SWI-Prolog 10.0 still joins it to
@@ -731,6 +843,7 @@ public static class TermWriter
     private enum ItemKind
     {
         Term,
+        Operand,
         Text,
         ListTail,
         PrefixGuard,
@@ -743,13 +856,15 @@ public static class TermWriter
     {
         internal static Item OfTerm(Cell cell, int maxPriority) => new(ItemKind.Term, cell, null, maxPriority);
 
+        /// <summary>A term written as the operand of an operator rather than as an argument.</summary>
+        internal static Item OfOperand(Cell cell, int maxPriority) => new(ItemKind.Operand, cell, null, maxPriority);
+
         internal static Item OfText(string text) => new(ItemKind.Text, default, text, 0);
 
         internal static Item OfListTail(Cell cell) => new(ItemKind.ListTail, cell, null, 0);
 
-        /// <summary>A marker between a prefix operator and its argument. <c>MaxPriority</c> carries
-        /// whether the operator was a sign, which is the only extra bit the marker needs.</summary>
-        internal static Item OfPrefixGuard(bool sign) => new(ItemKind.PrefixGuard, default, null, sign ? 1 : 0);
+        /// <summary>A marker between a prefix operator and its argument.</summary>
+        internal static Item OfPrefixGuard() => new(ItemKind.PrefixGuard, default, null, 0);
 
         /// <summary>Marks leaving the structure at heap index <paramref name="index"/>, carried in
         /// <c>MaxPriority</c>.</summary>
