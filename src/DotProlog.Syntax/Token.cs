@@ -15,6 +15,8 @@ namespace DotProlog.Syntax;
 /// <param name="Big">The exact value of an integer token whose magnitude exceeds <see cref="Integer"/>; for a rational token, its numerator.</param>
 /// <param name="RationalDenominator">The denominator of a rational token, or zero for other tokens.</param>
 /// <param name="FloatOverflow">Whether a float token exceeds the finite implementation range.</param>
+/// <param name="BackQuoted">Whether an atom token was a back-quoted string, which ISO does not read as a term.</param>
+/// <param name="DoubleQuoted">Whether an atom token was a double-quoted string read under <c>double_quotes=atom</c>, which is no name token.</param>
 internal readonly record struct Token(
     TokenKind Kind,
     string Text,
@@ -26,7 +28,9 @@ internal readonly record struct Token(
     bool IntegerOverflow = false,
     System.Numerics.BigInteger Big = default,
     System.Numerics.BigInteger RationalDenominator = default,
-    bool FloatOverflow = false
+    bool FloatOverflow = false,
+    bool BackQuoted = false,
+    bool DoubleQuoted = false
 )
 {
     /// <summary>Whether this token is the punctuation <paramref name="text"/>.</summary>

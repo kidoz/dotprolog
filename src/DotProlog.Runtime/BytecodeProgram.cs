@@ -88,6 +88,7 @@ public sealed class BytecodeProgram
         Flags.CharConversion = languageMode == PrologLanguageMode.StrictIso;
         Flags.RationalLiterals = languageMode != PrologLanguageMode.StrictIso;
         Flags.CodePointCharacters = languageMode != PrologLanguageMode.StrictIso;
+        Flags.IsoReading = languageMode == PrologLanguageMode.StrictIso;
         Symbols = new SymbolTable(Flags.CodePointCharacters);
         Operators = new OperatorTable(includeExtensions: languageMode != PrologLanguageMode.StrictIso);
         Builtins = new BuiltinRegistry(Symbols);

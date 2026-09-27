@@ -115,18 +115,23 @@ public sealed class OperatorWritingTests
     [InlineData("f('/*', //*, '*/')")]
     public void WriteqRoundTripsThroughTheReader(string source)
     {
-        var engine = new PrologEngine();
+        // Each mode reads the source its own way — strict ISO reads - 1 as the integer — and
+        // must read what it wrote back the same way.
+        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        {
+            var engine = new PrologEngine(mode);
 
-        Cell original = ReadOntoHeap(engine, source);
-        var written = TermWriter.ToDisplayString(engine.Machine, original, quoted: true);
-        Cell reread = ReadOntoHeap(engine, written);
+            Cell original = ReadOntoHeap(engine, source);
+            var written = TermWriter.ToDisplayString(engine.Machine, original, quoted: true);
+            Cell reread = ReadOntoHeap(engine, written);
 
-        Assert.True(
-            TermOrder.AreIdentical(engine.Machine, original, reread),
-            $"{source} was written as {written}, which reads back as "
-                + $"{TermWriter.ToDisplayString(engine.Machine, reread, quoted: true, ignoreOperators: true)} rather than "
-                + $"{TermWriter.ToDisplayString(engine.Machine, original, quoted: true, ignoreOperators: true)}."
-        );
+            Assert.True(
+                TermOrder.AreIdentical(engine.Machine, original, reread),
+                $"{mode}: {source} was written as {written}, which reads back as "
+                    + $"{TermWriter.ToDisplayString(engine.Machine, reread, quoted: true, ignoreOperators: true)} rather than "
+                    + $"{TermWriter.ToDisplayString(engine.Machine, original, quoted: true, ignoreOperators: true)}."
+            );
+        }
     }
 
     [Theory]
@@ -149,7 +154,7 @@ public sealed class OperatorWritingTests
 
     private static Cell ReadOntoHeap(PrologEngine engine, string source)
     {
-        ParseResult parsed = TermReader.ReadTerm(source, operators: engine.Program.Operators);
+        ParseResult parsed = TermReader.ReadTerm(source, operators: engine.Program.Operators, flags: engine.Program.Flags);
         Assert.Empty(parsed.Diagnostics);
         Assert.Single(parsed.Clauses);
         return TermReifier.ToHeap(engine.Machine, parsed.Clauses[0], []);

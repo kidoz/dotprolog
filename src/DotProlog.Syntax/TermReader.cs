@@ -395,8 +395,8 @@ public sealed class TermReader
                 continue;
             }
 
-            SyntaxTerm? right = ParseTerm(op.RightPriority, out _);
-            if (right is null)
+            SyntaxTerm? right = ParseTerm(op.RightPriority, out var rightPriority);
+            if (right is null || !FitsOperand(right, rightPriority, op.RightPriority))
             {
                 return null;
             }
@@ -408,11 +408,11 @@ public sealed class TermReader
         }
     }
 
-    private static string? InfixName(Token token)
+    private string? InfixName(Token token)
     {
         if (token.Kind == TokenKind.Atom)
         {
-            return token.Text;
+            return token.BackQuoted && IsoReading ? null : token.Text;
         }
 
         return token.IsPunctuation(",") || token.IsPunctuation("|") ? token.Text : null;
@@ -440,6 +440,11 @@ public sealed class TermReader
             case TokenKind.Variable:
                 Advance();
                 return new VariableTerm(token.Text, token.Span);
+
+            // ISO lexes a back-quoted string but gives it no meaning as a term (6.4.7).
+            case TokenKind.Atom when token.BackQuoted && IsoReading:
+                Report(DiagnosticIds.UnexpectedToken, "A back-quoted string is not a term in ISO Prolog.", token.Span);
+                return null;
 
             case TokenKind.Atom:
                 return ParseAtomOrOperator(maxPriority, out priority);
@@ -495,9 +500,14 @@ public sealed class TermReader
             return ParseArguments(name, token.Span);
         }
 
-        // A minus directly in front of a numeric literal is part of the literal, not a prefix
-        // operator. A plus never is (Cor.2): +1 is +(1).
-        if (!token.Quoted && name == "-" && next.Kind is TokenKind.Integer or TokenKind.Float && !next.PrecededByLayout)
+        // A minus name directly in front of a numeric literal is part of the literal, not a prefix
+        // operator; ISO counts a quoted minus and one before layout too, SWI-Prolog neither. A
+        // double-quoted "-" is no name token, and a plus never is (Cor.2): +1 is +(1).
+        if (
+            name == "-"
+            && next.Kind is TokenKind.Integer or TokenKind.Float
+            && (IsoReading ? !token.DoubleQuoted : !token.Quoted && !next.PrecededByLayout)
+        )
         {
             Advance();
             Token literal = _current;
@@ -511,8 +521,8 @@ public sealed class TermReader
         if (_operators.TryGetPrefix(name, out PrologOperator prefix) && prefix.Priority <= maxPriority && CanStartTerm(next))
         {
             Advance();
-            SyntaxTerm? operand = ParseTerm(prefix.RightPriority, out _);
-            if (operand is null)
+            SyntaxTerm? operand = ParseTerm(prefix.RightPriority, out var operandPriority);
+            if (operand is null || !FitsOperand(operand, operandPriority, prefix.RightPriority))
             {
                 return null;
             }
@@ -522,9 +532,34 @@ public sealed class TermReader
         }
 
         Advance();
+
+        // ISO gives an atom that is an operator priority 1201, so it stands bare only where a whole
+        // term, an argument, or a list element does (6.3.1.3); SWI-Prolog uses its own priority.
         priority = _operators.MaxPriority(name);
+        if (IsoReading && priority > 0)
+        {
+            priority = MaxTermPriority + 1;
+        }
 
         return new AtomTerm(name, token.Span);
+    }
+
+    private bool IsoReading => _flags?.IsoReading ?? false;
+
+    /// <summary>
+    /// Whether an operand's priority is within its operator's limit, as ISO reading requires. Only an
+    /// atom that is an operator, which ISO reads bare with priority 1201, can exceed it.
+    /// </summary>
+    private bool FitsOperand(SyntaxTerm operand, int priority, int limit)
+    {
+        if (!IsoReading || priority <= limit)
+        {
+            return true;
+        }
+
+        var name = operand is AtomTerm atom ? atom.Name : string.Empty;
+        Report(DiagnosticIds.OperatorPriorityClash, $"The operator '{name}' needs brackets to be an operand.", operand.Span);
+        return false;
     }
 
     private static SyntaxTerm IntegerLiteral(Token token, bool negate, SourceSpan span)
@@ -731,6 +766,7 @@ public sealed class TermReader
             {
                 Kind = TokenKind.Atom,
                 Quoted = true,
+                DoubleQuoted = true,
             }
             : token;
     }

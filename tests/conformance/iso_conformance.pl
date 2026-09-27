@@ -567,7 +567,7 @@ iso_case('7.2.1', reads_as('1 + 2 * 3', +(1, *(2, 3))), success).
 iso_case('7.2.1', reads_as('(1 + 2) * 3', *(+(1, 2), 3)), success).
 iso_case('7.2.1', reads_as('1 - 2 - 3', -(-(1, 2), 3)), success).
 iso_case('7.2.1', reads_as('1 ^ 2 ^ 3', ^(1, ^(2, 3))), success).
-iso_case('7.2.1', reads_as('- 1', -(1)), success).
+iso_case('7.2.1', reads_as('- (1)', -(1)), success).
 iso_case('7.2.1', reads_as('a :- b, c', ':-'(a, ','(b, c))), success).
 iso_case('7.2.1', reads_as('\\+ a', \+(a)), success).
 iso_case('7.2.1', reads_as('f(-)', f(-)), success).

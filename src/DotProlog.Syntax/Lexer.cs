@@ -155,7 +155,7 @@ internal sealed class Lexer
         if (c == '`')
         {
             var name = ReadQuoted('`', out _);
-            return new Token(TokenKind.Atom, name, SpanFrom(start), layout, Quoted: true);
+            return new Token(TokenKind.Atom, name, SpanFrom(start), layout, Quoted: true, BackQuoted: true);
         }
 
         if (SymbolCharacters.Contains(c, StringComparison.Ordinal))
