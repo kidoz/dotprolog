@@ -175,6 +175,11 @@ jobs:
       - name: Pack
         run: dotnet pack DotProlog.slnx -c Release -o artifacts -p:ContinuousIntegrationBuild=true
 
+      # The standalone compiler packs and installs from a local feed, but stays off NuGet.org
+      # until it is announced, so its packages leave the release feed here.
+      - name: Hold back unannounced packages
+        run: rm -f artifacts/DotProlog.Compiler.Cli.*.nupkg artifacts/DotProlog.Compiler.Cli.*.snupkg
+
       - name: Test packed templates and tool
         run: tests/Integration/verify-packages.sh artifacts linux-x64
 
