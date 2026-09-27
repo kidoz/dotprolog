@@ -10,6 +10,18 @@ All notable changes to DotProlog are recorded here. The format follows
 
 - GreymereAdventure reports malformed command input and prompts again instead of exiting
   with an uncaught syntax error, preserving inventory and quest progress.
+- `writeq/1` and `print/1` bracket as Corrigendum 3 requires, so their output reads back in either
+  mode. An atom that is an operator stands bare as an argument or list element (`[:-,-]`,
+  `[',']`) and is bracketed as an operand (`(-)-(-)`, `(*)=(*)`). A prefix `-` brackets a
+  non-negative number or an infix or postfix operand: `- (1)` and `- (1^2)`, which were written
+  `- 1` and `- 1^2`. A left operand is bracketed where its operator would take the next one as its
+  operand (`(fy 1)yf`), `,` and `|` are bare as operators, `'/*'` is quoted, and adjacent quoted
+  names and a `0` before a quoted name are spaced apart (`' op' '1'`, `0 'f '`).
+- The reader reads `0''1` as `0 '' 1`, and `0'` before a line continuation as `0` followed by a
+  quoted atom, since no character code follows; `0xor 2`, `0bop 2`, and `0o8` as `0` followed by a
+  name; and `[ ](X)` as a compound whose functor is `[]`. These were syntax errors.
+- The `\d` and `\o` escapes are syntax errors in both modes, as in ISO and SWI-Prolog; before,
+  `number_chars(N, "0'\\o0\\")` answered 0. Octal is written `\101\`.
 
 ### Changed
 
@@ -25,6 +37,12 @@ All notable changes to DotProlog are recorded here. The format follows
 - The direct IL compiler groups straight-line operations into fewer methods, reducing dispatch
   overhead and generated assembly size. Calls, wake-up checks, and control-flow targets preserve
   their existing resumption behavior.
+- `+1` reads as `+(1)` in both modes, as Corrigendum 2 specifies and SWI-Prolog reads it, rather
+  than as the integer 1.
+- `StrictIso` reads as the standard does where it and SWI-Prolog disagree: `- 1`, `'-'1`, and
+  `- /* c */ 1` are the integer −1; an atom that is an operator needs brackets to be an operand, so
+  `X = -` is a syntax error there; and a back quoted string is a syntax error. `\e` is an escape
+  only in `Modern`, which keeps SWI-Prolog's reading of all of these.
 
 ## [0.14.2] — 2026-09-25
 
