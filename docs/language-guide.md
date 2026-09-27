@@ -61,6 +61,11 @@ The maximum compound arity is 255. Double-quoted text is a list of characters by
 distinct string term exists only where `double_quotes` is set to `string`, and the string
 predicates are never aliased to atoms.
 
+Strict mode reads three spellings as ISO does where Modern follows SWI-Prolog: `- 1` and `'-'1` are
+the integer −1 rather than `-(1)`, an atom that is an operator needs brackets to be an operand
+(`X = (-)`, not `X = -`), and a back-quoted string is a syntax error rather than an atom. See
+[language modes and text](explanation/language-modes.md#some-text-reads-differently).
+
 ## Control and errors
 
 The extended control surface includes conjunction, disjunction, if-then-else, soft cut, negation

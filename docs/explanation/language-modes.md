@@ -25,6 +25,23 @@ so an emoji is one character wherever text is measured, split, read, or sorted. 
 UTF-16 code units .NET stores, which ISO permits and which earlier DotProlog releases used in every
 mode.
 
+## Some text reads differently
+
+A few spellings mean one thing in ISO and another in SWI-Prolog. StrictIso reads them as the
+standard does, and Modern as SWI-Prolog does, so that SWI-style programs load unchanged:
+
+- `- 1` is the integer −1 in StrictIso, and so are `'-'1` and `- /* comment */ 1`. Modern joins a
+  minus to a number only when it is written directly before the digits, so `- 1` is `-(1)`.
+- An atom that is an operator needs brackets to be the operand of another operator in StrictIso:
+  `X = -` is a syntax error there and `X = (-)` is not. As an argument or a list element it
+  stands bare in both modes, as in `f(-)` and `[:-, -]`.
+- `\e` is an escape only in Modern, as are `\uXXXX` and `\UXXXXXXXX`. A back-quoted `` `text` `` is
+  a syntax error in StrictIso and an atom in Modern.
+
+Writing does not depend on the mode. `writeq/1` brackets wherever the two readings could differ, so
+`-(1)` is written `- (1)` and `(-)=(-)` keeps its brackets, and both modes read the output back as
+the same term.
+
 ## Defaults and local directives have different scopes
 
 A host override chooses the starting value for every source file without changing the mode's

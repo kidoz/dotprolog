@@ -183,12 +183,12 @@ Writing them was worth it immediately: they found these real defects.
 - Quoted atom spelling no longer suppresses the atom's operator definition. ISO prefix, infix, and
   postfix interpretation therefore applies equally to quoted default and dynamically declared
   operator names in compiled source and runtime term input.
-- ISO-delimited `\x...\` hexadecimal and `\o...\` octal character escapes now work in quoted
+- ISO-delimited `\x...\` hexadecimal and `\101\` octal character escapes now work in quoted
   atoms, double-quoted text, and character-code literals, with malformed and out-of-range forms
   retained as reader errors.
-- ISO backquoted-name syntax denotes atoms and supports doubled delimiters and the same escapes as
-  the other quoted forms, including `\d` for DEL. Raw control and non-space layout characters are
-  rejected inside quoted input.
+- Back-quoted text in `Modern` denotes atoms and supports doubled delimiters and the same escapes
+  as the other quoted forms. Raw control and non-space layout characters are rejected inside quoted
+  input.
 - ISO floats require a decimal point with digits on both sides before an exponent. Exponent-only
   spellings are rejected consistently by term input and number conversion, and single-term input
   no longer accepts an otherwise valid prefix while ignoring trailing tokens.
@@ -231,7 +231,8 @@ Writing them was worth it immediately: they found these real defects.
   conversions of any length answer their exact unbounded value.
 - A raw control or layout character after `0'`, such as a newline, is a syntax error, as it is
   between quotes; `0'\n` is the escape to write instead. `0'` followed by a line continuation,
-  which denotes no character, is a syntax error too rather than 0.
+  which denotes no character, is no character code: `number_chars/2` rejects it rather than
+  answering 0, and source text reads it as `0` followed by a quoted atom.
 - `format/3` accepted only the `user_output` and `user_error` aliases and routed both through the
   current output, so `with_output_to/2` captured error text. Stream arguments now resolve through
   the same handle and alias path as `write/2` — real `'$stream'(N)` handles and user aliases
@@ -243,6 +244,14 @@ Writing them was worth it immediately: they found these real defects.
 - `writeq/1` left carriage returns and most other control characters raw between quotes, which
   the reader rejects. The named ISO escapes `\a \b \f \n \r \t \v` and delimited `\x...\` hex
   escapes for the rest now round-trip every control character.
+- Against Ulrich Neumerkel's ISO syntax conformity table, `StrictIso` now gives one of the listed
+  answers for every case. `writeq/1` follows Corrigendum 3 in both modes: operator atoms stand bare
+  as arguments and list elements (`[:-,-]`) and bracketed as operands (`(-)-(-)`), a prefix `-`
+  brackets `- (1)` and `- (1^2)`, and `(fy 1)yf` keeps the brackets it needs to read back. The
+  reader reads `+1` as `+(1)`, `0''1` as `0 '' 1`, `0xor 2` as `0 xor 2`, and `[ ](X)` as a
+  compound, and rejects the `\d` and `\o` escapes. `Modern` differs from the table only where it
+  reads as SWI-Prolog does: `- 1` as `-(1)`, bare operator atoms as operands, the `\e` and `\u`
+  escapes, and back-quoted text.
 
 Beyond the conformance cases, the engine and toolchain are covered by more than 1,400 tests run
 through `dotnet test`, plus opt-in integration gates that build and run the C#, F#, and Visual Basic
@@ -286,6 +295,8 @@ samples and exercise NativeAOT.
 | Behaviour | DotProlog | Elsewhere |
 |---|---|---|
 | `\+ 4` | `type_error(callable, 4)` — the inner goal | Same |
+| `- 1`, `'-'1`, and `X = -` | `Modern` reads `- 1` and `'-'1` as `-(1)` and accepts a bare operator atom as an operand, as SWI does; `StrictIso` reads −1 and requires `X = (-)`, as ISO does | ISO and SWI disagree; SWI rejects `'-'1` |
+| `writeq(-(1))` | `- (1)`, and `- (1^2)` for `-(1^2)`, as Corrigendum 3 writes them | SWI writes `- 1` and `- 1^2`, which ISO reads as −1 and `(-1)^2` |
 | A character in `StrictIso` | A UTF-16 code unit, so a character outside the Basic Multilingual Plane is two codes and `atom_length/2` counts it as two. `Modern` counts code points | SWI counts code points |
 | Character-code numeric lists | `number_chars/2` and `number_codes/2` reject `0''`; use ISO `0'''` or `0'\'`. ISO `0'\0\` denotes zero | SWI 10.0.2 accepts `0''` and rejects the terminated octal-zero form in numeric lists |
 | Two modules exporting the same name | The first loaded gets the unqualified name | SWI reports a conflict |

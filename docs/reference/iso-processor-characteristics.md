@@ -71,8 +71,26 @@ predicates require a one-character atom in the mode's sense, and a code outside 
 raises `representation_error(character_code)`.
 
 The reader accepts Unicode source characters and ISO's numeric escapes; `\x…\` reaches 0x10FFFF in
-`Modern` and 0xFFFF in `StrictIso`. `Modern` also reads SWI-Prolog's `\uXXXX` and `\UXXXXXXXX`
-escapes, and a surrogate escape is a syntax error there.
+`Modern` and 0xFFFF in `StrictIso`. `Modern` also reads SWI-Prolog's `\e`, `\uXXXX`, and
+`\UXXXXXXXX` escapes, and a surrogate escape is a syntax error there. Neither mode has a `\d` or
+`\o` escape; octal is `\101\`.
+
+`StrictIso` reads three spellings as the standard does where `Modern` reads them as SWI-Prolog
+does. A `-` name token before a numeric literal is a negative number across layout or a comment
+and when quoted: `- 1`, `'-'1`, and `- /* c */ 1` are the integer −1 in `StrictIso` and `-(1)` in
+`Modern`, which joins only an unquoted minus written directly before the digits. An atom that is
+an operator has priority 1201 as an operand (6.3.1.3), so `X = -` and `- = -` are syntax errors in
+`StrictIso`, while `X = (-)`, `f(-)`, and `[:-, -]` read in both modes. A back quoted string is a
+token with no term, so `` `abc` `` is a syntax error in `StrictIso` and an atom in `Modern`. In both
+modes `+` is never part of a number (Corrigendum 2), so `+1` is `+(1)`; and `0` followed by a
+quote or a radix letter that begins no valid literal ends there, so `0''1` reads as `0 '' 1` and
+`0xor 2` as `0 xor 2`.
+
+`writeq/1` and `print/1` write so that either reading gives the term back, following Corrigendum
+3 7.10.5 in both modes: an atom that is an operator is bracketed as an operand and bare as an
+argument or list element (`(-)=(-)`, `[:-,-]`); a prefix `-` brackets a non-negative number and an
+infix or postfix operand (`- (1)`, `- (1^2)`); and a left operand is bracketed where its operator
+would take the next operator as its own operand (`(fy 1)yf`).
 
 The required portable characters have their Unicode/ASCII ordinal values. Extended characters are
 classified before tokenization: Unicode uppercase letters and underscore begin variables, other

@@ -112,7 +112,7 @@ certification or proof of correctness for every program and platform.
 | Cor.3 5.5.12 options | Option names, rightmost precedence, list validation, and unknown-option errors share one contract | R/D/C/A |
 | 6.1 notation | Concrete tokens lower to the specified abstract term forms | R/D/I |
 | 6.2 Prolog text | Directives, clauses, and ordinary data are distinguished before semantic preparation | R/I/C/A |
-| 6.3.1 atomic terms | Atoms, integers, floats, and negative numeric terms have the required abstract forms | R/D/I/A |
+| 6.3.1 atomic terms | Atoms, integers, floats, and negative numeric terms have the required abstract forms; in `StrictIso` a quoted `-` or one before layout also forms a negative number, and an operator atom has priority 1201 as an operand | R/D/I/A |
 | 6.3.2 variables | Anonymous and named variables have the required identity and occurrence behavior | R/D/I/C/A |
 | 6.3.3 functional notation | Compound functors, arguments, empty argument rejection, and arity limits are enforced | R/D/I/A |
 | 6.3.4 operator notation | Prefix, infix, postfix, associativity, priority, quoted names, and operator-as-functor cases parse correctly | R/D/I/C/A |
@@ -127,7 +127,7 @@ certification or proof of correctness for every program and platform.
 | 6.4.4 integer tokens | Decimal, character-code, binary, octal, and hexadecimal forms enforce representation limits | R/D/I/A |
 | 6.4.5 float tokens | Decimal point and exponent grammar, finite representation, overflow, and underflow choices are enforced | R/D/I/A/P |
 | 6.4.6 double-quoted tokens | Delimiters, escapes, continuations, and flag-dependent abstract values are covered | R/D/I/A |
-| 6.4.7 backquoted names | The processor choice is atom-valued; delimiters, escapes, and continuations are covered | R/D/I/A/P |
+| 6.4.7 back quoted strings | A back quoted string is a token with no term, so `StrictIso` reports a syntax error; `Modern` reads it as an atom; delimiters, escapes, and continuations are covered | R/D/I/A/P |
 | 6.4.8 other tokens | punctuation, end token, and Corrigendum 2 bar-token behavior are covered | R/D/I |
 | 6.5 character set | Required characters and the documented Unicode extension classes are recognized explicitly | R/D/I/P |
 | 6.6 collating sequence | Character codes and atom ordering follow the documented per-mode policy: code points in `Modern`, UTF-16 code units in `StrictIso` | R/D/I/P |
