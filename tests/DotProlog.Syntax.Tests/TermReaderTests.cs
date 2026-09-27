@@ -270,4 +270,31 @@ public sealed class TermReaderTests
         Assert.True(result.Success);
         Assert.False(operators.IsOperator("temporary_operator"));
     }
+
+    [Theory]
+    [InlineData(PrologLanguageMode.Modern)]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    public void PunctuationConversionChangesAtClauseBoundaries(PrologLanguageMode mode)
+    {
+        var conversions = new CharacterConversionTable();
+        PrologFlags flags = new BytecodeProgram(mode).Flags;
+        ParseResult result = TermReader.ReadProgram(
+            """
+            :- char_conversion('#', ',').
+            :- set_prolog_flag(char_conversion, on).
+            pair(a#b).
+            :- char_conversion('#', '|').
+            list([a#Tail]).
+            :- set_prolog_flag(char_conversion, off).
+            atom(#).
+            """,
+            characterConversions: conversions,
+            flags: flags
+        );
+
+        Assert.True(result.Success);
+        Assert.Equal("pair(a,b)", Canonical(result.Clauses[2]));
+        Assert.Equal("list(.(a,Tail))", Canonical(result.Clauses[4]));
+        Assert.Equal("atom(#)", Canonical(result.Clauses[6]));
+    }
 }

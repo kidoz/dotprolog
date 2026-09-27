@@ -87,7 +87,20 @@ internal sealed class Lexer
             }
 
             Advance();
-            return new Token(TokenKind.Punctuation, ConvertedText(start, 1), SpanFrom(start), layout);
+            // c already includes character conversion; token spans still describe the source.
+            var punctuation = c switch
+            {
+                '(' => "(",
+                ')' => ")",
+                '[' => "[",
+                ']' => "]",
+                '{' => "{",
+                '}' => "}",
+                ',' => ",",
+                '|' => "|",
+                _ => throw new InvalidOperationException($"Unexpected punctuation '{c}'."),
+            };
+            return new Token(TokenKind.Punctuation, punctuation, SpanFrom(start), layout);
         }
 
         if (c is '!' or ';')

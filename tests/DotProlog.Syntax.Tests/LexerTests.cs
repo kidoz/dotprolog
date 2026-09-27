@@ -78,6 +78,82 @@ public sealed class LexerTests
         Assert.True(detached[1].PrecededByLayout);
     }
 
+    [Theory]
+    [InlineData('(')]
+    [InlineData(')')]
+    [InlineData('[')]
+    [InlineData(']')]
+    [InlineData('{')]
+    [InlineData('}')]
+    [InlineData(',')]
+    [InlineData('|')]
+    public void ConvertedPunctuationKeepsSourcePositionAndQuotedText(char punctuation)
+    {
+        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        {
+            var conversions = new CharacterConversionTable();
+            conversions.Set('#', punctuation);
+            conversions.Set(punctuation, 'z');
+            PrologFlags flags = new BytecodeProgram(mode).Flags;
+            flags.SetCharConversion(true);
+            List<Diagnostic> diagnostics = [];
+            var lexer = new Lexer(
+                $" \n#{punctuation} '{punctuation}' \"{punctuation}\" `{punctuation}`",
+                "punctuation.pl",
+                diagnostics,
+                conversions,
+                flags
+            );
+
+            Token token = lexer.Next();
+            Assert.Equal(TokenKind.Punctuation, token.Kind);
+            Assert.Equal(punctuation.ToString(), token.Text);
+            Assert.Equal(new SourceSpan(2, 1, 2, 1), token.Span);
+            Assert.True(token.PrecededByLayout);
+            Assert.False(token.Quoted);
+
+            token = lexer.Next();
+            Assert.Equal(TokenKind.Atom, token.Kind);
+            Assert.Equal("z", token.Text);
+            Assert.Equal(new SourceSpan(3, 1, 2, 2), token.Span);
+            Assert.False(token.PrecededByLayout);
+            Assert.Equal((TokenKind.Atom, punctuation.ToString(), true), Quoted(lexer.Next()));
+            Assert.Equal((TokenKind.String, punctuation.ToString(), false), Quoted(lexer.Next()));
+            Assert.Equal((TokenKind.Atom, punctuation.ToString(), true), Quoted(lexer.Next()));
+            Assert.Equal(TokenKind.Eof, lexer.Next().Kind);
+            Assert.Empty(diagnostics);
+        }
+
+        static (TokenKind Kind, string Text, bool Quoted) Quoted(Token token) => (token.Kind, token.Text, token.Quoted);
+    }
+
+    [Theory]
+    [InlineData('[', ']', "[]")]
+    [InlineData('{', '}', "{}")]
+    public void ConvertedEmptyDelimitersRemainAtomsOnlyWhenAdjacent(char open, char close, string empty)
+    {
+        var conversions = new CharacterConversionTable();
+        conversions.Set('a', open);
+        conversions.Set('b', close);
+        var flags = new PrologFlags();
+        flags.SetCharConversion(true);
+        List<Diagnostic> diagnostics = [];
+        var lexer = new Lexer("ab a b", null, diagnostics, conversions, flags);
+
+        Token token = lexer.Next();
+        Assert.Equal(TokenKind.Atom, token.Kind);
+        Assert.Equal(empty, token.Text);
+        Assert.Equal(new SourceSpan(0, 2, 1, 1), token.Span);
+        token = lexer.Next();
+        Assert.Equal(TokenKind.Punctuation, token.Kind);
+        Assert.Equal(open.ToString(), token.Text);
+        token = lexer.Next();
+        Assert.Equal(TokenKind.Punctuation, token.Kind);
+        Assert.Equal(close.ToString(), token.Text);
+        Assert.Equal(TokenKind.Eof, lexer.Next().Kind);
+        Assert.Empty(diagnostics);
+    }
+
     [Fact]
     public void ReadsQuotedAtomWithEscapesAndDoubledQuote()
     {
