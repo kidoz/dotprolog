@@ -264,6 +264,52 @@ public sealed class LexerTests
     [InlineData('\'')]
     [InlineData('"')]
     [InlineData('`')]
+    public void RunsOfQuotesDistinguishDecodedDelimitersFromTheClosingDelimiter(char quote)
+    {
+        for (var length = 2; length <= 8; length++)
+        {
+            List<Token> tokens = Tokenize(new string(quote, length), out List<Diagnostic> diagnostics);
+
+            Assert.Equal(new string(quote, (length - 1) / 2), tokens[0].Text);
+            Assert.Equal(new SourceSpan(0, length, 1, 1), tokens[0].Span);
+            Assert.Equal(TokenKind.Eof, tokens[1].Kind);
+            if (length % 2 == 0)
+            {
+                Assert.Empty(diagnostics);
+            }
+            else
+            {
+                Assert.Equal(DiagnosticIds.UnterminatedQuoted, Assert.Single(diagnostics).Id);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData('\'')]
+    [InlineData('"')]
+    [InlineData('`')]
+    public void ClosingQuoteDoesNotConsumeTheAdjacentToken(char quote)
+    {
+        foreach (bool doubled in new[] { false, true })
+        {
+            string content = doubled ? $"head{quote}{quote}tail" : "head";
+            string expected = doubled ? $"head{quote}tail" : "head";
+            List<Token> tokens = Tokenize($"{quote}{content}{quote}next", out List<Diagnostic> diagnostics);
+
+            Assert.Empty(diagnostics);
+            Assert.Equal(expected, tokens[0].Text);
+            Assert.Equal(new SourceSpan(0, content.Length + 2, 1, 1), tokens[0].Span);
+            Assert.Equal("next", tokens[1].Text);
+            Assert.Equal(new SourceSpan(content.Length + 2, 4, 1, content.Length + 3), tokens[1].Span);
+            Assert.False(tokens[1].PrecededByLayout);
+            Assert.Equal(TokenKind.Eof, tokens[2].Kind);
+        }
+    }
+
+    [Theory]
+    [InlineData('\'')]
+    [InlineData('"')]
+    [InlineData('`')]
     public void QuotedLineContinuationKeepsPrefixAndFollowingPosition(char quote)
     {
         foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
