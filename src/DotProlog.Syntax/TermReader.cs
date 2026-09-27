@@ -495,17 +495,17 @@ public sealed class TermReader
             return ParseArguments(name, token.Span);
         }
 
-        // A sign directly in front of a numeric literal is part of the literal, not a prefix operator.
-        if (!token.Quoted && name is "-" or "+" && next.Kind is TokenKind.Integer or TokenKind.Float && !next.PrecededByLayout)
+        // A minus directly in front of a numeric literal is part of the literal, not a prefix
+        // operator. A plus never is (Cor.2): +1 is +(1).
+        if (!token.Quoted && name == "-" && next.Kind is TokenKind.Integer or TokenKind.Float && !next.PrecededByLayout)
         {
             Advance();
             Token literal = _current;
             Advance();
             SourceSpan span = token.Span.To(literal.Span);
-            var negate = name == "-";
             return literal.Kind == TokenKind.Integer
-                ? IntegerLiteral(literal, negate, span)
-                : FloatLiteral(literal, negate, span);
+                ? IntegerLiteral(literal, negate: true, span)
+                : FloatLiteral(literal, negate: true, span);
         }
 
         if (_operators.TryGetPrefix(name, out PrologOperator prefix) && prefix.Priority <= maxPriority && CanStartTerm(next))
@@ -612,11 +612,19 @@ public sealed class TermReader
         SourceSpan openSpan = _current.Span;
         Advance();
 
-        // '[]' is lexed as a single atom, so a ']' here means the source wrote '[ ]'.
+        // '[]' is lexed as a single atom, so a ']' here means the source wrote '[ ]', which is the
+        // same name: directly followed by '(' it is a functor, as in '[ ](X)'.
         if (_current.IsPunctuation("]"))
         {
             SourceSpan emptySpan = openSpan.To(_current.Span);
+            Token next = Peek();
             Advance();
+            if (next.IsPunctuation("(") && !next.PrecededByLayout)
+            {
+                Advance();
+                return ParseArguments("[]", emptySpan);
+            }
+
             return new AtomTerm("[]", emptySpan);
         }
 

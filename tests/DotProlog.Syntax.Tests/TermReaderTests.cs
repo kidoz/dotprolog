@@ -194,7 +194,6 @@ public sealed class TermReaderTests
     // BigIntegerTerm carrying the exact value.
     [Theory]
     [InlineData("999999999999999999999999999999", "999999999999999999999999999999")]
-    [InlineData("+999999999999999999999999999999", "999999999999999999999999999999")]
     [InlineData("-999999999999999999999999999999", "-999999999999999999999999999999")]
     [InlineData("0xffffffffffffffffffffffffffffffff", "340282366920938463463374607431768211455")]
     [InlineData("-0xffffffffffffffffffffffffffffffff", "-340282366920938463463374607431768211455")]
@@ -209,9 +208,43 @@ public sealed class TermReaderTests
         Assert.Equal(System.Numerics.BigInteger.Parse(expected, CultureInfo.InvariantCulture), big.Value);
     }
 
+    // Cor.2: a plus is never part of a number, so +1 is +(1) and + is a prefix operator there.
+    [Theory]
+    [InlineData("+1", "+", 1.0)]
+    [InlineData("+ 1", "+", 1.0)]
+    [InlineData("+1.5", "+", 1.5)]
+    [InlineData("- 1", "-", 1.0)]
+    public void ReadsAPlusBeforeANumberAsAPrefixOperator(string source, string name, double operand)
+    {
+        ParseResult result = TermReader.ReadTerm(source);
+
+        Assert.Empty(result.Diagnostics);
+        CompoundTerm term = Assert.IsType<CompoundTerm>(Assert.Single(result.Clauses));
+        Assert.Equal(name, term.Name);
+        double value = Assert.Single(term.Arguments) switch
+        {
+            IntegerTerm integer => integer.Value,
+            FloatTerm number => number.Value,
+            SyntaxTerm other => throw new InvalidOperationException($"Unexpected operand {other}."),
+        };
+        Assert.Equal(operand, value);
+    }
+
+    [Fact]
+    public void ReadsTheEmptyListNameWithASpaceAsAFunctor()
+    {
+        ParseResult result = TermReader.ReadTerm("[ ](1)");
+        Assert.Empty(result.Diagnostics);
+        CompoundTerm term = Assert.IsType<CompoundTerm>(Assert.Single(result.Clauses));
+        Assert.Equal("[]", term.Name);
+        Assert.Equal(1, term.Arity);
+
+        Assert.NotEmpty(TermReader.ReadTerm("[ ] (1)").Diagnostics);
+    }
+
     [Theory]
     [InlineData("1.0e9999", 0, 8)]
-    [InlineData("+1.0e9999", 0, 9)]
+    [InlineData("+1.0e9999", 1, 8)]
     [InlineData("-1.0e9999", 0, 9)]
     [InlineData("f(1.0e9999)", 2, 8)]
     public void ReportsFloatOverflowWithItsSourceSpan(string source, int start, int length)

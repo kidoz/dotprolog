@@ -350,7 +350,7 @@ internal sealed class Lexer
 
     private Token ReadNumber(int start, bool layout)
     {
-        if (InputAt(_position) == '0' && Peek(1) == '\'')
+        if (InputAt(_position) == '0' && Peek(1) == '\'' && StartsCharacterCode())
         {
             Advance(2);
             if (_position >= _text.Length)
@@ -363,20 +363,7 @@ internal sealed class Lexer
             if (_text[_position] == '\\')
             {
                 var builder = new StringBuilder();
-                var reported = _diagnostics.Count;
-                SourceSpan quote = SpanFrom(start);
                 ReadEscape(builder);
-
-                // A line continuation denotes no character, so it leaves the literal without one.
-                if (builder.Length == 0 && _diagnostics.Count == reported)
-                {
-                    Report(
-                        DiagnosticIds.InvalidNumber,
-                        "A character-code literal needs a character, not a line continuation.",
-                        quote
-                    );
-                }
-
                 code =
                     builder.Length == 0 ? 0
                     : CodePoints && builder.Length == 2 && char.IsHighSurrogate(builder[0])
@@ -385,21 +372,7 @@ internal sealed class Lexer
             }
             else if (_text[_position] == '\'')
             {
-                var quoteStart = _position;
-                Advance();
-                if (_position < _text.Length && _text[_position] == '\'')
-                {
-                    Advance();
-                }
-                else
-                {
-                    Report(
-                        DiagnosticIds.InvalidQuotedCharacter,
-                        "A single quote in a character-code literal must be doubled or escaped.",
-                        SpanFrom(quoteStart)
-                    );
-                }
-
+                Advance(2);
                 code = '\'';
             }
             else if (CodePoints && CodePointText.IsPairAt(_text, _position))
@@ -428,26 +401,16 @@ internal sealed class Lexer
             return new Token(TokenKind.Integer, ConvertedText(start, _position - start), SpanFrom(start), layout, Integer: code);
         }
 
-        if (InputAt(_position) == '0' && Peek(1) is 'x' or 'o' or 'b')
+        // 0x, 0o, and 0b begin a radix literal only before one of its digits; otherwise the
+        // integer 0 ends there and a name follows, so 0xor 2 is 0 xor 2.
+        var radix = InputAt(_position) == '0' ? RadixOf(Peek(1)) : 0;
+        if (radix != 0 && IsRadixDigit(Peek(2), radix))
         {
-            var marker = Peek(1);
-            var radix = marker switch
-            {
-                'x' => 16,
-                'o' => 8,
-                _ => 2,
-            };
             Advance(2);
             var digitsStart = _position;
             while (_position < _text.Length && IsRadixDigit(InputAt(_position), radix))
             {
                 Advance();
-            }
-
-            if (_position == digitsStart)
-            {
-                Report(DiagnosticIds.InvalidNumber, $"Expected digits after '0{marker}'.", SpanFrom(start));
-                return new Token(TokenKind.Integer, ConvertedText(start, _position - start), SpanFrom(start), layout);
             }
 
             BigInteger radixValue = 0;
@@ -555,6 +518,29 @@ internal sealed class Lexer
 
         return new Token(TokenKind.Integer, literal, span, layout, Integer: integer);
     }
+
+    /// <summary>
+    /// Whether the <c>0'</c> here begins a character-code literal. ISO reads one only before a
+    /// single quoted character, so before an undoubled quote or a line continuation, which denotes
+    /// no character, the token is the integer 0 and the quote begins the next token: <c>0''1</c> is
+    /// <c>0 '' 1</c>, and <c>0'\</c>, a newline, then <c>+'1</c> is <c>0 + 1</c>.
+    /// </summary>
+    private bool StartsCharacterCode() =>
+        RawPeek(2) switch
+        {
+            '\'' => RawPeek(3) == '\'',
+            '\\' => RawPeek(3) != '\n',
+            _ => true,
+        };
+
+    private static int RadixOf(char marker) =>
+        marker switch
+        {
+            'x' => 16,
+            'o' => 8,
+            'b' => 2,
+            _ => 0,
+        };
 
     private static bool IsRadixDigit(char c, int radix) =>
         radix switch

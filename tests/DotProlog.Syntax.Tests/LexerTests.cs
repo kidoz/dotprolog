@@ -439,7 +439,6 @@ public sealed class LexerTests
     }
 
     [Theory]
-    [InlineData("0''", DiagnosticIds.InvalidQuotedCharacter, 2, 1)]
     [InlineData(@"0'\0", DiagnosticIds.InvalidEscape, 2, 2)]
     [InlineData(@"'\0'", DiagnosticIds.InvalidEscape, 1, 2)]
     [InlineData("\"\\0\"", DiagnosticIds.InvalidEscape, 1, 2)]
@@ -580,15 +579,28 @@ public sealed class LexerTests
         Assert.Equal(DiagnosticIds.InvalidQuotedCharacter, Assert.Single(diagnostics).Id);
     }
 
-    [Fact]
-    public void RejectsALineContinuationAsTheCharacterOfACharacterCode()
+    // Where no single quoted character follows 0' (an undoubled quote, or a line continuation,
+    // which denotes none), the token is the integer 0 and the quote starts the next token.
+    [Theory]
+    [InlineData("0''1", "0", "", "1")]
+    [InlineData("0'\\\n+'1", "0", "+", "1")]
+    [InlineData("0xor 2", "0", "xor", "2")]
+    [InlineData("0bop 2", "0", "bop", "2")]
+    [InlineData("0o8", "0", "o8", null)]
+    [InlineData("0b2", "0", "b2", null)]
+    public void EndsTheIntegerZeroWhereNoCharacterCodeOrRadixDigitFollows(string text, string zero, string name, string? last)
     {
-        Tokenize("0'\\\nx", out List<Diagnostic> diagnostics);
+        List<Token> tokens = Tokenize(text, out List<Diagnostic> diagnostics);
 
-        Diagnostic diagnostic = Assert.Single(diagnostics);
-        Assert.Equal(DiagnosticIds.InvalidNumber, diagnostic.Id);
-        Assert.Equal(1, diagnostic.Span.Line);
-        Assert.Equal(1, diagnostic.Span.Column);
+        Assert.Empty(diagnostics);
+        Assert.Equal(TokenKind.Integer, tokens[0].Kind);
+        Assert.Equal(zero, tokens[0].Text);
+        Assert.Equal(TokenKind.Atom, tokens[1].Kind);
+        Assert.Equal(name, tokens[1].Text);
+        if (last is not null)
+        {
+            Assert.Equal(last, tokens[2].Text);
+        }
     }
 
     [Fact]
