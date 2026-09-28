@@ -52,7 +52,8 @@ reconstruct the entire original review corpus.
 
 The Modern mode deliberately keeps readings that the standard does not allow (see
 [language modes and text](../explanation/language-modes.md)), so it is outside this tracker. It is
-mentioned only where it differs in a way that matters.
+mentioned only where it differs in a way that matters. The
+[Modern mode tracker](modern-mode-tracker.md) classifies each Modern difference from ISO.
 
 The terms *implementation defined*, *implementation dependent*, *implementation specific*, and
 *undefined* have their Part 1 clause 3 meanings. *Extension* is used only in the sense of Part 1
