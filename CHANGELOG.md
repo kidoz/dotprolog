@@ -4,6 +4,14 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- The reference and conformance ledgers distinguish runtime configuration, language modes, flags,
+  and implementation-defined behavior. Division of two integers by `/2` is documented as returning
+  a float as ISO requires, including `1/1` producing `1.0`; it was incorrectly described as a choice.
+
 ## [0.15.0] — 2026-09-27
 
 ### Fixed
