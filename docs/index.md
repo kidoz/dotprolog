@@ -50,6 +50,8 @@ adventure, available in English and [Russian](book/ru/index.md).
 - [ISO processor characteristics](reference/iso-processor-characteristics.md).
 - [ISO Part 1 conformance](reference/iso-part1-conformance.md).
 - [ISO Parts 2 and 3 conformance](reference/iso-parts2-3-conformance.md).
+- [ISO conformance tracker](reference/iso-conformance-tracker.md) — each requirement's status and
+  the open gaps.
 - [SWI compatibility ledger](reference/swi-compatibility.md).
 
 ## Explanation — understand the design
