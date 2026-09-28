@@ -287,7 +287,7 @@ A program runs in one of two modes, fixed when its engine is created:
 
 | Mode | Surface | `"abc"` reads as | A character is |
 |---|---|---|---|
-| `modern` (default) | ISO Parts 1–3 plus the documented extensions, SWI-Prolog-aligned | `[a,b,c]` | a Unicode code point |
+| `modern` (default) | ISO Parts 1–3 plus the documented extensions and a few documented modifications, SWI-Prolog-aligned | `[a,b,c]` | a Unicode code point |
 | `strict-iso` | Only the ISO/IEC 13211 Parts 1–3 surface | `[97,98,99]` | a UTF-16 code unit |
 
 ```prolog
@@ -295,7 +295,7 @@ A program runs in one of two modes, fixed when its engine is created:
    L = a, Ls = [b,c].
 ```
 
-ISO leaves the initial `double_quotes` value to the processor. `chars` is what Scryer, Trealla,
+ISO makes the initial `double_quotes` value implementation defined. `chars` is what Scryer, Trealla,
 ichiban, Flowlog, and Trilog use, and it lets a grammar over text look like the text it parses. A
 program written for code lists keeps working with one override: `double_quotes=codes` in the
 `DotPrologFlags` project property, `--flag double_quotes=codes` on the command line, or

@@ -11,6 +11,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - The reference and conformance ledgers distinguish runtime configuration, language modes, flags,
   and implementation-defined behavior. Division of two integers by `/2` is documented as returning
   a float as ISO requires, including `1/1` producing `1.0`; it was incorrectly described as a choice.
+- The documentation and the `dotnet prolog` mode help separate Modern's modifications of ISO
+  results, such as reading `- 1` as `-(1)`, the `double_quotes=string` setting, and the plain-name
+  export alias, from its extensions. These were described as extensions.
 
 ## [0.15.0] — 2026-09-27
 

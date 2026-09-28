@@ -11,8 +11,13 @@ These are different categories:
   ISO leaves the initial `double_quotes` value implementation defined.
 - **Required ISO behavior** follows the standard and is not a configurable alternative. For
   example, `/2` applied to two integers produces a float, even for an exact quotient.
-- **Extensions** add features outside the standard, such as Modern's rational numbers and
-  `double_quotes=string` setting. They are identified separately from ISO requirements.
+- **Extensions** add features that the standard leaves undefined or explicitly permits (Part 1
+  5.5), such as Modern's string type, soft cut, and extra built-in predicates. They are identified
+  separately from ISO requirements.
+- **Modifications** change a result that the standard defines for conforming text or goals. They
+  occur only in `Modern`: for example, reading `- 1` as `-(1)`, ordering rational numbers among the
+  integers, and the `double_quotes=string` setting. The
+  [Modern mode tracker](modern-mode-tracker.md) lists them.
 
 See [language modes and text](../explanation/language-modes.md) for configuration guidance.
 Requirement and execution-path evidence is recorded separately in the
@@ -69,8 +74,8 @@ X = 1.0.
 ```
 
 There is no flag that selects an integer or rational result for division of two integers.
-Modern's `rdiv/2` provides exact rational division as a separate extension; `/2` with a rational
-operand also uses the rational extension's arithmetic rules.
+Modern's extension functor `rdiv/2` provides exact rational division, and `/2` with a rational
+operand follows Modern's rational arithmetic.
 
 ## Bitwise arithmetic
 
@@ -145,13 +150,16 @@ otherwise would. The value is scoped to the load unit: a `set_prolog_flag(double
 directive governs the rest of the file that issued it, and the entering value is restored when
 that file finishes loading.
 
-`double_quotes` accepts the extension value `string` in `Modern` only — a directive, flag call, or project override selecting
-it inside `StrictIso` stays a domain error, so the strict mode keeps the three ISO values.
+`double_quotes` accepts the additional value `string` in `Modern` only. Part 1 7.11.2.5 lists
+three values, so the [Modern mode tracker](modern-mode-tracker.md) records `string` as a
+modification (CHG-04). A directive, flag call, or project override selecting it inside `StrictIso`
+stays a domain error, so the strict mode keeps the three ISO values.
 
 The standard order of terms places strings between numbers and atoms:
 `Var < Float < Integer < String < Atom < Compound`. The string slot is SWI-Prolog 10's probed
-behavior; ISO leaves no slot for the type, and the float/integer split remains DotProlog's
-documented divergence.
+behavior; ISO leaves no slot for an additional type, and it depends only on the type, as Part 1
+5.5.4 requires. Every float precedes every integer, as Part 1 7.2 requires; SWI-Prolog instead
+orders numbers by value.
 
 The initial `char_conversion` flag is `on` in `StrictIso` (Part 1 7.11.2.1) and `off` in `Modern`.
 Character conversion applies to unquoted lexical input while quoted text, escapes, character-code
@@ -191,7 +199,7 @@ In both modes, ISO `unify_with_occurs_check/2` fails when unification would crea
 Modern's flag does not change that predicate. ISO leaves ordinary cycle-producing unification
 undefined (Part 1 7.3.4), so the new error is not an ISO requirement.
 
-The error shape is a compatibility choice. The implementation comparison made for
+The error term follows other implementations. The comparison made for
 [issue 6](https://github.com/kidoz/dotprolog/issues/6) found:
 
 | Implementation | Error when its occurs-check flag is `error` | Evidence |
@@ -303,7 +311,10 @@ qualification, so procedures in ISO modules report `public`; export remains a se
 
 An exported predicate is also published under its plain name when that name is still free. The
 first loaded export therefore owns a plain-name alias; later modules remain reachable through
-qualification or an unambiguous import. Loading source and its relationship to files are DotProlog
+qualification or an unambiguous import. Because a call from `user` then reaches the export without
+an import, the alias changes the result of conforming goals. It is GAP-41 in the
+[ISO conformance tracker](iso-conformance-tracker.md) and CHG-07 in the
+[Modern mode tracker](modern-mode-tracker.md), not a Part 2 extension. Loading source and its relationship to files are DotProlog
 extensions rather than claims about the Part 2 filesystem model.
 
 Modern mode additionally accepts the Quintus-family `module/2`, `use_module/1,2`, and

@@ -40,8 +40,9 @@ required ISO behavior. Known deviations are recorded in the [conformance tracker
 
 Part 2 permits optional inaccessible-procedure and dynamic-module extensions. DotProlog implements
 neither: every ISO-module procedure is reachable by explicit qualification, and modules are created
-by preparing interfaces rather than by a runtime module-creation predicate. Filesystem loading and
-the plain-name alias assigned to the first free export are documented compatibility extensions.
+by preparing interfaces rather than by a runtime module-creation predicate. Filesystem loading is an
+extension. The plain-name alias assigned to the first free export is not: it changes the result of
+conforming goals (GAP-41 in the [ISO conformance tracker](iso-conformance-tracker.md)).
 
 ## Part 3 definite clause grammars
 

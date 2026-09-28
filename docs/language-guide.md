@@ -13,7 +13,7 @@ DotProlog has two language modes.
 
 | Mode | Predefined surface | Initial `double_quotes` | Character |
 |---|---|---|---|
-| `Modern` (default) | ISO Parts 1–3 plus documented DotProlog extensions | `chars` | Unicode code point |
+| `Modern` (default) | ISO Parts 1–3 plus documented DotProlog extensions and a few documented modifications | `chars` | Unicode code point |
 | `StrictIso` | ISO Parts 1–3 inventory | `codes` | UTF-16 code unit |
 
 With `chars`, `"abc"` reads as `[a,b,c]`; with `codes`, it reads as `[97,98,99]`.

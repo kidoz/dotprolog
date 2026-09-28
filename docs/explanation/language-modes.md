@@ -1,7 +1,8 @@
 # Language modes and text
 
 A language mode groups related defaults and supported features into a profile. DotProlog's
-Modern mode provides the ISO core together with documented extensions; StrictIso limits
+Modern mode provides the ISO core together with documented extensions and a few documented
+modifications, listed in the [Modern mode tracker](../reference/modern-mode-tracker.md); StrictIso limits
 predefined features to the ISO Parts 1–3 inventory. Selecting strict mode is useful when the
 standardized surface is part of a program's requirements. Modern's adopted SWI predicates follow
 SWI behavior feature by feature, as recorded in the

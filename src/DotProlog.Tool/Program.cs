@@ -410,7 +410,9 @@ internal static class Program
         output.WriteLine("      analyze source without consulting it or executing directives");
         output.WriteLine();
         output.WriteLine("Language modes:");
-        output.WriteLine("  modern       ISO plus the DotProlog extensions, double_quotes starting at chars (default)");
+        output.WriteLine(
+            "  modern       ISO with DotProlog extensions and modifications, double_quotes starting at chars (default)"
+        );
         output.WriteLine("  strict-iso   only the standardized ISO/IEC 13211 surface, double_quotes starting at codes");
         output.WriteLine();
         output.WriteLine("Flag overrides (--flag, repeatable) layer an initial flag value over the mode:");
