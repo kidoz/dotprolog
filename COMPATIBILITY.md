@@ -201,7 +201,8 @@ Writing them was worth it immediately: they found these real defects.
   does not follow it.
 - Integer `0/0` raised `evaluation_error(undefined)`. An integer zero divisor now always raises
   `evaluation_error(zero_divisor)`; only the float `0.0/0.0`, whose IEEE result is NaN, stays
-  `undefined`. `/2` on two integers keeps its documented processor choice of float division.
+  `undefined`. `/2` on two integers returns a float in both language modes, as ISO requires,
+  including exact quotients (`1/1` evaluates to `1.0`). This behavior is not configurable.
 - `atom_chars/2` and `atom_codes/2` parsed the list even when the first argument was bound, so
   `atom_chars(abc, [X, Y, Z])` raised `instantiation_error`. A bound first argument now decides
   the direction: it is converted and the result unified with the list, filling unbound elements

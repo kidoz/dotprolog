@@ -42,6 +42,20 @@ arithmetic rejects NaN and infinity with the applicable ISO evaluation error. A 
 literal that overflows binary64 is a `syntax_error(float_overflow)`; underflow rounds to signed
 zero.
 
+## Required division result
+
+ISO/IEC 13211-1 9.1.1 and 9.1.5 require `/2` on two integer operands to produce a float.
+DotProlog follows this rule in both `StrictIso` and `Modern`, including exact quotients:
+
+```prolog
+?- X is 1/1.
+X = 1.0.
+```
+
+There is no flag that selects an integer or rational result for division of two integers.
+Modern's `rdiv/2` provides exact rational division as a separate extension; `/2` with a rational
+operand also uses the rational extension's arithmetic rules.
+
 ## Bitwise arithmetic
 
 Bitwise functions use two’s-complement signed integer semantics. In particular, DotProlog fixes the

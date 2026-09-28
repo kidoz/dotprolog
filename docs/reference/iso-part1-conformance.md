@@ -242,8 +242,9 @@ Modern NativeAOT sample.
 
 ## Clause 9 evaluable functors
 
-Each row covers operand evaluation, result kind, exceptional values, signatures, errors, and the
-processor choices recorded in the characteristics page.
+These rows map tests for operand evaluation, result kind, exceptional values, signatures, and errors.
+The characteristics reference separates implementation-defined aspects from required behavior:
+`/2` on two integers must produce a float (`1/1` evaluates to `1.0`) in both language modes.
 
 | Subclause | Evaluable functors | Evidence |
 |---|---|---|

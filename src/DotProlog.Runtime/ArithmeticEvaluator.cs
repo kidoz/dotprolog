@@ -291,8 +291,8 @@ public static class ArithmeticEvaluator
 
                 if (rational)
                 {
-                    // Division with a rational operand stays exact; two integers keep the
-                    // documented processor choice of float division.
+                    // Division with a rational operand stays exact as an extension.
+                    // Two integer operands take the ISO-required float path below.
                     return PrologNumber.FromRational(left.Numerator * right.Denominator, left.Denominator * right.Numerator);
                 }
 
