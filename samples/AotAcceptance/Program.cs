@@ -126,7 +126,7 @@ internal static class Program
                 xor(-10, 12) =:= -6,
                 -16 << 2 =:= -64,
                 -16 >> 2 =:= -4,
-                write(bitwise_processor_choices), nl,
+                write(bitwise_implementation_defined), nl,
 
                 % Occurs-check unification is iterative and must survive NativeAOT trimming.
                 \+ unify_with_occurs_check(Cycle, f(Cycle)), var(Cycle),
