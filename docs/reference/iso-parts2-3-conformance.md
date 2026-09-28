@@ -10,7 +10,11 @@ Evidence codes are:
 - **G** — focused grammar tests in `GrammarTests`
 - **C** — generated-C# installation and execution
 - **A** — published NativeAOT execution
-- **P** — processor choice recorded in `iso-processor-characteristics.md`
+- **P** — documentation in the [runtime configuration and implementation characteristics reference](iso-processor-characteristics.md)
+
+`P` identifies supporting documentation, not an executable test or permission to choose a different
+result. The reference distinguishes configuration, implementation-defined behavior, extensions, and
+required ISO behavior. Known deviations are recorded in the [conformance tracker](iso-conformance-tracker.md).
 
 ## Part 2 modules
 

@@ -47,7 +47,7 @@ adventure, available in English and [Russian](book/ru/index.md).
 - [Language](language-guide.md) — syntax, modes, supported features, and limits.
 - [Linting](linting.md) — options, diagnostic identifiers, and exit codes.
 - [.NET integration](dotnet-integration.md) — embedding, facade, and SDK contracts.
-- [ISO processor characteristics](reference/iso-processor-characteristics.md).
+- [Runtime configuration and implementation characteristics](reference/iso-processor-characteristics.md).
 - [ISO Part 1 conformance](reference/iso-part1-conformance.md).
 - [ISO Parts 2 and 3 conformance](reference/iso-parts2-3-conformance.md).
 - [ISO conformance tracker](reference/iso-conformance-tracker.md) — each requirement's status and

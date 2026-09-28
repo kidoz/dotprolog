@@ -1,12 +1,28 @@
-# ISO processor characteristics
+# Runtime configuration and implementation characteristics
 
-This page records the processor-defined choices that accompany DotProlog's ISO/IEC 13211
-implementation. Requirement and execution-path evidence is recorded separately in the
-[Part 1](iso-part1-conformance.md) and [Parts 2 and 3](iso-parts2-3-conformance.md) ledgers.
+This page documents DotProlog's language modes, flags, representation limits, and behavior.
+These are different categories:
 
-## Strict ISO mode
+- **Runtime configuration** means the language mode and supported flag settings selected for a
+  DotProlog program. A **language mode** selects a predefined feature set and initial flag values;
+  a **flag** controls a particular setting. These configure DotProlog, not the .NET runtime or CPU.
+- **Implementation-defined behavior** means an aspect that ISO explicitly leaves to the
+  implementation to specify. It can be fixed; it need not have a user-selectable flag. For example,
+  ISO leaves the initial `double_quotes` value implementation defined.
+- **Required ISO behavior** follows the standard and is not a configurable alternative. For
+  example, `/2` applied to two integers produces a float, even for an exact quotient.
+- **Extensions** add features outside the standard, such as Modern's rational numbers and
+  `double_quotes=string` setting. They are identified separately from ISO requirements.
 
-`PrologLanguageMode.StrictIso` is an immutable, program-owned processor mode. It admits the
+See [language modes and text](../explanation/language-modes.md) for configuration guidance.
+Requirement and execution-path evidence is recorded separately in the
+[Part 1](iso-part1-conformance.md) and [Parts 2 and 3](iso-parts2-3-conformance.md) ledgers;
+the [conformance tracker](iso-conformance-tracker.md) records known gaps. A characteristic listed
+here is not, by itself, a claim that ISO permits alternatives or that a setting exists to change it.
+
+## Strict ISO language mode
+
+`PrologLanguageMode.StrictIso` is an immutable, program-owned language mode. It admits the
 explicitly inventoried predefined surface from ISO/IEC 13211 Parts 1, 2, and 3 and rejects known
 predefined DotProlog extensions. Source preparation reports `DPL1018`; a runtime-constructed
 meta-goal or host binding raises the catchable term
@@ -18,7 +34,7 @@ mode is `Modern`, which keeps the documented extensions.
 
 ## Representation limits
 
-| Characteristic | DotProlog choice |
+| Characteristic | DotProlog value or behavior |
 |---|---|
 | Integer model | Unbounded, promoted from 60-bit tagged fixnums |
 | `min_integer` | No value; `current_prolog_flag/2` fails |

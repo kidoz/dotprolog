@@ -11,8 +11,9 @@ including the final Cor.3 PDF, on 2026-09-28, and every gap was then reproduced 
 against the text in an adversarial review. Where this page disagrees with the
 [Part 1 ledger](iso-part1-conformance.md), the
 [Parts 2 and 3 ledger](iso-parts2-3-conformance.md), or the
-[processor characteristics](iso-processor-characteristics.md), this page records the observed
-behavior. Those pages have not been corrected yet.
+[runtime configuration and implementation characteristics](iso-processor-characteristics.md), this page records the observed
+behavior. Terminology and the `/2` classification have been corrected; other differences remain
+tracked below.
 
 Requirements are paraphrased. The ISO publications remain authoritative, and clause numbers refer
 to them.
@@ -219,7 +220,7 @@ matching checklist row.
 | ID | Severity | Ref | Gap | Status |
 |---|---|---|---|---|
 | GAP-64 | Medium | Part 1 5.4, Part 2 4.1 d, Part 3 5.1 | These implementation defined features are not documented on the characteristics page: the collating integers of the control escapes (`\a` 7, `\b` 8, `\f` 12, `\n` 10, `\r` 13, `\t` 9, `\v` 11), and FF, VT, and CR as layout; the float rounding function, approximate addition, and underflow of arithmetic results (9.1.4.1–9.1.4.3); negative shift counts (`16 >> -2` gives 64 and `16 << -2` gives 4); position terms at and past end of stream (7.10.2.9); the effect of directives that add or remove clauses while text is prepared (7.4.3); invalid semicontexts, <code>'&#124;'</code> inside if-then-else, and whether `(\+)//1` and `(->)//2` are provided (Part 3 7.13.1, 7.14.6, 7.14.11, 7.14.12). Also GAP-14, GAP-25, and GAP-30 | Open |
-| GAP-65 | Medium | Part 1 clause 3, 5.4 | Terms the standard does not define, and claims this page contradicts. The characteristics page and both ledgers say "processor-defined choice" or "processor choice", a term the standard does not use (issue #13). COMPATIBILITY.md and the SWI ledger describe float `/` on two integers as a choice, but 9.1.1 and 9.1.5 require `1/1` to be `1.0`. The ledgers also claim full coverage | Open |
+| GAP-65 | Medium | Part 1 clause 3, 5.4 | Issue #13 terminology and arithmetic classification corrected: the characteristics reference and ledgers distinguish configuration, implementation-defined behavior, extensions, and required behavior. COMPATIBILITY.md and the SWI ledger identify float `/` on two integers as required by 9.1.1 and 9.1.5 (`1/1` is `1.0`). Evidence labels now distinguish documentation from tests. Broader conformance claims still need reconciliation with the behavioral gaps in this tracker | Partial |
 
 ## Requirement checklists
 

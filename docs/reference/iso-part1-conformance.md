@@ -1,6 +1,6 @@
 # ISO/IEC 13211-1 conformance
 
-DotProlog's `StrictIso` processor mode implements ISO/IEC 13211-1:1995, Technical
+DotProlog's `StrictIso` language mode implements ISO/IEC 13211-1:1995, Technical
 Corrigendum 1:2007, Technical Corrigendum 2:2012, and Technical Corrigendum 3:2017. This
 declaration applies to Part 1, General core. Parts 2 and 3 are separate publications and are not
 included in this Part 1 declaration.
@@ -10,7 +10,8 @@ does not reproduce the licensed standard. The authoritative text remains the ISO
 
 ## Evidence model
 
-Every row below is covered by one or more of these executable evidence classes:
+Rows below identify test paths and supporting documentation using these evidence codes.
+Known deviations and coverage limits are recorded in the [conformance tracker](iso-conformance-tracker.md).
 
 | Code | Evidence |
 |---|---|
@@ -21,7 +22,11 @@ Every row below is covered by one or more of these executable evidence classes:
 | `CB` | Generated C# calling consulted bytecode |
 | `BC` | Consulted bytecode calling generated C# |
 | `A` | Published NativeAOT execution |
-| `P` | A documented processor-defined choice |
+| `P` | Documentation in the runtime configuration and implementation characteristics reference |
+
+`P` identifies supporting documentation, not an executable test or permission to choose a different
+result. The reference distinguishes configuration, implementation-defined behavior, extensions, and
+required ISO behavior.
 
 The independent inventory is run unchanged through `I`, `C`, `CB`, `BC`, and `A`. The inventory
 gate rejects count drift, unsupported declarations, and changed upstream sources. The Part 1
@@ -95,9 +100,9 @@ certification or proof of correctness for every program and platform.
 | 5.1 processor execution | Prepared goals preserve success, failure, bindings, solution order, errors, and side effects | R/D/I/C/CB/BC/A |
 | 5.1 rejection | Invalid source and read terms produce source diagnostics or catchable syntax errors | R/D/I/A |
 | 5.1 strict mode | `StrictIso` rejects known predefined implementation-specific features in source, meta-calls, assertions, host bindings, generated code, and NativeAOT | R/C/CB/BC/A |
-| 5.2 conforming text | Standard syntax and documented processor-defined features are accepted | R/D/I/C/A |
+| 5.2 conforming text | Standard syntax and documented implementation-defined features are accepted | R/D/I/C/A |
 | 5.3 conforming goals | Standard controls and predicates execute under the Part 1 contract | R/D/I/C/CB/BC/A |
-| 5.4 documentation | Numeric, text, stream, error, flag, and ordering choices are recorded in the processor-characteristics page | P |
+| 5.4 documentation | Numeric, text, stream, error, flag, and ordering behavior is documented in the characteristics reference; outstanding items are tracked in GAP-64 | P |
 | 5.5.1 syntax extensions | Extended syntax cannot change the meaning of a Part 1 term in `StrictIso` | R/I/C/A |
 | 5.5.2 operator extensions | The ISO operator table and `op/3` restrictions take precedence over extended operators | R/D/I/A |
 | 5.5.3 character conversion | Program-owned conversion is gated by the ISO flag and applied before unquoted lexical classification | R/D/I/C/A |
@@ -276,5 +281,5 @@ the following green:
 5. The focused parser, compiler, runtime, stream, database, arithmetic, flag, and strict-mode tests.
 6. The 125-case strict review fixture, including its generated, cross-path, and NativeAOT checks.
 
-Any new implementation-defined behavior must be added to the processor-characteristics page and
+Any new implementation-defined behavior must be added to the implementation characteristics reference and
 covered by an executable test before release.

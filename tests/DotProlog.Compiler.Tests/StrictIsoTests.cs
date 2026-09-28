@@ -2,7 +2,7 @@ using DotProlog.Runtime;
 
 namespace DotProlog.Compiler.Tests;
 
-/// <summary>The opt-in processor mode that rejects implementation-specific language features.</summary>
+/// <summary>The opt-in language mode that rejects implementation-specific language features.</summary>
 public sealed class StrictIsoTests
 {
     [Fact]
