@@ -651,6 +651,63 @@ public sealed class LexerTests
         Assert.Equal(expected, tokens[0].Integer);
     }
 
+    [Theory]
+    [InlineData("1_000", 1000L)]
+    [InlineData("1_000_000", 1000000L)]
+    [InlineData("1_ 000", 1000L)]
+    [InlineData("1_ /**/ 000", 1000L)]
+    [InlineData("0xFF_FF", 65535L)]
+    [InlineData("0o7_7", 63L)]
+    [InlineData("0b1010_1010", 170L)]
+    public void ReadsDigitSeparatorsBetweenDigitGroups(string text, long expected)
+    {
+        List<Token> tokens = Tokenize(text, out List<Diagnostic> diagnostics);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(TokenKind.Integer, tokens[0].Kind);
+        Assert.Equal(expected, tokens[0].Integer);
+        Assert.Equal(TokenKind.Eof, tokens[1].Kind);
+    }
+
+    [Fact]
+    public void AnUnderscoreNoDigitFollowsStartsTheNextToken()
+    {
+        List<Token> tokens = Tokenize("1__000", out List<Diagnostic> diagnostics);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal([TokenKind.Integer, TokenKind.Variable, TokenKind.Eof], tokens.Select(token => token.Kind));
+        Assert.Equal(1L, tokens[0].Integer);
+    }
+
+    [Fact]
+    public void ASeparatedIntegerDoesNotContinueIntoAFloat()
+    {
+        List<Token> tokens = Tokenize("1_5.5", out _);
+
+        Assert.Equal(TokenKind.Integer, tokens[0].Kind);
+        Assert.Equal(15L, tokens[0].Integer);
+    }
+
+    [Fact]
+    public void ReadsDigitSeparatorsInRationalLiterals()
+    {
+        List<Token> tokens = Tokenize("1_0r3", out List<Diagnostic> diagnostics);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(TokenKind.Integer, tokens[0].Kind);
+        Assert.Equal(new System.Numerics.BigInteger(10), tokens[0].Big);
+        Assert.Equal(new System.Numerics.BigInteger(3), tokens[0].RationalDenominator);
+    }
+
+    [Fact]
+    public void RejectsDigitSeparatorsInStrictIso()
+    {
+        List<Token> tokens = TokenizeStrict("1_000", out _);
+
+        Assert.Equal([TokenKind.Integer, TokenKind.Variable, TokenKind.Eof], tokens.Select(token => token.Kind));
+        Assert.Equal(1L, tokens[0].Integer);
+    }
+
     [Fact]
     public void ReadsFloatLiteralButNotClauseTerminator()
     {

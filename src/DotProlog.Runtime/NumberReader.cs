@@ -11,7 +11,9 @@ namespace DotProlog.Runtime;
 /// and <c>"1 "</c>, <c>"+1"</c>, and <c>"0X1"</c> are not. Strict ISO also reads a quoted <c>'-'</c>
 /// and layout or a comment between the minus and the digits, as the reader does (6.3.4.1); otherwise
 /// only an unquoted <c>-</c> directly before the digits forms a negative number, as SWI-Prolog reads
-/// it, so <c>"- 1"</c> and <c>"'-'1"</c> are numbers in strict ISO mode only.
+/// it, so <c>"- 1"</c> and <c>"'-'1"</c> are numbers in strict ISO mode only. In the default mode an
+/// underscore and following layout text separate digit groups of an integer, so <c>"1_000"</c> is
+/// 1000 there and no number in strict ISO mode; floats never take separators.
 /// </summary>
 /// <remarks>
 /// The syntax is the term reader's, character conversion aside, which does not apply here. The runtime
@@ -42,8 +44,16 @@ internal static class NumberReader
     /// <param name="codePoints">Whether characters are code points, as in the default mode.</param>
     /// <param name="rationals">Whether <c>NrM</c> rational literals are read, as in the default mode.</param>
     /// <param name="isoReading">Whether a quoted <c>-</c>, or one before layout, forms a negative number, as in strict ISO mode.</param>
+    /// <param name="digitSeparators">Whether an underscore and following layout text separate digit groups, as in the default mode.</param>
     /// <param name="number">The number read, when the outcome is <see cref="Outcome.Number"/>.</param>
-    internal static Outcome Read(string text, bool codePoints, bool rationals, bool isoReading, out PrologNumber number)
+    internal static Outcome Read(
+        string text,
+        bool codePoints,
+        bool rationals,
+        bool isoReading,
+        bool digitSeparators,
+        out PrologNumber number
+    )
     {
         number = default;
         var position = 0;
@@ -80,7 +90,7 @@ internal static class NumberReader
             return Outcome.NotANumber;
         }
 
-        Outcome outcome = ReadNumberToken(text, ref position, codePoints, rationals, out PrologNumber value);
+        Outcome outcome = ReadNumberToken(text, ref position, codePoints, rationals, digitSeparators, out PrologNumber value);
         if (outcome != Outcome.Number)
         {
             return outcome;
@@ -93,6 +103,49 @@ internal static class NumberReader
 
         number = negate ? Negate(value) : value;
         return Outcome.Number;
+    }
+
+    /// <summary>
+    /// Reads a run of digits and returns their text. When <paramref name="separators"/> is on, a
+    /// single underscore followed by layout text — white space and comments — separates digit groups
+    /// and is dropped, as the lexer reads it; <paramref name="separated"/> tells the caller a run used
+    /// one, because a separated run is an integer: floats never take separators. An underscore that no
+    /// digit follows is left for the rest of the text to reject.
+    /// </summary>
+    private static string ReadDigits(string text, ref int position, bool separators, Func<char, bool> isDigit, out bool separated)
+    {
+        var start = position;
+        StringBuilder? cleaned = null;
+        separated = false;
+
+        while (position < text.Length)
+        {
+            var c = text[position];
+            if (isDigit(c))
+            {
+                cleaned?.Append(c);
+                position++;
+                continue;
+            }
+
+            if (c != '_' || !separators || position == start)
+            {
+                break;
+            }
+
+            var mark = position;
+            position++;
+            if (!SkipLayout(text, ref position) || position >= text.Length || !isDigit(text[position]))
+            {
+                position = mark;
+                break;
+            }
+
+            cleaned ??= new StringBuilder(text.Substring(start, mark - start));
+            separated = true;
+        }
+
+        return cleaned?.ToString() ?? text.Substring(start, position - start);
     }
 
     /// <summary>Skips layout characters and comments; false for a block comment left open.</summary>
@@ -306,6 +359,7 @@ internal static class NumberReader
         ref int position,
         bool codePoints,
         bool rationals,
+        bool separators,
         out PrologNumber number
     )
     {
@@ -336,17 +390,16 @@ internal static class NumberReader
                 _ => 2,
             };
             position += 2;
-            var digitsStart = position;
-            BigInteger value = 0;
-            while (position < text.Length && IsRadixDigit(text[position], radix))
-            {
-                value = (value * radix) + EscapeDigitValue(text[position]);
-                position++;
-            }
-
-            if (position == digitsStart)
+            var radixDigits = ReadDigits(text, ref position, separators, c => IsRadixDigit(c, radix), out _);
+            if (radixDigits.Length == 0)
             {
                 return Outcome.NotANumber;
+            }
+
+            BigInteger value = 0;
+            foreach (var digit in radixDigits)
+            {
+                value = (value * radix) + EscapeDigitValue(digit);
             }
 
             number = PrologNumber.FromBig(value);
@@ -354,13 +407,10 @@ internal static class NumberReader
         }
 
         var start = position;
-        while (position < text.Length && char.IsAsciiDigit(text[position]))
-        {
-            position++;
-        }
+        var digits = ReadDigits(text, ref position, separators, char.IsAsciiDigit, out var separated);
 
         var isFloat = false;
-        if (position + 1 < text.Length && text[position] == '.' && char.IsAsciiDigit(text[position + 1]))
+        if (!separated && position + 1 < text.Length && text[position] == '.' && char.IsAsciiDigit(text[position + 1]))
         {
             isFloat = true;
             position++;
@@ -385,23 +435,11 @@ internal static class NumberReader
 
         if (!isFloat && rationals && position + 1 < text.Length && text[position] == 'r' && char.IsAsciiDigit(text[position + 1]))
         {
-            BigInteger numerator = BigInteger.Parse(
-                text.AsSpan(start, position - start),
-                NumberStyles.None,
-                CultureInfo.InvariantCulture
-            );
+            BigInteger numerator = BigInteger.Parse(digits, NumberStyles.None, CultureInfo.InvariantCulture);
             position++;
-            var denominatorStart = position;
-            while (position < text.Length && char.IsAsciiDigit(text[position]))
-            {
-                position++;
-            }
+            var denominatorDigits = ReadDigits(text, ref position, separators, char.IsAsciiDigit, out _);
 
-            BigInteger denominator = BigInteger.Parse(
-                text.AsSpan(denominatorStart, position - denominatorStart),
-                NumberStyles.None,
-                CultureInfo.InvariantCulture
-            );
+            BigInteger denominator = BigInteger.Parse(denominatorDigits, NumberStyles.None, CultureInfo.InvariantCulture);
             if (denominator.IsZero)
             {
                 return Outcome.NotANumber;
@@ -411,7 +449,7 @@ internal static class NumberReader
             return Outcome.Number;
         }
 
-        ReadOnlySpan<char> literal = text.AsSpan(start, position - start);
+        ReadOnlySpan<char> literal = separated ? digits.AsSpan() : text.AsSpan(start, position - start);
         if (isFloat)
         {
             var value = double.Parse(literal, CultureInfo.InvariantCulture);

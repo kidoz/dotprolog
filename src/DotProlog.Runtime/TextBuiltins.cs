@@ -613,6 +613,7 @@ internal static class TextBuiltins
                 machine.Symbols.CodePoints,
                 machine.Program.Flags.RationalLiterals,
                 machine.Program.Flags.IsoReading,
+                machine.Program.Flags.DigitSeparators,
                 out PrologNumber parsed
             );
             return outcome switch
@@ -1071,6 +1072,15 @@ internal static class TextBuiltins
             return false;
         }
 
+        // Digit separators are dropped before parsing; they belong to integers, so a separated
+        // text is no float.
+        var separated = false;
+        if (machine.Program.Flags.DigitSeparators && span.IndexOf('_') >= 0)
+        {
+            var cleaned = CleanDigitSeparators(span, out separated);
+            span = cleaned.AsSpan();
+        }
+
         if (TryParseRadix(span, machine.Symbols.CodePoints, out System.Numerics.BigInteger radixValue))
         {
             number = PrologNumber.FromBig(negative ? -radixValue : radixValue);
@@ -1113,6 +1123,11 @@ internal static class TextBuiltins
         }
 
         var real = span.Contains('.');
+
+        if (real && separated)
+        {
+            return false;
+        }
 
         if (!real)
         {
@@ -1174,6 +1189,73 @@ internal static class TextBuiltins
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Drops digit separators from number text: an underscore between digits — a hex digit counts in
+    /// a radix literal — followed by layout text, white space and comments. An underscore anywhere
+    /// else stays, for the strict parse to reject; <paramref name="separated"/> tells the caller a
+    /// separator was dropped, because a separated text is an integer, never a float.
+    /// </summary>
+    private static string CleanDigitSeparators(ReadOnlySpan<char> span, out bool separated)
+    {
+        var builder = new StringBuilder(span.Length);
+        separated = false;
+
+        var index = 0;
+        while (index < span.Length)
+        {
+            var c = span[index];
+            if (c == '_' && builder.Length > 0 && char.IsAsciiLetterOrDigit(builder[^1]))
+            {
+                var lookahead = index + 1;
+                SkipDigitSeparatorLayout(span, ref lookahead);
+                if (lookahead < span.Length && char.IsAsciiLetterOrDigit(span[lookahead]))
+                {
+                    separated = true;
+                    index = lookahead;
+                    continue;
+                }
+            }
+
+            builder.Append(c);
+            index++;
+        }
+
+        return builder.ToString();
+    }
+
+    /// <summary>Skips white space and comments after a digit separator's underscore.</summary>
+    private static void SkipDigitSeparatorLayout(ReadOnlySpan<char> span, ref int index)
+    {
+        while (index < span.Length)
+        {
+            if (char.IsWhiteSpace(span[index]))
+            {
+                index++;
+            }
+            else if (span[index] == '%')
+            {
+                while (index < span.Length && span[index] != '\n')
+                {
+                    index++;
+                }
+            }
+            else if (index + 1 < span.Length && span[index] == '/' && span[index + 1] == '*')
+            {
+                var end = span[(index + 2)..].IndexOf("*/");
+                if (end < 0)
+                {
+                    return;
+                }
+
+                index += 2 + end + 2;
+            }
+            else
+            {
+                return;
+            }
+        }
     }
 
     private static bool TryParseRadix(ReadOnlySpan<char> span, bool codePoints, out System.Numerics.BigInteger value)

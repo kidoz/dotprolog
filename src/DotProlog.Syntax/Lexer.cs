@@ -185,6 +185,9 @@ internal sealed class Lexer
     /// <summary>Whether characters are Unicode code points; strict ISO mode keeps UTF-16 code units.</summary>
     private bool CodePoints => _flags?.CodePointCharacters ?? true;
 
+    /// <summary>Whether an underscore and following layout text separate digit groups in integer literals.</summary>
+    private bool DigitSeparators => _flags?.DigitSeparators ?? true;
+
     /// <summary>
     /// The character at <paramref name="position"/> and its width in code units: a surrogate pair is
     /// one character when characters are code points; otherwise it is the converted code unit.
@@ -407,14 +410,10 @@ internal sealed class Lexer
         if (radix != 0 && IsRadixDigit(Peek(2), radix))
         {
             Advance(2);
-            var digitsStart = _position;
-            while (_position < _text.Length && IsRadixDigit(InputAt(_position), radix))
-            {
-                Advance();
-            }
+            var radixDigits = ReadDigits(c => IsRadixDigit(c, radix), out _);
 
             BigInteger radixValue = 0;
-            foreach (var digit in ConvertedText(digitsStart, _position - digitsStart))
+            foreach (var digit in radixDigits)
             {
                 radixValue =
                     (radixValue * radix) + (char.IsAsciiDigit(digit) ? digit - '0' : char.ToLowerInvariant(digit) - 'a' + 10);
@@ -432,13 +431,10 @@ internal sealed class Lexer
             );
         }
 
-        while (_position < _text.Length && char.IsAsciiDigit(InputAt(_position)))
-        {
-            Advance();
-        }
+        var digits = ReadDigits(char.IsAsciiDigit, out var separated);
 
         var isFloat = false;
-        if (_position < _text.Length && InputAt(_position) == '.' && char.IsAsciiDigit(Peek(1)))
+        if (!separated && _position < _text.Length && InputAt(_position) == '.' && char.IsAsciiDigit(Peek(1)))
         {
             isFloat = true;
             Advance();
@@ -470,20 +466,12 @@ internal sealed class Lexer
             && (_flags?.RationalLiterals ?? true)
         )
         {
-            var numeratorText = ConvertedText(start, _position - start);
+            var numeratorText = digits;
             Advance();
-            var denominatorStart = _position;
-            while (_position < _text.Length && char.IsAsciiDigit(InputAt(_position)))
-            {
-                Advance();
-            }
+            var denominatorText = ReadDigits(char.IsAsciiDigit, out _);
 
             BigInteger numerator = BigInteger.Parse(numeratorText, NumberStyles.None, CultureInfo.InvariantCulture);
-            BigInteger denominator = BigInteger.Parse(
-                ConvertedText(denominatorStart, _position - denominatorStart),
-                NumberStyles.None,
-                CultureInfo.InvariantCulture
-            );
+            BigInteger denominator = BigInteger.Parse(denominatorText, NumberStyles.None, CultureInfo.InvariantCulture);
             SourceSpan rationalSpan = SpanFrom(start);
             if (denominator.IsZero)
             {
@@ -501,7 +489,7 @@ internal sealed class Lexer
             );
         }
 
-        var literal = ConvertedText(start, _position - start);
+        var literal = separated ? digits : ConvertedText(start, _position - start);
         SourceSpan span = SpanFrom(start);
 
         if (isFloat)
@@ -517,6 +505,55 @@ internal sealed class Lexer
         }
 
         return new Token(TokenKind.Integer, literal, span, layout, Integer: integer);
+    }
+
+    /// <summary>
+    /// Reads a run of digits, each converted, and returns their text. In Modern a single underscore
+    /// followed by layout text — white space and comments — separates digit groups and is dropped
+    /// from the value (SWI-Prolog's digit separators); <paramref name="separated"/> tells the caller
+    /// a run used one, because a separated run is an integer: floats never take separators, so the
+    /// run must not continue into a fraction or exponent. An underscore that no digit follows starts
+    /// the next token instead.
+    /// </summary>
+    private string ReadDigits(Func<char, bool> isDigit, out bool separated)
+    {
+        var start = _position;
+        StringBuilder? cleaned = null;
+        separated = false;
+
+        while (_position < _text.Length)
+        {
+            var c = InputAt(_position);
+            if (isDigit(c))
+            {
+                cleaned?.Append(c);
+                Advance();
+                continue;
+            }
+
+            if (c != '_' || !DigitSeparators || _position == start)
+            {
+                break;
+            }
+
+            var mark = _position;
+            var markLine = _line;
+            var markLineStart = _lineStart;
+            Advance();
+            SkipLayout();
+            if (!isDigit(InputAt(_position)))
+            {
+                _position = mark;
+                _line = markLine;
+                _lineStart = markLineStart;
+                break;
+            }
+
+            cleaned ??= new StringBuilder(ConvertedText(start, mark - start));
+            separated = true;
+        }
+
+        return cleaned?.ToString() ?? ConvertedText(start, _position - start);
     }
 
     /// <summary>

@@ -94,6 +94,13 @@ public sealed class PrologFlags
     /// </summary>
     public bool IsoReading { get; internal set; }
 
+    /// <summary>
+    /// Whether an underscore followed by layout text separates digit groups in an integer, radix, or
+    /// rational literal, as SWI-Prolog reads them: <c>1_000</c> is one integer. Seeded from the
+    /// language mode — strict ISO has no such token — and not a Prolog flag.
+    /// </summary>
+    public bool DigitSeparators { get; internal set; }
+
     /// <summary>Creates an independent copy of the current flag values.</summary>
     public PrologFlags Copy() =>
         new()
@@ -106,6 +113,7 @@ public sealed class PrologFlags
             RationalLiterals = RationalLiterals,
             CodePointCharacters = CodePointCharacters,
             IsoReading = IsoReading,
+            DigitSeparators = DigitSeparators,
         };
 
     /// <summary>Replaces every mutable flag value with those from another set.</summary>
@@ -120,5 +128,6 @@ public sealed class PrologFlags
         RationalLiterals = source.RationalLiterals;
         CodePointCharacters = source.CodePointCharacters;
         IsoReading = source.IsoReading;
+        DigitSeparators = source.DigitSeparators;
     }
 }

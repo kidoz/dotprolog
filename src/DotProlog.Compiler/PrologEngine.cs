@@ -44,12 +44,15 @@ public sealed class PrologEngine : IRuntimeCompiler
         // codes and Modern's operand reading whatever mode or override the host chose; no dialect
         // can reinterpret them.
         var isoReading = Program.Flags.IsoReading;
+        var digitSeparators = Program.Flags.DigitSeparators;
         Program.Flags.DoubleQuotes = DoubleQuotesMode.Codes;
         Program.Flags.IsoReading = false;
+        Program.Flags.DigitSeparators = true;
         LoadLibrary(BootstrapLibrary.Source, "bootstrap");
         LoadLibrary(StandardLibrary.Source, "library");
         Program.Flags.DoubleQuotes = Program.InitialDoubleQuotes;
         Program.Flags.IsoReading = isoReading;
+        Program.Flags.DigitSeparators = digitSeparators;
     }
 
     /// <summary>Compiles one of the built-in libraries, which must not fail.</summary>
