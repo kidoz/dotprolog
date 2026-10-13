@@ -215,20 +215,23 @@ Writing them was worth it immediately: they found these real defects.
 - `number_chars/2` and `number_codes/2` wrote a bound number out and compared the text, so
   `number_chars(1.0e9, "1.0E9")` failed, and they read the list with a smaller number syntax of
   their own. A list holding the whole text now decides: it is read with the term reader's number
-  syntax — leading layout and comments, a `-` name token, quoted or not, then one number token and
-  nothing after it — and the result unified with the first argument, with the table's
+  syntax — leading layout and comments, an optional `-` name token (quoted, or separated from the
+  digits, only in strict ISO mode), then one number token and nothing after it — and the result
+  unified with the first argument, with the table's
   `syntax_error`, `type_error(character, C)`, and `type_error(list, L)` answers for a bound first
   argument too. Only a partial list, or one with a variable in it, lets a bound number decide.
-  Every case of the ISO conformity table for `number_chars/2` gives one of its allowed answers; a
-  float beyond the finite range is `representation_error(max_float)`, the table's first answer.
+  In strict ISO mode, every case of the ISO conformity table for `number_chars/2` gives one of its
+  allowed answers, except case 82: a float beyond the finite range is `syntax_error(float_overflow)`
+  — the reader's answer, and SWI-Prolog's — rather than the table's `representation_error(max_float)`,
+  since 7.12.2 f defines no such representation flag.
   Cyclic lists now raise `type_error(list, Culprit)` with the cyclic culprit preserved through
   `catch/3`; previously, copying the exception replaced it with `representation_error(cyclic_term)`.
   Explicit thrown balls also preserve cycles. Detached copies for `copy_term/2`, `findall/3`,
   and stored clauses still reject cyclic terms.
 - `atom_number/2` and the number conversions let an oversized float literal become an unprintable
   IEEE infinity and wrapped an oversized radix literal to an arbitrary small integer. They now
-  raise an error — `syntax_error(float_overflow)` for `atom_number/2`, as the reader does, and
-  `representation_error(max_float)` for `number_chars/2` and `number_codes/2` — and integer
+  raise an error — `syntax_error(float_overflow)` for `atom_number/2`, `number_chars/2`, and
+  `number_codes/2`, as the reader does — and integer
   conversions of any length answer their exact unbounded value.
 - A raw control or layout character after `0'`, such as a newline, is a syntax error, as it is
   between quotes; `0'\n` is the escape to write instead. `0'` followed by a line continuation,

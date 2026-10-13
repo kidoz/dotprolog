@@ -87,16 +87,16 @@ written term, such as GAP-03 or GAP-04, is rated below one that ordinary program
 | Part 1 clause 5, compliance | 21 | 5 | 15 | 0 | 1 | 0 |
 | Part 1 clause 6, syntax | 46 | 37 | 9 | 0 | 0 | 0 |
 | Part 1 clause 7, concepts and semantics | 109 | 79 | 29 | 0 | 1 | 0 |
-| Part 1 clause 8, built-in predicates | 87 | 59 | 27 | 1 | 0 | 0 |
+| Part 1 clause 8, built-in predicates | 87 | 61 | 25 | 1 | 0 | 0 |
 | Part 1 clause 9, evaluable functors | 54 | 32 | 22 | 0 | 0 | 0 |
 | Corrigenda 1, 2, and 3 | 70 | 62 | 8 | 0 | 0 | 0 |
 | Implementation defined documentation | 32 | 19 | 13 | 0 | 0 | 0 |
 | Part 2, modules | 63 | 23 | 36 | 0 | 0 | 4 |
 | Part 3, grammar rules | 29 | 19 | 8 | 0 | 0 | 2 |
-| **Total** | **511** | **335** | **167** | **1** | **2** | **6** |
+| **Total** | **511** | **337** | **165** | **1** | **2** | **6** |
 
-There are 70 open gaps: 14 High, 24 Medium, and 32 Low. GAP-35 was closed after Cor.3 was
-reviewed. Most of the Partial rows in Part 1 share a few causes: the strict-mode handling of
+There are 69 open gaps: 14 High, 24 Medium, and 31 Low. GAP-35 was closed after Cor.3 was
+reviewed, and GAP-08 was fixed in 0.15.1. Most of the Partial rows in Part 1 share a few causes: the strict-mode handling of
 extension names (GAP-09 to GAP-11), existential `^` in `bagof/3` and `setof/3` and their reliance on
 public library names (GAP-15, GAP-66), and arithmetic exception classes and integers outside the
 float range (GAP-32 to GAP-39, GAP-67, GAP-68). Part 2 module qualification is the largest area of
@@ -118,7 +118,7 @@ matching checklist row.
 | GAP-05 | Low | Cor.1 6.3.7 | With `double_quotes` set to `atom`, `"-"1` reads as `-(1)`. ISO requires a syntax error | Open |
 | GAP-06 | Low | 6.4.8 | An end char at the very end of the input (`a.` with nothing after it) is accepted as an end token. ISO requires layout or `%` after it | Open |
 | GAP-07 | Low | 6.5, 5.4 | Non-ASCII whitespace (U+00A0, U+2003, U+0085) counts as layout and non-ASCII decimal digits count as alphanumeric. Both contradict the documented `StrictIso` character classes | Open |
-| GAP-08 | Low | 8.16.7, 8.16.8 | For `1.0e400`, `number_chars/2` raises `representation_error(max_float)` while the reader raises `syntax_error(float_overflow)`. `max_float` is not a representation flag in 7.12.2 f. Every other probed text agrees between the two parsers in `StrictIso`, including the texts from issues #2, #7, #10, and #12 | Open |
+| GAP-08 | Low | 8.16.7, 8.16.8 | For `1.0e400`, `number_chars/2` raised `representation_error(max_float)` while the reader raises `syntax_error(float_overflow)`; `max_float` is not a representation flag in 7.12.2 f, and 8.16.7.3 e defines only `syntax_error(imp_dep_atom)` for a list that is not parsable as a number. Both parsers now raise the reader's error in every mode. Every other probed text agrees between the two parsers in every mode, including the texts from issues #2, #7, #10, and #12 | Fixed in 0.15.1 |
 
 ### Strict mode and extensions
 
@@ -501,8 +501,8 @@ matching checklist row.
 | Cor.1, Cor.2 8.16.4 | `atom_chars/2` | Done | 8/8 examples, 15/15 errors |
 | Cor.1, Cor.2 8.16.5 | `atom_codes/2` | Done | 8/8 examples, 12/12 errors |
 | 8.16.6 | `char_code/2` | Partial | 7/7 examples, 5/9 errors. GAP-29 |
-| Cor.2 8.16.7 | `number_chars/2` | Partial | 12/12 examples, 17/17 errors, 71 extra cases (issues #2, #7, #10, #12). GAP-08 |
-| Cor.2 8.16.8 | `number_codes/2` | Partial | 10/10 examples, 11/11 errors. GAP-08 |
+| Cor.2 8.16.7 | `number_chars/2` | Done | 12/12 examples, 17/17 errors, 71 extra cases (issues #2, #7, #10, #12). GAP-08 fixed in 0.15.1 (`AnOversizedFloatLiteralRaisesTheReadersSyntaxError`) |
+| Cor.2 8.16.8 | `number_codes/2` | Done | 10/10 examples, 11/11 errors. GAP-08 fixed in 0.15.1 (`AnOversizedFloatLiteralRaisesTheReadersSyntaxError`) |
 | 8.17.1 | `set_prolog_flag/2` | Partial | 5/5 examples, 14/14 errors. GAP-31 |
 | 8.17.2 | `current_prolog_flag/2` | Done | 3/3 examples, 2/2 errors |
 | 8.17.3 | `halt/0` | Done | Exit status 0 |

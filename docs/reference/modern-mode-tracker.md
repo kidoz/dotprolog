@@ -91,8 +91,8 @@ follow the ISO tracker.
 
 - **Modifications:** 7 (CHG-01 to CHG-07). Five are deliberate and documented, CHG-02 is a
   deliberate feature whose conflict with ISO text is undocumented, and CHG-04 is contested.
-- **ISO tracker gaps:** 56 of the 71 also occur in Modern. GAP-10 and GAP-15 do not occur, and
-  GAP-35 is closed. Seven become permitted extensions, GAP-41 is a modification (CHG-07), and
+- **ISO tracker gaps:** 55 of the 71 also occur in Modern. GAP-10 and GAP-15 do not occur, GAP-35
+  is closed, and GAP-08 was fixed in 0.15.1. Seven become permitted extensions, GAP-41 is a modification (CHG-07), and
   GAP-03, GAP-09, GAP-40, and GAP-69 take a different form in Modern.
 - **Modern gaps:** 6 (MGAP-01 to MGAP-06): 4 Medium and 2 Low.
 - **Extensions:** 20 groups (EXT-01 to EXT-20), including 163 extension predicates, 15 extra
@@ -132,8 +132,9 @@ as a modification.
 
 ## ISO tracker gaps in Modern
 
-56 of the 71 gaps behave the same in Modern: GAP-02, GAP-04, GAP-08, GAP-14, GAP-16 to GAP-34,
-GAP-36 to GAP-39, GAP-42 to GAP-68, GAP-70, and GAP-71. The other 15:
+55 of the 71 gaps behave the same in Modern: GAP-02, GAP-04, GAP-14, GAP-16 to GAP-34,
+GAP-36 to GAP-39, GAP-42 to GAP-68, GAP-70, and GAP-71. GAP-08 was fixed in 0.15.1, and GAP-35
+is closed. The other 15:
 
 | Gap | Modern | Notes |
 |---|---|---|

@@ -8,6 +8,10 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Fixed
 
+- `number_chars/2` and `number_codes/2` raise the reader's `syntax_error(float_overflow)` for a
+  float literal beyond the binary64 range, such as `9.9e999`, in both modes — the same answer
+  SWI-Prolog gives — instead of `representation_error(max_float)`, which names no representation
+  flag the standard defines.
 - `number_chars/2` and `number_codes/2` read a minus with the mode's own number syntax, so the
   two parsers no longer disagree: in Modern `number_chars(N, "- 1")` and
   `number_chars(N, "'-'1")` now raise `syntax_error(illegal_number)`, as the reader reads `- 1`

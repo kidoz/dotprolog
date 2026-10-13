@@ -60,7 +60,8 @@ program's lifetime, an embedding consideration beside atom growth. Converting a 
 float that overflows binary64 raises `evaluation_error(float_overflow)`; a shift count or exponent
 whose result would exceed the big-integer representation raises `resource_error(memory)`. Float
 arithmetic rejects NaN and infinity with the applicable ISO evaluation error. A decimal float
-literal that overflows binary64 is a `syntax_error(float_overflow)`; underflow rounds to signed
+literal that overflows binary64 is a `syntax_error(float_overflow)`, in source text and in
+`number_chars/2` and `number_codes/2` input alike; underflow rounds to signed
 zero.
 
 ## Required division result
