@@ -618,7 +618,12 @@ internal static class TextBuiltins
             return outcome switch
             {
                 NumberReader.Outcome.Number => machine.Unify(number, ArithmeticEvaluator.ToCell(machine, parsed)),
-                NumberReader.Outcome.FloatOverflow => throw PrologErrors.Representation(machine, "max_float"),
+                // The reader's answer for an oversized float literal: runtime-read floats stay
+                // finite, and max_float is no representation flag.
+                NumberReader.Outcome.FloatOverflow => throw machine.CreateBall(
+                    SyntaxErrorTerm(machine, "float_overflow"),
+                    "syntax_error(float_overflow)"
+                ),
                 _ => throw machine.CreateBall(SyntaxErrorTerm(machine, "illegal_number"), "syntax_error(illegal_number)"),
             };
         }

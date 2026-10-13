@@ -96,8 +96,29 @@ public sealed class NumberCharsConformityTests
     [InlineData("number_chars(1, [_|2])", "type_error(list,[A|2])")] // 43
     [InlineData("number_chars(1, [[]|_])", "type_error(character,[])")] // 44
     [InlineData("number_chars(1+1, \"2\")", "type_error(number,1+1)")] // 53
-    [InlineData("number_chars(N, \"9.9e999\")", "representation_error(max_float)")] // 82
     public void ReportsTheErrorsTheTableExpects(string goal, string expected) => Assert.Equal(expected, Outcome(goal));
+
+    // Case 82: the table expects representation_error(max_float) or a like flag, but 7.12.2 f defines
+    // no such flag, so an oversized float literal raises the reader's syntax_error(float_overflow)
+    // instead, as SWI-Prolog answers, in both modes.
+    [Theory]
+    [InlineData(PrologLanguageMode.Modern)]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    public void AnOversizedFloatLiteralRaisesTheReadersSyntaxError(PrologLanguageMode mode)
+    {
+        var engine = new PrologEngine(mode) { Output = new StringWriter() };
+        Assert.True(
+            engine
+                .Query(
+                    "catch(number_codes(N, [57,46,57,101,57,57,57]), error(syntax_error(float_overflow), _), Caught_ = yes), "
+                        + "Caught_ == yes, var(N), "
+                        + "atom_codes(Atom_, [57,46,57,101,57,57,57]), atom_chars(Atom_, Chars_), "
+                        + "catch(number_chars(M, Chars_), error(syntax_error(float_overflow), _), Caught2_ = yes), "
+                        + "Caught2_ == yes, var(M)"
+                )
+                .Prove()
+        );
+    }
 
     [Theory]
     [InlineData(PrologLanguageMode.Modern)]

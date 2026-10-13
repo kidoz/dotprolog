@@ -33,7 +33,7 @@ internal static class NumberReader
         /// <summary>The text is not a number: <c>syntax_error</c>.</summary>
         NotANumber,
 
-        /// <summary>The text is a float beyond the finite range: <c>representation_error(max_float)</c>.</summary>
+        /// <summary>The text is a float beyond the finite range: <c>syntax_error(float_overflow)</c>.</summary>
         FloatOverflow,
     }
 
