@@ -6,6 +6,14 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Digit separators in Modern source and numeric conversions: an underscore followed by optional
+  layout text — white space and comments — separates digit groups of integer, radix, and rational
+  literals, so `X = 1_000_000.` and `number_codes(N, "1_000")` read one number, as SWI-Prolog
+  does. Floats take no separators, SWI's single-space separator is not read, and strict ISO mode
+  is unchanged.
+
 ### Fixed
 
 - `number_chars/2` and `number_codes/2` raise the reader's `syntax_error(float_overflow)` for a

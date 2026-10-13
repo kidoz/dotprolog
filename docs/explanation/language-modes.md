@@ -40,6 +40,9 @@ standard does, and Modern as SWI-Prolog does, so that SWI-style programs load un
   stands bare in both modes, as in `f(-)` and `[:-, -]`.
 - `\e` is an escape only in Modern, as are `\uXXXX` and `\UXXXXXXXX`. A back-quoted `` `text` `` is
   a syntax error in StrictIso and an atom in Modern.
+- `1_000_000` reads as one integer in Modern — an underscore and following layout text separate
+  digit groups of integer, radix, and rational literals — while StrictIso keeps ISO's tokens, so
+  the underscore starts a variable there.
 
 Writing does not depend on the mode. `writeq/1` brackets wherever the two readings could differ, so
 `-(1)` is written `- (1)` and `(-)=(-)` keeps its brackets, and both modes read the output back as

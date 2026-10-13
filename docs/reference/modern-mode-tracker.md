@@ -95,7 +95,7 @@ follow the ISO tracker.
   is closed, and GAP-08 was fixed in 0.15.1. Seven become permitted extensions, GAP-41 is a modification (CHG-07), and
   GAP-03, GAP-09, GAP-40, and GAP-69 take a different form in Modern.
 - **Modern gaps:** 6 (MGAP-01 to MGAP-06): 4 Medium and 2 Low.
-- **Extensions:** 20 groups (EXT-01 to EXT-20), including 163 extension predicates, 15 extra
+- **Extensions:** 21 groups (EXT-01 to EXT-21), including 163 extension predicates, 15 extra
   predefined operators, 12 evaluable functors, one extra type, and one extra flag.
 
 ## Modifications
@@ -178,6 +178,7 @@ is closed. The other 15:
 | EXT-18 | 5.5.10 | 12 evaluable functors: `e/0`, `inf/0`, `infinite/0`, `nan/0`, `max_tagged_integer/0`, `min_tagged_integer/0`, `integer/1`, `numerator/1`, `denominator/1`, `rational/1`, `rationalize/1`, and `rdiv/2`. No ISO expression yields a value of an extra type; `2^(-1)` raises `type_error(float, 2)` as Cor.3 requires. The values of `inf`, `infinite`, and `nan` are MGAP-02 | In part (MGAP-05) |
 | EXT-19 | 5.5.11 | About 208 reserved internal `$` names | No (GAP-14, MGAP-05) |
 | EXT-20 | Cor.3 5.5.12 | The write option `spacing/1`, with values `standard` and `next_argument`; also accepted in `StrictIso` (GAP-13). Invalid values raise the errors 5.5.12 requires | Changelog only (MGAP-05) |
+| EXT-21 | 5.5.1 | Digit separators: an underscore and following layout text — white space and comments — between digit groups of an integer, radix, or rational literal, so `1_000_000`, `0xFF_FF`, and `1_0r3` read as one number in source and in `number_chars/2`, `number_codes/2`, and `atom_number/2` (issue #14). Floats take no separators, and SWI-Prolog's single-space separator is not read | Yes |
 
 ### Extension predicates
 
@@ -243,7 +244,7 @@ and mode-specific observations in the StrictIso notes are not inherited. Where a
 | 5.1 e | Offer a strictly conforming mode that rejects implementation specific features in text and during execution | Partial | N/A | A requirement on the strictly conforming mode |
 | 5.2 | Conforming and strictly conforming Prolog text | Partial | Modified | CHG-01, CHG-02 |
 | 5.3 | Conforming and strictly conforming goals | Partial | Modified | CHG-04, CHG-06 and CHG-07 change the results of conforming goals. Extension goals run (5.5.9) |
-| 5.5.1 | Extra syntax must not change the meaning of conforming text | Partial | Modified | CHG-01 and CHG-02 change the abstract syntax of conforming text. The syntax extensions EXT-01 to EXT-05 do not. Also GAP-02, MGAP-01 |
+| 5.5.1 | Extra syntax must not change the meaning of conforming text | Partial | Modified | CHG-01 and CHG-02 change the abstract syntax of conforming text. The syntax extensions EXT-01 to EXT-05 and EXT-21 do not. Also GAP-02, MGAP-01 |
 | 5.5.2 | Extra predefined operators | Partial | Partial | EXT-06, EXT-07. The operators `xor`, `*->`, `module`, `use_module`, and `meta_predicate`, and the readings the extra operators change, are undocumented (MGAP-05) |
 | 5.5.4 | Extra types | Done | Modified | CHG-03: rationals break 5.5.4 b. The string type (EXT-08) meets a, b, d, and f; c and e are undocumented (MGAP-05) |
 | 5.5.5 | Extra directives | Partial | Extension | EXT-09 to EXT-11 |

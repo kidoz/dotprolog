@@ -313,7 +313,7 @@ A `.dplproj` selects its mode with `<DotPrologLanguageMode>`. See the
 
 | Area | Predicates |
 |---|---|
-| Terms | atoms, variables, unbounded integers, rationals, floats, strings, lists, double-quoted character lists, structures |
+| Terms | atoms, variables, unbounded integers, rationals, floats, strings, lists, double-quoted character lists, structures; `_` digit groups in integer literals |
 | Control | `,/2`, `;/2`, `->/2`, `*->/2`, `\+/1`, `!/0`, `call/1..8`, `once/1`, `repeat/0`, `ignore/1`, `not/1`, `true/0`, `fail/0` |
 | Exceptions | `throw/1`, `catch/3`, with catchable ISO `error/2` terms |
 | All solutions | `findall/3,4`, `bagof/3`, `setof/3`, `forall/2`, `call_nth/2`, `countall/2`, `aggregate_all/3,4` and `aggregate/3,4` (`count`, `bag`, `set`, `sum`, `max`, `min`) |

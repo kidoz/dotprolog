@@ -44,7 +44,9 @@ For the design and text representation choices, see [language modes and text](ex
 ## Terms and clauses
 
 The reader supports variables, atoms, unbounded integers, rationals, finite floats, lists, structures, and
-double-quoted text interpreted according to `double_quotes`. Programs contain facts, rules, and directives:
+double-quoted text interpreted according to `double_quotes`. In the default mode, integer, radix,
+and rational literals may group digits with an underscore and following layout: `1_000_000`.
+Programs contain facts, rules, and directives:
 
 ```prolog
 parent(ada, byron).
