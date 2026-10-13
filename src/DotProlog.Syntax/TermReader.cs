@@ -109,8 +109,10 @@ public sealed class TermReader
     /// <summary>
     /// Reads <paramref name="text"/> as <c>number_chars/2</c> and <c>number_codes/2</c> read their
     /// list (ISO 8.16.7 and 8.16.8): layout text, which may hold comments, then an optional <c>-</c>
-    /// name token, quoted or not, then one number token, and nothing after it, not even layout. So
-    /// <c>" 1"</c>, <c>"- 1"</c>, and <c>"/**/1"</c> are numbers, and <c>"1 "</c> and <c>"+1"</c> are not.
+    /// name token, then one number token, and nothing after it, not even layout. So <c>" 1"</c>,
+    /// <c>"-1"</c>, and <c>"/**/1"</c> are numbers, and <c>"1 "</c> and <c>"+1"</c> are not. The minus
+    /// follows the mode's reading: strict ISO also takes a quoted <c>'-'</c> and one before layout or
+    /// a comment, so <c>"- 1"</c> and <c>"'-'1"</c> are numbers there only.
     /// </summary>
     /// <remarks>
     /// The runtime reads these lists with its own <c>NumberReader</c>, since it cannot depend on this
@@ -132,17 +134,26 @@ public sealed class TermReader
         List<Diagnostic> found = [];
         diagnostics = found;
         var lexer = new Lexer(text, null, found, conversions: null, flags);
+        var isoReading = flags?.IsoReading ?? false;
 
         Token token = lexer.Next();
         SourceSpan start = token.Span;
-        var negate = token is { Kind: TokenKind.Atom, Text: "-" };
+
+        // The minus rule is the term reader's own: strict ISO takes a quoted minus too, otherwise
+        // only an unquoted one directly before the digits forms a negative number.
+        var negate = token is { Kind: TokenKind.Atom, Text: "-" } && (isoReading || !token.Quoted);
         if (negate)
         {
             token = lexer.Next();
         }
 
         Token end = lexer.Next();
-        if (token.Kind is not (TokenKind.Integer or TokenKind.Float) || end.Kind != TokenKind.Eof || end.PrecededByLayout)
+        if (
+            token.Kind is not (TokenKind.Integer or TokenKind.Float)
+            || end.Kind != TokenKind.Eof
+            || end.PrecededByLayout
+            || (negate && !isoReading && token.PrecededByLayout)
+        )
         {
             found.Add(new Diagnostic(DiagnosticIds.InvalidNumber, DiagnosticSeverity.Error, "The text is not a number.", start));
             return null;

@@ -6,9 +6,12 @@ namespace DotProlog.Runtime;
 
 /// <summary>
 /// Reads the text of a <c>number_chars/2</c> or <c>number_codes/2</c> list (ISO 8.16.7 and 8.16.8):
-/// layout text, which may hold comments, then an optional <c>-</c> name token, quoted or not, then one
-/// number token, and nothing after it, not even layout. So <c>" 1"</c>, <c>"- 1"</c>, <c>"'-'1"</c>, and
-/// <c>"/**/1"</c> are numbers, and <c>"1 "</c>, <c>"+1"</c>, and <c>"0X1"</c> are not.
+/// layout text, which may hold comments, then an optional <c>-</c> name token, then one number token,
+/// and nothing after it, not even layout. So <c>" 1"</c>, <c>"-1"</c>, and <c>"/**/1"</c> are numbers,
+/// and <c>"1 "</c>, <c>"+1"</c>, and <c>"0X1"</c> are not. Strict ISO also reads a quoted <c>'-'</c>
+/// and layout or a comment between the minus and the digits, as the reader does (6.3.4.1); otherwise
+/// only an unquoted <c>-</c> directly before the digits forms a negative number, as SWI-Prolog reads
+/// it, so <c>"- 1"</c> and <c>"'-'1"</c> are numbers in strict ISO mode only.
 /// </summary>
 /// <remarks>
 /// The syntax is the term reader's, character conversion aside, which does not apply here. The runtime
@@ -38,8 +41,9 @@ internal static class NumberReader
     /// <param name="text">The characters of the list.</param>
     /// <param name="codePoints">Whether characters are code points, as in the default mode.</param>
     /// <param name="rationals">Whether <c>NrM</c> rational literals are read, as in the default mode.</param>
+    /// <param name="isoReading">Whether a quoted <c>-</c>, or one before layout, forms a negative number, as in strict ISO mode.</param>
     /// <param name="number">The number read, when the outcome is <see cref="Outcome.Number"/>.</param>
-    internal static Outcome Read(string text, bool codePoints, bool rationals, out PrologNumber number)
+    internal static Outcome Read(string text, bool codePoints, bool rationals, bool isoReading, out PrologNumber number)
     {
         number = default;
         var position = 0;
@@ -61,7 +65,7 @@ internal static class NumberReader
             negate = true;
             position++;
         }
-        else if (position < text.Length && text[position] == '\'')
+        else if (isoReading && position < text.Length && text[position] == '\'')
         {
             if (!TryReadQuoted(text, ref position, codePoints, out var name) || name != "-")
             {
@@ -71,7 +75,7 @@ internal static class NumberReader
             negate = true;
         }
 
-        if (negate && !SkipLayout(text, ref position))
+        if (negate && isoReading && !SkipLayout(text, ref position))
         {
             return Outcome.NotANumber;
         }

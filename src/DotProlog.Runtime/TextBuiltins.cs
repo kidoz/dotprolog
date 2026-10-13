@@ -612,6 +612,7 @@ internal static class TextBuiltins
                 ReadText(machine, elements, chars),
                 machine.Symbols.CodePoints,
                 machine.Program.Flags.RationalLiterals,
+                machine.Program.Flags.IsoReading,
                 out PrologNumber parsed
             );
             return outcome switch

@@ -146,6 +146,7 @@ public sealed class NumberReaderParityTests
             text,
             flags.CodePointCharacters,
             flags.RationalLiterals,
+            flags.IsoReading,
             out PrologNumber number
         );
 

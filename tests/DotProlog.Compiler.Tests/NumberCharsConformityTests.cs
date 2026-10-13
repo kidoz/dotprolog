@@ -25,18 +25,29 @@ public sealed class NumberCharsConformityTests
     [InlineData("number_chars(N, \"0'\\\\n\"), N == 10")] // 60
     [InlineData("number_chars(N, \"0'\\\\7\\\\\"), N == 7")] // 61
     [InlineData("number_chars(N, \"0'.\"), N == 46")] // 62
-    [InlineData("number_chars(N, \"- 1\"), N == -1")] // 21
-    [InlineData("number_chars(N, \"'-'1\"), N == -1")] // 54
     [InlineData("number_chars(N, \"/**/1\"), N == 1")] // 22
     [InlineData("number_chars(N, \"%\\n1\"), N == 1")] // 23
-    [InlineData("number_chars(N, \"-%\\n0\"), N == 0")] // 74
-    [InlineData("number_chars(N, \"- /**/1\"), N == -1")] // 57
-    [InlineData("number_chars(N, \"'\\\\\\n-' 3\"), N == -3")] // 63
     [InlineData("number_chars(N, \"0x1\"), N == 1")] // 28
     [InlineData("number_chars(1, [C]), C == '1'")] // 31
     [InlineData("number_chars(10, [C, D]), [C, D] == ['1', '0']")] // 35
     [InlineData("number_chars(N, \"1.0e-8\"), number_chars(N, L), number_chars(N, L)")] // 78
     public void ReadsTheListAsTheReaderReadsANumber(string goal) => Assert.Equal("true", Outcome(goal));
+
+    // A minus counts as part of the number only where the mode's reader folds it in: strict ISO
+    // reads a quoted minus and one before layout or a comment; elsewhere only an unquoted minus
+    // directly before the digits counts, as SWI-Prolog reads it, so these are syntax errors there.
+    [Theory]
+    [InlineData("[45,32,49]", -1)] // 21: "- 1"
+    [InlineData("[39,45,39,49]", -1)] // 54: "'-'1"
+    [InlineData("[45,32,47,42,42,47,49]", -1)] // 57: "- /**/1"
+    [InlineData("[39,92,10,45,39,32,51]", -3)] // 63: "'\<newline>-' 3"
+    [InlineData("[45,37,10,48]", 0)] // 74: "-%<newline>0"
+    public void AMinusSeparatedFromTheDigitsIsANumberOnlyInStrictIso(string codes, int expected)
+    {
+        var goal = $"atom_codes(A, {codes}), atom_chars(A, Chars), number_chars(N, Chars), N == {expected}";
+        Assert.Equal("true", Outcome(PrologLanguageMode.StrictIso, goal));
+        Assert.Equal("syntax_error", Outcome(PrologLanguageMode.Modern, goal));
+    }
 
     [Theory]
     [InlineData("number_chars(1, [C, D])")] // 32
@@ -174,4 +185,12 @@ public sealed class NumberCharsConformityTests
             $"catch((({goal}) -> Outcome_ = true ; Outcome_ = false), error(Error_, _), Outcome_ = Error_), "
                 + "( Outcome_ = syntax_error(_) -> write(syntax_error) ; copy_term(Outcome_, Shown_), numbervars(Shown_, 0, _), writeq(Shown_) )"
         );
+
+    private static string Outcome(PrologLanguageMode mode, string goal)
+    {
+        var engine = new PrologEngine(mode) { Output = new StringWriter() };
+        var query = $"catch((({goal}) -> write(true) ; write(false)), error(syntax_error(_), _), write(syntax_error))";
+        Assert.True(engine.Query(query).Prove(), goal);
+        return ((StringWriter)engine.Output).ToString();
+    }
 }
