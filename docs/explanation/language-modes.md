@@ -33,6 +33,8 @@ standard does, and Modern as SWI-Prolog does, so that SWI-style programs load un
 
 - `- 1` is the integer −1 in StrictIso, and so are `'-'1` and `- /* comment */ 1`. Modern joins a
   minus to a number only when it is written directly before the digits, so `- 1` is `-(1)`.
+  `number_chars/2` and `number_codes/2` follow the mode's reading too: `number_chars(N, "- 1")`
+  gives −1 in StrictIso and raises `syntax_error(illegal_number)` in Modern.
 - An atom that is an operator needs brackets to be the operand of another operator in StrictIso:
   `X = -` is a syntax error there and `X = (-)` is not. As an argument or a list element it
   stands bare in both modes, as in `f(-)` and `[:-, -]`.

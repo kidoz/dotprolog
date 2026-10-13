@@ -63,7 +63,9 @@ predicates are never aliased to atoms.
 
 Strict mode reads three spellings as ISO does where Modern follows SWI-Prolog: `- 1` and `'-'1` are
 the integer −1 rather than `-(1)`, an atom that is an operator needs brackets to be an operand
-(`X = (-)`, not `X = -`), and a back-quoted string is a syntax error rather than an atom. See
+(`X = (-)`, not `X = -`), and a back-quoted string is a syntax error rather than an atom.
+`number_chars/2` and `number_codes/2` follow the mode's reading of a minus, so
+`number_chars(N, "- 1")` raises `syntax_error(illegal_number)` in Modern. See
 [language modes and text](explanation/language-modes.md#some-text-reads-differently).
 
 ## Control and errors
