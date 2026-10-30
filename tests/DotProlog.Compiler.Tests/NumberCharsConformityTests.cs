@@ -33,20 +33,20 @@ public sealed class NumberCharsConformityTests
     [InlineData("number_chars(N, \"1.0e-8\"), number_chars(N, L), number_chars(N, L)")] // 78
     public void ReadsTheListAsTheReaderReadsANumber(string goal) => Assert.Equal("true", Outcome(goal));
 
-    // A minus counts as part of the number only where the mode's reader folds it in: strict ISO
-    // reads a quoted minus and one before layout or a comment; elsewhere only an unquoted minus
-    // directly before the digits counts, as SWI-Prolog reads it, so these are syntax errors there.
+    // Both modes read a quoted minus and one before layout or a comment as part of the number.
     [Theory]
     [InlineData("[45,32,49]", -1)] // 21: "- 1"
     [InlineData("[39,45,39,49]", -1)] // 54: "'-'1"
     [InlineData("[45,32,47,42,42,47,49]", -1)] // 57: "- /**/1"
     [InlineData("[39,92,10,45,39,32,51]", -3)] // 63: "'\<newline>-' 3"
     [InlineData("[45,37,10,48]", 0)] // 74: "-%<newline>0"
-    public void AMinusSeparatedFromTheDigitsIsANumberOnlyInStrictIso(string codes, int expected)
+    public void AMinusSeparatedFromTheDigitsIsANumberInBothModes(string codes, int expected)
     {
-        var goal = $"atom_codes(A, {codes}), atom_chars(A, Chars), number_chars(N, Chars), N == {expected}";
+        var goal =
+            $"atom_codes(A, {codes}), atom_chars(A, Chars), number_chars(N, Chars), N == {expected}, "
+            + $"number_codes(M, {codes}), M == {expected}";
         Assert.Equal("true", Outcome(PrologLanguageMode.StrictIso, goal));
-        Assert.Equal("syntax_error", Outcome(PrologLanguageMode.Modern, goal));
+        Assert.Equal("true", Outcome(PrologLanguageMode.Modern, goal));
     }
 
     [Theory]

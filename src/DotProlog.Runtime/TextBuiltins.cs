@@ -612,7 +612,6 @@ internal static class TextBuiltins
                 ReadText(machine, elements, chars),
                 machine.Symbols.CodePoints,
                 machine.Program.Flags.RationalLiterals,
-                machine.Program.Flags.IsoReading,
                 machine.Program.Flags.DigitSeparators,
                 out PrologNumber parsed
             );
@@ -1059,6 +1058,23 @@ internal static class TextBuiltins
         if (span.Length == 0)
         {
             return false;
+        }
+
+        if (span[0] == '\'' || (span[0] == '-' && (span.Length == 1 || !char.IsAsciiDigit(span[1]))))
+        {
+            NumberReader.Outcome outcome = NumberReader.Read(
+                text,
+                machine.Symbols.CodePoints,
+                machine.Program.Flags.RationalLiterals,
+                machine.Program.Flags.DigitSeparators,
+                out number
+            );
+            if (outcome == NumberReader.Outcome.FloatOverflow)
+            {
+                throw machine.CreateBall(SyntaxErrorTerm(machine, "float_overflow"), "syntax_error(float_overflow)");
+            }
+
+            return outcome == NumberReader.Outcome.Number;
         }
 
         var negative = span[0] == '-';

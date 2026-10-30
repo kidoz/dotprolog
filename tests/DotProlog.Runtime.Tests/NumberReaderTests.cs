@@ -9,58 +9,22 @@ namespace DotProlog.Runtime.Tests;
 public sealed class NumberReaderTests
 {
     [Theory]
-    [InlineData("- 1", -1)]
-    [InlineData("/**/1", 1)]
-    [InlineData("'-'1", -1)]
-    [InlineData("- /**/1", -1)]
-    [InlineData("0'\\n", 10)]
-    public void ReadsLayoutCommentsAndAMinusBeforeTheNumberInStrictIso(string text, long expected)
-    {
-        Assert.Equal(
-            NumberReader.Outcome.Number,
-            NumberReader.Read(
-                text,
-                codePoints: true,
-                rationals: true,
-                isoReading: true,
-                digitSeparators: false,
-                out PrologNumber number
-            )
-        );
-        Assert.Equal(expected, number.Integer);
-    }
-
-    [Theory]
     [InlineData("-1", -1)]
     [InlineData(" -1", -1)]
     [InlineData("/**/1", 1)]
     [InlineData("0'\\n", 10)]
-    public void ReadsAMinusOnlyDirectlyBeforeTheDigitsOtherwise(string text, long expected)
+    [InlineData("- 1", -1)]
+    [InlineData("'-'1", -1)]
+    [InlineData("- /**/1", -1)]
+    [InlineData("-%\n0", 0)]
+    public void ReadsLayoutCommentsAndAMinusBeforeTheNumber(string text, long expected)
     {
         Assert.Equal(
             NumberReader.Outcome.Number,
-            NumberReader.Read(
-                text,
-                codePoints: true,
-                rationals: true,
-                isoReading: false,
-                digitSeparators: true,
-                out PrologNumber number
-            )
+            NumberReader.Read(text, codePoints: true, rationals: true, digitSeparators: true, out PrologNumber number)
         );
         Assert.Equal(expected, number.Integer);
     }
-
-    [Theory]
-    [InlineData("- 1")]
-    [InlineData("'-'1")]
-    [InlineData("- /**/1")]
-    [InlineData("-%\n0")]
-    public void RejectsASeparatedOrQuotedMinusOutsideStrictIso(string text) =>
-        Assert.Equal(
-            NumberReader.Outcome.NotANumber,
-            NumberReader.Read(text, codePoints: true, rationals: true, isoReading: false, digitSeparators: true, out _)
-        );
 
     [Theory]
     [InlineData("1_000", 1000)]
@@ -72,18 +36,12 @@ public sealed class NumberReaderTests
     [InlineData("0o7_7", 63)]
     [InlineData("0b1010_1010", 170)]
     [InlineData("-1_000", -1000)]
+    [InlineData("- 1_000", -1000)]
     public void ReadsDigitSeparatorsBetweenDigitGroups(string text, long expected)
     {
         Assert.Equal(
             NumberReader.Outcome.Number,
-            NumberReader.Read(
-                text,
-                codePoints: true,
-                rationals: true,
-                isoReading: false,
-                digitSeparators: true,
-                out PrologNumber number
-            )
+            NumberReader.Read(text, codePoints: true, rationals: true, digitSeparators: true, out PrologNumber number)
         );
         Assert.Equal(expected, number.Integer);
     }
@@ -94,7 +52,7 @@ public sealed class NumberReaderTests
     public void RejectsDigitSeparatorsInStrictIso(string text) =>
         Assert.Equal(
             NumberReader.Outcome.NotANumber,
-            NumberReader.Read(text, codePoints: true, rationals: true, isoReading: true, digitSeparators: false, out _)
+            NumberReader.Read(text, codePoints: true, rationals: true, digitSeparators: false, out _)
         );
 
     [Theory]
@@ -110,7 +68,7 @@ public sealed class NumberReaderTests
     public void RejectsMisplacedAndFloatSeparators(string text) =>
         Assert.Equal(
             NumberReader.Outcome.NotANumber,
-            NumberReader.Read(text, codePoints: true, rationals: true, isoReading: false, digitSeparators: true, out _)
+            NumberReader.Read(text, codePoints: true, rationals: true, digitSeparators: true, out _)
         );
 
     [Theory]
@@ -118,22 +76,17 @@ public sealed class NumberReaderTests
     [InlineData("1 ")]
     [InlineData("0X1")]
     [InlineData("0'\\\n")]
-    public void RejectsWhatTheReaderRejects(string text)
-    {
+    [InlineData("-/**/1")]
+    public void RejectsWhatTheReaderRejects(string text) =>
         Assert.Equal(
             NumberReader.Outcome.NotANumber,
-            NumberReader.Read(text, codePoints: true, rationals: true, isoReading: true, digitSeparators: false, out _)
+            NumberReader.Read(text, codePoints: true, rationals: true, digitSeparators: true, out _)
         );
-        Assert.Equal(
-            NumberReader.Outcome.NotANumber,
-            NumberReader.Read(text, codePoints: true, rationals: true, isoReading: false, digitSeparators: true, out _)
-        );
-    }
 
     [Fact]
     public void AFloatBeyondTheFiniteRangeOverflows() =>
         Assert.Equal(
             NumberReader.Outcome.FloatOverflow,
-            NumberReader.Read("9.9e999", codePoints: true, rationals: true, isoReading: true, digitSeparators: false, out _)
+            NumberReader.Read("9.9e999", codePoints: true, rationals: true, digitSeparators: false, out _)
         );
 }

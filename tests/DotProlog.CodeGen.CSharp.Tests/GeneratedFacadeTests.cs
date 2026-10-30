@@ -378,6 +378,34 @@ public sealed class GeneratedFacadeTests
         Assert.Contains("_host.Bind(\"in_stock\", 1)", source, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(Runtime.PrologLanguageMode.Modern)]
+    [InlineData(Runtime.PrologLanguageMode.StrictIso)]
+    public void GeneratedCodeReadsIsoNegativeNumbersInBothModes(Runtime.PrologLanguageMode mode)
+    {
+        ContractReadResult contract = ContractReader.Read(
+            """
+            :- clr_module('Numbers').
+            :- clr_namespace('Generated.Numbers').
+            :- clr_export(answer/1, semidet, [in(value, integer)]).
+            """,
+            "Generated.Numbers",
+            "numbers.dpli"
+        );
+        Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
+
+        var source = FacadeGenerator.Generate(contract.Contract!, "answer(- 1).", "numbers.pl", mode);
+        Assembly assembly = CompileGenerated(source);
+        Type type = assembly.GetType("Generated.Numbers.NumbersModule")!;
+        var engine = new Compiler.PrologEngine(mode);
+        object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
+
+        Assert.Equal(true, Call(module, type, "Answer", -1L));
+        Assert.Equal(false, Call(module, type, "Answer", 1L));
+        Assert.True(engine.ConsultText("bytecode_answer(X) :- answer(X).").Success);
+        Assert.Single(engine.Query("bytecode_answer(-1)").Solutions());
+    }
+
     [Fact]
     public void StrictFacadeCompilesRunsAndRequiresAStrictEngine()
     {

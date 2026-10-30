@@ -276,7 +276,6 @@ public sealed class TermReaderTests
     [InlineData("+1", "+", 1.0)]
     [InlineData("+ 1", "+", 1.0)]
     [InlineData("+1.5", "+", 1.5)]
-    [InlineData("- 1", "-", 1.0)]
     public void ReadsAPlusBeforeANumberAsAPrefixOperator(string source, string name, double operand)
     {
         ParseResult result = TermReader.ReadTerm(source);
@@ -291,6 +290,19 @@ public sealed class TermReaderTests
             SyntaxTerm other => throw new InvalidOperationException($"Unexpected operand {other}."),
         };
         Assert.Equal(operand, value);
+    }
+
+    [Theory]
+    [InlineData("- 1", -1)]
+    [InlineData("'-'1", -1)]
+    [InlineData("- /**/ 1", -1)]
+    public void ReadsAMinusBeforeANumberAsANegativeNumber(string source, long expected)
+    {
+        ParseResult result = TermReader.ReadTerm(source);
+
+        Assert.Empty(result.Diagnostics);
+        IntegerTerm term = Assert.IsType<IntegerTerm>(Assert.Single(result.Clauses));
+        Assert.Equal(expected, term.Value);
     }
 
     [Fact]

@@ -87,10 +87,9 @@ public sealed class PrologFlags
     public bool CodePointCharacters { get; internal set; } = true;
 
     /// <summary>
-    /// Whether the reader reads text the way ISO does where SWI-Prolog reads it differently: a
-    /// <c>-</c> name token before a numeric literal is a negative number even after layout or when
-    /// quoted, an atom that is an operator is no bare operand, and a back-quoted string is no term.
-    /// Seeded from the language mode — strict ISO reads the standard's way — and not a Prolog flag.
+    /// Whether the reader reads text the way ISO does where SWI-Prolog reads it differently: an atom
+    /// that is an operator is no bare operand, and a back-quoted string is no term. Seeded from the
+    /// language mode — strict ISO reads the standard's way — and not a Prolog flag.
     /// </summary>
     public bool IsoReading { get; internal set; }
 

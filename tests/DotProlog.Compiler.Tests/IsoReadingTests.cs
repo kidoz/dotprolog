@@ -3,34 +3,36 @@ using DotProlog.Runtime;
 namespace DotProlog.Compiler.Tests;
 
 /// <summary>
-/// Where ISO and SWI-Prolog read the same text differently, strict ISO mode reads it the standard's
-/// way and <c>Modern</c> keeps SWI-Prolog's: a <c>-</c> name before a numeric literal, an atom that
-/// is an operator used as an operand, and a back-quoted string.
+/// Negative numbers read as ISO requires in both modes. Where ISO and SWI-Prolog read other text
+/// differently, strict ISO mode reads it the standard's way and <c>Modern</c> keeps SWI-Prolog's:
+/// an atom that is an operator used as an operand, and a back-quoted string.
 /// </summary>
 public sealed class IsoReadingTests
 {
     // 6.3.4.1: a - name token followed by a numeric literal is a negative number, after layout or a
-    // comment too, and quoted or not. SWI-Prolog reads only an unquoted - directly before the digits.
+    // comment too, and quoted or not.
     [Theory]
-    [InlineData("integer(- 1)", "true", "false")]
-    [InlineData("integer('-'1)", "true", "false")]
-    [InlineData("integer('-' 1)", "true", "false")]
-    [InlineData("integer(- /* c */ 1)", "true", "false")]
-    [InlineData("X = - 1.5, float(X)", "true", "false")]
-    [InlineData("(- 1^2) == (-1)^2", "true", "false")]
-    [InlineData("integer(-1)", "true", "true")]
-    [InlineData("-(1) == - (1)", "true", "true")]
-    [InlineData("integer(+1)", "false", "false")]
-    public void AMinusNameBeforeANumberIsANegativeNumberInStrictIso(string goal, string strict, string modern)
+    [InlineData("integer(- 1)", "true")]
+    [InlineData("integer('-'1)", "true")]
+    [InlineData("integer('-' 1)", "true")]
+    [InlineData("integer(- /* c */ 1)", "true")]
+    [InlineData("X = - 1.5, float(X)", "true")]
+    [InlineData("(- 1^2) == (-1)^2", "true")]
+    [InlineData("integer(-1)", "true")]
+    [InlineData("-(1) == - (1)", "true")]
+    [InlineData("integer(+1)", "false")]
+    public void AMinusNameBeforeANumberIsANegativeNumberInBothModes(string goal, string expected)
     {
-        Assert.Equal(strict, Outcome(PrologLanguageMode.StrictIso, goal));
-        Assert.Equal(modern, Outcome(PrologLanguageMode.Modern, goal));
+        Assert.Equal(expected, Outcome(PrologLanguageMode.StrictIso, goal));
+        Assert.Equal(expected, Outcome(PrologLanguageMode.Modern, goal));
     }
 
-    [Fact]
-    public void AMinusStillFormsANumberWhenItIsNoLongerAnOperator()
+    [Theory]
+    [InlineData(PrologLanguageMode.Modern)]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    public void AMinusStillFormsANumberWhenItIsNoLongerAnOperator(PrologLanguageMode mode)
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = new StringWriter() };
+        var engine = new PrologEngine(mode) { Output = new StringWriter() };
         Assert.True(engine.ConsultText(":- op(0, fy, -).\nminus(X) :- X = - 1.\n").Success);
         Assert.True(engine.Query("minus(X), integer(X), X =:= -1").Prove());
     }

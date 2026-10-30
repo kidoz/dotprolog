@@ -22,7 +22,7 @@ public sealed class DigitSeparatorTests
     [InlineData("X = 1_0r3", "X == 10r3")]
     [InlineData("X = 1r3_0", "X == 1r30")]
     [InlineData("X = -1_000", "X == -1000")]
-    [InlineData("X = - 1_000", "X == -(1000)")]
+    [InlineData("X = - 1_000", "X == -1000")]
     [InlineData("X = 0'_", "X == 95")]
     public void SourceReadsSeparatedIntegersInModern(string body, string check)
     {

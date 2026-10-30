@@ -168,7 +168,6 @@ public sealed class NumberReaderParityTests
             text,
             flags.CodePointCharacters,
             flags.RationalLiterals,
-            flags.IsoReading,
             flags.DigitSeparators,
             out PrologNumber number
         );

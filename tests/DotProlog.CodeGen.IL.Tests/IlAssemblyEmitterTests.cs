@@ -411,6 +411,20 @@ public sealed class IlAssemblyEmitterTests
     [Theory]
     [InlineData(PrologLanguageMode.Modern)]
     [InlineData(PrologLanguageMode.StrictIso)]
+    public void DirectIlReadsIsoNegativeNumbersInBothModes(PrologLanguageMode mode)
+    {
+        using var compiled = new LoadedProgram("negative(- 1). quoted('-'1). commented(- /**/ 1).", mode);
+        var engine = new PrologEngine(mode);
+        compiled.Install(engine);
+
+        Assert.True(engine.Query("negative(-1), quoted(-1), commented(-1)").Prove());
+        Assert.True(engine.ConsultText("bytecode_negative(X) :- negative(X).").Success);
+        Assert.Single(engine.Query("bytecode_negative(-1)").Solutions());
+    }
+
+    [Theory]
+    [InlineData(PrologLanguageMode.Modern)]
+    [InlineData(PrologLanguageMode.StrictIso)]
     public void LanguageModeAndInitialFlagsAreValidated(PrologLanguageMode mode)
     {
         var flags = new PrologFlagOverrides { DoubleQuotes = DoubleQuotesMode.Atom };

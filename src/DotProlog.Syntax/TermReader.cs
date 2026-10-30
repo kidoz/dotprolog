@@ -110,9 +110,9 @@ public sealed class TermReader
     /// Reads <paramref name="text"/> as <c>number_chars/2</c> and <c>number_codes/2</c> read their
     /// list (ISO 8.16.7 and 8.16.8): layout text, which may hold comments, then an optional <c>-</c>
     /// name token, then one number token, and nothing after it, not even layout. So <c>" 1"</c>,
-    /// <c>"-1"</c>, and <c>"/**/1"</c> are numbers, and <c>"1 "</c> and <c>"+1"</c> are not. The minus
-    /// follows the mode's reading: strict ISO also takes a quoted <c>'-'</c> and one before layout or
-    /// a comment, so <c>"- 1"</c> and <c>"'-'1"</c> are numbers there only.
+    /// <c>"-1"</c>, and <c>"/**/1"</c> are numbers, and <c>"1 "</c> and <c>"+1"</c> are not. In both
+    /// modes a quoted <c>'-'</c> and one before layout or a comment form a negative number, so
+    /// <c>"- 1"</c> and <c>"'-'1"</c> are numbers.
     /// </summary>
     /// <remarks>
     /// The runtime reads these lists with its own <c>NumberReader</c>, since it cannot depend on this
@@ -134,26 +134,19 @@ public sealed class TermReader
         List<Diagnostic> found = [];
         diagnostics = found;
         var lexer = new Lexer(text, null, found, conversions: null, flags);
-        var isoReading = flags?.IsoReading ?? false;
 
         Token token = lexer.Next();
         SourceSpan start = token.Span;
 
-        // The minus rule is the term reader's own: strict ISO takes a quoted minus too, otherwise
-        // only an unquoted one directly before the digits forms a negative number.
-        var negate = token is { Kind: TokenKind.Atom, Text: "-" } && (isoReading || !token.Quoted);
+        // A minus name token forms a negative number in both modes, quoted or before layout too.
+        var negate = token is { Kind: TokenKind.Atom, Text: "-" };
         if (negate)
         {
             token = lexer.Next();
         }
 
         Token end = lexer.Next();
-        if (
-            token.Kind is not (TokenKind.Integer or TokenKind.Float)
-            || end.Kind != TokenKind.Eof
-            || end.PrecededByLayout
-            || (negate && !isoReading && token.PrecededByLayout)
-        )
+        if (token.Kind is not (TokenKind.Integer or TokenKind.Float) || end.Kind != TokenKind.Eof || end.PrecededByLayout)
         {
             found.Add(new Diagnostic(DiagnosticIds.InvalidNumber, DiagnosticSeverity.Error, "The text is not a number.", start));
             return null;
@@ -511,14 +504,10 @@ public sealed class TermReader
             return ParseArguments(name, token.Span);
         }
 
-        // A minus name directly in front of a numeric literal is part of the literal, not a prefix
-        // operator; ISO counts a quoted minus and one before layout too, SWI-Prolog neither. A
-        // double-quoted "-" is no name token, and a plus never is (Cor.2): +1 is +(1).
-        if (
-            name == "-"
-            && next.Kind is TokenKind.Integer or TokenKind.Float
-            && (IsoReading ? !token.DoubleQuoted : !token.Quoted && !next.PrecededByLayout)
-        )
+        // A minus name before a numeric literal is part of the literal, not a prefix operator, in
+        // both modes: quoted and before layout too. A double-quoted "-" is no name token, and a plus
+        // never is (Cor.2): +1 is +(1).
+        if (name == "-" && next.Kind is TokenKind.Integer or TokenKind.Float && !token.DoubleQuoted)
         {
             Advance();
             Token literal = _current;

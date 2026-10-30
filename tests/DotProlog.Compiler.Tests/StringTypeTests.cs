@@ -146,6 +146,7 @@ public sealed class StringTypeTests
     [InlineData("string_chars(\"xy\", C), writeq(C)", "[x,y]")]
     [InlineData("string_codes(\"xy\", K), writeq(K)", "[120,121]")]
     [InlineData("number_string(N, \"42\"), writeq(N)", "42")]
+    [InlineData("number_string(N, \"- 1\"), writeq(N)", "-1")]
     [InlineData("number_string(N, \"3.5\"), writeq(N)", "3.5")]
     [InlineData("( number_string(_, \" 3.5 \") -> write(y) ; write(fails) )", "fails")]
     [InlineData("( number_string(_, \"abc\") -> write(y) ; write(fails) )", "fails")]
