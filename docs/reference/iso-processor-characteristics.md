@@ -15,9 +15,8 @@ These are different categories:
   5.5), such as Modern's string type, soft cut, and extra built-in predicates. They are identified
   separately from ISO requirements.
 - **Modifications** change a result that the standard defines for conforming text or goals. They
-  occur only in `Modern`: for example, reading `- 1` as `-(1)`, ordering rational numbers among the
-  integers, and the `double_quotes=string` setting. The
-  [Modern mode tracker](modern-mode-tracker.md) lists them.
+  occur only in `Modern`: for example, ordering rational numbers among the integers and the
+  `double_quotes=string` setting. The [Modern mode tracker](modern-mode-tracker.md) lists them.
 
 See [language modes and text](../explanation/language-modes.md) for configuration guidance.
 Requirement and execution-path evidence is recorded separately in the
@@ -111,10 +110,9 @@ The reader accepts Unicode source characters and ISO's numeric escapes; `\x…\`
 `\UXXXXXXXX` escapes, and a surrogate escape is a syntax error there. Neither mode has a `\d` or
 `\o` escape; octal is `\101\`.
 
-`StrictIso` reads three spellings as the standard does where `Modern` reads them as SWI-Prolog
-does. A `-` name token before a numeric literal is a negative number across layout or a comment
-and when quoted: `- 1`, `'-'1`, and `- /* c */ 1` are the integer −1 in `StrictIso` and `-(1)` in
-`Modern`, which joins only an unquoted minus written directly before the digits. An atom that is
+In both modes, a `-` name token before a numeric literal is a negative number across layout or a
+comment and when quoted: `- 1`, `'-'1`, and `- /* c */ 1` are the integer −1. `StrictIso` reads two
+other spellings as the standard does where `Modern` reads them as SWI-Prolog does. An atom that is
 an operator has priority 1201 as an operand (6.3.1.3), so `X = -` and `- = -` are syntax errors in
 `StrictIso`, while `X = (-)`, `f(-)`, and `[:-, -]` read in both modes. A back quoted string is a
 token with no term, so `` `abc` `` is a syntax error in `StrictIso` and an atom in `Modern`. In both

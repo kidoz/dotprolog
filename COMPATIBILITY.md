@@ -215,8 +215,8 @@ Writing them was worth it immediately: they found these real defects.
 - `number_chars/2` and `number_codes/2` wrote a bound number out and compared the text, so
   `number_chars(1.0e9, "1.0E9")` failed, and they read the list with a smaller number syntax of
   their own. A list holding the whole text now decides: it is read with the term reader's number
-  syntax — leading layout and comments, an optional `-` name token (quoted, or separated from the
-  digits, only in strict ISO mode), then one number token and nothing after it — and the result
+  syntax — leading layout and comments, an optional `-` name token (quoted or separated from the
+  digits in either mode), then one number token and nothing after it — and the result
   unified with the first argument, with the table's
   `syntax_error`, `type_error(character, C)`, and `type_error(list, L)` answers for a bound first
   argument too. Only a partial list, or one with a variable in it, lets a bound number decide.
@@ -253,9 +253,9 @@ Writing them was worth it immediately: they found these real defects.
   as arguments and list elements (`[:-,-]`) and bracketed as operands (`(-)-(-)`), a prefix `-`
   brackets `- (1)` and `- (1^2)`, and `(fy 1)yf` keeps the brackets it needs to read back. The
   reader reads `+1` as `+(1)`, `0''1` as `0 '' 1`, `0xor 2` as `0 xor 2`, and `[ ](X)` as a
-  compound, and rejects the `\d` and `\o` escapes. `Modern` differs from the table only where it
-  reads as SWI-Prolog does: `- 1` as `-(1)`, bare operator atoms as operands, the `\e` and `\u`
-  escapes, and back-quoted text.
+  compound, and rejects the `\d` and `\o` escapes. Both modes read spaced, commented, and quoted
+  minus forms as negative numbers. `Modern` differs from the table only where it reads as SWI-Prolog
+  does: bare operator atoms as operands, the `\e` and `\u` escapes, and back-quoted text.
 
 Beyond the conformance cases, the engine and toolchain are covered by more than 1,400 tests run
 through `dotnet test`, plus opt-in integration gates that build and run the C#, F#, and Visual Basic
@@ -299,7 +299,7 @@ samples and exercise NativeAOT.
 | Behaviour | DotProlog | Elsewhere |
 |---|---|---|
 | `\+ 4` | `type_error(callable, 4)` — the inner goal | Same |
-| `- 1`, `'-'1`, and `X = -` | `Modern` reads `- 1` and `'-'1` as `-(1)` and accepts a bare operator atom as an operand, as SWI does; `StrictIso` reads −1 and requires `X = (-)`, as ISO does | ISO and SWI disagree; SWI rejects `'-'1` |
+| Negative numeric terms and operator atoms | Both modes read `- 1`, `'-'1`, and `- /* c */ 1` as −1, as ISO does. `Modern` accepts a bare operator atom as an operand, as SWI does; `StrictIso` requires `X = (-)` | SWI reads `- 1` as `-(1)` and rejects `'-'1` |
 | `writeq(-(1))` | `- (1)`, and `- (1^2)` for `-(1^2)`, as Corrigendum 3 writes them | SWI writes `- 1` and `- 1^2`, which ISO reads as −1 and `(-1)^2` |
 | A character in `StrictIso` | A UTF-16 code unit, so a character outside the Basic Multilingual Plane is two codes and `atom_length/2` counts it as two. `Modern` counts code points | SWI counts code points |
 | Character-code numeric lists | `number_chars/2` and `number_codes/2` reject `0''`; use ISO `0'''` or `0'\'`. ISO `0'\0\` denotes zero | SWI 10.0.2 accepts `0''` and rejects the terminated octal-zero form in numeric lists |

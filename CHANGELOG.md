@@ -20,16 +20,16 @@ All notable changes to DotProlog are recorded here. The format follows
   float literal beyond the binary64 range, such as `9.9e999`, in both modes — the same answer
   SWI-Prolog gives — instead of `representation_error(max_float)`, which names no representation
   flag the standard defines.
-- `number_chars/2` and `number_codes/2` read a minus with the mode's own number syntax, so the
-  two parsers no longer disagree: in Modern `number_chars(N, "- 1")` and
-  `number_chars(N, "'-'1")` now raise `syntax_error(illegal_number)`, as the reader reads `- 1`
-  as `-(1)` and as SWI-Prolog answers; strict ISO mode is unchanged and still gives `-1`.
+- Modern reads negative numbers as ISO does: `- 1`, `'-'1`, and `- /* comment */ 1` are the integer
+  `-1` in source and runtime term input rather than `-(1)` or a syntax error. `number_chars/2`,
+  `number_codes/2`, `atom_number/2`, and `number_string/2` accept the same negative-number forms,
+  so their syntax agrees with the reader. Strict ISO behavior is unchanged.
 - The reference and conformance ledgers distinguish runtime configuration, language modes, flags,
   and implementation-defined behavior. Division of two integers by `/2` is documented as returning
   a float as ISO requires, including `1/1` producing `1.0`; it was incorrectly described as a choice.
 - The documentation and the `dotnet prolog` mode help separate Modern's modifications of ISO
-  results, such as reading `- 1` as `-(1)`, the `double_quotes=string` setting, and the plain-name
-  export alias, from its extensions. These were described as extensions.
+  results, such as the `double_quotes=string` setting and the plain-name export alias, from its
+  extensions. These were described as extensions.
 
 ## [0.15.0] — 2026-09-27
 

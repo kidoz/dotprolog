@@ -63,11 +63,10 @@ The maximum compound arity is 255. Double-quoted text is a list of characters by
 distinct string term exists only where `double_quotes` is set to `string`, and the string
 predicates are never aliased to atoms.
 
-Strict mode reads three spellings as ISO does where Modern follows SWI-Prolog: `- 1` and `'-'1` are
-the integer −1 rather than `-(1)`, an atom that is an operator needs brackets to be an operand
-(`X = (-)`, not `X = -`), and a back-quoted string is a syntax error rather than an atom.
-`number_chars/2` and `number_codes/2` follow the mode's reading of a minus, so
-`number_chars(N, "- 1")` raises `syntax_error(illegal_number)` in Modern. See
+Both modes read `- 1`, `'-'1`, and `- /* comment */ 1` as the integer −1, in source and in
+`number_chars/2` and `number_codes/2`. Strict mode reads two other spellings as ISO does where
+Modern follows SWI-Prolog: an atom that is an operator needs brackets to be an operand
+(`X = (-)`, not `X = -`), and a back-quoted string is a syntax error rather than an atom. See
 [language modes and text](explanation/language-modes.md#some-text-reads-differently).
 
 ## Control and errors

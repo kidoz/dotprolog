@@ -78,8 +78,8 @@ follow the ISO tracker.
 
 | Area | Requirements | Done | Extension | Modified | Partial | Unverified | Optional | N/A |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Part 1 clause 5, compliance | 21 | 2 | 3 | 5 | 9 | 1 | 0 | 1 |
-| Part 1 clause 6, syntax | 46 | 30 | 5 | 3 | 8 | 0 | 0 | 0 |
+| Part 1 clause 5, compliance | 21 | 2 | 3 | 4 | 10 | 1 | 0 | 1 |
+| Part 1 clause 6, syntax | 46 | 31 | 5 | 1 | 9 | 0 | 0 | 0 |
 | Part 1 clause 7, concepts and semantics | 109 | 82 | 0 | 3 | 23 | 1 | 0 | 0 |
 | Part 1 clause 8, built-in predicates | 87 | 59 | 1 | 3 | 24 | 0 | 0 | 0 |
 | Part 1 clause 9, evaluable functors | 54 | 32 | 0 | 0 | 22 | 0 | 0 | 0 |
@@ -87,10 +87,11 @@ follow the ISO tracker.
 | Implementation defined documentation | 32 | 18 | 0 | 0 | 14 | 0 | 0 | 0 |
 | Part 2, modules | 63 | 22 | 0 | 4 | 32 | 0 | 4 | 1 |
 | Part 3, grammar rules | 29 | 19 | 0 | 0 | 8 | 0 | 2 | 0 |
-| **Total** | **511** | **328** | **9** | **18** | **146** | **2** | **6** | **2** |
+| **Total** | **511** | **329** | **9** | **16** | **147** | **2** | **6** | **2** |
 
-- **Modifications:** 7 (CHG-01 to CHG-07). Five are deliberate and documented, CHG-02 is a
+- **Modifications:** 6 (CHG-02 to CHG-07). Four are deliberate and documented, CHG-02 is a
   deliberate feature whose conflict with ISO text is undocumented, and CHG-04 is contested.
+  CHG-01 is resolved: both modes now read negative numbers as ISO requires.
 - **ISO tracker gaps:** 55 of the 71 also occur in Modern. GAP-10 and GAP-15 do not occur, GAP-35
   is closed, and GAP-08 was fixed in 0.15.1. Seven become permitted extensions, GAP-41 is a modification (CHG-07), and
   GAP-03, GAP-09, GAP-40, and GAP-69 take a different form in Modern.
@@ -105,7 +106,6 @@ modification with the `StrictIso` behavior named. It is not an extension (issue 
 
 | ID | Ref | Modification | ISO result | Modern result | Status |
 |---|---|---|---|---|---|
-| CHG-01 | 6.3.1.2, 5.5.1 | A `-` followed by a numeric literal is a negative number only when it is unquoted and directly before the digits | `X = - 1, integer(X)` succeeds; `'-'1` and `- /**/ 1` are `-1`; `- 1^2` is `(-1)^2` | `X = -(1)` and `integer(X)` fails; `- 1^2` is `-(1^2)`; `2 ** - 1` and, after `op(0, fy, -)`, `- 1` are syntax errors. `number_chars/2` and `number_codes/2` follow the mode's reading, so `number_chars(N, [-, ' ', '1'])` raises `syntax_error(illegal_number)` as SWI-Prolog does (issue #12) | Documented as an SWI reading; the syntax errors are not |
 | CHG-02 | 6.4, 5.5.1 | `NrM` is lexed as one rational token | After `:- op(200, xf, r3).`, `X = 1r3` reads as `r3(1)` | `X` is the rational `1r3`. With `op(200, xf, r0)`, `X = 1r0` is a load error. The related conversion `number_codes(N, [49,114,51])` gives `1r3` where StrictIso gives `syntax_error(illegal_number)`. With Modern's default `double_quotes=chars`, `number_codes(N, "1r3")` instead raises `type_error(integer,'1')` | Rational literals are documented; the conflict with ISO tokenization is not. The postfix-operator example establishes the modification; accepting otherwise invalid numeric text alone does not |
 | CHG-03 | 5.5.4 b | Rationals are an extra type ordered by value among the integers | The order between an extra type and a standard type depends only on the two types | `msort([2, 1r2, 0, 2.0, 1, 3r2], L)` gives `[2.0, 0, 1r2, 1, 3r2, 2]` | Documented in the SWI ledger |
 | CHG-04 | 7.11.2.5, 8.17.1.3 | `double_quotes` accepts the extra value `string` | `set_prolog_flag(double_quotes, string)` raises `domain_error(flag_value, double_quotes+string)` | Succeeds, and `"abc"` then reads as a string | Contested; documented as a modification |
@@ -127,7 +127,7 @@ as a modification.
 | MGAP-02 | Medium | 7.1.3, 5.5.10, 7.10.5 | The evaluable functors `inf/0`, `infinite/0`, and `nan/0` return IEEE infinity and NaN as floats. These values are outside the float set of 7.1.3. `writeq/1` writes them as `Infinity.0` and `NaN.0`, which read back as `'.'/2` terms, and `nan =:= nan` succeeds. The documentation says float arithmetic rejects NaN and infinity | Open |
 | MGAP-03 | Medium | 5.4, 7.4.3 | A user definition of one of the 41 natively implemented extension predicates (marked † in [the predicate list](#extension-predicates)) or of `'*->'/2` is silently ignored: compiled calls and meta-calls run the built-in, with no diagnostic, and so they do when the definition is in another text unit. A definition of one of the 122 extension predicates written in Prolog replaces the library version. ISO leaves the effect of clauses for a built-in undefined (7.4.3, 7.4.1), but the documentation says user-defined names are unrestricted and does not describe the split. This is the Modern form of GAP-09 | Open |
 | MGAP-04 | Low | Part 2 6.2.6, Part 3 7.4.4 | Module text and grammar rules cannot define library names that user text may redefine. The Part 2 6.2.6.1 `utilities` example, which defines `length/2` and `reverse/2`, is rejected with DPL1019, and `member --> [a].` is rejected with DPL1007. This is the Modern form of GAP-40 and GAP-69 | Open |
-| MGAP-05 | Medium | 5.4 | These Modern extensions are undocumented: the operators `xor`, `*->`, `module`, `use_module`, and `meta_predicate`, the priorities and types of all extra operators, and the readings they change (`X = $ - 1.` and `X = dynamic - 1.` are syntax errors); `"-"1` under `double_quotes` = `atom` (GAP-05); an end char at the end of input (GAP-06); non-ASCII layout (GAP-07); the write option `spacing/1` (GAP-13); `(^)/2` as a callable predicate; `sumlist/2`; the evaluable functor `infinite/0`; clause conversion and evaluation of strings (5.5.4 c, e); writing and clause conversion of rationals; the reserved `$` names (GAP-14) | Open |
+| MGAP-05 | Medium | 5.4 | These Modern extensions are undocumented: the operators `xor`, `*->`, `module`, `use_module`, and `meta_predicate`, the priorities and types of all extra operators, and the readings they change; `"-"1` under `double_quotes` = `atom` (GAP-05); an end char at the end of input (GAP-06); non-ASCII layout (GAP-07); the write option `spacing/1` (GAP-13); `(^)/2` as a callable predicate; `sumlist/2`; the evaluable functor `infinite/0`; clause conversion and evaluation of strings (5.5.4 c, e); writing and clause conversion of rationals; the reserved `$` names (GAP-14) | Open |
 | MGAP-06 | Low | 5.4 | Documentation that the probes contradict in Modern: strings exist under the default `double_quotes` = `chars` (`atom_string/2`, `split_string/4`); `print/1` writes unquoted, so its output does not read back as documented; writing depends on the mode, because Modern writes non-ASCII atoms and its extra operators without quotes, and `StrictIso` rejects that output; `occurs_check` is enumerated as a flag, although the ledgers say extension flags are hidden; back-quoted text is said to follow SWI-Prolog, which reads it as codes by default; the SWI ledger omits that SWI accepts the `\s` escape, which Modern rejects; a file loaded by `ensure_loaded/1` starts with the loading file's `double_quotes` value, not the mode or host value | Open |
 
 ## ISO tracker gaps in Modern
@@ -238,13 +238,13 @@ and mode-specific observations in the StrictIso notes are not inherited. Where a
 
 | Ref | Requirement | StrictIso | Modern | Notes |
 |---|---|---|---|---|
-| 5.1 a | Prepare all conforming text for execution | Partial | Modified | CHG-01 and CHG-02 change how conforming text reads. Also GAP-02, GAP-04, MGAP-01. GAP-09 and GAP-11 do not apply |
+| 5.1 a | Prepare all conforming text for execution | Partial | Partial | CHG-02 changes how conforming text reads. Also GAP-02, GAP-04, MGAP-01. GAP-09 and GAP-11 do not apply |
 | 5.1 b | Execute conforming goals correctly | Partial | Partial | GAP-16 to GAP-21, GAP-66, MGAP-02. GAP-10, GAP-11, and GAP-15 do not occur |
 | 5.1 c | Reject text and read-terms whose syntax does not conform | Partial | Partial | The historical Modern reader report has 303 automatic ISO-baseline matches, 51 differences, and 11 manual cases. Differences require the classifications in this page; they are not all gaps. StrictIso's 344/365 total does not apply |
 | 5.1 e | Offer a strictly conforming mode that rejects implementation specific features in text and during execution | Partial | N/A | A requirement on the strictly conforming mode |
-| 5.2 | Conforming and strictly conforming Prolog text | Partial | Modified | CHG-01, CHG-02 |
+| 5.2 | Conforming and strictly conforming Prolog text | Partial | Modified | CHG-02 |
 | 5.3 | Conforming and strictly conforming goals | Partial | Modified | CHG-04, CHG-06 and CHG-07 change the results of conforming goals. Extension goals run (5.5.9) |
-| 5.5.1 | Extra syntax must not change the meaning of conforming text | Partial | Modified | CHG-01 and CHG-02 change the abstract syntax of conforming text. The syntax extensions EXT-01 to EXT-05 and EXT-21 do not. Also GAP-02, MGAP-01 |
+| 5.5.1 | Extra syntax must not change the meaning of conforming text | Partial | Modified | CHG-02 changes the abstract syntax of conforming text. The syntax extensions EXT-01 to EXT-05 and EXT-21 do not. Also GAP-02, MGAP-01 |
 | 5.5.2 | Extra predefined operators | Partial | Partial | EXT-06, EXT-07. The operators `xor`, `*->`, `module`, `use_module`, and `meta_predicate`, and the readings the extra operators change, are undocumented (MGAP-05) |
 | 5.5.4 | Extra types | Done | Modified | CHG-03: rationals break 5.5.4 b. The string type (EXT-08) meets a, b, d, and f; c and e are undocumented (MGAP-05) |
 | 5.5.5 | Extra directives | Partial | Extension | EXT-09 to EXT-11 |
@@ -258,10 +258,10 @@ and mode-specific observations in the StrictIso notes are not inherited. Where a
 
 | Ref | Requirement | StrictIso | Modern | Notes |
 |---|---|---|---|---|
-| 6.3.1.2 | `-` followed by a numeric literal is a negative number, including after layout, a comment, or with `-` quoted | Done | Modified | CHG-01 |
+| 6.3.1.2 | `-` followed by a numeric literal is a negative number, including after layout, a comment, or with `-` quoted | Done | Done | Both modes read `- 1`, `'-'1`, and `- /**/ 1` as `-1`; numeric conversions use the same rule |
 | 6.3.1.3 | An operator atom as an operand has priority 1201 | Done | Extension | EXT-05 |
 | 6.3.3 | Functional notation needs `(` immediately after the name | Partial | Partial | GAP-04. GAP-03 becomes a silent misreading (MGAP-01) |
-| 6.3.4.2 | Prefix, infix, and postfix operators | Partial | Modified | CHG-01 (`- 1^2` reads as `-(1^2)`). MGAP-01 |
+| 6.3.4.2 | Prefix, infix, and postfix operators | Partial | Partial | MGAP-01 |
 | 6.3.4.4, table 7 | Initial operator table | Partial | Partial | EXT-06, EXT-07; the table is not fully documented (MGAP-05) |
 | 6.4.2 | Name tokens | Done | Extension | `a.b` reads through the `.` operator (EXT-06), text that ISO rejects |
 | 6.4.2.1 | Quoted characters and escapes; octal and hex escapes need a closing `\` | Done | Extension | EXT-01, EXT-02 |
