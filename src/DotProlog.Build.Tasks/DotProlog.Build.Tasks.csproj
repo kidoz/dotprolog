@@ -8,8 +8,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <!-- Provided by the MSBuild that loads this task, so it must not be copied alongside it. -->
-        <PackageReference Include="Microsoft.Build.Utilities.Core" Version="18.8.2" ExcludeAssets="runtime" PrivateAssets="all" />
+        <!-- Provided by the MSBuild that loads this task, so it must not be copied alongside it.
+             18.10 and later ship net11.0 assets only, so 18.9.x is the newest line that targets
+             net10.0. -->
+        <PackageReference Include="Microsoft.Build.Utilities.Core" Version="18.9.6" ExcludeAssets="runtime" PrivateAssets="all" />
     </ItemGroup>
 
     <ItemGroup>
