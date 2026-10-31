@@ -4,18 +4,20 @@ An original, old-school fantasy text adventure written entirely in DotProlog.
 
 The red star above ruined Gloamwatch Keep has awakened Lord Morvane, an oathbreaker who is neither
 living nor dead. He has stolen the Ember Crown, and the farms around Greymere are turning to ash.
-Explore seventeen locations, decipher the keep's bell ritual, survive its guardians, recover
+Explore twenty locations, decipher the keep's bell ritual, survive its guardians, recover
 the crown, and return it to Reeve Elowen. Along the way, rescue a missing bellkeeper, learn
-herbal medicine, and choose whether to fight a restless knight or restore his forgotten oath.
+two kinds of alchemy, restore an astronomer's telescope, and choose whether to fight a restless
+knight or restore his forgotten oath.
 
 The sample demonstrates:
 
-- a world represented by Prolog facts and rules;
-- reverse-path reasoning from one set of `passage/3` facts;
-- mutable game state with dynamic predicates;
-- an interactive `read/1` command loop;
+- a world represented by Prolog facts and rules, including reverse-path reasoning from `passage/3`;
+- mutable game state with dynamic predicates and an interactive `read/1` command loop;
+- recursive, backtracking route finding through the rooms already visited;
+- DCG rules and `phrase/2` for rune translation and telescope alignment;
+- `findall/3`, `member/2`, and `forall/2` for searching and data-driven alchemy;
 - inventory, crafting, keyed barriers, equipment, healing, and deterministic combat;
-- a recoverable sequence puzzle, optional quests, and an alternative to combat;
+- recoverable puzzles, optional quests, and alternatives to combat;
 - an exploration map, quest journal, and conditional victory and death endings;
 - optional ANSI illustrations, enemy portraits, and health bars, written in Prolog.
 
@@ -42,22 +44,35 @@ The village is a safe base: `talk(herbalist).` teaches a recipe, and `rest.` res
 your fourteen health. The old road branches into a moonleaf garden. Inside the keep,
 the courtyard leads to a well house, while the great hall leads north to the archive
 and its bell tower. `journal.` lists objectives and clues; `map.` lists visited rooms
-and their exits, marking unseen destinations as unexplored. Listed paths can still be locked.
+and their exits, marking unseen destinations as unexplored. `route_to(archive).` uses
+recursive graph search to print a route through places you have already visited.
+Listed paths can still be locked.
 
 | Command | Purpose |
 | --- | --- |
+| `search.` | Search a safe room once for concealed items and lore |
+| `route_to(archive).` | Print a path through explored rooms without moving |
 | `talk(bellkeeper).` | Speak to Tomas if you can reach his prison below the well |
 | `use(rope).` | Secure a permanent route down from the well house |
-| `brew(herbal_tonic).` | After learning the recipe, consume moonleaf and spring water to make one tonic |
-| `use(herbal_tonic).` | Heal eight health, capped at fourteen |
+| `brew(herbal_tonic).` | Consume moonleaf and spring water to make one tonic after learning the recipe |
+| `brew(ember_draught).` | Combine ember dust and spring water after learning Lyra's recipe |
 | `use(watch_oath).` | Release the knight peacefully when standing in the armory |
 | `ring(dawn).` | Ring a tower bell; the other names are `noon` and `dusk` |
+| `translate([star,crown,wolf]).` | Decode a list of runes with the codex and a DCG grammar |
+| `attune([star,crown,wolf]).` | Align the observatory telescope after restoring its lens |
 | `guard.` | Take an enemy turn with four extra protection, then gain two damage on your next attack |
 
 The archive mural explains the bell sequence. A wrong note resets the sequence so you
 can retry; completing it permanently breaks the sun seal on the final chamber. You
 still need the bone warden's key. The rescue, crafting, and peaceful knight route are
-optional, and the ending remembers the rescue and the knight's fate.
+optional, and the ending remembers your choices.
+
+East of the archive, the scriptorium and observatory begin Lyra's optional quest. Take
+her codex and speak to the astronomer to learn the second alchemy recipe. The sun
+medallion reveals a stair below the flooded vault; `search.` there recovers the missing
+star lens. Return it to the observatory and attune the three signs from the codex. Wrong
+rune lists are safe to retry. The resulting dawn prism adds three damage against Morvane
+and reduces his blows by one. It changes both the boss fight and the victory epilogue.
 
 Morvane alternates between gathering cinders and striking for seven damage. When he
 warns of a charged attack, guard before counterattacking. The bellkeeper's ash ward
@@ -65,12 +80,12 @@ reduces Morvane's damage by two while carried; your shield reduces enemy damage 
 Protection always leaves at least one damage. Counterattack bonuses do not stack and
 are lost when you leave the room or resolve the encounter.
 
-Only `attack.` and `guard.` advance an enemy's turn. You can inspect clues, manage
-items, heal, or retreat without a timed penalty. Brewing requires a room without a
-live enemy. Ingredients and potions are finite; medicine is kept when you are already
-at full health, and you can return to the village to recover. Equipment bonuses apply
-automatically while you carry the item. Commands must contain concrete names, without
-Prolog variables, and each new process begins a fresh game.
+Only `attack.` and `guard.` advance an enemy's turn. You can inspect clues, search, manage
+items, heal, or retreat without a timed penalty. Searching and brewing require a room
+without a live enemy. Ingredients and potions are finite; medicine is kept when you are
+already at full health, and you can return to the village to recover. Equipment bonuses
+apply automatically while you carry the item. Commands must contain concrete names,
+without Prolog variables, and each new process begins a fresh game.
 
 ## Illustrations
 
@@ -144,9 +159,10 @@ To smoke-test the colored version in a POSIX shell:
 ```
 
 Replace `on` with `ascii` for an illustrated transcript without colors. Compiler tests exercise
-both routes in all three modes, bell recovery and barriers, crafting, rescue rewards,
-guarding, rest, the exploration map, invalid commands, defeated enemies, and death:
+both original routes in all three modes, bell recovery and barriers, both alchemy recipes, rune
+translation failures and recovery, searching, route finding, the complete observatory quest,
+prism-assisted combat, rescue rewards, guarding, rest, invalid commands, and both endings:
 
 ```console
-dotnet test --project tests/DotProlog.Compiler.Tests --filter-class '*GreymereAdventureTests'
+dotnet test --project tests/DotProlog.Compiler.Tests -- --filter-class '*GreymereAdventureTests'
 ```
