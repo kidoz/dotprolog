@@ -93,17 +93,20 @@ public sealed class GeneratePrologFacade : Task
             foreach (ITaskItem source in Sources)
             {
                 var path = source.GetMetadata("FullPath");
-                sources.Add((Path.GetFileName(path), File.ReadAllText(path)));
+                sources.Add((path, File.ReadAllText(path)));
             }
 
             var entryPoint = Path.Combine(OutputPath, $"{EntryPointGenerator.TypeName}.g.cs");
-            WriteIfChanged(
-                entryPoint,
-                GenerateTestHost
-                    ? EntryPointGenerator.GenerateTestHost(RootNamespace, sources, languageMode, flagOverrides)
-                    : EntryPointGenerator.Generate(RootNamespace, sources, languageMode, flagOverrides)
-            );
-            generated.Add(new TaskItem(entryPoint));
+            IReadOnlyList<Diagnostic> diagnostics;
+            var sourceText = GenerateTestHost
+                ? EntryPointGenerator.GenerateTestHost(RootNamespace, sources, languageMode, flagOverrides, out diagnostics)
+                : EntryPointGenerator.Generate(RootNamespace, sources, languageMode, flagOverrides, out diagnostics);
+            ReportDiagnostics(diagnostics, string.Empty);
+            if (!diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
+            {
+                WriteIfChanged(entryPoint, sourceText);
+                generated.Add(new TaskItem(entryPoint));
+            }
         }
 
         foreach (ITaskItem contractItem in Contracts)
@@ -139,10 +142,17 @@ public sealed class GeneratePrologFacade : Task
             var facade = FacadeGenerator.Generate(
                 result.Contract!,
                 File.ReadAllText(sourcePath),
-                Path.GetFileName(sourcePath),
+                sourcePath,
                 languageMode,
-                flagOverrides
+                flagOverrides,
+                out var sourceDiagnostics
             );
+
+            ReportDiagnostics(sourceDiagnostics, sourcePath);
+            if (sourceDiagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
+            {
+                continue;
+            }
 
             var target = Path.Combine(OutputPath, $"{result.Contract!.ClrTypeName}Module.g.cs");
             WriteIfChanged(target, facade);

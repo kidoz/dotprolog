@@ -155,6 +155,38 @@ public sealed class IncrementalBuildTests : IDisposable
         Assert.Empty(Directory.GetFiles(generatedPath, "*.g.cs", SearchOption.AllDirectories));
     }
 
+    [Theory]
+    [InlineData("Library")]
+    [InlineData("Exe")]
+    [InlineData("Test")]
+    public async Task SourceErrorsUsePositionedMsBuildDiagnostics(string kind)
+    {
+        Assert.SkipUnless(
+            Environment.GetEnvironmentVariable(OptInVariable) == "1",
+            $"Set {OptInVariable}=1 to run toolchain tests."
+        );
+        (var taskExit, var taskLog) = await Run(
+            "dotnet",
+            ["build", "-nodereuse:false", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
+        );
+        Assert.True(taskExit == 0, taskLog);
+        WriteProjectFile();
+        WriteModule("rules", "Rules");
+        await File.WriteAllTextAsync(Path.Combine(_project, "rules.pl"), "\nvalue(.\n", TestContext.Current.CancellationToken);
+        string[] properties = kind switch
+        {
+            "Exe" => ["-p:OutputType=Exe"],
+            "Test" => ["-p:DotPrologTestProject=true"],
+            _ => [],
+        };
+        (var exit, var log) = await Build(properties);
+        Assert.NotEqual(0, exit);
+        Assert.Contains("rules.pl(2,7): error DPL0003", log, StringComparison.Ordinal);
+        Assert.DoesNotContain("MSB4018", log, StringComparison.Ordinal);
+        Assert.DoesNotContain("ArgumentException", log, StringComparison.Ordinal);
+        Assert.Empty(Directory.GetFiles(Path.Combine(_project, "obj", "prolog"), "*.g.cs"));
+    }
+
     private void WriteProjectFile()
     {
         var source = Path.Combine(RepositoryLayout.Root, "src");

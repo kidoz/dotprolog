@@ -14,6 +14,34 @@ namespace DotProlog.CodeGen.CSharp.Tests;
 /// </remarks>
 public sealed class GeneratedFacadeTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DeepSourceReturnsPositionedDiagnostics(bool testHost)
+    {
+        var input = new string('(', 20_000) + "a" + new string(')', 20_000) + ".";
+        IReadOnlyList<Syntax.Diagnostic> diagnostics;
+        var generated = testHost
+            ? EntryPointGenerator.GenerateTestHost(
+                "Generated.Deep",
+                [("deep.pl", input)],
+                Runtime.PrologLanguageMode.Modern,
+                Runtime.PrologFlagOverrides.None,
+                out diagnostics
+            )
+            : EntryPointGenerator.Generate(
+                "Generated.Deep",
+                [("deep.pl", input)],
+                Runtime.PrologLanguageMode.Modern,
+                Runtime.PrologFlagOverrides.None,
+                out diagnostics
+            );
+        Assert.Empty(generated);
+        Syntax.Diagnostic diagnostic = Assert.Single(diagnostics);
+        Assert.Equal("DPL0012", diagnostic.Id);
+        Assert.Equal("deep.pl", diagnostic.FileName);
+        Assert.Equal(1, diagnostic.Span.Line);
+    }
     private static readonly string[] SplitInput = ["a", "b"];
     private static readonly Runtime.PrologFlagOverrides CodesOverride = new() { DoubleQuotes = Runtime.DoubleQuotesMode.Codes };
 

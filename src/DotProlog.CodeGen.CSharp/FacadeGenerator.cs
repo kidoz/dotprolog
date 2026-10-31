@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using DotProlog.Runtime;
+using DotProlog.Syntax;
 
 namespace DotProlog.CodeGen.CSharp;
 
@@ -46,6 +47,28 @@ public static class FacadeGenerator
         PrologFlagOverrides flagOverrides
     )
     {
+        var source = Generate(contract, prologSource, sourceName, languageMode, flagOverrides, out var diagnostics);
+        if (diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
+        {
+            throw new ArgumentException(
+                $"Prolog sources did not compile: {string.Join("; ", diagnostics)}",
+                nameof(prologSource)
+            );
+        }
+
+        return source;
+    }
+
+    /// <summary>Generates source, returning positioned diagnostics and empty source on compilation errors.</summary>
+    public static string Generate(
+        ModuleContract contract,
+        string prologSource,
+        string sourceName,
+        PrologLanguageMode languageMode,
+        PrologFlagOverrides flagOverrides,
+        out IReadOnlyList<Diagnostic> diagnostics
+    )
+    {
         ArgumentNullException.ThrowIfNull(contract);
         ArgumentNullException.ThrowIfNull(prologSource);
         ArgumentNullException.ThrowIfNull(sourceName);
@@ -68,11 +91,11 @@ public static class FacadeGenerator
             [],
             languageMode,
             flagOverrides,
-            out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics
+            out diagnostics
         );
         if (diagnostics.Any(diagnostic => diagnostic.Severity == DotProlog.Syntax.DiagnosticSeverity.Error))
         {
-            throw new ArgumentException($"{sourceName} did not compile: {string.Join("; ", diagnostics)}", nameof(prologSource));
+            return string.Empty;
         }
 
         AppendImplementation(text, contract, compiledProgram, languageMode, flagOverrides);

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using DotProlog.Runtime;
+using DotProlog.Syntax;
 
 namespace DotProlog.CodeGen.CSharp;
 
@@ -42,6 +43,24 @@ public static class EntryPointGenerator
         PrologFlagOverrides flagOverrides
     )
     {
+        var source = GenerateTestHost(@namespace, sources, languageMode, flagOverrides, out var diagnostics);
+        if (diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
+        {
+            throw new ArgumentException($"Prolog tests did not compile: {string.Join("; ", diagnostics)}", nameof(sources));
+        }
+
+        return source;
+    }
+
+    /// <summary>Generates source, returning positioned diagnostics and empty source on compilation errors.</summary>
+    public static string GenerateTestHost(
+        string @namespace,
+        IReadOnlyList<(string Name, string Text)> sources,
+        PrologLanguageMode languageMode,
+        PrologFlagOverrides flagOverrides,
+        out IReadOnlyList<Diagnostic> diagnostics
+    )
+    {
         ArgumentNullException.ThrowIfNull(@namespace);
         ArgumentNullException.ThrowIfNull(sources);
         ArgumentNullException.ThrowIfNull(flagOverrides);
@@ -52,11 +71,11 @@ public static class EntryPointGenerator
             [],
             languageMode,
             flagOverrides,
-            out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics
+            out diagnostics
         );
         if (diagnostics.Any(diagnostic => diagnostic.Severity == DotProlog.Syntax.DiagnosticSeverity.Error))
         {
-            throw new ArgumentException($"Prolog tests did not compile: {string.Join("; ", diagnostics)}", nameof(sources));
+            return string.Empty;
         }
 
         var text = new StringBuilder();
@@ -127,6 +146,24 @@ public static class EntryPointGenerator
         PrologFlagOverrides flagOverrides
     )
     {
+        var source = Generate(@namespace, sources, languageMode, flagOverrides, out var diagnostics);
+        if (diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
+        {
+            throw new ArgumentException($"Prolog sources did not compile: {string.Join("; ", diagnostics)}", nameof(sources));
+        }
+
+        return source;
+    }
+
+    /// <summary>Generates source, returning positioned diagnostics and empty source on compilation errors.</summary>
+    public static string Generate(
+        string @namespace,
+        IReadOnlyList<(string Name, string Text)> sources,
+        PrologLanguageMode languageMode,
+        PrologFlagOverrides flagOverrides,
+        out IReadOnlyList<Diagnostic> diagnostics
+    )
+    {
         ArgumentNullException.ThrowIfNull(@namespace);
         ArgumentNullException.ThrowIfNull(sources);
         ArgumentNullException.ThrowIfNull(flagOverrides);
@@ -137,11 +174,11 @@ public static class EntryPointGenerator
             [],
             languageMode,
             flagOverrides,
-            out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics
+            out diagnostics
         );
         if (diagnostics.Any(diagnostic => diagnostic.Severity == DotProlog.Syntax.DiagnosticSeverity.Error))
         {
-            throw new ArgumentException($"Prolog sources did not compile: {string.Join("; ", diagnostics)}", nameof(sources));
+            return string.Empty;
         }
 
         var text = new StringBuilder();
