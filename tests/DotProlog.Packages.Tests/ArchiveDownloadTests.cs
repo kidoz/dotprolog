@@ -18,6 +18,12 @@ public sealed class ArchiveDownloadTests
         using var key = RSA.Create(2048);
         var request = new CertificateRequest("CN=localhost", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         using var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow.AddHours(1));
+        const string password = "propack-test";
+        using var serverCertificate = X509CertificateLoader.LoadPkcs12(
+            certificate.Export(X509ContentType.Pfx, password),
+            password,
+            X509KeyStorageFlags.Exportable
+        );
         using var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
@@ -34,7 +40,7 @@ public sealed class ArchiveDownloadTests
             {
                 UseProxy = false,
                 ServerCertificateCustomValidationCallback = (_, presented, _, _) =>
-                    presented?.Thumbprint == certificate.Thumbprint,
+                    presented?.Thumbprint == serverCertificate.Thumbprint,
             };
             var uri = new Uri($"https://127.0.0.1:{port}/package.zip");
             if (mode == "success")
@@ -68,7 +74,7 @@ public sealed class ArchiveDownloadTests
                     using var client = await listener.AcceptTcpClientAsync(stop.Token);
                     using var tls = new SslStream(client.GetStream());
                     await tls.AuthenticateAsServerAsync(
-                        new SslServerAuthenticationOptions { ServerCertificate = certificate },
+                        new SslServerAuthenticationOptions { ServerCertificate = serverCertificate },
                         stop.Token
                     );
                     using var reader = new StreamReader(tls, Encoding.ASCII, leaveOpen: true);
