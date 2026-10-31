@@ -119,7 +119,7 @@ public sealed class OperatorWritingTests
         // must read what it wrote back the same way.
         foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
         {
-            var engine = new PrologEngine(mode);
+            using var engine = new PrologEngine(mode);
 
             Cell original = ReadOntoHeap(engine, source);
             var written = TermWriter.ToDisplayString(engine.Machine, original, quoted: true);

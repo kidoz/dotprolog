@@ -12,7 +12,7 @@ namespace DotProlog.Compiler;
 /// never emits CLR IL, so it stays valid inside a NativeAOT process. The build-time path that turns
 /// Prolog into generated C# is a separate component.
 /// </remarks>
-public sealed class PrologEngine : IRuntimeCompiler
+public sealed class PrologEngine : IRuntimeCompiler, IDisposable
 {
     private const int ControlGoalCacheLimit = 1024;
 
@@ -93,6 +93,10 @@ public sealed class PrologEngine : IRuntimeCompiler
             characterConversions: Program.CharacterConversions,
             flags: Program.Flags
         );
+
+    /// <summary>Closes program-owned streams, leaving host-owned standard streams open.</summary>
+    /// <remarks>Call after the engine has stopped executing; the engine is not thread-safe.</remarks>
+    public void Dispose() => Machine.Dispose();
 
     /// <summary>The program this engine loads into.</summary>
     public BytecodeProgram Program { get; }

@@ -9,7 +9,7 @@ namespace DotProlog.Benchmarks;
 /// <summary>Compares warmed direct-IL predicates with consulted bytecode using identical goals.</summary>
 /// <remarks>Assembly loading is JIT benchmark setup only; it is excluded from timing and production AOT paths.</remarks>
 [MemoryDiagnoser]
-public class CompilerExecutionBenchmarks
+public class CompilerExecutionBenchmarks : IDisposable
 {
     private AssemblyLoadContext _context = null!;
     private PrologEngine _bytecode = null!;
@@ -88,7 +88,29 @@ public class CompilerExecutionBenchmarks
     public RunResult TableIl() => _tableIl.Machine.Run(_tableIlGoal);
 
     [GlobalCleanup]
-    public void Cleanup() => _context.Unload();
+    public void Cleanup() => Dispose();
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposing)
+        {
+            return;
+        }
+
+        _bytecode?.Dispose();
+        _linearBytecode?.Dispose();
+        _compiled?.Dispose();
+        _unfused?.Dispose();
+        _linearIl?.Dispose();
+        _tableIl?.Dispose();
+        _context?.Unload();
+    }
 
     private PrologEngine Install(
         string source,

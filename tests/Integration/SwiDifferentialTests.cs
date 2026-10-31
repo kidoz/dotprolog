@@ -325,7 +325,7 @@ public sealed class SwiDifferentialTests
         // One writer for both streams, because the swipl side of the comparison is also
         // stdout and stderr concatenated. A corpus goal therefore writes to one stream only.
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output, Error = output };
+        using var engine = new PrologEngine { Output = output, Error = output };
 
         LoadResult loaded = engine.ConsultText($":- initialization(({goal})).", "differential.pl");
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));

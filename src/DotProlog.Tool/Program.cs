@@ -106,7 +106,7 @@ internal static class Program
             return ExitUsage;
         }
 
-        var engine = new PrologEngine(languageMode, flagOverrides) { Output = output, Error = error };
+        using var engine = new PrologEngine(languageMode, flagOverrides) { Output = output, Error = error };
 
         // Directives run while the file loads, so an error one raises surfaces here as it would from
         // an initialization goal.

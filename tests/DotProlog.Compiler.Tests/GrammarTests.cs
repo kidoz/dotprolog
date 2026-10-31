@@ -19,7 +19,7 @@ public sealed class GrammarTests
     {
         foreach (var mode in new[] { PrologLanguageMode.StrictIso, PrologLanguageMode.Modern })
         {
-            var engine = new PrologEngine(mode);
+            using var engine = new PrologEngine(mode);
             Assert.Equal(succeeds, engine.Query(goal).Prove());
         }
     }

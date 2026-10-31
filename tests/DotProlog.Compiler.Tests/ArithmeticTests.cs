@@ -70,7 +70,7 @@ public sealed class ArithmeticTests
     [Fact]
     public void DivisionByZeroIsAnEvaluationError()
     {
-        var engine = new PrologEngine { Output = new StringWriter() };
+        using var engine = new PrologEngine { Output = new StringWriter() };
         Assert.True(engine.ConsultText(":- initialization(X is 1 // 0).").Success);
 
         PrologException exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
@@ -81,7 +81,7 @@ public sealed class ArithmeticTests
     [Fact]
     public void EvaluatingAnUnboundVariableIsAnInstantiationError()
     {
-        var engine = new PrologEngine { Output = new StringWriter() };
+        using var engine = new PrologEngine { Output = new StringWriter() };
         Assert.True(engine.ConsultText(":- initialization(X is Y + 1).").Success);
 
         PrologException exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
@@ -103,7 +103,7 @@ public sealed class ArithmeticTests
     [InlineData("\\ 1.0", "type_error(integer, 1.0)")]
     public void RaisesIsoArithmeticErrors(string expression, string expected)
     {
-        var engine = new PrologEngine { Output = new StringWriter() };
+        using var engine = new PrologEngine { Output = new StringWriter() };
         Assert.True(engine.ConsultText($":- initialization(X is {expression}).").Success);
 
         PrologException exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());

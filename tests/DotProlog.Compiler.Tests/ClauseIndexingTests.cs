@@ -119,7 +119,7 @@ public sealed class ClauseIndexingTests
     public void RuntimeConsultedPredicatesAreIndexed()
     {
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine { Output = output, Input = TextReader.Null };
 
         Assert.Empty(engine.ConsultText("speed(car, fast). speed(snail, slow).", "facts.pl").Diagnostics);
         Assert.Equal(RunResult.Success, engine.RunGoal("speed(snail, X), write(X)", out _));
@@ -129,7 +129,7 @@ public sealed class ClauseIndexingTests
     private static string Run(string source, string goal)
     {
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine { Output = output, Input = TextReader.Null };
 
         Assert.Empty(engine.ConsultText(source, "indexing.pl").Diagnostics);
         Assert.Equal(RunResult.Success, engine.RunGoal(goal, out _));

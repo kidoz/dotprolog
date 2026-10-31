@@ -704,7 +704,7 @@ internal static class Program
 
     private static bool ExerciseSystemErrors()
     {
-        var engine = new PrologEngine { Input = new FailingReader() };
+        using var engine = new PrologEngine { Input = new FailingReader() };
         if (
             engine.RunGoal("catch(get_char(_), error(system_error, _), true)", out IReadOnlyList<Diagnostic> inputDiagnostics)
                 != RunResult.Success

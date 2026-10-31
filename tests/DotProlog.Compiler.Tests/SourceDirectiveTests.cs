@@ -76,7 +76,7 @@ public sealed class SourceDirectiveTests : IDisposable
     [Fact]
     public void MissingIncludeProducesAStableDiagnostic()
     {
-        var engine = new PrologEngine();
+        using var engine = new PrologEngine();
         var main = Write("main.pl", ":- include(missing).");
 
         LoadResult loaded = engine.ConsultFile(main);
@@ -88,7 +88,7 @@ public sealed class SourceDirectiveTests : IDisposable
     public void RecursiveIncludeProducesAStableDiagnostic()
     {
         var main = Write("main.pl", ":- include(main).");
-        var engine = new PrologEngine();
+        using var engine = new PrologEngine();
 
         LoadResult loaded = engine.ConsultFile(main);
 
@@ -116,7 +116,7 @@ public sealed class SourceDirectiveTests : IDisposable
     {
         var dependency = Write("dependency.pl", ":- initialization(write(dependency)).");
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine { Output = output, Input = TextReader.Null };
 
         Assert.Empty(engine.ConsultFile(dependency).Diagnostics);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
@@ -129,7 +129,7 @@ public sealed class SourceDirectiveTests : IDisposable
     [Fact]
     public void MissingEnsureLoadedProducesAStableDiagnostic()
     {
-        var engine = new PrologEngine();
+        using var engine = new PrologEngine();
         var main = Write("main.pl", ":- ensure_loaded(missing).");
 
         LoadResult loaded = engine.ConsultFile(main);
@@ -216,7 +216,7 @@ public sealed class SourceDirectiveTests : IDisposable
     public void ExecutableDirectiveSeesOnlyClausesPreparedBeforeItsSourcePosition()
     {
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine { Output = output, Input = TextReader.Null };
 
         LoadResult loaded = engine.ConsultText(
             """
@@ -256,7 +256,7 @@ public sealed class SourceDirectiveTests : IDisposable
     public void DynamicStoredRulesSurviveDirectiveFlushesAndRetraction(PrologLanguageMode mode)
     {
         var output = new StringWriter();
-        var engine = new PrologEngine(mode) { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine(mode) { Output = output, Input = TextReader.Null };
         LoadResult loaded = engine.ConsultText(
             """
             :- dynamic(value/2).
@@ -288,7 +288,7 @@ public sealed class SourceDirectiveTests : IDisposable
             """
         );
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine { Output = output, Input = TextReader.Null };
 
         Assert.Equal(RunResult.Success, engine.RunGoal($"consult('{QuotedAtomText(dependency)}')", out _));
         Assert.Equal("", output.ToString());
@@ -304,7 +304,7 @@ public sealed class SourceDirectiveTests : IDisposable
     [InlineData(":- multifile value/256.", CompilerDiagnosticIds.InvalidMultifileDeclaration)]
     public void PredicatePropertyDeclarationsValidateEveryIndicator(string source, string diagnosticId)
     {
-        var engine = new PrologEngine();
+        using var engine = new PrologEngine();
 
         LoadResult loaded = engine.ConsultText(source, "invalid.pl");
 
@@ -325,7 +325,7 @@ public sealed class SourceDirectiveTests : IDisposable
     private static string RunFile(string path)
     {
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine { Output = output, Input = TextReader.Null };
 
         LoadResult loaded = engine.ConsultFile(path);
         Assert.Empty(loaded.Diagnostics);

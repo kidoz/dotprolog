@@ -11,7 +11,7 @@ public sealed class ModernModeTests
     [Fact]
     public void ModernModeStartsDoubleQuotesAtChars()
     {
-        var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
+        using var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
 
         Assert.Equal(DoubleQuotesMode.Chars, engine.Program.InitialDoubleQuotes);
         Assert.Equal(RunResult.Success, engine.RunGoal("current_prolog_flag(double_quotes, chars)", out _));
@@ -21,7 +21,7 @@ public sealed class ModernModeTests
     [Fact]
     public void ModernModeDecomposesAStringAsAListOfChars()
     {
-        var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
+        using var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
 
         Assert.True(engine.ConsultText("head(L, Ls) :- \"abc\" = [L|Ls].").Success);
         Assert.Equal(RunResult.Success, engine.RunGoal("head(a, [b,c])", out _));
@@ -30,7 +30,7 @@ public sealed class ModernModeTests
     [Fact]
     public void ModernIsTheDefaultMode()
     {
-        var engine = new PrologEngine { Output = new StringWriter() };
+        using var engine = new PrologEngine { Output = new StringWriter() };
 
         Assert.Equal(PrologLanguageMode.Modern, engine.Program.LanguageMode);
         Assert.Equal(PrologLanguageMode.Modern, new BytecodeProgram().LanguageMode);
@@ -41,13 +41,14 @@ public sealed class ModernModeTests
     [Fact]
     public void StrictIsoStartsDoubleQuotesAtCodes()
     {
-        Assert.Equal(DoubleQuotesMode.Codes, new PrologEngine(PrologLanguageMode.StrictIso).Program.InitialDoubleQuotes);
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
+        Assert.Equal(DoubleQuotesMode.Codes, engine.Program.InitialDoubleQuotes);
     }
 
     [Fact]
     public void ModernWithACodesOverrideReadsCodeLists()
     {
-        var engine = new PrologEngine(
+        using var engine = new PrologEngine(
             PrologLanguageMode.Modern,
             new PrologFlagOverrides { DoubleQuotes = DoubleQuotesMode.Codes }
         )
@@ -62,7 +63,7 @@ public sealed class ModernModeTests
     [Fact]
     public void ModernModeKeepsTheExtensionSurface()
     {
-        var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
+        using var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
 
         // A bundled extension that StrictIso would reject stays available here.
         Assert.True(engine.ConsultText("p :- member(a, [a]).").Success);
@@ -74,7 +75,7 @@ public sealed class ModernModeTests
     {
         // The libraries are processor implementation. If they were re-read as chars the engine would
         // not construct, but assert on behavior rather than on construction alone.
-        var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
+        using var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
 
         Assert.Equal(RunResult.Success, engine.RunGoal("append([1], [2], [1,2]), msort([b,a], [a,b])", out _));
     }
@@ -82,7 +83,7 @@ public sealed class ModernModeTests
     [Fact]
     public void DoubleQuotesDirectiveDoesNotEscapeItsLoadUnit()
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = new StringWriter() };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = new StringWriter() };
 
         Assert.True(
             engine
@@ -107,7 +108,7 @@ public sealed class ModernModeTests
     [Fact]
     public void ModernModeRestoresCharsAfterALoadUnitOptsOut()
     {
-        var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
+        using var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
 
         Assert.True(
             engine

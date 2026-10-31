@@ -103,7 +103,7 @@ public sealed class CharacterConversionTests
     public void PrimitiveCharacterInputRemainsUnconverted()
     {
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output, Input = new StringReader("z") };
+        using var engine = new PrologEngine { Output = output, Input = new StringReader("z") };
 
         engine.ConsultOrThrow(
             """
@@ -142,7 +142,7 @@ public sealed class CharacterConversionTests
     public void ConvertedTerminatorsAreRecognizedByStreamingTermInput()
     {
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output, Input = new StringReader("hello#") };
+        using var engine = new PrologEngine { Output = output, Input = new StringReader("hello#") };
 
         engine.ConsultOrThrow(
             """
@@ -163,7 +163,7 @@ public sealed class CharacterConversionTests
     [Fact]
     public void HostGoalsUseTheSameConversionState()
     {
-        var engine = new PrologEngine();
+        using var engine = new PrologEngine();
         engine.ConsultOrThrow("fixx.", "host.pl");
 
         Assert.Equal(RunResult.Success, engine.RunGoal("char_conversion(z, x)", out _));
@@ -174,8 +174,8 @@ public sealed class CharacterConversionTests
     [Fact]
     public void MappingStateIsIsolatedBetweenEngines()
     {
-        var first = new PrologEngine();
-        var second = new PrologEngine();
+        using var first = new PrologEngine();
+        using var second = new PrologEngine();
 
         Assert.Equal(RunResult.Success, first.RunGoal("char_conversion(z, x)", out _));
         Assert.Equal(RunResult.Success, first.RunGoal("current_char_conversion(z, x)", out _));

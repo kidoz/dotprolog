@@ -109,7 +109,8 @@ public class StartupBenchmarks
     {
         if (!compile)
         {
-            return new PrologEngine().Program.CodeLength;
+            using var engine = new PrologEngine();
+            return engine.Program.CodeLength;
         }
         using var output = new MemoryStream();
         CompilerBenchmarkSource.Check(IlAssemblyEmitter.Emit(sources, "PipelineBenchmark", output));
@@ -122,7 +123,7 @@ public class StartupBenchmarks
     [Benchmark(Description = "Construct, then consult and run a goal")]
     public RunResult ConstructAndRun()
     {
-        var engine = new PrologEngine { Output = TextWriter.Null };
+        using var engine = new PrologEngine { Output = TextWriter.Null };
         engine.ConsultOrThrow("greeting('Hello! World!').", "bench.pl");
         return engine.RunGoal("greeting(_)", out _);
     }

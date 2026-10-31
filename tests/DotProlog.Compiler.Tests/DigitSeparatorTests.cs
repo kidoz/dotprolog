@@ -26,7 +26,7 @@ public sealed class DigitSeparatorTests
     [InlineData("X = 0'_", "X == 95")]
     public void SourceReadsSeparatedIntegersInModern(string body, string check)
     {
-        var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
+        using var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
         Assert.True(engine.ConsultText($"t(X) :- {body}.\n", "test.pl").Success);
         Assert.True(engine.Query($"t(X), {check}").Prove());
     }
@@ -38,21 +38,21 @@ public sealed class DigitSeparatorTests
     [InlineData("X = 1.5_5.\n")]
     public void MisplacedAndFloatSeparatorsAreSourceErrorsInModern(string text)
     {
-        var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
+        using var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
         Assert.False(engine.ConsultText(text, "test.pl").Success);
     }
 
     [Fact]
     public void StrictIsoSourceHasNoDigitSeparators()
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = new StringWriter() };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = new StringWriter() };
         Assert.False(engine.ConsultText("X = 1_000.\n", "test.pl").Success);
     }
 
     [Fact]
     public void NumericListsReadSeparatedIntegersInModern()
     {
-        var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
+        using var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
         Assert.True(engine.Query("number_codes(N, [49,95,48,48,48]), N == 1000").Prove());
         Assert.True(engine.Query("atom_codes(A, [49,95,48,48,48]), atom_chars(A, C), number_chars(M, C), M == 1000").Prove());
         Assert.True(engine.Query("number_codes(R, [49,95,48,114,51]), R == 10r3").Prove());
@@ -61,7 +61,7 @@ public sealed class DigitSeparatorTests
     [Fact]
     public void NumericListsRejectSeparatorsInStrictIso()
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = new StringWriter() };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = new StringWriter() };
         Assert.True(
             engine.Query("catch(number_codes(_, [49,95,48,48,48]), error(syntax_error(illegal_number), _), true)").Prove()
         );
@@ -78,7 +78,7 @@ public sealed class DigitSeparatorTests
     [Fact]
     public void NumericListsRejectFloatSeparatorsInModern()
     {
-        var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
+        using var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
         Assert.True(
             engine.Query("catch(number_codes(_, [49,95,53,46,53]), error(syntax_error(illegal_number), _), true)").Prove()
         );
@@ -90,7 +90,7 @@ public sealed class DigitSeparatorTests
     [Fact]
     public void AtomNumberReadsSeparatedIntegers()
     {
-        var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
+        using var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = new StringWriter() };
         Assert.True(engine.Query("atom_number('1_000', N), N == 1000").Prove());
         Assert.True(engine.Query("atom_number('0xFF_FF', H), H == 65535").Prove());
         Assert.True(engine.Query("atom_number('1_0r3', R), R == 10r3").Prove());
@@ -103,7 +103,7 @@ public sealed class DigitSeparatorTests
     public void WritingHasNoSeparators()
     {
         var output = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = output };
+        using var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = output };
         Assert.True(engine.Query("writeq(1_000_000)").Prove());
         Assert.Equal("1000000", output.ToString());
         Assert.True(engine.Query("number_chars(1000, C), C == ['1','0','0','0']").Prove());

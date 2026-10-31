@@ -31,7 +31,7 @@ public sealed class IlBlockFusionTests
         foreach (var fused in new[] { false, true })
         {
             using var program = new LoadedProgram(source, fuseBlocks: fused);
-            var engine = new PrologEngine();
+            using var engine = new PrologEngine();
             program.Install(engine);
             Assert.True(engine.Query($"findall(V,p({wide},V),[wide,fallback])").Prove());
             Assert.True(engine.Query($"findall(V,p({mismatch},V),[fallback])").Prove());
@@ -47,7 +47,7 @@ public sealed class IlBlockFusionTests
     {
         using var program = new LoadedProgram("p(f(a),a,a). p(f(b),b,b).", fuseBlocks: fuseBlocks);
         using var output = new StringWriter();
-        var engine = new PrologEngine { Output = output };
+        using var engine = new PrologEngine { Output = output };
         program.Install(engine);
         Assert.True(engine.Query("freeze(X,write(X)), p(f(X),X,b)").Prove());
         Assert.Equal("b", output.ToString());
@@ -86,7 +86,7 @@ public sealed class IlBlockFusionTests
         foreach (var fused in new[] { false, true })
         {
             using var program = new LoadedProgram(source, fuseBlocks: fused);
-            var engine = new PrologEngine();
+            using var engine = new PrologEngine();
             program.Install(engine);
             Assert.True(engine.Query(goal).Prove());
         }
@@ -112,7 +112,7 @@ public sealed class IlBlockFusionTests
         {
             using var program = new LoadedProgram(source, fuseBlocks: fused);
             using var output = new StringWriter();
-            var engine = new PrologEngine { Output = output };
+            using var engine = new PrologEngine { Output = output };
             program.Install(engine);
             Assert.True(engine.Query(goal).Prove());
             Assert.Equal(expected, output.ToString());
@@ -125,7 +125,7 @@ public sealed class IlBlockFusionTests
         foreach (var fused in new[] { false, true })
         {
             using var program = new LoadedProgram("p(a). p(b). bridge(X) :- consulted(X), true.", fuseBlocks: fused);
-            var engine = new PrologEngine();
+            using var engine = new PrologEngine();
             program.Install(engine);
             engine.ConsultOrThrow("consulted(X) :- p(X).", "runtime.pl");
             Assert.Collection(

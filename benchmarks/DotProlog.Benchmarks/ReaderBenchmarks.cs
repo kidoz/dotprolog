@@ -27,5 +27,9 @@ public class ReaderBenchmarks
     public int ReadProgram() => TermReader.ReadProgram(_source).Clauses.Count;
 
     [Benchmark]
-    public bool Consult() => new PrologEngine().ConsultText(_source).Success;
+    public bool Consult()
+    {
+        using var engine = new PrologEngine();
+        return engine.ConsultText(_source).Success;
+    }
 }

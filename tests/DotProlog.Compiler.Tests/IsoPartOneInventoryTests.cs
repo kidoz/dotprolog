@@ -133,7 +133,7 @@ public sealed class IsoPartOneInventoryTests
     [Fact]
     public void EveryPartOnePredefinedPredicateIsInstalled()
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso);
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
 
         foreach ((var name, var arity) in Predicates)
         {
@@ -148,7 +148,7 @@ public sealed class IsoPartOneInventoryTests
     [Fact]
     public void EveryPartOneControlConstructCompilesInStrictMode()
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso);
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
         LoadResult loaded = engine.ConsultText(
             """
             controls :-
@@ -171,7 +171,7 @@ public sealed class IsoPartOneInventoryTests
     public void EveryPartOneEvaluableFunctorExecutesInStrictMode()
     {
         var output = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output };
         const string goal =
             "_ is pi, _ is +1, _ is -1, _ is abs(-1), _ is sign(-1), "
             + "_ is float_integer_part(1.5), _ is float_fractional_part(1.5), _ is float(1), "

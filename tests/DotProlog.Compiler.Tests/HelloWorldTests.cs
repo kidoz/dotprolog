@@ -9,7 +9,7 @@ public sealed class HelloWorldTests
     public void SampleFilePrintsItsGreeting()
     {
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output };
+        using var engine = new PrologEngine { Output = output };
 
         LoadResult loaded = engine.ConsultFile("hello.pl");
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));

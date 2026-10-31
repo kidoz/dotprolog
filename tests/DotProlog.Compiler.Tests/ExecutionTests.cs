@@ -9,7 +9,7 @@ public sealed class ExecutionTests
     [Fact]
     public void ReusedClauseCompilerResetsSlotsAndFailureState()
     {
-        var engine = new PrologEngine();
+        using var engine = new PrologEngine();
         List<Diagnostic> diagnostics = [];
         var compiler = new ClauseCompiler(engine.Program, new ConstantPool(engine.Program), diagnostics, "reuse.pl");
         SyntaxTerm wideHead = Assert.Single(TermReader.ReadProgram("wide(X, A, B, C, D, E, F, G).").Clauses);
@@ -270,7 +270,7 @@ public sealed class ExecutionTests
     [Fact]
     public void CallingAnUndefinedPredicateRaisesAnExistenceError()
     {
-        var engine = new PrologEngine { Output = new StringWriter() };
+        using var engine = new PrologEngine { Output = new StringWriter() };
         Assert.True(engine.ConsultText(":- initialization(nowhere(1)).").Success);
 
         PrologException exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());

@@ -7,7 +7,7 @@ public sealed class ExceptionTests
 {
     private static PrologException Uncaught(string source)
     {
-        var engine = new PrologEngine { Output = new StringWriter() };
+        using var engine = new PrologEngine { Output = new StringWriter() };
         Assert.True(engine.ConsultText(source).Success);
         return Assert.Throws<PrologException>(() => engine.RunPendingGoals());
     }

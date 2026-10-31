@@ -106,7 +106,7 @@ public sealed class NumberCharsConformityTests
     [InlineData(PrologLanguageMode.StrictIso)]
     public void AnOversizedFloatLiteralRaisesTheReadersSyntaxError(PrologLanguageMode mode)
     {
-        var engine = new PrologEngine(mode) { Output = new StringWriter() };
+        using var engine = new PrologEngine(mode) { Output = new StringWriter() };
         Assert.True(
             engine
                 .Query(
@@ -125,7 +125,7 @@ public sealed class NumberCharsConformityTests
     [InlineData(PrologLanguageMode.StrictIso)]
     public void CyclicListsRaiseAListTypeErrorWithTheCyclicCulprit(PrologLanguageMode mode)
     {
-        var engine = new PrologEngine(mode);
+        using var engine = new PrologEngine(mode);
         // Case 46, plus codes, bound numbers, and a cycle reached through a finite prefix.
         string[] goals =
         [
@@ -155,7 +155,7 @@ public sealed class NumberCharsConformityTests
     [InlineData(PrologLanguageMode.StrictIso)]
     public void CharacterCodeQuotesAndOctalEscapesFollowIsoGrammar(PrologLanguageMode mode)
     {
-        var engine = new PrologEngine(mode);
+        using var engine = new PrologEngine(mode);
         // 0'\o0\ and 0'\d: ISO has no \o or \d escape, and neither has SWI-Prolog.
         string[] malformed =
         [
@@ -209,7 +209,7 @@ public sealed class NumberCharsConformityTests
 
     private static string Outcome(PrologLanguageMode mode, string goal)
     {
-        var engine = new PrologEngine(mode) { Output = new StringWriter() };
+        using var engine = new PrologEngine(mode) { Output = new StringWriter() };
         var query = $"catch((({goal}) -> write(true) ; write(false)), error(syntax_error(_), _), write(syntax_error))";
         Assert.True(engine.Query(query).Prove(), goal);
         return ((StringWriter)engine.Output).ToString();

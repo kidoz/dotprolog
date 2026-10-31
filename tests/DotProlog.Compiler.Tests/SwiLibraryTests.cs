@@ -243,7 +243,7 @@ public sealed class SwiLibraryTests
     [Fact]
     public void StrictModeRejectsTheSwiLibrarySurface()
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso);
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
 
         LoadResult loaded = engine.ConsultText("p :- must_be(integer, 1).", "strict.pl");
 
@@ -256,7 +256,7 @@ public sealed class SwiLibraryTests
     public void ModernModeSharesTheSwiLibrarySurface()
     {
         var output = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = output };
+        using var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = output };
 
         Assert.True(engine.ConsultText(":- initialization((must_be(chars, \"ab\"), write(ok))).").Success);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());

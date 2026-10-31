@@ -280,7 +280,7 @@ public sealed class GeneratedFacadeTests
     {
         var unused = CreateModule(out Type type);
         _ = unused;
-        var engine = new Compiler.PrologEngine();
+        using var engine = new Compiler.PrologEngine();
         var module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
         engine.ConsultOrThrow("runtime_value(alpha). runtime_value(beta).", "runtime.pl");
 
@@ -303,7 +303,7 @@ public sealed class GeneratedFacadeTests
     {
         var unused = CreateModule(out Type type);
         _ = unused;
-        var engine = new Compiler.PrologEngine();
+        using var engine = new Compiler.PrologEngine();
         type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine]);
         engine.ConsultOrThrow("consulted_colour(X) :- colour(X).", "runtime.pl");
         var host = new Runtime.PrologHost(engine.Machine);
@@ -322,7 +322,7 @@ public sealed class GeneratedFacadeTests
         var unused = CreateModule(out Type type);
         _ = unused;
         using var output = new StringWriter();
-        var engine = new Compiler.PrologEngine { Output = output };
+        using var engine = new Compiler.PrologEngine { Output = output };
 
         type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine]);
 
@@ -334,7 +334,7 @@ public sealed class GeneratedFacadeTests
     {
         var unused = CreateModule(out Type type);
         _ = unused;
-        var engine = new Compiler.PrologEngine();
+        using var engine = new Compiler.PrologEngine();
         var module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
 
         var initial = (IEnumerable<string>)Call(module, type, "DynamicValue", CancellationToken.None)!;
@@ -397,7 +397,7 @@ public sealed class GeneratedFacadeTests
         var source = FacadeGenerator.Generate(contract.Contract!, "answer(- 1).", "numbers.pl", mode);
         Assembly assembly = CompileGenerated(source);
         Type type = assembly.GetType("Generated.Numbers.NumbersModule")!;
-        var engine = new Compiler.PrologEngine(mode);
+        using var engine = new Compiler.PrologEngine(mode);
         object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
 
         Assert.Equal(true, Call(module, type, "Answer", -1L));
@@ -464,7 +464,7 @@ public sealed class GeneratedFacadeTests
         var source = FacadeGenerator.Generate(contract.Contract!, prolog, "iso-review.pl", Runtime.PrologLanguageMode.StrictIso);
         Assembly assembly = CompileGenerated(source);
         Type type = assembly.GetType("Generated.IsoReview.IsoReviewModule")!;
-        var engine = new Compiler.PrologEngine(Runtime.PrologLanguageMode.StrictIso);
+        using var engine = new Compiler.PrologEngine(Runtime.PrologLanguageMode.StrictIso);
         object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
         Compiler.LoadResult loaded = engine.ConsultText(
             "bytecode_review(Name) :- run_iso_review_case(Name).\n" + (consultInvoker ? invoker : "")
@@ -532,7 +532,7 @@ public sealed class GeneratedFacadeTests
         );
         Assembly assembly = CompileGenerated(source);
         Type type = assembly.GetType("Generated.Conversion.ConversionModule")!;
-        var engine = new Compiler.PrologEngine(mode);
+        using var engine = new Compiler.PrologEngine(mode);
         object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
         Assert.Equal(true, Call(module, type, "Check"));
         Assert.Single(engine.Query("check").Solutions());
@@ -572,7 +572,7 @@ public sealed class GeneratedFacadeTests
         var source = FacadeGenerator.Generate(contract.Contract!, prolog, "iso-context.pl", Runtime.PrologLanguageMode.StrictIso);
         Assembly assembly = CompileGenerated(source);
         Type type = assembly.GetType("Generated.IsoContext.IsoContextModule")!;
-        var engine = new Compiler.PrologEngine(Runtime.PrologLanguageMode.StrictIso);
+        using var engine = new Compiler.PrologEngine(Runtime.PrologLanguageMode.StrictIso);
         object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
         foreach (
             var goal in new[]
@@ -653,7 +653,7 @@ public sealed class GeneratedFacadeTests
 
         Assembly assembly = CompileGenerated(source);
         Type type = assembly.GetType("Generated.Replay.ReplayModule")!;
-        var engine = new Compiler.PrologEngine(Runtime.PrologLanguageMode.Modern, CodesOverride);
+        using var engine = new Compiler.PrologEngine(Runtime.PrologLanguageMode.Modern, CodesOverride);
         object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
 
         // The source was one load unit: replaying its directive at install time must not leak the
@@ -726,7 +726,7 @@ public sealed class GeneratedFacadeTests
 
         Assembly assembly = CompileGenerated(source);
         Type type = assembly.GetType("Generated.Frozen.FrozenModule")!;
-        var engine = new Compiler.PrologEngine();
+        using var engine = new Compiler.PrologEngine();
         object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
         engine.ConsultOrThrow("runtime_bind(1).", "runtime.pl");
 
@@ -770,7 +770,7 @@ public sealed class GeneratedFacadeTests
         );
         Assembly assembly = CompileGenerated(source);
         Type type = assembly.GetType("Generated.OccursCheck.OccursCheckModule")!;
-        var engine = new Compiler.PrologEngine(mode);
+        using var engine = new Compiler.PrologEngine(mode);
         object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
         engine.ConsultOrThrow("runtime_check :- " + body + "\nruntime_to_compiled :- check.", "runtime.pl");
 
@@ -815,7 +815,7 @@ public sealed class GeneratedFacadeTests
         );
         Assembly assembly = CompileGenerated(source);
         Type type = assembly.GetType("Generated.CyclicErrors.CyclicErrorsModule")!;
-        var engine = new Compiler.PrologEngine(mode);
+        using var engine = new Compiler.PrologEngine(mode);
         object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
         engine.ConsultOrThrow(
             """
@@ -863,7 +863,7 @@ public sealed class GeneratedFacadeTests
         );
         Assembly assembly = CompileGenerated(source);
         Type type = assembly.GetType("Generated.NumericSyntax.NumericSyntaxModule")!;
-        var engine = new Compiler.PrologEngine(mode);
+        using var engine = new Compiler.PrologEngine(mode);
         object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
         engine.ConsultOrThrow("runtime_check :- " + body + "\nruntime_to_compiled :- check.", "runtime.pl");
 

@@ -13,7 +13,7 @@ public sealed class InitializationGoalTests
     public void NowRunsInPlaceAndAfterLoadWaitsForTheFile()
     {
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output };
+        using var engine = new PrologEngine { Output = output };
 
         Assert.True(
             engine
@@ -31,7 +31,7 @@ public sealed class InitializationGoalTests
     public void TheLastMainGoalRunsLastAndHalts()
     {
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output };
+        using var engine = new PrologEngine { Output = output };
 
         Assert.True(
             engine
@@ -49,7 +49,7 @@ public sealed class InitializationGoalTests
     public void AMainGoalDefinedInAModuleIsFound()
     {
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output };
+        using var engine = new PrologEngine { Output = output };
 
         Assert.True(
             engine
@@ -66,7 +66,7 @@ public sealed class InitializationGoalTests
     [InlineData(":- initialization(true, _).", "instantiation_error")]
     public void AnUnknownWhenIsAnError(string source, string expected)
     {
-        var engine = new PrologEngine { Output = new StringWriter() };
+        using var engine = new PrologEngine { Output = new StringWriter() };
 
         PrologException exception = Assert.Throws<PrologException>(() => engine.ConsultText(source));
 
@@ -77,7 +77,7 @@ public sealed class InitializationGoalTests
     public void ACallAtRunTimeRunsTheGoal()
     {
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output };
+        using var engine = new PrologEngine { Output = output };
 
         Assert.True(engine.ConsultText(":- initialization(initialization(write(ran), after_load)).").Success);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
@@ -87,7 +87,7 @@ public sealed class InitializationGoalTests
     [Fact]
     public void StrictIsoRejectsIt()
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = new StringWriter() };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = new StringWriter() };
 
         LoadResult loaded = engine.ConsultText(":- initialization(main, main).\nmain.\n");
 

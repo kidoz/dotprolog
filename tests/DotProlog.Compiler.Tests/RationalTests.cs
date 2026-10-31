@@ -113,7 +113,7 @@ public sealed class RationalTests
     [Fact]
     public void StrictModeKeepsIsoLexing()
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso);
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
 
         LoadResult loaded = engine.ConsultText("p(1r3).", "strict.pl");
 
@@ -123,7 +123,7 @@ public sealed class RationalTests
     [Fact]
     public void TheEmbeddingSurfaceMarshalsRationals()
     {
-        var engine = new PrologEngine { Output = new StringWriter() };
+        using var engine = new PrologEngine { Output = new StringWriter() };
         Assert.True(engine.ConsultText("half(X, Y) :- Y is X / 2.").Success);
 
         var host = new PrologHost(engine.Machine);

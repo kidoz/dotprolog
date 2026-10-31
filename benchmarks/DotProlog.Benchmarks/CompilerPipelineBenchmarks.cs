@@ -8,7 +8,7 @@ namespace DotProlog.Benchmarks;
 
 /// <summary>Separates lowering, direct IL emission, and installation; all output stays in memory.</summary>
 [MemoryDiagnoser]
-public class CompilerPipelineBenchmarks
+public class CompilerPipelineBenchmarks : IDisposable
 {
     private string _source = string.Empty;
     private (string Name, string Text)[] _sources = [];
@@ -36,8 +36,10 @@ public class CompilerPipelineBenchmarks
         // measurements. Disable tiering in controlled runs if tier transitions still distort timing.
         for (var iteration = 0; iteration < 64; iteration++)
         {
-            _install(CreateEngine());
-            _installTable(CreateEngine());
+            using var engine = CreateEngine();
+            using var tableEngine = CreateEngine();
+            _install(engine);
+            _installTable(tableEngine);
         }
     }
 
@@ -85,13 +87,25 @@ public class CompilerPipelineBenchmarks
     public PrologEngine CreateEngine() => new() { Output = TextWriter.Null };
 
     [Benchmark]
-    public int[] CreateEngineAndInstallIl() => _install(CreateEngine());
+    public int[] CreateEngineAndInstallIl()
+    {
+        using var engine = CreateEngine();
+        return _install(engine);
+    }
 
     [Benchmark]
-    public int[] CreateEngineAndInstallTableIl() => _installTable(CreateEngine());
+    public int[] CreateEngineAndInstallTableIl()
+    {
+        using var engine = CreateEngine();
+        return _installTable(engine);
+    }
 
     [IterationSetup(Targets = [nameof(InstallIl), nameof(InstallTableIl)])]
-    public void SetupInstallation() => _installationEngine = CreateEngine();
+    public void SetupInstallation()
+    {
+        _installationEngine?.Dispose();
+        _installationEngine = CreateEngine();
+    }
 
     [Benchmark]
     public int[] InstallIl() => _install(_installationEngine);
@@ -100,7 +114,24 @@ public class CompilerPipelineBenchmarks
     public int[] InstallTableIl() => _installTable(_installationEngine);
 
     [GlobalCleanup]
-    public void Cleanup() => _context.Unload();
+    public void Cleanup() => Dispose();
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposing)
+        {
+            return;
+        }
+
+        _installationEngine?.Dispose();
+        _context?.Unload();
+    }
 
     private Func<PrologEngine, int[]> LoadInstaller(string name, bool linearVariableFallback)
     {

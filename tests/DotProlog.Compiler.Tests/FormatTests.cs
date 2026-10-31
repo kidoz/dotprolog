@@ -63,7 +63,7 @@ public sealed class FormatTests
     {
         var output = new StringWriter();
         var error = new StringWriter();
-        var engine = new PrologEngine { Output = output, Error = error };
+        using var engine = new PrologEngine { Output = output, Error = error };
 
         Assert.True(engine.ConsultText(":- initialization(with_output_to(atom(A), format(user_error, \"oops\", []))).").Success);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());

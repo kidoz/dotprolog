@@ -24,7 +24,7 @@ public static class IlProgramHost
             ValidateHeader(reader);
             var mode = (PrologLanguageMode)reader.ReadInt32();
             var quotes = (DoubleQuotesMode)reader.ReadInt32();
-            var engine = new PrologEngine(mode, new PrologFlagOverrides { DoubleQuotes = quotes });
+            using var engine = new PrologEngine(mode, new PrologFlagOverrides { DoubleQuotes = quotes });
             var initializers = Install(engine, image, blocks);
             var result = RunResult.Success;
             foreach (var target in initializers)

@@ -100,9 +100,8 @@ public sealed class FacadeShapeTests
         }
     }
 
-    private static PricingModule NewModule()
+    private static PricingModule NewModule(PrologEngine engine)
     {
-        var engine = new PrologEngine { Output = TextWriter.Null };
         LoadResult loaded = engine.ConsultText(PricingSource, "pricing.pl");
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
 
@@ -112,7 +111,8 @@ public sealed class FacadeShapeTests
     [Fact]
     public void DeterministicPredicateReturnsItsOutput()
     {
-        IPricingModule module = NewModule();
+        using var engine = new PrologEngine { Output = TextWriter.Null };
+        IPricingModule module = NewModule(engine);
 
         Assert.Equal(90.0, module.Discount(100.0, 10));
     }
@@ -123,7 +123,8 @@ public sealed class FacadeShapeTests
     [InlineData("sprocket", false)]
     public void SemiDeterministicPredicateReturnsWhetherItHolds(string item, bool expected)
     {
-        IPricingModule module = NewModule();
+        using var engine = new PrologEngine { Output = TextWriter.Null };
+        IPricingModule module = NewModule(engine);
 
         Assert.Equal(expected, module.InStock(item));
     }
@@ -131,7 +132,8 @@ public sealed class FacadeShapeTests
     [Fact]
     public void NondeterministicPredicateYieldsEverySolution()
     {
-        IPricingModule module = NewModule();
+        using var engine = new PrologEngine { Output = TextWriter.Null };
+        IPricingModule module = NewModule(engine);
 
         Assert.Equal(["red", "green", "blue"], module.Colour());
     }
@@ -139,7 +141,8 @@ public sealed class FacadeShapeTests
     [Fact]
     public void NondeterministicPredicateIsEnumeratedLazily()
     {
-        IPricingModule module = NewModule();
+        using var engine = new PrologEngine { Output = TextWriter.Null };
+        IPricingModule module = NewModule(engine);
 
         Assert.Equal(["red"], module.Colour().Take(1));
     }
@@ -147,7 +150,8 @@ public sealed class FacadeShapeTests
     [Fact]
     public void ListsCrossTheBoundaryInBothDirections()
     {
-        IPricingModule module = NewModule();
+        using var engine = new PrologEngine { Output = TextWriter.Null };
+        IPricingModule module = NewModule(engine);
 
         // Every way of splitting [a,b] into two lists, rendered as "left|right".
         string[] shapes =
@@ -161,7 +165,7 @@ public sealed class FacadeShapeTests
     [Fact]
     public void BindingAnUndefinedPredicateFailsImmediatelyRatherThanAtCallTime()
     {
-        var engine = new PrologEngine { Output = TextWriter.Null };
+        using var engine = new PrologEngine { Output = TextWriter.Null };
         var host = new PrologHost(engine.Machine);
 
         PrologException error = Assert.Throws<PrologException>(() => host.Bind("nowhere", 2));
@@ -172,7 +176,7 @@ public sealed class FacadeShapeTests
     [Fact]
     public void CallingWithTheWrongNumberOfArgumentsIsRejected()
     {
-        var engine = new PrologEngine { Output = TextWriter.Null };
+        using var engine = new PrologEngine { Output = TextWriter.Null };
         Assert.True(engine.ConsultText(PricingSource, "pricing.pl").Success);
 
         var host = new PrologHost(engine.Machine);

@@ -147,7 +147,7 @@ internal static class CompiledConformanceSourceGenerator
                 {
                     var output = new global::System.IO.StringWriter(
                         global::System.Globalization.CultureInfo.InvariantCulture);
-                    var engine = new global::DotProlog.Compiler.PrologEngine(
+                    using var engine = new global::DotProlog.Compiler.PrologEngine(
                         global::DotProlog.Runtime.PrologLanguageMode.StrictIso)
                     {
                         Output = output,
@@ -284,7 +284,7 @@ internal static class CompiledConformanceSourceGenerator
             {
                 internal static int Run()
                 {
-                    var engine = new global::DotProlog.Compiler.PrologEngine(
+                    using var engine = new global::DotProlog.Compiler.PrologEngine(
                         global::DotProlog.Runtime.PrologLanguageMode.Modern);
                     __ModernCompiled.Install(engine);
 

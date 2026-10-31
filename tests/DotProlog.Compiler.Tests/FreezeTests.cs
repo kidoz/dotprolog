@@ -73,7 +73,7 @@ public sealed class FreezeTests
     [Fact]
     public void AHostEnumeratesSolutionsThroughAWokenGoal()
     {
-        var engine = new PrologEngine { Output = new StringWriter() };
+        using var engine = new PrologEngine { Output = new StringWriter() };
         Assert.True(engine.ConsultText("wake(Z) :- freeze(X, member(Z, [1, 2, 3])), X = go.\n").Success);
 
         var solutions = engine.Query("wake(Z)").Solutions().Select(solution => solution["Z"].ToString()).ToArray();
@@ -84,7 +84,7 @@ public sealed class FreezeTests
     [Fact]
     public void StrictIsoRejectsFreeze()
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = new StringWriter() };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = new StringWriter() };
 
         LoadResult loaded = engine.ConsultText(":- initialization(freeze(_, true)).\n");
 

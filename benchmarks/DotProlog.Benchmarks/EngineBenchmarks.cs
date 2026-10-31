@@ -9,7 +9,7 @@ namespace DotProlog.Benchmarks;
 /// calls (countdown), and choice-point churn (fact-table scan).
 /// </summary>
 [MemoryDiagnoser]
-public class EngineBenchmarks
+public class EngineBenchmarks : IDisposable
 {
     private PrologEngine _reverseEngine = null!;
     private PrologEngine _countdownEngine = null!;
@@ -67,5 +67,26 @@ public class EngineBenchmarks
         }
 
         return address;
+    }
+
+    [GlobalCleanup]
+    public void Cleanup() => Dispose();
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposing)
+        {
+            return;
+        }
+
+        _reverseEngine?.Dispose();
+        _countdownEngine?.Dispose();
+        _backtrackEngine?.Dispose();
     }
 }

@@ -11,7 +11,7 @@ public sealed class FlagOverrideTests
     [Fact]
     public void OverrideSeedsTheInitialValueInModernMode()
     {
-        PrologEngine engine = Engine(PrologLanguageMode.Modern, DoubleQuotesMode.Atom);
+        using PrologEngine engine = Engine(PrologLanguageMode.Modern, DoubleQuotesMode.Atom);
 
         Assert.Equal(DoubleQuotesMode.Atom, engine.Program.InitialDoubleQuotes);
         Assert.Equal(RunResult.Success, engine.RunGoal("current_prolog_flag(double_quotes, atom)", out _));
@@ -21,7 +21,7 @@ public sealed class FlagOverrideTests
     [Fact]
     public void OverrideAppliesInStrictIsoMode()
     {
-        PrologEngine engine = Engine(PrologLanguageMode.StrictIso, DoubleQuotesMode.Atom);
+        using PrologEngine engine = Engine(PrologLanguageMode.StrictIso, DoubleQuotesMode.Atom);
 
         Assert.Equal(RunResult.Success, engine.RunGoal("current_prolog_flag(double_quotes, atom)", out _));
         Assert.Equal(RunResult.Success, engine.RunGoal("\"hi\" == hi", out _));
@@ -30,7 +30,7 @@ public sealed class FlagOverrideTests
     [Fact]
     public void OverrideWinsOverTheModeDefault()
     {
-        PrologEngine engine = Engine(PrologLanguageMode.Modern, DoubleQuotesMode.Codes);
+        using PrologEngine engine = Engine(PrologLanguageMode.Modern, DoubleQuotesMode.Codes);
 
         Assert.Equal(DoubleQuotesMode.Codes, engine.Program.InitialDoubleQuotes);
         Assert.Equal(RunResult.Success, engine.RunGoal("\"hi\" == [104,105]", out _));
@@ -39,7 +39,7 @@ public sealed class FlagOverrideTests
     [Fact]
     public void DirectiveStillOverridesLocallyAndRestoresToTheOverride()
     {
-        PrologEngine engine = Engine(PrologLanguageMode.Modern, DoubleQuotesMode.Codes);
+        using PrologEngine engine = Engine(PrologLanguageMode.Modern, DoubleQuotesMode.Codes);
 
         LoadResult loaded = engine.ConsultText(
             """
@@ -62,7 +62,7 @@ public sealed class FlagOverrideTests
     [Fact]
     public void RedundantOverrideIsANoOp()
     {
-        PrologEngine engine = Engine(PrologLanguageMode.Modern, DoubleQuotesMode.Chars);
+        using PrologEngine engine = Engine(PrologLanguageMode.Modern, DoubleQuotesMode.Chars);
 
         Assert.Equal(RunResult.Success, engine.RunGoal("current_prolog_flag(double_quotes, chars)", out _));
     }
@@ -72,7 +72,7 @@ public sealed class FlagOverrideTests
     {
         // Constructing the engine consults the bootstrap and standard libraries; a misread there
         // fails construction, and library predicates keep working under the override.
-        PrologEngine engine = Engine(PrologLanguageMode.Modern, DoubleQuotesMode.Atom);
+        using PrologEngine engine = Engine(PrologLanguageMode.Modern, DoubleQuotesMode.Atom);
 
         Assert.Equal(RunResult.Success, engine.RunGoal("atom_length(abc, 3), msort([b,a], [a,b])", out _));
     }

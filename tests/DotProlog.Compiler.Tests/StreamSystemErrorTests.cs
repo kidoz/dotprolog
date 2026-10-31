@@ -17,7 +17,7 @@ public sealed class StreamSystemErrorTests
     [InlineData("read(_)")]
     public void InputFailuresRaiseCatchableSystemError(string operation)
     {
-        var engine = new PrologEngine { Input = new FailingReader() };
+        using var engine = new PrologEngine { Input = new FailingReader() };
 
         Assert.Equal(
             RunResult.Success,
@@ -43,7 +43,7 @@ public sealed class StreamSystemErrorTests
     [InlineData("tab(1)")]
     public void OutputFailuresRaiseCatchableSystemError(string operation)
     {
-        var engine = new PrologEngine { Output = new FailingWriter() };
+        using var engine = new PrologEngine { Output = new FailingWriter() };
 
         Assert.Equal(
             RunResult.Success,
@@ -55,7 +55,7 @@ public sealed class StreamSystemErrorTests
     [Fact]
     public void ForceCloseIgnoresAStandardOutputFlushFailure()
     {
-        var engine = new PrologEngine { Output = new FailingWriter() };
+        using var engine = new PrologEngine { Output = new FailingWriter() };
 
         Assert.Equal(
             RunResult.Success,
@@ -69,7 +69,7 @@ public sealed class StreamSystemErrorTests
     [InlineData("true", "forced")]
     public void CloseNormalizesDisposedOutputAccordingToForce(string force, string expected)
     {
-        var engine = new PrologEngine { Output = new DisposedWriter() };
+        using var engine = new PrologEngine { Output = new DisposedWriter() };
         var goal =
             force == "true"
                 ? "close(user_output, [force(true)]), write(forced)"

@@ -39,7 +39,7 @@ public sealed class CompiledDispatchTests
             )
         );
 
-        var machine = new Machine(program);
+        using var machine = new Machine(program);
         Assert.Equal(RunResult.Success, machine.Run(entry));
         Assert.Equal(Cell.Integer60(42), machine.Argument(0));
         Assert.NotSame(originalCode, program.Code);
@@ -82,7 +82,7 @@ public sealed class CompiledDispatchTests
             program.Emit(OpCode.Stop);
         }
 
-        var machine = new Machine(program);
+        using var machine = new Machine(program);
         Assert.Equal(RunResult.Success, machine.Run(entry));
         Assert.Equal(RunResult.Failure, machine.Redo());
     }
@@ -91,7 +91,7 @@ public sealed class CompiledDispatchTests
     public void CompiledHaltDoesNotTryAnOutstandingAlternative()
     {
         var program = new BytecodeProgram();
-        var machine = new Machine(program);
+        using var machine = new Machine(program);
         var compiled = new CompiledProgram([], [], [], 2);
         var alternatives = 0;
         compiled.SetTarget(

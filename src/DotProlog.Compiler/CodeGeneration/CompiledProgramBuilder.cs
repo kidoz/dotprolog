@@ -14,7 +14,7 @@ internal static class CompiledProgramBuilder
         bool indexFirstArgument = false
     )
     {
-        var engine = new PrologEngine(languageMode, flagOverrides)
+        using var engine = new PrologEngine(languageMode, flagOverrides)
         {
             Output = TextWriter.Null,
             Error = TextWriter.Null,

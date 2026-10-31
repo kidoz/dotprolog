@@ -89,7 +89,7 @@ public sealed class TextAcceptanceTests
     [Fact]
     public void StrictModeDoesNotOfferTheStringLibrary()
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = new StringWriter() };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = new StringWriter() };
 
         Assert.Equal(
             RunResult.Success,

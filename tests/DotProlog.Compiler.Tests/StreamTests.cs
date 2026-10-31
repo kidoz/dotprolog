@@ -16,7 +16,7 @@ public sealed class StreamTests : IDisposable
     private static string RunWithInput(string source, string input)
     {
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output, Input = new StringReader(input) };
+        using var engine = new PrologEngine { Output = output, Input = new StringReader(input) };
 
         engine.ConsultOrThrow(source, "test.pl");
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
@@ -488,7 +488,7 @@ public sealed class StreamTests : IDisposable
         // A file written and then left to halt must still be on disk, which means the close cannot
         // be left to a finalizer.
         var path = Path("halted.txt");
-        var engine = new PrologEngine { Output = TextWriter.Null };
+        using var engine = new PrologEngine { Output = TextWriter.Null };
 
         engine.ConsultOrThrow($":- initialization((open('{path}', write, S), write(S, 'kept .'), halt)).", "halt.pl");
         Assert.Equal(RunResult.Halted, engine.RunPendingGoals());

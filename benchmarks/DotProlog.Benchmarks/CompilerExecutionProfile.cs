@@ -15,7 +15,7 @@ internal static class CompilerExecutionProfile
             );
             return 2;
         }
-        var benchmark = new CompilerExecutionBenchmarks { Workload = args[1] };
+        using var benchmark = new CompilerExecutionBenchmarks { Workload = args[1] };
         Func<RunResult>? execute = args[0] switch
         {
             "Bytecode" => benchmark.Bytecode,

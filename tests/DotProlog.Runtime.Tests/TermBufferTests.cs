@@ -22,7 +22,7 @@ public sealed class TermBufferTests
     [Fact]
     public void CopiesAConstant()
     {
-        Machine machine = NewMachine();
+        using Machine machine = NewMachine();
         var buffer = new TermBuffer();
 
         var root = buffer.Copy(machine, Cell.Integer60(42));
@@ -33,7 +33,7 @@ public sealed class TermBufferTests
     [Fact]
     public void CopiesANestedStructure()
     {
-        Machine machine = NewMachine();
+        using Machine machine = NewMachine();
         var f = machine.Symbols.InternFunctor("f", 2);
         var g = machine.Symbols.InternFunctor("g", 1);
         Cell inner = machine.CreateStructure(g, [Cell.Atom(machine.Symbols.InternAtom("a"))]);
@@ -48,7 +48,7 @@ public sealed class TermBufferTests
     [Fact]
     public void KeepsVariablesSharedWithinOneCopy()
     {
-        Machine machine = NewMachine();
+        using Machine machine = NewMachine();
         var f = machine.Symbols.InternFunctor("f", 2);
         Cell variable = machine.CreateVariable();
         Cell term = machine.CreateStructure(f, [variable, variable]);
@@ -66,7 +66,7 @@ public sealed class TermBufferTests
     [Fact]
     public void RenamesVariablesApartBetweenCopies()
     {
-        Machine machine = NewMachine();
+        using Machine machine = NewMachine();
         Cell variable = machine.CreateVariable();
 
         var buffer = new TermBuffer();
@@ -84,7 +84,7 @@ public sealed class TermBufferTests
     [Fact]
     public void CopyFollowsBindingsRatherThanRecordingTheReference()
     {
-        Machine machine = NewMachine();
+        using Machine machine = NewMachine();
         Cell variable = machine.CreateVariable();
         Assert.True(machine.Unify(variable, Cell.Atom(machine.Symbols.InternAtom("bound"))));
 
@@ -97,7 +97,7 @@ public sealed class TermBufferTests
     [Fact]
     public void CopyingACyclicTermRaisesACatchableRepresentationError()
     {
-        Machine machine = NewMachine();
+        using Machine machine = NewMachine();
         var f = machine.Symbols.InternFunctor("f", 1);
         Cell variable = machine.CreateVariable();
         Cell term = machine.CreateStructure(f, [variable]);
@@ -112,7 +112,7 @@ public sealed class TermBufferTests
     [Fact]
     public void CyclePreservingCopiesRelocateBackEdgesAndRemainIndependent()
     {
-        Machine machine = NewMachine();
+        using Machine machine = NewMachine();
         Cell cycle = machine.CreateVariable();
         Cell variable = machine.CreateVariable();
         var f = machine.Symbols.InternFunctor("f", 3);
@@ -141,7 +141,7 @@ public sealed class TermBufferTests
     [Fact]
     public void CopyingASharedSubtermIsNotMistakenForACycle()
     {
-        Machine machine = NewMachine();
+        using Machine machine = NewMachine();
         var f = machine.Symbols.InternFunctor("f", 2);
         var g = machine.Symbols.InternFunctor("g", 1);
         Cell shared = machine.CreateStructure(g, [Cell.Integer60(1)]);
@@ -156,7 +156,7 @@ public sealed class TermBufferTests
     [Fact]
     public void ClearDiscardsEverythingCopiedSoFar()
     {
-        Machine machine = NewMachine();
+        using Machine machine = NewMachine();
         var buffer = new TermBuffer();
         buffer.Copy(machine, Cell.Integer60(1));
 

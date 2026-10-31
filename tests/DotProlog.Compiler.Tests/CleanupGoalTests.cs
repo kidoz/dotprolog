@@ -123,7 +123,7 @@ public sealed class CleanupGoalTests
     [Fact]
     public void StrictModeRejectsCleanupGoals()
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso);
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
 
         LoadResult loaded = engine.ConsultText("p :- call_cleanup(true, true).", "strict.pl");
 

@@ -181,7 +181,7 @@ public sealed class CodePointCharacterTests
     public void StrictModeKeepsCodeUnitCharacters(string goal, string expected)
     {
         var output = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output };
 
         Assert.True(engine.ConsultText($":- initialization(({goal})).\n").Success);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());

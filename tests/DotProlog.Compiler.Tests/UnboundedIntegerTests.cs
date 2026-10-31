@@ -171,7 +171,7 @@ public sealed class UnboundedIntegerTests
     [Fact]
     public void TheEmbeddingSurfaceMarshalsBigIntegers()
     {
-        var engine = new PrologEngine { Output = new StringWriter() };
+        using var engine = new PrologEngine { Output = new StringWriter() };
         Assert.True(engine.ConsultText("double(X, Y) :- Y is X * 2.").Success);
 
         var host = new PrologHost(engine.Machine);

@@ -96,7 +96,7 @@ public sealed class ChoicePointProtectionTests
         // catch/3's deactivated frame is still referenced by p/1's choice point after the first
         // solution; if throw_if/1's frames clobber it, the redo path jumps past throw_if(2) and
         // the program "succeeds" instead of aborting.
-        var engine = new PrologEngine { Output = new StringWriter() };
+        using var engine = new PrologEngine { Output = new StringWriter() };
         Assert.True(
             engine
                 .ConsultText(

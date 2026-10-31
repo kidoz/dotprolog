@@ -22,7 +22,7 @@ public sealed class ConformanceTests
         Assert.True(File.Exists(suite), $"The conformance suite is missing from {suite}.");
 
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine { Output = output, Input = TextReader.Null };
 
         LoadResult loaded = engine.ConsultFile(suite);
         Assert.Empty(loaded.Diagnostics);

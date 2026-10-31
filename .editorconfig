@@ -82,3 +82,7 @@ dotnet_diagnostic.CA1822.severity = none
 # BenchmarkDotNet requires public benchmark classes and settable [Params] properties.
 dotnet_diagnostic.CA1515.severity = none
 dotnet_diagnostic.CA1051.severity = none
+[tests/Integration/LogtalkConformanceTests.cs]
+# TryGetSourceEngine returns a borrowed cached engine through an out parameter. The engines
+# dictionary owns these instances and the run's finally block disposes every cached engine.
+dotnet_diagnostic.CA2000.severity = none

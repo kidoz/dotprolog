@@ -103,7 +103,7 @@ public sealed class GlobalVariableTests
     public void GoalBoundariesKeepNonBacktrackableAndDropBacktrackableValues()
     {
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output };
+        using var engine = new PrologEngine { Output = output };
         Assert.True(engine.ConsultText("").Success);
 
         Assert.Equal(RunResult.Success, engine.RunGoal("nb_setval(keep, 7), b_setval(drop, 1)", out _));
@@ -117,7 +117,7 @@ public sealed class GlobalVariableTests
     [Fact]
     public void StrictModeRejectsGlobalVariables()
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso);
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
 
         LoadResult loaded = engine.ConsultText("p :- nb_setval(k, 1).", "strict.pl");
 

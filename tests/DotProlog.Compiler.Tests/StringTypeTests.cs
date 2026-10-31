@@ -102,7 +102,7 @@ public sealed class StringTypeTests
             )
         );
 
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = new StringWriter() };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = new StringWriter() };
         Assert.Equal(
             RunResult.Success,
             engine.RunGoal(
@@ -115,7 +115,7 @@ public sealed class StringTypeTests
     [Fact]
     public void TheOverrideSurfaceAcceptsStringOutsideStrictMode()
     {
-        var engine = new PrologEngine(
+        using var engine = new PrologEngine(
             PrologLanguageMode.Modern,
             new PrologFlagOverrides { DoubleQuotes = DoubleQuotesMode.String }
         )

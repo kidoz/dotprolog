@@ -70,7 +70,7 @@ public sealed class QuotedTokenTests
     public void StreamingTermInputIgnoresTerminatorsInsideBackquotedNames()
     {
         var output = new StringWriter();
-        var engine = new PrologEngine { Input = new StringReader("`inside.with.dot`. next."), Output = output };
+        using var engine = new PrologEngine { Input = new StringReader("`inside.with.dot`. next."), Output = output };
 
         engine.ConsultOrThrow(
             """

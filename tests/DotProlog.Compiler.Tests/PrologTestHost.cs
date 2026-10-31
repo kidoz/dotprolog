@@ -20,7 +20,7 @@ internal static class PrologTestHost
     internal static (RunResult Result, string Output, IReadOnlyList<Diagnostic> Diagnostics) Execute(string source)
     {
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output };
+        using var engine = new PrologEngine { Output = output };
 
         LoadResult loaded = engine.ConsultText(source, "test.pl");
         if (!loaded.Success)

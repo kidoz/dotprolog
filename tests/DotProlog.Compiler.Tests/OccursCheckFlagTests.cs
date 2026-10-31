@@ -85,7 +85,7 @@ public sealed class OccursCheckFlagTests
     [InlineData("error")]
     public void UnifyWithOccursCheckFailsRegardlessOfTheModernFlag(string value)
     {
-        var engine = new PrologEngine(PrologLanguageMode.Modern);
+        using var engine = new PrologEngine(PrologLanguageMode.Modern);
         Assert.Single(
             engine
                 .Query(
@@ -98,7 +98,7 @@ public sealed class OccursCheckFlagTests
     [Fact]
     public void StrictUnifyWithOccursCheckFailsWithoutRaisingAnError()
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso);
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
         Assert.Single(engine.Query("\\+ unify_with_occurs_check(X, -X), var(X)").Solutions());
     }
 
@@ -129,7 +129,7 @@ public sealed class OccursCheckFlagTests
     public void StrictModeDoesNotHaveTheFlag()
     {
         var output = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output };
 
         Assert.True(
             engine

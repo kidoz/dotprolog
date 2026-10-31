@@ -21,7 +21,7 @@ public sealed class PrologFlagTests
                     current_prolog_flag(debug,on)), After),
                 Before == After, current_prolog_flag(debug,on), current_prolog_flag(unknown,fail).
             """;
-        var engine = new PrologEngine(mode);
+        using var engine = new PrologEngine(mode);
         string source = inModule
             ? ":- module(flags). :- export(snapshot/0). :- end_module(flags). :- body(flags).\n"
                 + clause
@@ -35,7 +35,7 @@ public sealed class PrologFlagTests
     [Fact]
     public void StrictUnknownFlagRaisesADomainError()
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso);
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
         Assert.True(
             engine
                 .Query(
@@ -55,7 +55,7 @@ public sealed class PrologFlagTests
     [InlineData(PrologLanguageMode.Modern)]
     public void IntegerLimitFlagsFailBecauseIntegersAreUnbounded(PrologLanguageMode mode)
     {
-        var engine = new PrologEngine(mode);
+        using var engine = new PrologEngine(mode);
 
         Assert.True(engine.Query("current_prolog_flag(bounded, false)").Prove());
         Assert.False(engine.Query("current_prolog_flag(max_integer, _)").Prove());
@@ -155,7 +155,7 @@ public sealed class PrologFlagTests
     [Fact]
     public void DoubleQuotesFlagAffectsQueriesAndTermInput()
     {
-        var engine = new PrologEngine { Output = new StringWriter() };
+        using var engine = new PrologEngine { Output = new StringWriter() };
 
         Assert.Equal(RunResult.Success, engine.RunGoal("set_prolog_flag(double_quotes, atom)", out _));
         Assert.Equal(RunResult.Success, engine.RunGoal("\"hi\" == hi", out _));
@@ -175,7 +175,7 @@ public sealed class PrologFlagTests
     [Fact]
     public void UnknownFailAppliesToDirectMetaAndHostCalls()
     {
-        var engine = new PrologEngine { Output = new StringWriter() };
+        using var engine = new PrologEngine { Output = new StringWriter() };
         Assert.Equal(RunResult.Success, engine.RunGoal("set_prolog_flag(unknown, fail)", out _));
 
         Assert.Equal(RunResult.Failure, engine.RunGoal("not_defined_directly", out _));
@@ -190,7 +190,7 @@ public sealed class PrologFlagTests
     public void UnknownWarningWritesToUserErrorAndFails()
     {
         var warnings = new StringWriter();
-        var engine = new PrologEngine { Output = new StringWriter(), Error = warnings };
+        using var engine = new PrologEngine { Output = new StringWriter(), Error = warnings };
         Assert.Equal(RunResult.Success, engine.RunGoal("set_prolog_flag(unknown, warning)", out _));
 
         Assert.Equal(RunResult.Failure, engine.RunGoal("missing_warning(1)", out _));

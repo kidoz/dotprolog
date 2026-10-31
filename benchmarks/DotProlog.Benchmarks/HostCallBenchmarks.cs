@@ -9,9 +9,10 @@ namespace DotProlog.Benchmarks;
 /// surface that builds equivalent argument cells.
 /// </summary>
 [MemoryDiagnoser]
-public class HostCallBenchmarks
+public class HostCallBenchmarks : IDisposable
 {
-    private Machine _machine = null!;
+    private PrologEngine _engine = null!;
+    private Machine Machine => _engine.Machine;
     private PrologHost _host = null!;
     private PrologPredicate _predicate;
     private int _pairFunctor;
@@ -19,11 +20,10 @@ public class HostCallBenchmarks
     [GlobalSetup]
     public void Setup()
     {
-        var engine = new PrologEngine { Output = TextWriter.Null };
-        engine.ConsultOrThrow("pair(1, 2).", "host-call-benchmark.pl");
+        _engine = new PrologEngine { Output = TextWriter.Null };
+        _engine.ConsultOrThrow("pair(1, 2).", "host-call-benchmark.pl");
 
-        _machine = engine.Machine;
-        _host = new PrologHost(_machine);
+        _host = new PrologHost(Machine);
         _predicate = _host.Bind("pair", 2);
         _pairFunctor = _predicate.FunctorId;
     }
@@ -31,8 +31,8 @@ public class HostCallBenchmarks
     [Benchmark(Description = "Machine.Call with a two-cell collection expression")]
     public RunResult MachineSpanCall()
     {
-        _machine.BeginCall();
-        return _machine.Call(_pairFunctor, [Cell.Integer60(1), Cell.Integer60(2)]);
+        Machine.BeginCall();
+        return Machine.Call(_pairFunctor, [Cell.Integer60(1), Cell.Integer60(2)]);
     }
 
     [Benchmark(Description = "PrologHost.Prove with two typed inputs")]
@@ -41,7 +41,26 @@ public class HostCallBenchmarks
     [Benchmark(Description = "CreateStructure with a two-cell collection expression")]
     public Cell SmallStructureConstruction()
     {
-        _machine.BeginCall();
-        return _machine.CreateStructure(_pairFunctor, [Cell.Integer60(1), Cell.Integer60(2)]);
+        Machine.BeginCall();
+        return Machine.CreateStructure(_pairFunctor, [Cell.Integer60(1), Cell.Integer60(2)]);
+    }
+
+    [GlobalCleanup]
+    public void Cleanup() => Dispose();
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposing)
+        {
+            return;
+        }
+
+        _engine?.Dispose();
     }
 }

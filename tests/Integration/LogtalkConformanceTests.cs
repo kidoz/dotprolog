@@ -212,7 +212,7 @@ public sealed class LogtalkConformanceTests
         );
         Assert.False(LogtalkTestAdapter.TryUnwrapBackendGoal(unrelatedDispatch, out _));
 
-        var textInputEngine = CreateAdapterEngine(Path.GetTempPath());
+        using var textInputEngine = CreateAdapterEngine(Path.GetTempPath());
         Assert.Equal(
             RunResult.Success,
             textInputEngine.RunGoal(
@@ -251,7 +251,7 @@ public sealed class LogtalkConformanceTests
         );
         Assert.Empty(namedTextOutputDiagnostics);
 
-        var adapterEngine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
+        using var adapterEngine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
         var errors = new LogtalkTestDeclaration(
             "fixture.lgt",
             "iso_errors",
@@ -272,7 +272,7 @@ public sealed class LogtalkConformanceTests
             quick_check(iso_quick_fixture, twice(+term)).
             """;
         Assert.True(LogtalkTestAdapter.TryReadSupportProgram(quickCheckSource, out var quickCheckSupport));
-        var quickCheckEngine = CreateAdapterEngine(Path.GetTempPath());
+        using var quickCheckEngine = CreateAdapterEngine(Path.GetTempPath());
         quickCheckEngine.ConsultOrThrow(quickCheckSupport, "quick-check-fixture.lgt");
         LogtalkTestDeclaration quickCheck = Assert.Single(
             LogtalkTestAdapter.ReadDeclarations(quickCheckSource, "quick-check-fixture.lgt")
@@ -579,7 +579,7 @@ public sealed class LogtalkConformanceTests
         {
             foreach (PrologEngine engine in engines.Values)
             {
-                engine.Machine.Streams.CloseAll();
+                engine.Dispose();
             }
 
             DeleteCheckout(checkout);
@@ -627,7 +627,7 @@ public sealed class LogtalkConformanceTests
 
     private static bool BackendConditionHolds(string condition)
     {
-        var engine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
+        using var engine = new PrologEngine { Input = TextReader.Null, Output = TextWriter.Null };
         engine.Program.Builtins.Register("current_logtalk_flag", 2, CurrentLogtalkFlag);
         // The corpus's operating-system conditionals select newline expectations. DotProlog's text
         // convention is '\n' on every platform — nl/0 writes a bare line feed — so the unix branch
@@ -702,6 +702,7 @@ public sealed class LogtalkConformanceTests
             && !TryLoadDirectiveFixture(test.SourcePath, testsRoot, engine, out failure)
         )
         {
+            engine.Dispose();
             return false;
         }
 
@@ -711,6 +712,7 @@ public sealed class LogtalkConformanceTests
             if (!loaded.Success)
             {
                 failure = $"support program did not compile: {string.Join("; ", loaded.Diagnostics)}";
+                engine.Dispose();
                 return false;
             }
 

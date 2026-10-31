@@ -23,7 +23,7 @@ public sealed class EmbeddingTests
     [Fact]
     public void EnumeratesEverySolutionOfAPredicate()
     {
-        PrologEngine engine = NewEngine("colour(red).\ncolour(green).\ncolour(blue).");
+        using PrologEngine engine = NewEngine("colour(red).\ncolour(green).\ncolour(blue).");
 
         string[] colours = [.. engine.Query("colour(C)").Solutions().Select(s => s["C"].ToString())];
 
@@ -33,7 +33,7 @@ public sealed class EmbeddingTests
     [Fact]
     public void ReportsEveryVariableOfTheGoal()
     {
-        PrologEngine engine = NewEngine("pair(a, 1).\npair(b, 2).");
+        using PrologEngine engine = NewEngine("pair(a, 1).\npair(b, 2).");
 
         PrologQuery query = engine.Query("pair(Name, Number)");
 
@@ -44,7 +44,8 @@ public sealed class EmbeddingTests
     [Fact]
     public void YieldsOneEmptySolutionForAGroundGoalThatSucceeds()
     {
-        PrologSolution solution = Assert.Single(NewEngine().Query("1 < 2").Solutions());
+        using PrologEngine engine = NewEngine();
+        PrologSolution solution = Assert.Single(engine.Query("1 < 2").Solutions());
 
         Assert.Empty(solution.Bindings);
         Assert.Equal("true", solution.ToString());
@@ -53,13 +54,14 @@ public sealed class EmbeddingTests
     [Fact]
     public void YieldsNothingForAGoalThatFails()
     {
-        Assert.Empty(NewEngine().Query("1 > 2").Solutions());
+        using PrologEngine engine = NewEngine();
+        Assert.Empty(engine.Query("1 > 2").Solutions());
     }
 
     [Fact]
     public void ProveReportsSuccessWithoutMarshalling()
     {
-        PrologEngine engine = NewEngine("ok.");
+        using PrologEngine engine = NewEngine("ok.");
 
         Assert.True(engine.Query("ok").Prove());
         Assert.False(engine.Query("fail").Prove());
@@ -68,7 +70,7 @@ public sealed class EmbeddingTests
     [Fact]
     public void FirstOrDefaultStopsAfterOneAnswer()
     {
-        PrologEngine engine = NewEngine("n(1).\nn(2).");
+        using PrologEngine engine = NewEngine("n(1).\nn(2).");
 
         Assert.Equal("1", engine.Query("n(X)").FirstOrDefault()?["X"].ToString());
         Assert.Null(engine.Query("n(99)").FirstOrDefault());
@@ -77,7 +79,7 @@ public sealed class EmbeddingTests
     [Fact]
     public void SolutionsAreProducedLazilySoAnInfiniteGoalIsUsable()
     {
-        PrologEngine engine = NewEngine();
+        using PrologEngine engine = NewEngine();
 
         long[] first =
         [
@@ -90,7 +92,7 @@ public sealed class EmbeddingTests
     [Fact]
     public void AQueryCanBeRunMoreThanOnce()
     {
-        PrologEngine engine = NewEngine("n(1).\nn(2).");
+        using PrologEngine engine = NewEngine("n(1).\nn(2).");
         PrologQuery query = engine.Query("n(X)");
 
         Assert.Equal(2, query.Solutions().Count());
@@ -100,7 +102,7 @@ public sealed class EmbeddingTests
     [Fact]
     public void MarshalsEachTermKind()
     {
-        PrologEngine engine = NewEngine();
+        using PrologEngine engine = NewEngine();
 
         PrologSolution solution = Assert.Single(engine.Query("X = f(atom, 42, 1.5, Y, [a,b])").Solutions());
         var term = Assert.IsType<PrologCompound>(solution["X"]);
@@ -115,7 +117,7 @@ public sealed class EmbeddingTests
     [Fact]
     public void ReadsAProperListBackAsAList()
     {
-        PrologEngine engine = NewEngine();
+        using PrologEngine engine = NewEngine();
 
         PrologSolution solution = Assert.Single(engine.Query("X = [a,b,c]").Solutions());
 
@@ -126,7 +128,7 @@ public sealed class EmbeddingTests
     [Fact]
     public void APartialListIsNotAProperList()
     {
-        PrologEngine engine = NewEngine();
+        using PrologEngine engine = NewEngine();
 
         PrologSolution solution = Assert.Single(engine.Query("X = [a|_]").Solutions());
 
@@ -138,7 +140,7 @@ public sealed class EmbeddingTests
     {
         // Bindings are marshalled as each answer is produced, so collecting them all is safe even
         // though backtracking discards the heap they came from.
-        PrologEngine engine = NewEngine("n(1).\nn(2).\nn(3).");
+        using PrologEngine engine = NewEngine("n(1).\nn(2).\nn(3).");
 
         List<PrologSolution> all = [.. engine.Query("n(X)").Solutions()];
 
@@ -148,7 +150,7 @@ public sealed class EmbeddingTests
     [Fact]
     public void AnUncaughtBallReachesTheHost()
     {
-        PrologEngine engine = NewEngine();
+        using PrologEngine engine = NewEngine();
 
         PrologException error = Assert.Throws<PrologException>(() => engine.Query("throw(oops)").Prove());
 
@@ -164,7 +166,7 @@ public sealed class EmbeddingTests
     [Fact]
     public void QueriesSeeClausesAssertedThroughAnEarlierQuery()
     {
-        PrologEngine engine = NewEngine();
+        using PrologEngine engine = NewEngine();
 
         Assert.True(engine.Query("assertz(fact(one)), assertz(fact(two))").Prove());
         Assert.Equal(["one", "two"], engine.Query("fact(X)").Solutions().Select(s => s["X"].ToString()));

@@ -9,7 +9,7 @@ namespace DotProlog.Runtime;
 /// than CLR method calls, so recursion depth is bounded by the machine's own stacks; failure is a
 /// return value rather than an exception.
 /// </remarks>
-public sealed class Machine
+public sealed class Machine : IDisposable
 {
     /// <summary>Number of argument registers, which also bounds predicate arity.</summary>
     public const int ArgumentRegisterCount = 256;
@@ -75,6 +75,7 @@ public sealed class Machine
     private bool _writeMode;
     private int _argumentCount;
     private bool _halted;
+    private bool _disposed;
     private bool _forceTrail;
     private bool _solutionPending;
     private int _currentBuiltin = -1;
@@ -95,6 +96,22 @@ public sealed class Machine
         _wakeupFunctor = _symbols.InternFunctor("$wakeup", 1);
         _wakePairFunctor = _symbols.InternFunctor("-", 2);
         _frozenAndFunctor = _symbols.InternFunctor("$and", 2);
+    }
+
+    /// <summary>Cooperative cancellation checked between bytecode instructions and compiled blocks.</summary>
+    /// <remarks>Set before running the machine. Blocking host predicates must observe cancellation themselves.</remarks>
+    public CancellationToken CancellationToken { get; set; }
+
+    /// <summary>Closes program-owned streams. Dispose only after execution has stopped.</summary>
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        Streams.CloseAll();
+        _disposed = true;
     }
 
     /// <summary>The streams this program has open.</summary>
@@ -255,6 +272,7 @@ public sealed class Machine
 
     private RunResult Dispatch()
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         if (IsRunning)
         {
             throw new InvalidOperationException("A Prolog machine cannot be entered recursively.");
@@ -299,6 +317,12 @@ public sealed class Machine
 
         while (true)
         {
+            CancellationToken.ThrowIfCancellationRequested();
+            if (_halted)
+            {
+                return RunResult.Halted;
+            }
+
             var proved = true;
 
             if (BytecodeProgram.IsCompiledTarget(_pc))
@@ -1725,6 +1749,7 @@ public sealed class Machine
     }
 
     /// <summary>Requests that the current run stop with <paramref name="exitCode"/>, as <c>halt/1</c> does.</summary>
+    /// <remarks>Call on the execution thread: this closes streams. Use <see cref="CancellationToken"/> for cancellation from another thread.</remarks>
     public void RequestHalt(int exitCode)
     {
         ExitCode = exitCode;

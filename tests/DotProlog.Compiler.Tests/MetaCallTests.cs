@@ -161,7 +161,7 @@ public sealed class MetaCallTests
     [Fact]
     public void CallingAnUnboundGoalIsAnInstantiationError()
     {
-        var engine = new PrologEngine { Output = new StringWriter() };
+        using var engine = new PrologEngine { Output = new StringWriter() };
         Assert.True(engine.ConsultText(":- initialization(call(G)).").Success);
 
         PrologException exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
@@ -172,7 +172,7 @@ public sealed class MetaCallTests
     [Fact]
     public void CallingANumberIsATypeError()
     {
-        var engine = new PrologEngine { Output = new StringWriter() };
+        using var engine = new PrologEngine { Output = new StringWriter() };
         Assert.True(engine.ConsultText(":- initialization(( G = 42, call(G) )).").Success);
 
         PrologException exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
@@ -209,7 +209,7 @@ public sealed class MetaCallTests
     [Fact]
     public void CallingAnUndefinedGoalIsAnExistenceError()
     {
-        var engine = new PrologEngine { Output = new StringWriter() };
+        using var engine = new PrologEngine { Output = new StringWriter() };
         Assert.True(engine.ConsultText(":- initialization(call(nowhere)).").Success);
 
         PrologException exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
@@ -220,7 +220,7 @@ public sealed class MetaCallTests
     [Fact]
     public void MetaCallingTheSameControlShapeTwiceReusesTheCompiledClause()
     {
-        var engine = new PrologEngine { Output = new StringWriter() };
+        using var engine = new PrologEngine { Output = new StringWriter() };
         Machine machine = engine.Machine;
         var conjunction = machine.Symbols.InternFunctor(",", 2);
         Cell yes = Cell.Atom(machine.Symbols.InternAtom("true"));

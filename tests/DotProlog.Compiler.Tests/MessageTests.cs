@@ -15,7 +15,7 @@ public sealed class MessageTests
     {
         var output = new StringWriter();
         var error = new StringWriter();
-        var engine = new PrologEngine { Output = output, Error = error };
+        using var engine = new PrologEngine { Output = output, Error = error };
 
         Assert.True(engine.ConsultText(source, "messages.pl").Success);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
@@ -259,7 +259,7 @@ public sealed class MessageTests
     [Fact]
     public void StrictModeRejectsPrintMessage()
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso);
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
 
         LoadResult loaded = engine.ConsultText("p :- print_message(error, foo).", "strict.pl");
 
@@ -273,7 +273,7 @@ public sealed class MessageTests
     {
         var output = new StringWriter();
         var error = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = output, Error = error };
+        using var engine = new PrologEngine(PrologLanguageMode.Modern) { Output = output, Error = error };
 
         Assert.True(engine.ConsultText(":- initialization(print_message(warning, format('w', []))).").Success);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());

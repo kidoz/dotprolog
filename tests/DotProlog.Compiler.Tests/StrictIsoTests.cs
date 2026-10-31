@@ -8,7 +8,7 @@ public sealed class StrictIsoTests
     [Fact]
     public void StrictModeIsOptIn()
     {
-        var engine = new PrologEngine();
+        using var engine = new PrologEngine();
 
         Assert.Equal(PrologLanguageMode.Modern, engine.Program.LanguageMode);
         Assert.True(engine.ConsultText("p :- member(a, [a]).").Success);
@@ -17,7 +17,7 @@ public sealed class StrictIsoTests
     [Fact]
     public void StrictModeAcceptsStandardPredicatesAndControls()
     {
-        var engine = StrictEngine();
+        using var engine = StrictEngine();
         LoadResult loaded = engine.ConsultText(
             """
             values(L) :-
@@ -44,7 +44,7 @@ public sealed class StrictIsoTests
     [Fact]
     public void StrictModeRejectsAPredefinedLibraryExtension()
     {
-        var engine = StrictEngine();
+        using var engine = StrictEngine();
 
         LoadResult loaded = engine.ConsultText("p :- member(a, [a]).", "strict.pl");
 
@@ -57,7 +57,7 @@ public sealed class StrictIsoTests
     [Fact]
     public void StrictModeAllowsAUserDefinitionWithAnExtensionLibraryName()
     {
-        var engine = StrictEngine();
+        using var engine = StrictEngine();
         LoadResult loaded = engine.ConsultText(
             """
             answer :- member(a, [a]).
@@ -73,7 +73,7 @@ public sealed class StrictIsoTests
     [Fact]
     public void StrictModeRejectsSoftCutAsAPartOneControlConstruct()
     {
-        var engine = StrictEngine();
+        using var engine = StrictEngine();
 
         LoadResult loaded = engine.ConsultText("p :- (true *-> true ; fail).");
 
@@ -88,7 +88,7 @@ public sealed class StrictIsoTests
     [InlineData("p(X) :- X = (a '.' b).")]
     public void StrictModeDoesNotPredefineExtendedOperators(string source)
     {
-        var engine = StrictEngine();
+        using var engine = StrictEngine();
 
         LoadResult loaded = engine.ConsultText(source, "strict.pl");
 
@@ -102,7 +102,7 @@ public sealed class StrictIsoTests
     [InlineData("p(X) :- X = (a '.' b).")]
     public void ModernModeKeepsItsPredefinedOperators(string source)
     {
-        var engine = new PrologEngine();
+        using var engine = new PrologEngine();
 
         LoadResult loaded = engine.ConsultText(source, "modern.pl");
 
@@ -112,7 +112,7 @@ public sealed class StrictIsoTests
     [Fact]
     public void StrictModeAcceptsAStandardMetaPredicateDeclaration()
     {
-        var engine = StrictEngine();
+        using var engine = StrictEngine();
 
         LoadResult loaded = engine.ConsultText(
             """
@@ -152,7 +152,7 @@ public sealed class StrictIsoTests
                     + ":- body(main).\n:- import(library, answer/1).\nresult(X) :- answer(X).\n:- end_body(main).\n"
             );
 
-            var engine = StrictEngine();
+            using var engine = StrictEngine();
             LoadResult libraryLoaded = engine.ConsultFile(library);
             LoadResult loaded = engine.ConsultFile(main);
 
@@ -169,7 +169,7 @@ public sealed class StrictIsoTests
     [Fact]
     public void StrictModeStillAcceptsAStandardModuleText()
     {
-        var engine = StrictEngine();
+        using var engine = StrictEngine();
 
         LoadResult loaded = engine.ConsultText(
             """
@@ -191,7 +191,7 @@ public sealed class StrictIsoTests
     [Fact]
     public void StrictModeRejectsAnExtensionInAHostTextualGoal()
     {
-        var engine = StrictEngine();
+        using var engine = StrictEngine();
 
         PrologException exception = Assert.Throws<PrologException>(() => engine.Query("member(a, [a])"));
 
@@ -201,7 +201,7 @@ public sealed class StrictIsoTests
     [Fact]
     public void StrictModeRejectsARuntimeConstructedExtensionGoal()
     {
-        var engine = StrictEngine();
+        using var engine = StrictEngine();
         Assert.True(engine.ConsultText("invoke(Goal) :- call(Goal).").Success);
 
         PrologException exception = Assert.Throws<PrologException>(() => engine.RunGoal("invoke(member(a, [a]))", out _));
@@ -216,7 +216,7 @@ public sealed class StrictIsoTests
     [Fact]
     public void StrictModeRejectsExtensionArithmeticConstantsAndFunctors()
     {
-        var engine = StrictEngine();
+        using var engine = StrictEngine();
 
         Assert.Equal(
             RunResult.Success,
@@ -232,7 +232,7 @@ public sealed class StrictIsoTests
     [Fact]
     public void StrictPartThreeTreatsSoftCutAsANonTerminal()
     {
-        var engine = StrictEngine();
+        using var engine = StrictEngine();
         LoadResult loaded = engine.ConsultText(
             """
             '*->'(_, _) --> [].
@@ -248,7 +248,7 @@ public sealed class StrictIsoTests
     public void StrictPartThreeTreatsRunTimeSoftCutAsANonTerminal()
     {
         var output = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output };
         LoadResult loaded = engine.ConsultText(
             """
             '*->'(_, _, S, S).
@@ -264,7 +264,7 @@ public sealed class StrictIsoTests
     [Fact]
     public void StrictModeReadsEveryDoubleQuotesValue()
     {
-        var engine = StrictEngine();
+        using var engine = StrictEngine();
         Assert.Equal(DoubleQuotesMode.Codes, engine.Program.InitialDoubleQuotes);
 
         LoadResult loaded = engine.ConsultText(
@@ -293,7 +293,7 @@ public sealed class StrictIsoTests
     [Fact]
     public void StrictModeAcceptsOnlyTheThreeDoubleQuotesValues()
     {
-        var engine = StrictEngine();
+        using var engine = StrictEngine();
 
         Assert.Equal(
             RunResult.Success,
@@ -316,7 +316,7 @@ public sealed class StrictIsoTests
     [Fact]
     public void StrictHostBindingRejectsAPredefinedExtension()
     {
-        var engine = StrictEngine();
+        using var engine = StrictEngine();
         var host = new PrologHost(engine.Machine);
 
         PrologException exception = Assert.Throws<PrologException>(() => host.Bind("member", 2));

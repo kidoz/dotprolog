@@ -87,7 +87,7 @@ public sealed class SetArgTests
     [Fact]
     public void StrictModeRejectsDestructiveAssignment()
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso);
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
 
         LoadResult loaded = engine.ConsultText("p :- setarg(1, f(a), x).", "strict.pl");
 

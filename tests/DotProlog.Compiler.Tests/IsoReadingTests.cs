@@ -32,7 +32,7 @@ public sealed class IsoReadingTests
     [InlineData(PrologLanguageMode.StrictIso)]
     public void AMinusStillFormsANumberWhenItIsNoLongerAnOperator(PrologLanguageMode mode)
     {
-        var engine = new PrologEngine(mode) { Output = new StringWriter() };
+        using var engine = new PrologEngine(mode) { Output = new StringWriter() };
         Assert.True(engine.ConsultText(":- op(0, fy, -).\nminus(X) :- X = - 1.\n").Success);
         Assert.True(engine.Query("minus(X), integer(X), X =:= -1").Prove());
     }
@@ -68,7 +68,7 @@ public sealed class IsoReadingTests
     [Fact]
     public void PrefixAndPostfixOperatorsWithNoOperandAreSyntaxErrorsInStrictIso()
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = new StringWriter() };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = new StringWriter() };
         Assert.True(engine.ConsultText(":- op(9, fy, f), op(9, yf, f), op(9, fy, p), op(9, yfx, p).\n").Success);
 
         foreach (var text in new[] { "f f .", "1 p p p 2 ." })
@@ -90,18 +90,21 @@ public sealed class IsoReadingTests
 
     // The bundled library uses bare operator atoms as operands, and is read as Modern reads it.
     [Fact]
-    public void TheBundledLibraryLoadsInStrictIso() =>
-        Assert.True(new PrologEngine(PrologLanguageMode.StrictIso).Query("atom_length(abc, 3)").Prove());
+    public void TheBundledLibraryLoadsInStrictIso()
+    {
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
+        Assert.True(engine.Query("atom_length(abc, 3)").Prove());
+    }
 
     private static string Outcome(PrologLanguageMode mode, string goal)
     {
-        var engine = new PrologEngine(mode) { Output = new StringWriter() };
+        using var engine = new PrologEngine(mode) { Output = new StringWriter() };
         return engine.Query(goal).Prove() ? "true" : "false";
     }
 
     private static string ReadOutcome(PrologLanguageMode mode, string text)
     {
-        var engine = new PrologEngine(mode) { Output = new StringWriter(), Input = new StringReader(text) };
+        using var engine = new PrologEngine(mode) { Output = new StringWriter(), Input = new StringReader(text) };
         return engine
             .Query("catch((read(_), Outcome = read), error(syntax_error(_), _), Outcome = syntax_error), write(Outcome)")
             .Prove()

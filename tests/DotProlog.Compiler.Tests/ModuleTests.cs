@@ -73,7 +73,7 @@ public sealed class ModuleTests : IDisposable
     [InlineData(PrologLanguageMode.Modern)]
     public void InterfaceReaderDirectivesOnlyAffectBodies(PrologLanguageMode mode)
     {
-        var engine = new PrologEngine(mode);
+        using var engine = new PrologEngine(mode);
         LoadResult loaded = engine.ConsultText(
             """
             :- module(words).
@@ -102,7 +102,7 @@ public sealed class ModuleTests : IDisposable
     [InlineData(PrologLanguageMode.Modern)]
     public void InterfaceOperatorsCannotParseLaterInterfaceTerms(PrologLanguageMode mode)
     {
-        var engine = new PrologEngine(mode);
+        using var engine = new PrologEngine(mode);
         LoadResult loaded = engine.ConsultText(
             """
             :- module(words).
@@ -130,7 +130,7 @@ public sealed class ModuleTests : IDisposable
     private static string RunFile(string path)
     {
         var output = new StringWriter();
-        var engine = new PrologEngine { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine { Output = output, Input = TextReader.Null };
 
         LoadResult loaded = engine.ConsultFile(path);
         Assert.Empty(loaded.Diagnostics);
@@ -265,7 +265,7 @@ public sealed class ModuleTests : IDisposable
         );
         var main = Write("main.pl", ":- use_module(library, [hidden/0]).\n");
 
-        var engine = new PrologEngine { Output = TextWriter.Null };
+        using var engine = new PrologEngine { Output = TextWriter.Null };
         LoadResult loaded = engine.ConsultFile(main);
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidModuleImport);
@@ -283,7 +283,7 @@ public sealed class ModuleTests : IDisposable
         );
         var main = Write("main.pl", ":- use_module(library, [visible]).\n");
 
-        var engine = new PrologEngine { Output = TextWriter.Null };
+        using var engine = new PrologEngine { Output = TextWriter.Null };
         LoadResult loaded = engine.ConsultFile(main);
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidModuleImport);
@@ -303,7 +303,7 @@ public sealed class ModuleTests : IDisposable
             """
         );
 
-        var engine = new PrologEngine { Output = TextWriter.Null };
+        using var engine = new PrologEngine { Output = TextWriter.Null };
         LoadResult loaded = engine.ConsultFile(main);
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidModuleImport);
@@ -320,7 +320,7 @@ public sealed class ModuleTests : IDisposable
             """
         );
 
-        var engine = new PrologEngine { Output = TextWriter.Null };
+        using var engine = new PrologEngine { Output = TextWriter.Null };
         LoadResult loaded = engine.ConsultFile(path);
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidModuleDeclaration);
@@ -337,7 +337,7 @@ public sealed class ModuleTests : IDisposable
             """
         );
 
-        var engine = new PrologEngine { Output = TextWriter.Null };
+        using var engine = new PrologEngine { Output = TextWriter.Null };
         LoadResult loaded = engine.ConsultFile(path);
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidModuleDeclaration);
@@ -556,7 +556,7 @@ public sealed class ModuleTests : IDisposable
     {
         var path = Write($"{declaration}-bad.pl", $":- {declaration} token//-1.\n");
 
-        var engine = new PrologEngine { Output = TextWriter.Null };
+        using var engine = new PrologEngine { Output = TextWriter.Null };
         LoadResult loaded = engine.ConsultFile(path);
 
         Assert.False(loaded.Success);
@@ -619,7 +619,7 @@ public sealed class ModuleTests : IDisposable
     {
         var path = Write("missing.pl", ":- use_module(nowhere).\n");
 
-        var engine = new PrologEngine { Output = TextWriter.Null };
+        using var engine = new PrologEngine { Output = TextWriter.Null };
         LoadResult loaded = engine.ConsultFile(path);
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.ModuleNotFound);
@@ -630,7 +630,7 @@ public sealed class ModuleTests : IDisposable
     {
         var path = Write("bad.pl", ":- module(bad, [oops]).\n");
 
-        var engine = new PrologEngine { Output = TextWriter.Null };
+        using var engine = new PrologEngine { Output = TextWriter.Null };
         LoadResult loaded = engine.ConsultFile(path);
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidModuleDeclaration);
@@ -662,7 +662,7 @@ public sealed class ModuleTests : IDisposable
             """;
 
         var output = new StringWriter();
-        var engine = new PrologEngine(mode) { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine(mode) { Output = output, Input = TextReader.Null };
 
         LoadResult loaded = engine.ConsultText(source, "iso-modules.pl");
 
@@ -680,7 +680,7 @@ public sealed class ModuleTests : IDisposable
             :- end_body(other).
             """;
 
-        var engine = new PrologEngine { Output = TextWriter.Null };
+        using var engine = new PrologEngine { Output = TextWriter.Null };
         LoadResult loaded = engine.ConsultText(source, "bad-iso-modules.pl");
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidIsoModuleText);
@@ -689,7 +689,7 @@ public sealed class ModuleTests : IDisposable
     [Fact]
     public void AnIsoBodyRequiresItsPreviouslyLoadedInterface()
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
 
         LoadResult loaded = engine.ConsultText(
             """
@@ -707,7 +707,7 @@ public sealed class ModuleTests : IDisposable
     public void AnInterfaceAndItsBodyMayBePreparedFromSeparateModuleTexts()
     {
         var output = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
         LoadResult interfaceLoaded = engine.ConsultText(
             """
@@ -753,7 +753,7 @@ public sealed class ModuleTests : IDisposable
             """;
 
         var output = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
         LoadResult loaded = engine.ConsultText(source, "nested-user-body.pl");
 
@@ -787,7 +787,7 @@ public sealed class ModuleTests : IDisposable
             """;
 
         var output = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
         LoadResult loaded = engine.ConsultText(source, "mixed-module-text.pl");
 
@@ -821,7 +821,7 @@ public sealed class ModuleTests : IDisposable
             """;
 
         var output = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
         LoadResult loaded = engine.ConsultText(source, "metapredicate-export.pl");
 
@@ -835,7 +835,7 @@ public sealed class ModuleTests : IDisposable
     [InlineData("!/0")]
     public void AnIsoInterfaceCannotExportAPredefinedProcedure(string indicator)
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
         LoadResult loaded = engine.ConsultText(
             $"""
             :- module(invalid).
@@ -855,7 +855,7 @@ public sealed class ModuleTests : IDisposable
     [InlineData(":- metapredicate(once(:)).")]
     public void AnIsoInterfaceRejectsInvalidDeclarations(string declaration)
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
         LoadResult loaded = engine.ConsultText(
             $"""
             :- module(invalid).
@@ -880,7 +880,7 @@ public sealed class ModuleTests : IDisposable
             :- end_body(invalid).
             """;
 
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
         LoadResult loaded = engine.ConsultText(source, "invalid-body-heads.pl");
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidIsoModuleText);
@@ -918,7 +918,7 @@ public sealed class ModuleTests : IDisposable
             """;
 
         var output = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
         LoadResult loaded = engine.ConsultText(source, "iso-reflection.pl");
 
@@ -973,7 +973,7 @@ public sealed class ModuleTests : IDisposable
             """;
 
         var output = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso)
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso)
         {
             Output = output,
             Input = new StringReader("alice likes bob."),
@@ -1028,7 +1028,7 @@ public sealed class ModuleTests : IDisposable
             """;
 
         var output = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
         LoadResult loaded = engine.ConsultText(source, "iso-database.pl");
 
@@ -1066,7 +1066,7 @@ public sealed class ModuleTests : IDisposable
             """;
 
         var output = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
         LoadResult loaded = engine.ConsultText(source, "iso-static-clause.pl");
 
@@ -1078,7 +1078,7 @@ public sealed class ModuleTests : IDisposable
     [Fact]
     public void ModernDynamicModuleClausesRetainTheirResolvedBodies()
     {
-        var engine = new PrologEngine();
+        using var engine = new PrologEngine();
         LoadResult loaded = engine.ConsultText(
             """
             :- module(memo, [item/1]).
@@ -1120,7 +1120,7 @@ public sealed class ModuleTests : IDisposable
             """;
 
         var output = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
         LoadResult loaded = engine.ConsultText(source, "iso-dynamic-clause.pl");
 
@@ -1160,7 +1160,7 @@ public sealed class ModuleTests : IDisposable
             """;
 
         var output = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
         LoadResult loaded = engine.ConsultText(source, "iso-meta.pl");
 
@@ -1196,7 +1196,7 @@ public sealed class ModuleTests : IDisposable
             """;
 
         var output = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
         LoadResult loaded = engine.ConsultText(source, "iso-explicit-context.pl");
 
@@ -1220,7 +1220,7 @@ public sealed class ModuleTests : IDisposable
             """;
 
         var output = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
         LoadResult loaded = engine.ConsultText(source, "iso-unknown.pl");
 
@@ -1235,7 +1235,7 @@ public sealed class ModuleTests : IDisposable
     [InlineData(":- meta_predicate(run(0)).")]
     public void StrictIsoRejectsCompatibilityModuleDirectives(string source)
     {
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
 
         LoadResult loaded = engine.ConsultText(source, "compatibility.pl");
 
@@ -1278,7 +1278,7 @@ public sealed class ModuleTests : IDisposable
             """;
 
         var output = new StringWriter();
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
         LoadResult loaded = engine.ConsultText(source, "iso-reexport.pl");
 

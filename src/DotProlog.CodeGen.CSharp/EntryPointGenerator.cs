@@ -160,7 +160,7 @@ public static class EntryPointGenerator
         text.AppendLine("    {");
         text.AppendLine(
             CultureInfo.InvariantCulture,
-            $"        var engine = new global::DotProlog.Compiler.PrologEngine({FlagOverridesSyntax.EngineArguments(languageMode, flagOverrides)});"
+            $"        using var engine = new global::DotProlog.Compiler.PrologEngine({FlagOverridesSyntax.EngineArguments(languageMode, flagOverrides)});"
         );
         text.AppendLine("        int[] initialization = __CompiledProgram.Install(engine);");
         text.AppendLine("        try");

@@ -30,7 +30,7 @@ public sealed class MachineTests
         );
         var predicate = program.Symbols.InternFunctor("indexed", 1);
         program.DefinePredicate(predicate, entry);
-        var machine = new Machine(program);
+        using var machine = new Machine(program);
         machine.BeginCall();
         var value = Cell.Integer60(argument);
         if (aliased)
@@ -69,7 +69,7 @@ public sealed class MachineTests
         );
         var predicate = program.Symbols.InternFunctor("indexed", 1);
         program.DefinePredicate(predicate, entry);
-        var machine = new Machine(program);
+        using var machine = new Machine(program);
         machine.BeginCall();
         Assert.Equal(RunResult.Success, machine.Call(predicate, [machine.CreateVariable()]));
         Assert.Equal(Cell.Integer60(1), machine.Argument(0));
@@ -98,7 +98,7 @@ public sealed class MachineTests
         var predicate = program.Symbols.InternFunctor("indexed", 1);
         program.DefinePredicate(predicate, program.Emit(OpCode.EnterStatic, index));
 
-        var machine = new Machine(program);
+        using var machine = new Machine(program);
         machine.BeginCall();
         var argument = boundArgument ? Cell.Integer60(1) : machine.CreateVariable();
         Assert.Equal(RunResult.Success, machine.Call(predicate, [argument]));
@@ -140,7 +140,8 @@ public sealed class MachineTests
         program.Emit(OpCode.Deallocate);
         program.Emit(OpCode.Proceed);
 
-        Assert.Equal(RunResult.Success, new Machine(program).Solve(p));
+        using var machine = new Machine(program);
+        Assert.Equal(RunResult.Success, machine.Solve(p));
     }
 
     [Fact]
@@ -163,7 +164,8 @@ public sealed class MachineTests
         program.Emit(OpCode.Deallocate);
         program.Emit(OpCode.Proceed);
 
-        Assert.Equal(RunResult.Success, new Machine(program).Solve(p));
+        using var machine = new Machine(program);
+        Assert.Equal(RunResult.Success, machine.Solve(p));
     }
 
     [Fact]
@@ -187,7 +189,8 @@ public sealed class MachineTests
         program.Emit(OpCode.Deallocate);
         program.Emit(OpCode.Proceed);
 
-        Assert.Equal(RunResult.Failure, new Machine(program).Solve(p));
+        using var machine = new Machine(program);
+        Assert.Equal(RunResult.Failure, machine.Solve(p));
     }
 
     [Fact]
@@ -213,7 +216,7 @@ public sealed class MachineTests
         program.Emit(OpCode.Proceed);
 
         var output = new StringWriter();
-        var machine = new Machine(program) { Output = output };
+        using var machine = new Machine(program) { Output = output };
 
         Assert.Equal(RunResult.Success, machine.Solve(p));
         Assert.Equal("done", output.ToString());
@@ -234,7 +237,7 @@ public sealed class MachineTests
         program.Emit(OpCode.Deallocate);
         program.Emit(OpCode.Proceed);
 
-        var machine = new Machine(program);
+        using var machine = new Machine(program);
 
         Assert.Equal(RunResult.Halted, machine.Solve(p));
         Assert.Equal(7, machine.ExitCode);
@@ -255,7 +258,7 @@ public sealed class MachineTests
     public void OccursCheckRejectsADirectCycleAndRestoresTheVariable()
     {
         BytecodeProgram program = NewProgram();
-        var machine = new Machine(program);
+        using var machine = new Machine(program);
         Cell variable = machine.CreateVariable();
         Cell recursive = machine.CreateStructure(program.Symbols.InternFunctor("f", 1), [variable]);
 
@@ -267,7 +270,7 @@ public sealed class MachineTests
     public void OccursCheckRetainsFiniteBindings()
     {
         BytecodeProgram program = NewProgram();
-        var machine = new Machine(program);
+        using var machine = new Machine(program);
         Cell variable = machine.CreateVariable();
         Cell value = machine.CreateStructure(program.Symbols.InternFunctor("point", 2), [Cell.Integer60(2), Cell.Integer60(3)]);
 
@@ -281,7 +284,7 @@ public sealed class MachineTests
     public void OccursCheckHandlesHeapGrowthBeforeAndAfterItsFirstUse(bool checkBeforeGrowth)
     {
         BytecodeProgram program = NewProgram();
-        var machine = new Machine(program);
+        using var machine = new Machine(program);
         var functor = program.Symbols.InternFunctor("f", 1);
         Cell earlyVariable = machine.CreateVariable();
         Cell earlyTerm = machine.CreateStructure(functor, [earlyVariable]);
@@ -313,7 +316,7 @@ public sealed class MachineTests
     [Fact]
     public void FirstHeapReservationCanMaterializeMoreThanTheInitialCapacity()
     {
-        var machine = new Machine(NewProgram());
+        using var machine = new Machine(NewProgram());
         var cells = new Cell[70_000];
         for (var i = 0; i < cells.Length; i++)
         {
@@ -333,7 +336,7 @@ public sealed class MachineTests
     public void OccursCheckRestoresBindingsAfterALaterMismatch()
     {
         BytecodeProgram program = NewProgram();
-        var machine = new Machine(program);
+        using var machine = new Machine(program);
         Cell variable = machine.CreateVariable();
         var pair = program.Symbols.InternFunctor("pair", 2);
         Cell left = machine.CreateStructure(pair, [variable, variable]);
@@ -350,7 +353,7 @@ public sealed class MachineTests
     public void OccursCheckTerminatesWhenTheCandidateContainsAnExistingCycle()
     {
         BytecodeProgram program = NewProgram();
-        var machine = new Machine(program);
+        using var machine = new Machine(program);
         Cell cyclicVariable = machine.CreateVariable();
         Cell cyclicTerm = machine.CreateStructure(program.Symbols.InternFunctor("cycle", 1), [cyclicVariable]);
         Assert.True(machine.Unify(cyclicVariable, cyclicTerm));
@@ -366,7 +369,7 @@ public sealed class MachineTests
     public void OrdinaryUnificationTerminatesWhenCyclicIntermediateBindingsPrecedeAMismatch()
     {
         BytecodeProgram program = NewProgram();
-        var machine = new Machine(program);
+        using var machine = new Machine(program);
         var a = program.Symbols.InternFunctor("a", 1);
         var f = program.Symbols.InternFunctor("f", 4);
         Cell x = machine.CreateVariable();
@@ -384,7 +387,7 @@ public sealed class MachineTests
     public void TermIdentityTerminatesForEquivalentRationalTreesWithDifferentPeriods()
     {
         BytecodeProgram program = NewProgram();
-        var machine = new Machine(program);
+        using var machine = new Machine(program);
         Cell shortTail = machine.CreateVariable();
         Cell shortCycle = machine.CreateList([Cell.Integer60(1), Cell.Integer60(2), Cell.Integer60(3)], shortTail);
         Assert.True(machine.Unify(shortTail, shortCycle));

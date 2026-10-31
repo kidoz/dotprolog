@@ -224,7 +224,7 @@ public sealed class IlAssemblyEmitterTests
     {
         using (var table = new LoadedProgram(source, linearVariableFallback: false))
         {
-            var engine = new PrologEngine();
+            using var engine = new PrologEngine();
             table.Install(engine);
             Assert.True(engine.Query(goal).Prove());
         }
@@ -233,7 +233,7 @@ public sealed class IlAssemblyEmitterTests
             foreach (var fused in new[] { false, true })
             {
                 using var compiled = new LoadedProgram(source, fuseBlocks: fused, indexFirstArgument: indexed);
-                var engine = new PrologEngine();
+                using var engine = new PrologEngine();
                 // Relocation must not rely on the compiling engine's symbol or table IDs.
                 engine.ConsultOrThrow("unrelated(z). unrelated(y). extra(q(r)).", "existing.pl");
                 compiled.Install(engine);
@@ -248,7 +248,7 @@ public sealed class IlAssemblyEmitterTests
     public void IndexedDeterministicCallRunsCleanupBeforeReturning(bool fused)
     {
         using var compiled = new LoadedProgram("p(a). p(b). p(c).", fuseBlocks: fused);
-        var engine = new PrologEngine();
+        using var engine = new PrologEngine();
         compiled.Install(engine);
         Assert.True(engine.Query("setup_call_cleanup(true,p(b),Done=yes), Done==yes").Prove());
         Assert.True(
@@ -267,7 +267,7 @@ public sealed class IlAssemblyEmitterTests
             "p(a). p(b). :- findall(X,p(X),L), write(L). p(c). :- findall(X,p(X),L), write(L)."
         );
         using var output = new StringWriter();
-        var engine = new PrologEngine { Output = output };
+        using var engine = new PrologEngine { Output = output };
         compiled.Install(engine);
         Assert.Equal("[a,b][a,b,c]", output.ToString());
         Assert.True(engine.Query("findall(X,p(X),[a,b,c])").Prove());
@@ -276,13 +276,14 @@ public sealed class IlAssemblyEmitterTests
     [Fact]
     public void VersionOneInstallationImagesRemainReadable()
     {
+        using var engine = new PrologEngine();
         using var stream = new MemoryStream();
         using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true))
         {
             writer.Write(InstallationImage.Magic);
             writer.Write(1);
             writer.Write((int)PrologLanguageMode.Modern);
-            writer.Write((int)new PrologEngine().Program.InitialDoubleQuotes);
+            writer.Write((int)engine.Program.InitialDoubleQuotes);
             // Version one: blocks, functors, builtins, constants, modules, preparation,
             // predicates, dynamic predicates, and initialization; no static-index section.
             for (var i = 0; i < 9; i++)
@@ -291,7 +292,7 @@ public sealed class IlAssemblyEmitterTests
             }
         }
         var image = Convert.ToBase64String(stream.ToArray());
-        Assert.Empty(IlProgramHost.Install(new PrologEngine(), image, []));
+        Assert.Empty(IlProgramHost.Install(engine, image, []));
         Assert.Equal(0, IlProgramHost.Run(image, []));
     }
 
@@ -331,7 +332,7 @@ public sealed class IlAssemblyEmitterTests
     public void EmittedPredicatesPreserveLanguageSemantics(string source, string goal)
     {
         using var compiled = new LoadedProgram(source);
-        var engine = new PrologEngine();
+        using var engine = new PrologEngine();
         compiled.Install(engine);
         Assert.True(engine.Query(goal).Prove());
     }
@@ -340,7 +341,7 @@ public sealed class IlAssemblyEmitterTests
     public void InstallationRegistersNativeBlocksWithoutAppendingPredicateBytecode()
     {
         using var compiled = new LoadedProgram("p(a). p(b).");
-        var engine = new PrologEngine();
+        using var engine = new PrologEngine();
         var originalCodeLength = engine.Program.CodeLength;
         compiled.Install(engine);
         Assert.Equal(originalCodeLength, engine.Program.CodeLength);
@@ -352,7 +353,7 @@ public sealed class IlAssemblyEmitterTests
     public void CompiledAndConsultedPredicatesCallEachOther()
     {
         using var compiled = new LoadedProgram("compiled(a). compiled(b). bridge(X) :- consulted(X).");
-        var engine = new PrologEngine();
+        using var engine = new PrologEngine();
         compiled.Install(engine);
         Assert.True(engine.ConsultText("consulted(X) :- compiled(X).").Success);
         Assert.True(engine.Query("findall(X,bridge(X),[a,b])").Prove());
@@ -368,7 +369,7 @@ public sealed class IlAssemblyEmitterTests
             collect(Xs) :- findall(X, (p(X), (X=first -> assertz(p(later)); true)), Xs).
             """
         );
-        var engine = new PrologEngine();
+        using var engine = new PrologEngine();
         compiled.Install(engine);
         Assert.True(engine.Query("collect([first]), p(later), retract(p(first)), \\+ p(first)").Prove());
     }
@@ -385,7 +386,7 @@ public sealed class IlAssemblyEmitterTests
             :- initialization(writeln(initialized)).
             """
         );
-        var engine = new PrologEngine { Output = output };
+        using var engine = new PrologEngine { Output = output };
         var initializers = compiled.Install(engine);
         Assert.Equal("before", output.ToString());
         Assert.True(engine.Query("findall(X,value(X),[before,after])").Prove());
@@ -403,7 +404,7 @@ public sealed class IlAssemblyEmitterTests
             colour(blue).
             """
         );
-        var engine = new PrologEngine();
+        using var engine = new PrologEngine();
         compiled.Install(engine);
         Assert.True(engine.Query("findall(X,colours:colour(X),[red,blue])").Prove());
     }
@@ -414,7 +415,7 @@ public sealed class IlAssemblyEmitterTests
     public void DirectIlReadsIsoNegativeNumbersInBothModes(PrologLanguageMode mode)
     {
         using var compiled = new LoadedProgram("negative(- 1). quoted('-'1). commented(- /**/ 1).", mode);
-        var engine = new PrologEngine(mode);
+        using var engine = new PrologEngine(mode);
         compiled.Install(engine);
 
         Assert.True(engine.Query("negative(-1), quoted(-1), commented(-1)").Prove());
@@ -429,7 +430,7 @@ public sealed class IlAssemblyEmitterTests
     {
         var flags = new PrologFlagOverrides { DoubleQuotes = DoubleQuotesMode.Atom };
         using var compiled = new LoadedProgram("p(\"hello\").", mode, flags);
-        var engine = new PrologEngine(mode, flags);
+        using var engine = new PrologEngine(mode, flags);
         compiled.Install(engine);
         Assert.True(engine.Query("p(hello)").Prove());
         Assert.Throws<PrologException>(() => compiled.Install(new PrologEngine(mode)));
@@ -487,7 +488,7 @@ public sealed class IlAssemblyEmitterTests
             source = source.Replace(invoker, string.Empty, StringComparison.Ordinal);
         }
         using var compiled = new LoadedProgram(source, PrologLanguageMode.StrictIso);
-        var engine = new PrologEngine(PrologLanguageMode.StrictIso);
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
         compiled.Install(engine);
         Assert.True(
             engine
