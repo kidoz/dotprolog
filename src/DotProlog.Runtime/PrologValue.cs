@@ -14,6 +14,7 @@ public abstract record PrologValue
 {
     /// <summary>Marshals <paramref name="term"/> and everything it refers to.</summary>
     /// <remarks>Traversal is iterative, so a deeply nested term cannot exhaust the CLR stack.</remarks>
+    /// <exception cref="PrologException">The term is cyclic: <c>representation_error(cyclic_term)</c>.</exception>
     public static PrologValue FromTerm(Machine machine, Cell term)
     {
         ArgumentNullException.ThrowIfNull(machine);
@@ -24,6 +25,7 @@ public abstract record PrologValue
             return Convert(machine, root);
         }
 
+        HashSet<int> active = [root.Index];
         var pending = new Stack<Frame>();
         pending.Push(Frame.For(machine, root));
 
@@ -36,6 +38,11 @@ public abstract record PrologValue
                 Cell argument = machine.Dereference(frame.Arguments[frame.Index]);
                 if (argument.Tag == CellTag.Structure)
                 {
+                    if (!active.Add(argument.Index))
+                    {
+                        throw PrologErrors.Representation(machine, "cyclic_term");
+                    }
+
                     pending.Push(Frame.For(machine, argument));
                     continue;
                 }
@@ -45,6 +52,7 @@ public abstract record PrologValue
             }
 
             pending.Pop();
+            active.Remove(frame.Address);
             var completed = new PrologCompound(frame.Name, frame.Values);
 
             if (pending.Count == 0)
@@ -98,7 +106,7 @@ public abstract record PrologValue
         return new PrologRational(numerator, denominator);
     }
 
-    private sealed class Frame(string name, Cell[] arguments)
+    private sealed class Frame(int address, string name, Cell[] arguments)
     {
         internal static Frame For(Machine machine, Cell structure)
         {
@@ -109,8 +117,10 @@ public abstract record PrologValue
                 arguments[i] = machine.HeapAt(structure.Index + 1 + i);
             }
 
-            return new Frame(machine.Symbols.AtomName(functor.NameAtom), arguments);
+            return new Frame(structure.Index, machine.Symbols.AtomName(functor.NameAtom), arguments);
         }
+
+        internal int Address { get; } = address;
 
         internal string Name { get; } = name;
 

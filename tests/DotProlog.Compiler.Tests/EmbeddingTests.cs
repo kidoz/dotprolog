@@ -17,6 +17,52 @@ public sealed class EmbeddingTests
         Assert.Equal("DPL0012", Assert.Single(loaded.Diagnostics).Id);
         Assert.True(engine.Query("true").Prove());
     }
+
+    [Theory]
+    [InlineData("X = f(X)")]
+    [InlineData("X = [a|X]")]
+    [InlineData("X = f(Y), Y = g(X)")]
+    public void QueryRejectsCyclicHostValuesAndCanBeReused(string goal)
+    {
+        using var engine = new PrologEngine();
+        PrologException first = Assert.Throws<PrologException>(() => engine.Query(goal).FirstOrDefault());
+        Assert.Contains("representation_error(cyclic_term)", first.Message, StringComparison.Ordinal);
+        PrologException all = Assert.Throws<PrologException>(() => engine.Query(goal).Solutions().ToArray());
+        Assert.Contains("representation_error(cyclic_term)", all.Message, StringComparison.Ordinal);
+        Assert.True(engine.Query("true").Prove());
+    }
+
+    [Theory]
+    [InlineData("cyclic(X) :- X = f(X).")]
+    [InlineData("cyclic(X) :- X = [a|X].")]
+    [InlineData("cyclic(X) :- X = f(Y), Y = g(X).")]
+    public void HostRejectsCyclicOutputs(string source)
+    {
+        using PrologEngine engine = NewEngine(source);
+        var host = new PrologHost(engine.Machine);
+        PrologPredicate predicate = host.Bind("cyclic", 1);
+        PrologException first = Assert.Throws<PrologException>(() => host.CallOnce(predicate, PrologInput.Output));
+        Assert.Contains("representation_error(cyclic_term)", first.Message, StringComparison.Ordinal);
+        PrologException all = Assert.Throws<PrologException>(() => host.CallAll(predicate, PrologInput.Output).ToArray());
+        Assert.Contains("representation_error(cyclic_term)", all.Message, StringComparison.Ordinal);
+        Assert.True(engine.Query("true").Prove());
+    }
+
+    [Fact]
+    public void MarshallingAcceptsSharedFiniteStructuresAndDeepFiniteValues()
+    {
+        using var engine = new PrologEngine();
+        PrologSolution solution = engine.Query("X = f(a), Y = pair(X,X)").FirstOrDefault()!;
+        Assert.Equal("pair(f(a),f(a))", solution["Y"].ToString());
+        engine.ConsultOrThrow("nest(0, a) :- !. nest(N, f(X)) :- M is N-1, nest(M, X).", "nest.pl");
+        PrologValue value = engine.Query("nest(20000, X)").FirstOrDefault()!["X"];
+        for (var i = 0; i < 20_000; i++)
+        {
+            value = Assert.Single(Assert.IsType<PrologCompound>(value).Arguments);
+        }
+        Assert.Equal("a", Assert.IsType<PrologAtom>(value).Name);
+    }
+
     private static PrologEngine NewEngine(string? source = null)
     {
         var engine = new PrologEngine { Output = TextWriter.Null };
