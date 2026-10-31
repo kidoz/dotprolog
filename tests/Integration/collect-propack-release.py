@@ -2,6 +2,7 @@
 """Collect verified platform artifacts into one stable release asset set."""
 import argparse
 import hashlib
+import json
 from pathlib import Path
 import re
 import shutil
@@ -33,9 +34,13 @@ def main():
         parser.error('Expected stable major.minor.patch version.')
     if args.verify:
         verify(args.output)
-        package = args.output / f'DotProlog.Packages.Cli.{args.version}.nupkg'
-        if not package.is_file():
-            raise ValueError('Missing release tool package.')
+        required = {f'DotProlog.Packages.Cli.{args.version}.nupkg', 'sbom.json', 'SHA256SUMS'}
+        required.update(f'propack-{args.version}-{rid}.zip' for rid in ['linux-x64', 'win-x64', 'osx-arm64'])
+        if {p.name for p in args.output.iterdir()} != required:
+            raise ValueError('Release assets are incomplete or contain unexpected files.')
+        component = json.loads((args.output / 'sbom.json').read_text())['metadata']['component']
+        if component.get('name') != 'DotProlog.Packages.Cli' or component.get('version') != args.version:
+            raise ValueError('SBOM identity does not match the release.')
         print('Release asset checksums verified.')
         return
     if args.input is None or args.output.exists():

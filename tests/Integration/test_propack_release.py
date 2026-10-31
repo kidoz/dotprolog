@@ -1,5 +1,6 @@
 """Release collection must reject missing or modified platform artifacts."""
 import hashlib
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -52,6 +53,15 @@ class ReleaseCollectionTests(unittest.TestCase):
         target.unlink()
         self.assertNotEqual(self.collect().returncode, 0)
         self.assertFalse((self.root / 'output').exists())
+
+    def test_wrong_sbom_version_blocks_publication_even_with_matching_checksums(self):
+        self.assertEqual(self.collect().returncode, 0)
+        output = self.root / 'output'
+        (output / 'sbom.json').write_text(json.dumps({'metadata': {'component': {'name': 'DotProlog.Packages.Cli', 'version': '0.0.0'}}}))
+        self.checksum(output)
+        result = subprocess.run([sys.executable, str(SCRIPT), '--version', VERSION, '--output', str(output), '--verify'], capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('SBOM identity', result.stderr)
 
 
 if __name__ == '__main__':

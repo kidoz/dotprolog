@@ -132,7 +132,7 @@ jobs:
         run: |
           dotnet tool install --global CycloneDX --version 6.2.0
           version="${RELEASE_TAG#propack-v}"
-          Version="$version" dotnet CycloneDX src/DotProlog.Packages.Cli/DotProlog.Packages.Cli.csproj -o release-artifacts --filename sbom.json --json
+          Version="$version" dotnet CycloneDX src/DotProlog.Packages.Cli/DotProlog.Packages.Cli.csproj -o release-artifacts --filename sbom.json --json --recursive --include-project-references --set-version "$version"
           cd release-artifacts
           sha256sum *.nupkg *.zip sbom.json > SHA256SUMS
       - name: Create GitHub release and start NuGet publication
