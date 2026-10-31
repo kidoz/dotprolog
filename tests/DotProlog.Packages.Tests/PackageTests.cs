@@ -609,6 +609,65 @@ public sealed class PackageTests : IDisposable
         Assert.Single(Directory.GetDirectories(Cache));
     }
 
+    [Theory]
+    [InlineData("git")]
+    [InlineData("revision")]
+    [InlineData("archive")]
+    public void Source_control_characters_are_rejected_before_acquisition(string field)
+    {
+        var source = field switch
+        {
+            "git" => new PackageSource { Git = "https://example.invalid/repo\n", Revision = "HEAD" },
+            "revision" => new PackageSource { Git = "https://example.invalid/repo", Revision = "HEAD\r\nother" },
+            _ => new PackageSource { Archive = "https://example.invalid/package.zip\n" },
+        };
+        Write(
+            Root,
+            new PackageManifest
+            {
+                Name = "demo/app",
+                Dependencies = new() { ["demo/lib"] = source },
+            }
+        );
+        Assert.Contains(
+            "control characters",
+            Assert.Throws<InvalidDataException>(() => Workspace.Restore()).Message,
+            StringComparison.Ordinal
+        );
+        Assert.False(Directory.Exists(Cache));
+    }
+
+    [Fact]
+    public void Git_submodules_are_rejected_without_fetching_them()
+    {
+        var package = Package("source", "demo/lib", "1.0.0", "lib", "ok.");
+        File.WriteAllText(
+            Path.Combine(package, ".gitmodules"),
+            "[submodule \"bad\"]\npath = bad\nurl = https://example.invalid/bad\n"
+        );
+        var source = Source(package, "git");
+        Assert.Contains(
+            "submodules",
+            Assert.Throws<InvalidDataException>(() => PackageFiles.Acquire(source, Cache)).Message,
+            StringComparison.Ordinal
+        );
+        Assert.Empty(Directory.GetFileSystemEntries(Cache));
+    }
+
+    [Fact]
+    public void Git_symlinks_are_materialized_as_text_without_reading_the_target()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Creating symbolic links can require additional Windows privileges.");
+        var package = Package("source", "demo/lib", "1.0.0", "lib", "ok.");
+        var secret = Path.Combine(_directory, "secret.txt");
+        File.WriteAllText(secret, "outside package");
+        File.CreateSymbolicLink(Path.Combine(package, "link.inc"), secret);
+        var acquired = PackageFiles.Acquire(Source(package, "git"), Cache);
+        var link = Path.Combine(acquired.Directory, "link.inc");
+        Assert.Equal((FileAttributes)0, File.GetAttributes(link) & FileAttributes.ReparsePoint);
+        Assert.Equal(secret, File.ReadAllText(link));
+    }
+
     [Fact]
     public void Archive_traversal_and_bad_checksums_fail_without_lock()
     {

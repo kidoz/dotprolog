@@ -174,42 +174,7 @@ internal static class PackageFiles
             {
                 if (string.IsNullOrWhiteSpace(source.Revision) || source.Revision.StartsWith('-'))
                     throw new InvalidDataException("Git sources require an explicit revision.");
-                ProcessOutput(
-                    "git",
-                    [
-                        "-c",
-                        "core.hooksPath=/dev/null",
-                        "-c",
-                        "core.autocrlf=false",
-                        "clone",
-                        "--quiet",
-                        "--no-checkout",
-                        "--no-hardlinks",
-                        "--",
-                        source.Git,
-                        staging,
-                    ]
-                );
-                var commit = ProcessOutput("git", ["-C", staging, "rev-parse", "--verify", source.Revision + "^{commit}"]).Trim();
-                ProcessOutput(
-                    "git",
-                    [
-                        "-C",
-                        staging,
-                        "-c",
-                        "core.hooksPath=/dev/null",
-                        "-c",
-                        "core.autocrlf=false",
-                        "checkout",
-                        "--quiet",
-                        "--detach",
-                        commit,
-                    ]
-                );
-                if (File.Exists(System.IO.Path.Combine(staging, ".gitmodules")))
-                    throw new InvalidDataException("Git submodules are not supported.");
-                DeleteDirectory(System.IO.Path.Combine(staging, ".git"));
-                source = source with { Revision = commit };
+                source = source with { Revision = AcquireGit(source, staging) };
             }
             else if (source.Archive is not null)
             {
@@ -307,6 +272,82 @@ internal static class PackageFiles
             throw new InvalidDataException("HTTPS archives require an explicit SHA-256 digest before downloading.");
     }
 
+    private static string AcquireGit(PackageSource source, string staging)
+    {
+        var settings = staging + "-git";
+        var hooks = System.IO.Path.Combine(settings, "hooks");
+        var config = System.IO.Path.Combine(settings, "config");
+        Directory.CreateDirectory(hooks);
+        File.WriteAllText(config, "");
+        try
+        {
+            var local = System.IO.Path.IsPathRooted(source.Git!);
+            GitOutput([
+                "clone",
+                "--quiet",
+                "--no-checkout",
+                "--no-hardlinks",
+                "--no-local",
+                "--no-recurse-submodules",
+                "--template=" + hooks,
+                "--",
+                source.Git!,
+                staging,
+            ]);
+            var commit = GitOutput(["-C", staging, "rev-parse", "--verify", "--end-of-options", source.Revision + "^{commit}"])
+                .Trim();
+            if (commit.Length is not (40 or 64) || commit.Any(c => c is not (>= '0' and <= '9' or >= 'a' and <= 'f')))
+                throw new InvalidDataException("Git did not resolve the revision to a hexadecimal commit id.");
+            GitOutput(["-C", staging, "checkout", "--quiet", "--detach", "--no-recurse-submodules", commit]);
+            if (File.Exists(System.IO.Path.Combine(staging, ".gitmodules")))
+                throw new InvalidDataException("Git submodules are not supported.");
+            return commit;
+
+            string GitOutput(string[] arguments)
+            {
+                var start = ProcessStart(
+                    "git",
+                    [
+                        "-c",
+                        "core.hooksPath=" + hooks,
+                        "-c",
+                        "core.attributesFile=" + config,
+                        "-c",
+                        "core.autocrlf=false",
+                        "-c",
+                        "core.symlinks=false",
+                        "-c",
+                        "submodule.recurse=false",
+                        "-c",
+                        "protocol.allow=never",
+                        "-c",
+                        "protocol.https.allow=always",
+                        "-c",
+                        "protocol.ssh.allow=always",
+                        "-c",
+                        "protocol.file.allow=" + (local ? "always" : "never"),
+                        .. arguments,
+                    ]
+                );
+                foreach (
+                    var key in start
+                        .Environment.Keys.Where(k => k.StartsWith("GIT_", StringComparison.OrdinalIgnoreCase))
+                        .ToArray()
+                )
+                    start.Environment.Remove(key);
+                start.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
+                start.Environment["GIT_CONFIG_GLOBAL"] = config;
+                start.Environment["GIT_ATTR_NOSYSTEM"] = "1";
+                start.Environment["GIT_TERMINAL_PROMPT"] = "0";
+                return ProcessOutput(start);
+            }
+        }
+        finally
+        {
+            DeleteDirectory(settings);
+        }
+    }
+
     internal static void DeleteDirectory(string directory)
     {
         foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
@@ -374,7 +415,10 @@ internal static class PackageFiles
         }
     }
 
-    public static string ProcessOutput(string executable, IEnumerable<string> arguments)
+    public static string ProcessOutput(string executable, IEnumerable<string> arguments) =>
+        ProcessOutput(ProcessStart(executable, arguments));
+
+    private static ProcessStartInfo ProcessStart(string executable, IEnumerable<string> arguments)
     {
         var start = new ProcessStartInfo(executable)
         {
@@ -384,19 +428,24 @@ internal static class PackageFiles
         };
         foreach (var argument in arguments)
             start.ArgumentList.Add(argument);
-        using var process = Process.Start(start) ?? throw new IOException($"Could not start {executable}.");
+        return start;
+    }
+
+    private static string ProcessOutput(ProcessStartInfo start)
+    {
+        using var process = Process.Start(start) ?? throw new IOException($"Could not start {start.FileName}.");
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
         if (!process.WaitForExit(120000))
         {
             process.Kill(true);
             process.WaitForExit();
-            throw new IOException($"{executable} timed out.");
+            throw new IOException($"{start.FileName} timed out.");
         }
         var output = stdout.GetAwaiter().GetResult();
         var error = stderr.GetAwaiter().GetResult();
         if (process.ExitCode != 0)
-            throw new IOException($"{executable} failed: {error.Trim()}");
+            throw new IOException($"{start.FileName} failed: {error.Trim()}");
         return output;
     }
 
