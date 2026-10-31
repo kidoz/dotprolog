@@ -383,7 +383,7 @@ public sealed partial class GreymereAdventureTests
             "go(down).\ngo(east).\ntake(rune_codex).\ngo(up).\ntalk(astronomer).\ngo(down).\ngo(west).\ngo(up).\n";
         const string cryptDetour =
             "go(down).\nsearch.\ntake(star_lens).\ngo(up).\ngo(west).\ngo(up).\ngo(up).\ngo(north).\ngo(east).\ngo(up).\nattune([star,crown,wolf]).\ngo(down).\ngo(west).\ngo(south).\ngo(down).\ngo(down).\ngo(east).\n";
-        var path = File.ReadAllText(SamplePath("winning_path.txt"));
+        var path = File.ReadAllText(SamplePath("winning_path.txt")).ReplaceLineEndings("\n");
         path = path.Replace("ring(noon).\n", "ring(noon).\n" + archiveDetour, StringComparison.Ordinal);
         path = path.Replace("use(healing_draught).\n", "use(healing_draught).\n" + cryptDetour, StringComparison.Ordinal);
 
