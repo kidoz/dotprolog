@@ -394,6 +394,52 @@ public sealed class PackageTests : IDisposable
         Assert.False(File.Exists(Path.Combine(Root, "propack.lock.json")));
     }
 
+    [Theory]
+    [InlineData("/* first */\n% line\n :- module ( lib , []).", true)]
+    [InlineData(":- module(lib\n, []).", true)]
+    [InlineData("/* unterminated", false)]
+    [InlineData("% only comment", false)]
+    [InlineData(":- module(liberal, []).", false)]
+    [InlineData(":- module('lib', []).", false)]
+    [InlineData(":- initialization(main).\n:- module(lib, []).", false)]
+    public void Module_header_scanner_preserves_comment_and_identifier_rules(string text, bool expected) =>
+        Assert.Equal(expected, PackageModuleHeader.Matches(text, "lib"));
+
+    [Fact]
+    public void Module_header_does_not_treat_layout_as_part_of_an_identifier() =>
+        Assert.False(PackageModuleHeader.Matches(":- module(lib\n, []).", "lib\n"));
+
+    [Theory]
+    [InlineData(65000, true)]
+    [InlineData(66000, false)]
+    public void Module_header_scan_is_bounded_to_the_first_64_KiB(int commentLength, bool accepted)
+    {
+        Write(
+            Root,
+            new PackageManifest
+            {
+                Name = "demo/app",
+                Modules = new() { ["lib"] = "lib.pl" },
+            }
+        );
+        File.WriteAllText(
+            Path.Combine(Root, "lib.pl"),
+            "/*" + new string(' ', commentLength) + "*/\n:- module(lib, []).\n%" + new string('x', 1024 * 1024)
+        );
+        if (accepted)
+        {
+            Workspace.Restore();
+            Assert.Single(Workspace.GetLibraries());
+        }
+        else
+            Assert.Contains(
+                "64 KiB",
+                Assert.Throws<InvalidDataException>(() => Workspace.Restore()).Message,
+                StringComparison.Ordinal
+            );
+        Assert.Equal(64 * 1024, PackageFiles.ReadHeader(Root, "lib.pl").Length);
+    }
+
     [Fact]
     public void Archive_traversal_and_bad_checksums_fail_without_lock()
     {

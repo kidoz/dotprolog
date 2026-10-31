@@ -56,6 +56,31 @@ internal static class PackageFiles
         return reader.ReadToEnd();
     }
 
+    internal static string ReadHeader(string root, string relative)
+    {
+        using var input = PackageInput.OpenRead(root, relative);
+        const int headerBytes = 64 * 1024;
+        var buffer = ArrayPool<byte>.Shared.Rent(headerBytes);
+        try
+        {
+            var count = 0;
+            while (count < headerBytes)
+            {
+                var read = input.Read(buffer, count, headerBytes - count);
+                if (read == 0)
+                    break;
+                count += read;
+            }
+            using var bytes = new MemoryStream(buffer, 0, count);
+            using var reader = new StreamReader(bytes);
+            return reader.ReadToEnd();
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
+
     public static string Inside(string root, string relative)
     {
         var fullRoot = System.IO.Path.GetFullPath(root);

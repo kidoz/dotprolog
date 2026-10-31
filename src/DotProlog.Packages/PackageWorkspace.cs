@@ -395,17 +395,10 @@ public sealed partial class PackageWorkspace
             var file = PackageFiles.Inside(directory, relative);
             if (Path.GetFileName(file) != name + ".pl" || !File.Exists(file))
                 throw new InvalidDataException($"Missing Prolog module {name}: {relative}");
-            Match header;
-            try
-            {
-                header = ModuleHeaderPattern().Match(PackageFiles.ReadText(file));
-            }
-            catch (RegexMatchTimeoutException)
-            {
-                throw new InvalidDataException($"Module declaration is too complex: {name}.");
-            }
-            if (!header.Success || header.Groups[1].Value != name)
-                throw new InvalidDataException($"Module {name} must begin with :- module({name}, ...), after optional comments.");
+            if (!PackageModuleHeader.Matches(PackageFiles.ReadHeader(directory, relative), name))
+                throw new InvalidDataException(
+                    $"Module {name} must begin with :- module({name}, ...), after optional comments, within the first 64 KiB."
+                );
             if (!modules.TryAdd(name, file))
                 throw new InvalidDataException($"Module conflict: '{name}' is exported by more than one package/root.");
         }
@@ -448,13 +441,6 @@ public sealed partial class PackageWorkspace
 
     [GeneratedRegex("^[a-f0-9]{64}$", RegexOptions.CultureInvariant)]
     private static partial Regex HashPattern();
-
-    [GeneratedRegex(
-        @"\A(?:\s|%[^\n]*(?:\n|$)|/\*[\s\S]*?\*/)*:-\s*module\s*\(\s*([a-z][a-zA-Z0-9_]*)\s*,",
-        RegexOptions.CultureInvariant,
-        1000
-    )]
-    private static partial Regex ModuleHeaderPattern();
 
     private sealed record Request(string Name, PackageSource Source, string BaseDirectory, string Parent);
 
