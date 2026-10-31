@@ -6,6 +6,87 @@ namespace DotProlog.Syntax.Tests;
 
 public sealed class TermReaderTests
 {
+    [Theory]
+    [InlineData("parentheses")]
+    [InlineData("braces")]
+    [InlineData("arguments")]
+    [InlineData("lists")]
+    [InlineData("prefix")]
+    [InlineData("right")]
+    [InlineData("left")]
+    [InlineData("flat-list")]
+    [InlineData("string")]
+    public void ExcessiveDepthProducesOnePositionedDiagnosticAndRecovers(string shape)
+    {
+        const int depth = 20_000;
+        var source = shape switch
+        {
+            "parentheses" => new string('(', depth) + "a" + new string(')', depth),
+            "braces" => new string('{', depth) + "a" + new string('}', depth),
+            "arguments" => string.Concat(Enumerable.Repeat("f(", depth)) + "a" + new string(')', depth),
+            "lists" => new string('[', depth) + "a" + new string(']', depth),
+            "prefix" => string.Concat(Enumerable.Repeat("+ ", depth)) + "a",
+            "right" => string.Concat(Enumerable.Repeat("a ^ ", depth)) + "a",
+            "left" => string.Concat(Enumerable.Repeat("a + ", depth)) + "a",
+            "flat-list" => "[" + string.Join(",", Enumerable.Repeat("a", depth)) + "]",
+            _ => "\"" + new string('a', depth) + "\"",
+        };
+
+        ParseResult parsed = TermReader.ReadProgram("\n" + source + ". recovered.", "deep.pl");
+        Diagnostic diagnostic = Assert.Single(parsed.Diagnostics);
+        Assert.False(parsed.Success);
+        Assert.Equal(DiagnosticIds.NestingLimitExceeded, diagnostic.Id);
+        Assert.Equal("deep.pl", diagnostic.FileName);
+        Assert.Equal(2, diagnostic.Span.Line);
+        Assert.True(diagnostic.Span.Column > 0);
+        Assert.Equal("recovered", Assert.IsType<AtomTerm>(Assert.Single(parsed.Clauses)).Name);
+
+        ParseResult single = TermReader.ReadTerm(source, "deep.pl");
+        Assert.Empty(single.Clauses);
+        Assert.Equal(DiagnosticIds.NestingLimitExceeded, Assert.Single(single.Diagnostics).Id);
+    }
+
+    [Theory]
+    [InlineData(DoubleQuotesMode.Atom)]
+    [InlineData(DoubleQuotesMode.String)]
+    public void LongAtomicTextDoesNotConsumeTermDepth(DoubleQuotesMode mode)
+    {
+        var flags = new PrologFlags();
+        flags.SetDoubleQuotes(mode);
+        ParseResult parsed = TermReader.ReadTerm("\"" + new string('a', 20_000) + "\"", flags: flags);
+        Assert.True(parsed.Success, string.Join("; ", parsed.Diagnostics));
+        Assert.Single(parsed.Clauses);
+    }
+
+    [Fact]
+    public void ListSpinesObserveTheResultingTermDepthBoundary()
+    {
+        var accepted = "[" + string.Join(",", Enumerable.Repeat("a", TermReader.MaxTermDepth - 1)) + "]";
+        Assert.True(TermReader.ReadTerm(accepted).Success);
+        var rejected = "[" + string.Join(",", Enumerable.Repeat("a", TermReader.MaxTermDepth)) + "]";
+        Assert.Equal(DiagnosticIds.NestingLimitExceeded, Assert.Single(TermReader.ReadTerm(rejected).Diagnostics).Id);
+    }
+
+    [Fact]
+    public void SmallHostThreadStackStillProducesADiagnostic()
+    {
+        var source = string.Concat(Enumerable.Repeat("f(", 20_000)) + "a" + new string(')', 20_000) + ".";
+        ParseResult? parsed = null;
+        var worker = new Thread(() => parsed = TermReader.ReadProgram(source, "small-stack.pl"), 128 * 1024);
+        worker.Start();
+        Assert.True(worker.Join(TimeSpan.FromSeconds(5)));
+        Assert.NotNull(parsed);
+        Assert.Equal(DiagnosticIds.NestingLimitExceeded, Assert.Single(parsed.Diagnostics).Id);
+    }
+
+    [Fact]
+    public void DepthBudgetResetsBetweenClausesAndSiblingArguments()
+    {
+        var term = new string('(', 128) + "a" + new string(')', 128);
+        Assert.True(TermReader.ReadProgram($"p({term},{term}). p({term},{term}).").Success);
+        Assert.True(TermReader.ReadTerm(new string('(', 128) + "a" + new string(')', 128)).Success);
+    }
+
     private static string Canonical(SyntaxTerm term) =>
         term switch
         {

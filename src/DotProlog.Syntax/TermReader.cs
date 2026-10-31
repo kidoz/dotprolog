@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DotProlog.Runtime;
 
 namespace DotProlog.Syntax;
@@ -15,6 +16,13 @@ public sealed class TermReader
     /// <summary>Maximum priority of an argument or list element; <c>,</c> separates instead of operating.</summary>
     private const int ArgumentPriority = 999;
 
+    /// <summary>Maximum number of nested parser calls accepted by the reader.</summary>
+    public const int MaxNestingDepth = 512;
+
+    /// <summary>Maximum resulting term depth, including iteratively built lists and operators.</summary>
+    public const int MaxTermDepth = 512;
+
+    private int _nestingDepth;
     private readonly Lexer _lexer;
     private readonly OperatorTable _operators;
     private readonly List<Diagnostic> _diagnostics;
@@ -193,6 +201,10 @@ public sealed class TermReader
         List<Diagnostic> diagnostics = [];
         var reader = new TermReader(text, fileName, operators ?? new OperatorTable(), diagnostics, characterConversions, flags);
         SyntaxTerm? term = reader.ParseTerm(MaxTermPriority, out _);
+        if (term is not null && !reader.ValidateDepth(term))
+        {
+            term = null;
+        }
         if (term is not null && reader._current.Kind == TokenKind.End)
         {
             reader.Advance();
@@ -289,7 +301,7 @@ public sealed class TermReader
     {
         SyntaxTerm? term = ParseTerm(MaxTermPriority, out _);
 
-        if (term is null)
+        if (term is null || !ValidateDepth(term))
         {
             SkipToClauseEnd();
             return null;
@@ -369,6 +381,69 @@ public sealed class TermReader
     }
 
     private SyntaxTerm? ParseTerm(int maxPriority, out int priority)
+    {
+        priority = 0;
+        if (_nestingDepth >= MaxNestingDepth || !RuntimeHelpers.TryEnsureSufficientExecutionStack())
+        {
+            ReportDepth(_current.Span, MaxNestingDepth);
+            return null;
+        }
+
+        _nestingDepth++;
+        try
+        {
+            return ParseTermCore(maxPriority, out priority);
+        }
+        finally
+        {
+            _nestingDepth--;
+        }
+    }
+
+    // Left-associative operators and list spines are built iteratively, but their consumers may
+    // recurse. Include those trees and quoted text that will become a list in the same budget.
+    private bool ValidateDepth(SyntaxTerm term)
+    {
+        var pending = new Stack<(SyntaxTerm Term, int Depth)>();
+        pending.Push((term, 1));
+        while (pending.TryPop(out var entry))
+        {
+            var depth = entry.Depth;
+            if (
+                entry.Term is StringTerm text
+                && (_flags?.DoubleQuotes ?? DoubleQuotesMode.Codes) is DoubleQuotesMode.Codes or DoubleQuotesMode.Chars
+            )
+            {
+                var length = CodePointText.Of(text.Value, _flags?.CodePointCharacters ?? true).Length;
+                depth += length;
+            }
+
+            if (depth > MaxTermDepth)
+            {
+                ReportDepth(entry.Term.Span, MaxTermDepth);
+                return false;
+            }
+
+            if (entry.Term is CompoundTerm compound)
+            {
+                foreach (SyntaxTerm argument in compound.Arguments)
+                {
+                    pending.Push((argument, depth + 1));
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private void ReportDepth(SourceSpan span, int limit) =>
+        Report(
+            DiagnosticIds.NestingLimitExceeded,
+            $"Source term exceeds the available reader depth budget (maximum {limit}).",
+            span
+        );
+
+    private SyntaxTerm? ParseTermCore(int maxPriority, out int priority)
     {
         SyntaxTerm? left = ParsePrimary(maxPriority, out priority);
         if (left is null)

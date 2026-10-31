@@ -35,4 +35,7 @@ public static class DiagnosticIds
 
     /// <summary>An unescaped control or layout character appeared inside a quoted token.</summary>
     public const string InvalidQuotedCharacter = "DPL0011";
+
+    /// <summary>Source nesting or resulting term depth exceeds the reader budget.</summary>
+    public const string NestingLimitExceeded = "DPL0012";
 }

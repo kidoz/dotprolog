@@ -2,6 +2,18 @@ namespace DotProlog.Tool.Tests;
 
 public sealed class ToolCommandTests : IDisposable
 {
+    [Theory]
+    [InlineData("lint")]
+    [InlineData("run")]
+    public void DeepSourceReturnsADiagnostic(string command)
+    {
+        var path = Source("deep.pl", new string('(', 20_000) + "a" + new string(')', 20_000) + ".");
+        (var exitCode, _, var error) = Execute(command, path);
+        Assert.Equal(65, exitCode);
+        Assert.Contains("error DPL0012", error, StringComparison.Ordinal);
+        Assert.Contains(path + "(1,", error, StringComparison.Ordinal);
+    }
+
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "DotProlog.Tool.Tests", Guid.NewGuid().ToString("N"));
 
     public ToolCommandTests() => Directory.CreateDirectory(_directory);

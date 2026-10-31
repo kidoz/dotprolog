@@ -12,6 +12,18 @@ namespace DotProlog.CodeGen.IL.Tests;
 public sealed class IlAssemblyEmitterTests
 {
     [Fact]
+    public void DeepSourceReturnsPositionedDiagnosticsWithoutAnAssembly()
+    {
+        using var output = new MemoryStream();
+        var source = new string('(', 20_000) + "a" + new string(')', 20_000) + ".";
+        IReadOnlyList<Diagnostic> diagnostics = IlAssemblyEmitter.Emit([("deep.pl", source)], "Deep", output);
+        Diagnostic diagnostic = Assert.Single(diagnostics);
+        Assert.Equal("DPL0012", diagnostic.Id);
+        Assert.Equal("deep.pl", diagnostic.FileName);
+        Assert.Equal(1, diagnostic.Span.Line);
+        Assert.Equal(0, output.Length);
+    }
+    [Fact]
     public void ContentHashPreservesBlobSlicesAndOrder()
     {
         byte[] expected = [0, 1, 127, 128, 255, 2];

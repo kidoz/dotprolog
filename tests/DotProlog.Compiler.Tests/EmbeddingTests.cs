@@ -8,6 +8,15 @@ namespace DotProlog.Compiler.Tests;
 /// </summary>
 public sealed class EmbeddingTests
 {
+    [Fact]
+    public void ConsultRejectsExcessiveSourceDepthAndRemainsUsable()
+    {
+        using var engine = new PrologEngine();
+        LoadResult loaded = engine.ConsultText(new string('(', 20_000) + "a" + new string(')', 20_000) + ".", "deep.pl");
+        Assert.False(loaded.Success);
+        Assert.Equal("DPL0012", Assert.Single(loaded.Diagnostics).Id);
+        Assert.True(engine.Query("true").Prove());
+    }
     private static PrologEngine NewEngine(string? source = null)
     {
         var engine = new PrologEngine { Output = TextWriter.Null };

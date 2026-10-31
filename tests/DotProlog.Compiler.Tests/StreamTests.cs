@@ -26,6 +26,19 @@ public sealed class StreamTests : IDisposable
     private string Path(string name) => System.IO.Path.Combine(_directory, name).Replace("\\", "/", StringComparison.Ordinal);
 
     [Fact]
+    public void DeepRuntimeInputIsCatchableAndKeepsTheFollowingTerm()
+    {
+        var input = new string('(', 20_000) + "a" + new string(')', 20_000) + ". ok.";
+        Assert.Equal(
+            "recovered",
+            RunWithInput(
+                ":- initialization((catch(read(_), error(syntax_error('DPL0012'), _), true), read(ok), write(recovered))).",
+                input
+            )
+        );
+    }
+
+    [Fact]
     public void ReadsTermsFromStandardInput() =>
         Assert.Equal(
             "foo(bar)\n'a b'\n",
