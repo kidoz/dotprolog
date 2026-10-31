@@ -21,7 +21,14 @@ public sealed partial class PackageWorkspace
                 ?? Environment.GetEnvironmentVariable("PROPACK_CACHE")
                 ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "propack", "cache-v1")
         );
-        if (_cache.StartsWith(_root + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+        // GetRelativePath applies the platform's path comparison and normalizes directory boundaries.
+        // Only parent-relative paths and paths on another file-system root are outside the project.
+        var relativeCache = Path.GetRelativePath(_root, _cache);
+        if (
+            !Path.IsPathRooted(relativeCache)
+            && relativeCache != ".."
+            && !relativeCache.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+        )
             throw new ArgumentException("The package cache must be outside the project.", nameof(cacheDirectory));
     }
 

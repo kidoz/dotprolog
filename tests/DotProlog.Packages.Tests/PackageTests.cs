@@ -16,6 +16,65 @@ public sealed class PackageTests : IDisposable
 
     public void Dispose() => PackageFiles.DeleteDirectory(_directory);
 
+    [Theory]
+    [InlineData(".", false)]
+    [InlineData(".", true)]
+    [InlineData("cache", false)]
+    [InlineData("cache", true)]
+    [InlineData("cache/snapshots", false)]
+    [InlineData("cache/..", false)]
+    public void Cache_must_not_equal_or_descend_from_project(string relativeCache, bool trailingProjectSeparator)
+    {
+        var project = trailingProjectSeparator ? Root + Path.DirectorySeparatorChar : Root;
+        var error = Assert.Throws<ArgumentException>(() => new PackageWorkspace(project, Path.Combine(Root, relativeCache)));
+        Assert.Equal("cacheDirectory", error.ParamName);
+        Assert.Contains("outside the project", error.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(".")]
+    [InlineData("cache")]
+    public void Cache_path_comparison_follows_platform_case_rules(string relativeCache)
+    {
+        var cache = Path.Combine(_directory, "APP", relativeCache);
+        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
+            Assert.Throws<ArgumentException>(() => new PackageWorkspace(Root, cache));
+        else
+            _ = new PackageWorkspace(Root, cache);
+    }
+
+    [Fact]
+    public void Cache_can_be_a_sibling_with_the_project_name_prefix()
+    {
+        _ = new PackageWorkspace(Root, Root + "-cache");
+        _ = new PackageWorkspace(Root, _directory);
+    }
+
+    [Fact]
+    public void File_system_root_project_has_no_cache_directory_outside_it_on_the_same_root()
+    {
+        Assert.Throws<ArgumentException>(() => new PackageWorkspace(Path.GetPathRoot(Root)!, Cache));
+    }
+
+    [Theory]
+    [InlineData(".")]
+    [InlineData("cache")]
+    public void Restore_rejects_cache_inside_project_before_creating_files(string relativeCache)
+    {
+        File.WriteAllText(Path.Combine(Root, "propack.json"), "{\"name\":\"demo/app\"}");
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var result = PackageCommands.Execute(
+            ["restore", "--project", Root, "--cache", Path.Combine(Root, relativeCache)],
+            output,
+            error
+        );
+        Assert.Equal(64, result);
+        Assert.Contains("outside the project", error.ToString(), StringComparison.Ordinal);
+        Assert.Empty(Directory.GetDirectories(Root));
+        Assert.False(File.Exists(Path.Combine(Root, "propack.lock.json")));
+    }
+
     [Fact]
     public void Library_aliases_compile_to_direct_IL_and_run_without_source_files()
     {
