@@ -1,9 +1,9 @@
 # Portable package format, schema 1
 
-This is the preview contract for `propack.json`, a root catalog, and `propack.lock.json`.
-Schema 1's fields and version rules are fixed for the installable preview. Incompatible format
+This is the schema 1 contract for `propack.json`, a root catalog, and `propack.lock.json`.
+Schema 1's fields and version rules are fixed for the stable release. Incompatible format
 changes require a new schema number; additions to these strict objects are incompatible with older
-readers. Preview tool releases may fix implementation defects without changing the format.
+readers. Tool releases may fix implementation defects without changing the format.
 
 The [manifest editor schema](propack-manifest.schema.json) and
 [lock editor schema](propack-lock.schema.json) describe object structure. The semantic checks below
@@ -140,5 +140,5 @@ on failed acceptance conditions, because engine initialization-failure behavior 
 | Executed program | Child process exit code |
 
 `--version` reports the installed tool's informational version. The CLI and package schema versions
-are separate: preview tools can have prerelease versions even though schema 1 package versions
+are separate: tool release versions are independent of dependency package versions even though schema 1 package versions
 support only stable versions.

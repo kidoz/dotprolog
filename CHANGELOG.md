@@ -8,12 +8,10 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Added
 
-- The `propack` preview can be installed as a .NET tool or extracted from a native executable ZIP.
-  The preview producer includes version reporting, license notices, and SHA-256 checksums.
-- Preview CI builds and installs the artifacts on Windows, Linux, and macOS, then verifies the
-  pinned upstream `heaps` library under SWI-Prolog and DotProlog in clean projects. The schema 1
-  package format and editor schemas document the preview contract.
-
+- Stable `propack` release 0.17.0 provides a .NET tool package and native ZIPs for Linux x64,
+  Windows x64, and macOS ARM64, with checksums and a software bill of materials. The dedicated
+  release workflow validates clean installation and the pinned upstream `heaps` library under
+  both engines before publication. The schema 1 format and editor schemas define the contract.
 - An experimental standalone `propack` tool restores pure Prolog source packages from local
   directories, Git revisions, ZIP archives, and local version catalogs. Lockfiles pin the graph
   and content hashes; conflicting requirements, duplicate module names, and changed cached

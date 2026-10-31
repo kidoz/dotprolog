@@ -18,13 +18,13 @@ IL directly and can publish a native executable with NativeAOT. It can be packed
 The packages have been on NuGet.org since 0.2.0 and the current release is 0.16.1: see
 [CHANGELOG.md](CHANGELOG.md) and [COMPATIBILITY.md](COMPATIBILITY.md).
 
-## Experimental portable packages
+## Portable packages
 
 The standalone `propack` tool restores pure Prolog packages for SWI-Prolog and DotProlog,
 with explicit dependency resolution, a shared lockfile, local/Git/ZIP sources, and module
 conflict checks. DotProlog's CLI and SDK consume the same restored graph. See the
 [package guide](docs/how-to/manage-packages.md) and `samples/PortablePackages` for a runnable
-transitive dependency example. Installable preview artifacts can be built locally or downloaded from the `Propack preview` CI workflow. The tool has not been published to NuGet.org.
+transitive dependency example. Stable propack 0.17.0 provides a .NET tool package and native binaries for Linux, Windows, and macOS. Install with `dotnet tool install --global DotProlog.Packages.Cli --version 0.17.0`.
 
 ## Hello, world
 

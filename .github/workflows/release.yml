@@ -10,6 +10,11 @@ on:
   # at the tag, so a fix landing later on main would not apply. Only the publish job runs.
   workflow_dispatch:
     inputs:
+      product:
+        description: Product to publish from an existing GitHub release
+        type: choice
+        options: [dotprolog, propack]
+        default: dotprolog
       version:
         description: Version to publish to nuget.org, for example 0.2.0
         required: true
@@ -261,7 +266,7 @@ jobs:
     name: Publish to NuGet
     needs: release
     # always() keeps this reachable on a manual run, where every build job above is skipped.
-    if: always() && (github.event_name == 'workflow_dispatch' || needs.release.result == 'success')
+    if: always() && inputs.product != 'propack' && (github.event_name == 'workflow_dispatch' || needs.release.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: release
@@ -340,3 +345,58 @@ jobs:
           dotnet nuget push "artifacts/$pointer" \
             --source https://api.nuget.org/v3/index.json \
             --api-key "$NUGET_API_KEY"
+
+  publish-propack:
+    name: Publish propack to NuGet
+    if: github.event_name == 'workflow_dispatch' && inputs.product == 'propack'
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          global-json-file: global.json
+      - name: Download and verify the stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          python - <<'PYVERSION'
+          import os, re
+          assert re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', os.environ['VERSION'])
+          PYVERSION
+          gh release download "propack-v$VERSION" --repo "$GITHUB_REPOSITORY" --dir propack-assets
+          python tests/Integration/collect-propack-release.py --version "$VERSION" --output propack-assets --verify
+      - name: Log in to nuget.org
+        id: login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+      - name: Publish the propack tool
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          test -n "$NUGET_API_KEY"
+          dotnet nuget push "propack-assets/DotProlog.Packages.Cli.$VERSION.nupkg" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY"
+      - name: Verify installation from NuGet.org
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 20); do
+            if dotnet tool install DotProlog.Packages.Cli --tool-path "$RUNNER_TEMP/propack-published" --version "$VERSION"; then
+              "$RUNNER_TEMP/propack-published/propack" --version | grep -Fx "propack $VERSION"
+              "$RUNNER_TEMP/propack-published/propack" --help
+              exit 0
+            fi
+            sleep 30
+          done
+          echo 'Published package did not become installable within ten minutes.' >&2
+          exit 1

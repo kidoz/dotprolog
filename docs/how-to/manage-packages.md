@@ -1,17 +1,27 @@
 # Manage portable Prolog packages
 
-The experimental `propack` tool restores pure Prolog source packages independently of a Prolog
+The `propack` tool restores pure Prolog source packages independently of a Prolog
 engine. The same manifest and lock work with SWI-Prolog, `dotnet prolog`, and DotProlog SDK projects.
-An installable preview can be prepared from this repository; it has not been published to NuGet.org.
+The stable release is version 0.17.0. It has dedicated native binaries and a .NET tool package.
 The [schema 1 format reference](../reference/propack-format.md) defines the manifest and lock contract.
 
-## Prepare and install the preview
+## Install propack 0.17.0
+
+```sh
+dotnet tool install --global DotProlog.Packages.Cli --version 0.17.0
+propack --help
+```
+
+Native binaries and checksums are available from the
+[propack 0.17.0 release](https://github.com/kidoz/dotprolog/releases/tag/propack-v0.17.0).
+
+## Build and verify release artifacts
 
 Requires Python 3, .NET 10, and the host platform's NativeAOT prerequisites:
 
 ```sh
-python tests/Integration/prepare-propack-preview.py --rid osx-arm64 --version 0.17.0-preview.1 --output artifacts/propack-preview
-dotnet tool install --tool-path ./artifacts/propack-tools --add-source ./artifacts/propack-preview --version 0.17.0-preview.1 DotProlog.Packages.Cli
+python tests/Integration/prepare-propack-release.py --rid osx-arm64 --version 0.17.0 --output artifacts/propack-release
+dotnet tool install --tool-path ./artifacts/propack-tools --add-source ./artifacts/propack-release --version 0.17.0 DotProlog.Packages.Cli
 ./artifacts/propack-tools/propack --version
 ```
 
@@ -21,24 +31,28 @@ license and instructions, and `SHA256SUMS`. The ZIP executable can be extracted 
 Windows uses `propack.exe`. Verify the SHA-256 digests against `SHA256SUMS` before installation.
 The managed tool requires .NET 10; the native executable restores packages independently of .NET.
 The command above creates only local artifacts. The ordinary solution/release pack excludes this
-preview tool; explicit packing uses `-p:PropackPreview=true`.
+propack tool; explicit packing uses `-p:PropackRelease=true`.
 
-The `Propack preview` CI workflow builds these artifacts on Windows, Linux and macOS, installs the
+The `Propack release` CI workflow builds these artifacts on Windows, Linux and macOS, installs the
 actual tool package from an isolated feed, and runs an unchanged, pinned SWI-Prolog `heaps` library
 under both engines from clean temporary projects. It also extracts and tests the native ZIP, checks
 its version and hashes, and verifies locked-restore failure followed by explicit update. The fixture's
 upstream commit, file digest and BSD license are retained in `tests/fixtures/packages/swi-heaps`.
 The probe checks that SWI loaded the restored source, rather than its bundled `heaps` library.
-CI uploads verified artifacts; publication to a package feed is separate.
+The workflow uploads verified artifacts on main. A `propack-v<version>` tag creates a stable GitHub
+release after all three platform checks pass, then dispatches `release.yml` with `product=propack`.
+NuGet publication uses the existing `release` environment and trusted-publishing policy; it pushes
+only the propack tool and verifies installation from NuGet.org. `src/DotProlog.Packages.Cli/Version.props`
+is the propack version source. The full-product `v*` tags use their existing release path.
 
 To run the same acceptance locally (requires `swipl`, Python and the native toolchain):
 
 ```sh
-DOTPROLOG_RUN_PACKAGE_PREVIEW_TESTS=1 dotnet test --project tests/Integration -- --filter-class Integration.Tests.PropackPreviewTests
+DOTPROLOG_RUN_PACKAGE_RELEASE_TESTS=1 dotnet test --project tests/Integration -- --filter-class Integration.Tests.PropackReleaseTests
 ```
 
-Set `DOTPROLOG_PREVIEW_ARTIFACTS` to an existing producer output directory to validate those exact
-artifacts instead of producing another preview. The acceptance exercises all twelve exported heap
+Set `DOTPROLOG_RELEASE_ARTIFACTS` to an existing producer output directory to validate those exact
+artifacts instead of producing another release artifact set. The acceptance exercises all twelve exported heap
 operations, including priority ordering, merge, deletion, empty-heap failure and validation. It does
 not claim general SWI compatibility.
 
@@ -62,7 +76,9 @@ dotnet run --project samples/PortablePackages/app/PortablePackages.dplproj
 Each execution prints `hello`. The application depends on `example/greeting`, which depends on
 `example/words`. SWI execution requires `swipl` on PATH. Standalone `propack run --engine dotprolog`
 requires `dotnet-prolog` on PATH with package support (either the native executable or a .NET tool shim); the source-tree command above
-uses the tool being developed here.
+uses the tool from this checkout. The NuGet-published DotProlog.Tool 0.16.1 predates package
+support; use the source-tree commands here or build `src/DotProlog.Tool` for `--engine dotprolog`.
+SWI-Prolog works with its regular installed executable.
 
 Build a standalone executable for your platform, for example:
 

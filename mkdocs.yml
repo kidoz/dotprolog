@@ -67,6 +67,7 @@ nav:
       - Language: language-guide.md
       - Linting and diagnostics: linting.md
       - .NET integration: dotnet-integration.md
+      - Propack 0.17.0 release: releases/propack-0.17.0.md
       - Portable package format: reference/propack-format.md
       - Runtime configuration and implementation characteristics: reference/iso-processor-characteristics.md
       - ISO Part 1 conformance: reference/iso-part1-conformance.md

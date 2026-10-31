@@ -4,31 +4,35 @@ using System.Text.Json;
 
 namespace Integration.Tests;
 
-/// <summary>Installs preview artifacts and consumes an unchanged external library outside the repository.</summary>
-public sealed class PropackPreviewTests
+/// <summary>Installs release artifacts and consumes an unchanged external library outside the repository.</summary>
+public sealed class PropackReleaseTests
 {
     [Fact]
     public async Task InstalledAndNativeToolsConsumePinnedHeapsInCleanProjects()
     {
         Assert.SkipUnless(
-            Environment.GetEnvironmentVariable("DOTPROLOG_RUN_PACKAGE_PREVIEW_TESTS") == "1",
-            "Set DOTPROLOG_RUN_PACKAGE_PREVIEW_TESTS=1; this test requires Python, SWI-Prolog and a native toolchain."
+            Environment.GetEnvironmentVariable("DOTPROLOG_RUN_PACKAGE_RELEASE_TESTS") == "1",
+            "Set DOTPROLOG_RUN_PACKAGE_RELEASE_TESTS=1; this test requires Python, SWI-Prolog and a native toolchain."
         );
-        var root = Directory.CreateTempSubdirectory("propack preview ").FullName;
+        var root = Directory.CreateTempSubdirectory("propack release ").FullName;
         if (OperatingSystem.IsMacOS() && root.StartsWith("/var/", StringComparison.Ordinal))
             root = "/private" + root;
         try
         {
             var rid = System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier;
-            var version = "0.17.0-preview." + Guid.NewGuid().ToString("N");
-            var distribution = Environment.GetEnvironmentVariable("DOTPROLOG_PREVIEW_ARTIFACTS");
+            var version = System
+                .Xml.Linq.XDocument.Load(Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Packages.Cli", "Version.props"))
+                .Descendants("PropackVersion")
+                .Single()
+                .Value;
+            var distribution = Environment.GetEnvironmentVariable("DOTPROLOG_RELEASE_ARTIFACTS");
             if (distribution is null)
             {
                 distribution = Path.Combine(root, "distribution");
                 await Success(
                     "python",
                     [
-                        Path.Combine(RepositoryLayout.Root, "tests", "Integration", "prepare-propack-preview.py"),
+                        Path.Combine(RepositoryLayout.Root, "tests", "Integration", "prepare-propack-release.py"),
                         "--rid",
                         rid,
                         "--version",
@@ -76,6 +80,7 @@ public sealed class PropackPreviewTests
             var config = Path.Combine(root, "NuGet.Config");
             await Write(config, "<configuration><packageSources><clear /></packageSources></configuration>");
             var tools = Path.Combine(root, "installed tools");
+            var installEnvironment = new Dictionary<string, string?> { ["NUGET_PACKAGES"] = Path.Combine(root, "nuget-cache") };
             await Success(
                 "dotnet",
                 [
@@ -91,7 +96,8 @@ public sealed class PropackPreviewTests
                     "--add-source",
                     distribution,
                 ],
-                root
+                root,
+                installEnvironment
             );
             var installed = Path.Combine(tools, Exe("propack"));
             Assert.Equal("propack " + version, (await Success(installed, ["--version"], root)).Trim());
@@ -154,7 +160,7 @@ public sealed class PropackPreviewTests
                 foreach (var file in Directory.GetFiles(fixture))
                     File.Copy(file, Path.Combine(library, Path.GetFileName(file)));
                 var cache = Path.Combine(consumer, "cache");
-                await Success(cli, ["init", "preview/consumer", "--project", app, "--cache", cache], consumer);
+                await Success(cli, ["init", "release/consumer", "--project", app, "--cache", cache], consumer);
                 await Success(
                     cli,
                     [
@@ -176,9 +182,9 @@ public sealed class PropackPreviewTests
                 await Write(
                     Path.Combine(app, "main.pl"),
                     """
-                    :- module(preview_consumer, []).
+                    :- module(release_consumer, []).
                     :- use_module(library(heaps)).
-                    :- initialization(preview_consumer:main).
+                    :- initialization(release_consumer:main).
                     checks :-
                         empty_heap(Empty), is_heap(Empty), heap_size(Empty, 0),
                         add_to_heap(Empty, 2, two, H1), add_to_heap(H1, 1, one, H2),
@@ -190,7 +196,7 @@ public sealed class PropackPreviewTests
                         list_to_heap([3-three,1-one,2-two], H3),
                         delete_from_heap(H3, 2, two, H4), heap_to_list(H4, [1-one,3-three]),
                         \+ get_from_heap(Empty, _, _, _), \+ is_heap(not_a_heap).
-                    main :- (checks -> writeln('heaps-preview: passed'); halt(1)).
+                    main :- (checks -> writeln('heaps-release: passed'); halt(1)).
                     """
                 );
                 foreach (var backend in new[] { "dotprolog", "swi" })
@@ -202,7 +208,7 @@ public sealed class PropackPreviewTests
                         environment
                     );
                     Assert.True(result.ExitCode == 0, result.Log);
-                    Assert.Equal("heaps-preview: passed", result.Log.Trim());
+                    Assert.Equal("heaps-release: passed", result.Log.Trim());
                 }
                 // SWI must load the restored copy, rather than satisfying the probe from its bundled heaps library.
                 using var locked = JsonDocument.Parse(
@@ -250,9 +256,14 @@ public sealed class PropackPreviewTests
     private static Task Write(string path, string text) =>
         File.WriteAllTextAsync(path, text, TestContext.Current.CancellationToken);
 
-    private static async Task<string> Success(string executable, string[] args, string directory)
+    private static async Task<string> Success(
+        string executable,
+        string[] args,
+        string directory,
+        IReadOnlyDictionary<string, string?>? environment = null
+    )
     {
-        var result = await ChildProcess.RunAsync(executable, args, directory);
+        var result = await ChildProcess.RunAsync(executable, args, directory, environment);
         Assert.True(result.ExitCode == 0, result.Log);
         return result.Log;
     }
