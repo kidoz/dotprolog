@@ -35,10 +35,14 @@ flags; consumers must pin their build environment separately.
 A module identifier matches `[a-z][a-zA-Z0-9_]*`. Each module's file basename is `<identifier>.pl`.
 The file starts with `:- module(identifier, Exports).`, after optional whitespace, `%` comments or
 non-nested block comments. Schema 1 does not support quoted module identifiers in this header.
+The header through the module name and following comma must occur within the first 64 KiB;
+leading comments and whitespace count toward this limit. Header validation scans this prefix linearly.
 Paths must remain inside the package. Every `.pl` file in a dependency package is declared in
 `modules`; textual include fragments can use another extension. Root applications can have
 non-module entry files. Duplicate declared module names are errors across the whole graph,
 including the root. Imports can see the whole graph, including transitive packages.
+Module paths cannot contain the excluded segments `.git`, `bin`, `obj`, `.propack` or
+`propack.lock.json`, including in root applications.
 
 License and upstream provenance belong in package files such as `LICENSE.txt` and `UPSTREAM.json`;
 they are not additional manifest fields. Packaging does not confer permission to redistribute code.
@@ -66,7 +70,7 @@ Each dependency is an object with the following fields; all except `version` def
 | `git` | Local repository path, HTTPS URL or `ssh://` URL |
 | `revision` | Explicit Git branch, tag or commit; required with `git`, invalid without it |
 | `archive` | Local ZIP path or HTTPS URL; package manifest at the archive root |
-| `sha256` | Optional expected archive-byte digest; hexadecimal SHA-256, compared without regard to case |
+| `sha256` | Expected archive-byte digest; required for HTTPS archives, optional for local ZIPs; exactly 64 hexadecimal digits, compared without regard to case |
 
 Choose exactly one non-null transport (`path`, `git`, `archive`), or omit transports to use the
 root catalog. Git submodules and native build hooks are unsupported. Remote dependency packages
@@ -74,10 +78,28 @@ should use catalog dependencies; relative path dependencies must resolve within 
 snapshot to remain available on another machine. SCP-style Git addresses are not a transport URL
 in schema 1. Absolute local paths are accepted but reduce portability.
 
+HTTPS downloads reject redirects, including redirects on the same host. Use the final archive URL
+and provide a digest obtained independently of that download. The digest authenticates the fetched
+bytes against the manifest; it is not signed publisher metadata. Requiring a digest for HTTPS is a
+security tightening of the earlier optional-checksum behavior. Existing manifests with unpinned
+HTTPS archives must add a digest and explicitly update their lock.
+
+Git acquisition disables local-clone optimization, recursive submodules, hooks and symbolic-link
+checkout. Git symlinks become regular files containing the link text; their targets are never copied.
+System/global Git configuration, user attributes and inherited `GIT_*` overrides are ignored,
+including configured checkout filters, credential helpers and URL rewrites. SSH can still use the
+installed SSH client's configuration and agent. Remote clones cannot use Git's file protocol.
+Git locations, revisions and archive locations cannot contain control characters; spaces in local
+paths remain supported. Resolved Git revisions must be hexadecimal commit object IDs.
+
 The root catalog is a JSON object mapping package identities to arrays of source specifications.
 Candidate `version` values are exact versions and must match their package manifests. Local catalog
 source paths are relative to the catalog file. Dependency packages do not select their own catalogs.
 Resolution tries candidates from newer to older and backtracks for version/source constraints.
+An unavailable catalog transport is skipped so older candidates can be tried. Failed transports
+are not retried during the same solve; if no solution remains, diagnostics include those failures.
+Explicit source failures, checksum mismatches, corrupt cache entries and invalid package contents
+are fatal and never trigger an automatic downgrade.
 There is one version/source per package identity. Cycles, conflicting module exports, mismatched
 package identities and unreachable or duplicate lock entries are errors. Resolution is bounded to
 256 packages and 10,000 search steps.
@@ -108,10 +130,21 @@ comparison. Each record is UTF-8 encoding of:
 ```
 
 Directories contribute no records. At any depth, `.git`, `bin`, `obj`, `.propack` and
-`propack.lock.json` are excluded. Symbolic links are rejected. Source trees have at most 10,000
-files and 128 MiB of included file bytes. ZIP inputs also limit entry count and expanded bytes;
-traversal and non-regular entries are rejected. Integrity hashes authenticate bytes against the
+`propack.lock.json` are excluded. Filesystem symbolic links, FIFOs, sockets and devices are rejected.
+Reads open without following symbolic links and check the opened file's type before reading;
+package-relative parent directories are protected against replacement by symbolic links.
+The native input checks support Windows and Linux/macOS x64/ARM64; other Unix ABIs fail explicitly.
+Source trees have at most 10,000 files and 128 MiB of included file bytes. ZIP inputs also limit entry
+count and expanded bytes; traversal and non-regular entries are rejected. Hashing and copying count
+bytes actually read, including growth after the initial directory walk. The two-minute HTTPS timeout
+covers both response headers and the body. Integrity hashes authenticate bytes against the
 committed lock; they do not authenticate a publisher or establish that package code is safe.
+
+Every transport publishes only the included file set into the cache. Excluded paths and empty
+directories are omitted. Cache validation rejects those paths if they are later present, even when
+the included file bytes still match the lock hash. Older Git/ZIP cache entries containing excluded
+paths or empty directories must be removed and restored from their locked origins. A module that
+used an excluded path must be moved into an included path and the lock explicitly updated.
 
 `restore` creates a missing lock. With an existing lock it validates without changing the graph;
 a changed manifest or local source package requires `update`. `restore --locked` also requires an

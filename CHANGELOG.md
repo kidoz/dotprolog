@@ -22,6 +22,22 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Fixed
 
+- HTTPS package archives require an explicit SHA-256 digest and reject redirects. The download
+  timeout covers the response body as well as headers. Local ZIP checksums remain optional.
+- Package input reads reject FIFOs, devices and symbolic-link replacements before reading from
+  opened handles, and enforce the byte limit during hashing and copying.
+- Dependency resolution tries older catalog candidates after transport failures, while explicit
+  sources and integrity failures still fail immediately. Failed solves report unavailable candidates
+  and preserve the existing lock.
+- Package module headers are checked by a linear scan of the first 64 KiB, bounding work on large
+  comment-only inputs.
+- All package transports cache only the files covered by the tree hash. Cache reads reject
+  excluded paths and unexpected empty directories, and module declarations cannot point into
+  excluded paths. ZIP and Git snapshots can no longer preserve unhashed executable sources.
+- Git package acquisition ignores inherited Git configuration and checkout filters, disables
+  local-clone optimization, recursive submodules and symbolic-link checkout, and uses an empty
+  hooks directory on every platform. Resolved commit IDs and source control characters are checked
+  before checkout or acquisition.
 - Package restoration rejects a cache directory equal to or inside the project, including
   normalized paths and case variants on Windows and macOS. This prevents package snapshots
   from becoming inputs when the project is consumed as a local package.

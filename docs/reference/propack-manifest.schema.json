@@ -102,10 +102,36 @@
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "pattern": "^[a-fA-F0-9]{64}$"
         }
       },
-      "description": "A dependency without a transport uses the root catalog. Otherwise exactly one non-null path, git or archive is allowed; Git requires revision. Semantic checks are described in the format reference."
+      "description": "A dependency without a transport uses the root catalog. Otherwise exactly one non-null path, git or archive is allowed; Git requires revision. HTTPS archives require sha256. Semantic checks are described in the format reference.",
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "archive"
+            ],
+            "properties": {
+              "archive": {
+                "type": "string",
+                "pattern": "^[hH][tT][tT][pP][sS]://"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "sha256"
+            ],
+            "properties": {
+              "sha256": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }
