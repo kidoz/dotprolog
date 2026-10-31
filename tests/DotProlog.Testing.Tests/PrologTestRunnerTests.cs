@@ -87,9 +87,12 @@ public sealed class PrologTestRunnerTests
     public void ALoopingTestTimesOutAndFailsInsteadOfHanging()
     {
         PrologTestRunner runner = CreateRunner("test_loop :- test_loop.");
+        // Discovery runs under the default timeout: the short one below is meant for the looping
+        // test body, and on a loaded CI machine engine startup alone can take longer than it.
+        PrologTest test = Assert.Single(runner.Discover());
         runner.Timeout = TimeSpan.FromMilliseconds(250);
 
-        PrologTestResult result = RunSingle(runner);
+        PrologTestResult result = runner.Run(test);
 
         Assert.False(result.Succeeded);
         Assert.Contains("did not complete", result.Message, StringComparison.Ordinal);
