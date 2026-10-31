@@ -32,14 +32,48 @@ internal static class Program
             length(L, N).
         """;
 
+    private static bool ExerciseHostBoundaries()
+    {
+        using var engine = new PrologEngine { Output = TextWriter.Null };
+        LoadResult deep = engine.ConsultText(new string('(', 20_000) + "a" + new string(')', 20_000) + ".", "deep.pl");
+        if (deep.Success || deep.Diagnostics.Count != 1 || deep.Diagnostics[0].Id != DiagnosticIds.NestingLimitExceeded)
+        {
+            return false;
+        }
+
+        try
+        {
+            engine.Query("X = f(X)").FirstOrDefault();
+            return false;
+        }
+        catch (PrologException error) when (error.Message.Contains("representation_error(cyclic_term)", StringComparison.Ordinal))
+        {
+            // Host marshalling must also reject cycles in a native executable.
+        }
+
+        engine.ConsultOrThrow("loop :- loop.", "loop.pl");
+        using var cancellation = new CancellationTokenSource();
+        engine.Machine.CancellationToken = cancellation.Token;
+        cancellation.CancelAfter(TimeSpan.FromMilliseconds(100));
+        try
+        {
+            engine.Query("loop").Prove();
+            return false;
+        }
+        catch (OperationCanceledException)
+        {
+            return !engine.Machine.IsRunning;
+        }
+    }
+
     private static int Main(string[] args)
     {
         var path = args.Length > 0 ? args[0] : Path.Combine(AppContext.BaseDirectory, "acceptance.pl");
-        var engine = new PrologEngine();
+        using var engine = new PrologEngine();
         IPricingModule pricing = PricingModule.Create(engine);
         var maxAritySource = $"f({string.Join(",", Enumerable.Repeat("a", 256))})";
 
-        if (!ExerciseSystemErrors() || pricing.Discount(100.0, 10) != 90.0)
+        if (!ExerciseHostBoundaries() || !ExerciseSystemErrors() || pricing.Discount(100.0, 10) != 90.0)
         {
             return 1;
         }
