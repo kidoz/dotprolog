@@ -2,7 +2,7 @@ name: Propack preview
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'preview/propack-*']
     paths:
       - 'src/**'
       - 'tests/Integration/**'
