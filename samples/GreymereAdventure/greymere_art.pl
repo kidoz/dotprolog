@@ -91,7 +91,7 @@ health_color(Health, Maximum, Style) :-
 scene(gloamwatch, [
     row(danger, '                                  *'),
     row(danger, '                              THE RED STAR'),
-    row(stone, '           |_|_|                   |_|_|'),
+    row(stone, '           |_|_|                    |_|_|'),
     row(stone, '           |   |    |_|_|_|_|_|     |   |'),
     row(stone, '           | o |____|         |_____| o |'),
     row(stone, '           |   :    :  ___    :     :   |'),
@@ -113,7 +113,7 @@ scene(village_square, [
 
 scene(old_road, [
     row(danger, '                           *'),
-    row(life, '        /\\       /\\                    /\\'),
+    row(life, '        /\\       /\\                      /\\'),
     row(life, '       /**\\     /**\\      /\\           /**\\'),
     row(life, '      /****\\   /****\\    /**\\         /****\\'),
     row(stone, '        ||       ||     /  /            ||'),
@@ -333,4 +333,40 @@ scene(bell_tower, [
     row(stone, '            o         o         o'),
     row(magic, '           DAWN      NOON      DUSK'),
     row(stone, '        |___________________________|')
+]).
+
+scene(scriptorium, [
+    row(magic, '          *       .        *        .'),
+    row(stone, '       .--------.  .--------.  .--------.'),
+    row(ember, '       | STAR  /   | CROWN /   | WOLF  /'),
+    row(stone, '       |______/    |______/    |______/'),
+    row(stone, '             |          |          |'),
+    row(ember, '          ___|__________|__________|___'),
+    row(stone, '         /   the black rune codex      /|'),
+    row(shadow, '        /_____________________________/ |'),
+    row(stone, '        |_____________________________|/')
+]).
+
+scene(observatory, [
+    row(danger, '                         * RED STAR'),
+    row(stone, '                      .  |  .'),
+    row(ember, '                  .-----( )-----.'),
+    row(stone, '                 /   ___/ \\___   \\'),
+    row(stone, '                /___/           \\___\\'),
+    row(ember, '                    \\  [o] [o]  /'),
+    row(stone, '                     \\____|____/'),
+    row(stone, '                          |'),
+    row(magic, '               LYRA''S STARLESS OBSERVATORY')
+]).
+
+scene(sunken_crypt, [
+    row(magic, '      ~~~~  ~~~~  ~~~~  ~~~~  ~~~~  ~~~~'),
+    row(stone, '         .-----.           .-----.'),
+    row(stone, '         | o o |           | o o |'),
+    row(shadow, '         |  _  |           |  _  |'),
+    row(stone, '         |_____|     __    |_____|'),
+    row(stone, '                  __/  \\__'),
+    row(ember, '                 /  []    \\__'),
+    row(stone, '                /___/\\_______\\'),
+    row(magic, '      ~~~~ ~~~~  THE SUNKEN CRYPT  ~~~~ ~~~~')
 ]).
