@@ -177,6 +177,21 @@ public sealed class PropackReleaseTests
                     ],
                     consumer
                 );
+                var invalidCaches = new List<string> { app, Path.Combine(app, "cache") };
+                if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
+                    invalidCaches.Add(Path.Combine(consumer, "APP"));
+                foreach (var invalidCache in invalidCaches)
+                {
+                    var rejected = await ChildProcess.RunAsync(
+                        cli,
+                        ["restore", "--project", app, "--cache", invalidCache],
+                        consumer
+                    );
+                    Assert.Equal(64, rejected.ExitCode);
+                    Assert.Contains("outside the project", rejected.Log, StringComparison.Ordinal);
+                    Assert.Empty(Directory.GetDirectories(app));
+                    Assert.False(File.Exists(Path.Combine(app, "propack.lock.json")));
+                }
                 await Success(cli, ["restore", "--project", app, "--cache", cache], consumer);
                 await Success(cli, ["restore", "--locked", "--project", app, "--cache", cache], consumer);
                 await Write(

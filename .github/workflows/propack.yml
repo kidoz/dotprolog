@@ -143,5 +143,5 @@ jobs:
           set -euo pipefail
           version="${RELEASE_TAG#propack-v}"
           python tests/Integration/collect-propack-release.py --version "$version" --output release-artifacts --verify
-          gh release create "$RELEASE_TAG" --verify-tag --title "propack $version" --notes-file "docs/releases/propack-$version.md" release-artifacts/*
+          gh release create "$RELEASE_TAG" --verify-tag --title "$RELEASE_TAG" --notes-file "docs/releases/propack-$version.md" release-artifacts/*
           gh workflow run release.yml --ref main -f product=propack -f version="$version"

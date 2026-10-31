@@ -2,26 +2,26 @@
 
 The `propack` tool restores pure Prolog source packages independently of a Prolog
 engine. The same manifest and lock work with SWI-Prolog, `dotnet prolog`, and DotProlog SDK projects.
-The stable release is version 0.17.0. It has dedicated native binaries and a .NET tool package.
+The stable release is version 0.17.1. It has dedicated native binaries and a .NET tool package.
 The [schema 1 format reference](../reference/propack-format.md) defines the manifest and lock contract.
 
-## Install propack 0.17.0
+## Install propack 0.17.1
 
 ```sh
-dotnet tool install --global DotProlog.Packages.Cli --version 0.17.0
+dotnet tool install --global DotProlog.Packages.Cli --version 0.17.1
 propack --help
 ```
 
 Native binaries and checksums are available from the
-[propack 0.17.0 release](https://github.com/kidoz/dotprolog/releases/tag/propack-v0.17.0).
+[propack 0.17.1 release](https://github.com/kidoz/dotprolog/releases/tag/propack-v0.17.1).
 
 ## Build and verify release artifacts
 
 Requires Python 3, .NET 10, and the host platform's NativeAOT prerequisites:
 
 ```sh
-python tests/Integration/prepare-propack-release.py --rid osx-arm64 --version 0.17.0 --output artifacts/propack-release
-dotnet tool install --tool-path ./artifacts/propack-tools --add-source ./artifacts/propack-release --version 0.17.0 DotProlog.Packages.Cli
+python tests/Integration/prepare-propack-release.py --rid osx-arm64 --version 0.17.1 --output artifacts/propack-release
+dotnet tool install --tool-path ./artifacts/propack-tools --add-source ./artifacts/propack-release --version 0.17.1 DotProlog.Packages.Cli
 ./artifacts/propack-tools/propack --version
 ```
 

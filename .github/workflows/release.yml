@@ -391,7 +391,7 @@ jobs:
         run: |
           set -euo pipefail
           for attempt in $(seq 1 20); do
-            if dotnet tool install DotProlog.Packages.Cli --tool-path "$RUNNER_TEMP/propack-published" --version "$VERSION"; then
+            if dotnet tool install DotProlog.Packages.Cli --tool-path "$RUNNER_TEMP/propack-published" --version "$VERSION" --no-http-cache; then
               "$RUNNER_TEMP/propack-published/propack" --version | grep -Fx "propack $VERSION"
               "$RUNNER_TEMP/propack-published/propack" --help
               exit 0
