@@ -20,6 +20,12 @@ All notable changes to DotProlog are recorded here. The format follows
   Modern `use_module(library(Name))` resolves explicit host-supplied aliases. The portable package
   sample runs a transitive dependency under SWI-Prolog, DotProlog, and a compiled SDK application.
 
+### Fixed
+
+- Package restoration rejects a cache directory equal to or inside the project, including
+  normalized paths and case variants on Windows and macOS. This prevents package snapshots
+  from becoming inputs when the project is consumed as a local package.
+
 ## [0.16.1] — 2026-10-31
 
 ### Fixed
