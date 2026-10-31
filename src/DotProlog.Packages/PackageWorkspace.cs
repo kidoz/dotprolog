@@ -208,7 +208,7 @@ public sealed partial class PackageWorkspace
         if (!File.Exists(LockPath))
             throw new InvalidDataException("Missing propack.lock.json; run restore first.");
         var locked =
-            JsonSerializer.Deserialize(File.ReadAllText(LockPath), PackageJsonContext.Default.PackageLock)
+            JsonSerializer.Deserialize(PackageFiles.ReadText(LockPath), PackageJsonContext.Default.PackageLock)
             ?? throw new InvalidDataException("Empty lockfile.");
         if (locked.Schema != 1 || locked.ManifestHash != PackageFiles.HashFile(ManifestPath) || locked.Engine != manifest.Engine)
             throw new InvalidDataException("Manifest changed or unsupported lock schema; run update explicitly.");
@@ -297,7 +297,7 @@ public sealed partial class PackageWorkspace
             return new(StringComparer.Ordinal);
         var path = Path.GetFullPath(Path.Combine(_root, manifest.Catalog));
         var catalog =
-            JsonSerializer.Deserialize(File.ReadAllText(path), PackageJsonContext.Default.DictionaryStringListPackageSource)
+            JsonSerializer.Deserialize(PackageFiles.ReadText(path), PackageJsonContext.Default.DictionaryStringListPackageSource)
             ?? throw new InvalidDataException("Empty catalog.");
         return catalog.ToDictionary(
             p => p.Key,
@@ -332,7 +332,7 @@ public sealed partial class PackageWorkspace
     {
         var manifest =
             JsonSerializer.Deserialize(
-                File.ReadAllText(Path.Combine(directory, "propack.json")),
+                PackageFiles.ReadText(Path.Combine(directory, "propack.json")),
                 PackageJsonContext.Default.PackageManifest
             ) ?? throw new InvalidDataException("Empty package manifest.");
         ValidateManifest(manifest);
@@ -398,7 +398,7 @@ public sealed partial class PackageWorkspace
             Match header;
             try
             {
-                header = ModuleHeaderPattern().Match(File.ReadAllText(file));
+                header = ModuleHeaderPattern().Match(PackageFiles.ReadText(file));
             }
             catch (RegexMatchTimeoutException)
             {

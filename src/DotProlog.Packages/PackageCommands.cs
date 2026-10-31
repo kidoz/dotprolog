@@ -115,6 +115,7 @@ public static partial class PackageCommands
                         or Win32Exception
                         or HttpRequestException
                         or OperationCanceledException
+                        or NotSupportedException
             )
         {
             error.WriteLine($"propack: {exception.Message}");

@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Security.Cryptography;
@@ -9,13 +10,60 @@ internal static class PackageFiles
 {
     private const long MaxBytes = 128 * 1024 * 1024;
 
-    public static string HashFile(string path) => Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path)));
+    public static string HashFile(string path)
+    {
+        using var input = PackageInput.OpenRead(path);
+        return HashStream(input, MaxBytes).Hash;
+    }
+
+    private static (string Hash, long Bytes) HashInput(string root, string relative, long limit)
+    {
+        using var input = PackageInput.OpenRead(root, relative);
+        return HashStream(input, limit);
+    }
+
+    private static (string Hash, long Bytes) HashStream(Stream input, long limit)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        var buffer = ArrayPool<byte>.Shared.Rent(81920);
+        long total = 0;
+        try
+        {
+            int count;
+            while ((count = input.Read(buffer)) != 0)
+            {
+                total += count;
+                if (total > limit)
+                    throw new InvalidDataException("Package exceeds 128 MiB of input bytes.");
+                hash.AppendData(buffer, 0, count);
+            }
+            return (Convert.ToHexStringLower(hash.GetHashAndReset()), total);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
+
+    internal static string ReadText(string path)
+    {
+        using var input = PackageInput.OpenRead(path);
+        using var bytes = new MemoryStream();
+        long total = 0;
+        CopyBounded(input, bytes, ref total);
+        bytes.Position = 0;
+        using var reader = new StreamReader(bytes);
+        return reader.ReadToEnd();
+    }
 
     public static string Inside(string root, string relative)
     {
         var fullRoot = System.IO.Path.GetFullPath(root);
         var result = System.IO.Path.GetFullPath(System.IO.Path.Combine(fullRoot, relative));
-        if (!result.StartsWith(fullRoot + System.IO.Path.DirectorySeparatorChar, StringComparison.Ordinal))
+        var prefix = System.IO.Path.EndsInDirectorySeparator(fullRoot)
+            ? fullRoot
+            : fullRoot + System.IO.Path.DirectorySeparatorChar;
+        if (result == fullRoot || !result.StartsWith(prefix, StringComparison.Ordinal))
             throw new InvalidDataException($"Path escapes package: {relative}");
         return result;
     }
@@ -55,20 +103,26 @@ internal static class PackageFiles
     public static string HashTree(string root)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        long total = 0;
         foreach (var file in Files(root))
         {
-            hash.AppendData(Encoding.UTF8.GetBytes(file + "\0" + HashFile(Inside(root, file)) + "\n"));
+            var (digest, bytes) = HashInput(root, file, MaxBytes - total);
+            total += bytes;
+            hash.AppendData(Encoding.UTF8.GetBytes(file + "\0" + digest + "\n"));
         }
         return Convert.ToHexStringLower(hash.GetHashAndReset());
     }
 
     public static void CopyTree(string source, string destination)
     {
+        long total = 0;
         foreach (var file in Files(source))
         {
             var target = Inside(destination, file);
             Directory.CreateDirectory(System.IO.Path.GetDirectoryName(target)!);
-            File.Copy(Inside(source, file), target);
+            using var input = PackageInput.OpenRead(source, file);
+            using var output = new FileStream(target, FileMode.CreateNew, FileAccess.Write);
+            CopyBounded(input, output, ref total);
         }
     }
 
@@ -131,13 +185,15 @@ internal static class PackageFiles
                         using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
                         using var stream = client.GetStreamAsync(uri).GetAwaiter().GetResult();
                         using var output = File.Create(zipPath);
-                        CopyBounded(stream, output);
+                        long archiveBytes = 0;
+                        CopyBounded(stream, output, ref archiveBytes);
                     }
                     else
                     {
-                        if (new FileInfo(source.Archive).Length > MaxBytes)
-                            throw new InvalidDataException("Archive exceeds 128 MiB.");
-                        File.Copy(source.Archive, zipPath);
+                        using var input = PackageInput.OpenRead(source.Archive);
+                        using var output = File.Create(zipPath);
+                        long archiveBytes = 0;
+                        CopyBounded(input, output, ref archiveBytes);
                     }
                     var archiveHash = HashFile(zipPath);
                     if (
@@ -219,17 +275,23 @@ internal static class PackageFiles
         Directory.Delete(directory);
     }
 
-    private static void CopyBounded(Stream input, Stream output)
+    internal static void CopyBounded(Stream input, Stream output, ref long total)
     {
-        var buffer = new byte[81920];
-        long total = 0;
-        int count;
-        while ((count = input.Read(buffer)) != 0)
+        var buffer = ArrayPool<byte>.Shared.Rent(81920);
+        try
         {
-            total += count;
-            if (total > MaxBytes)
-                throw new InvalidDataException("Download exceeds 128 MiB.");
-            output.Write(buffer, 0, count);
+            int count;
+            while ((count = input.Read(buffer)) != 0)
+            {
+                total += count;
+                if (total > MaxBytes)
+                    throw new InvalidDataException("Package exceeds 128 MiB of input bytes.");
+                output.Write(buffer, 0, count);
+            }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
         }
     }
 
@@ -261,7 +323,7 @@ internal static class PackageFiles
 
     public static void WriteAtomic(string path, string contents)
     {
-        if (File.Exists(path) && File.ReadAllText(path) == contents)
+        if (File.Exists(path) && PackageFiles.ReadText(path) == contents)
             return;
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try

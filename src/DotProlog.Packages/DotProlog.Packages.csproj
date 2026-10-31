@@ -1,4 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <!-- Required by source-generated platform interop for regular-file input checks. -->
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    </PropertyGroup>
     <ItemGroup>
         <InternalsVisibleTo Include="DotProlog.Packages.Tests" />
     </ItemGroup>
