@@ -2,7 +2,51 @@
 
 The experimental `propack` tool restores pure Prolog source packages independently of a Prolog
 engine. The same manifest and lock work with SWI-Prolog, `dotnet prolog`, and DotProlog SDK projects.
-The tool and format are implemented in this repository; they are not published packages yet.
+An installable preview can be prepared from this repository; it has not been published to NuGet.org.
+The [schema 1 format reference](../reference/propack-format.md) defines the manifest and lock contract.
+
+## Prepare and install the preview
+
+Requires Python 3, .NET 10, and the host platform's NativeAOT prerequisites:
+
+```sh
+python tests/Integration/prepare-propack-preview.py --rid osx-arm64 --version 0.17.0-preview.1 --output artifacts/propack-preview
+dotnet tool install --tool-path ./artifacts/propack-tools --add-source ./artifacts/propack-preview --version 0.17.0-preview.1 DotProlog.Packages.Cli
+./artifacts/propack-tools/propack --version
+```
+
+Use `linux-x64`, `win-x64`, or `osx-arm64` on the matching operating system. The producer requires
+a new output directory. It creates a portable `.nupkg`, a native ZIP containing the executable,
+license and instructions, and `SHA256SUMS`. The ZIP executable can be extracted and placed on PATH;
+Windows uses `propack.exe`. Verify the SHA-256 digests against `SHA256SUMS` before installation.
+The managed tool requires .NET 10; the native executable restores packages independently of .NET.
+The command above creates only local artifacts. The ordinary solution/release pack excludes this
+preview tool; explicit packing uses `-p:PropackPreview=true`.
+
+The `Propack preview` CI workflow builds these artifacts on Windows, Linux and macOS, installs the
+actual tool package from an isolated feed, and runs an unchanged, pinned SWI-Prolog `heaps` library
+under both engines from clean temporary projects. It also extracts and tests the native ZIP, checks
+its version and hashes, and verifies locked-restore failure followed by explicit update. The fixture's
+upstream commit, file digest and BSD license are retained in `tests/fixtures/packages/swi-heaps`.
+The probe checks that SWI loaded the restored source, rather than its bundled `heaps` library.
+CI uploads verified artifacts; publication to a package feed is separate.
+
+To run the same acceptance locally (requires `swipl`, Python and the native toolchain):
+
+```sh
+DOTPROLOG_RUN_PACKAGE_PREVIEW_TESTS=1 dotnet test --project tests/Integration -- --filter-class Integration.Tests.PropackPreviewTests
+```
+
+Set `DOTPROLOG_PREVIEW_ARTIFACTS` to an existing producer output directory to validate those exact
+artifacts instead of producing another preview. The acceptance exercises all twelve exported heap
+operations, including priority ordering, merge, deletion, empty-heap failure and validation. It does
+not claim general SWI compatibility.
+
+A preliminary unchanged upstream `pairs` probe found a DotProlog compatibility limitation:
+its meta-predicate callback formed a nested module-qualified closure and raised
+`existence_error(procedure, (:)/4)`. Root-level imports also conflicted with pair predicates already
+defined in `user`. These results are not claims of support; that library is excluded from the
+portable acceptance fixture. A package manifest cannot make engine-specific behavior portable.
 
 ## Run the portable example
 

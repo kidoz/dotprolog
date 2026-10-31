@@ -24,7 +24,7 @@ The standalone `propack` tool restores pure Prolog packages for SWI-Prolog and D
 with explicit dependency resolution, a shared lockfile, local/Git/ZIP sources, and module
 conflict checks. DotProlog's CLI and SDK consume the same restored graph. See the
 [package guide](docs/how-to/manage-packages.md) and `samples/PortablePackages` for a runnable
-transitive dependency example. This tool is built from source and has not been published.
+transitive dependency example. Installable preview artifacts can be built locally or downloaded from the `Propack preview` CI workflow. The tool has not been published to NuGet.org.
 
 ## Hello, world
 

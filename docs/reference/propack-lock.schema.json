@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Propack schema 1 lock",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "manifestHash",
+    "engine",
+    "packages"
+  ],
+  "properties": {
+    "schema": {
+      "const": 1
+    },
+    "manifestHash": {
+      "$ref": "#/$defs/hash"
+    },
+    "engine": {
+      "enum": [
+        "dotprolog",
+        "swi"
+      ]
+    },
+    "packages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "version",
+          "source",
+          "hash"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]*/[a-z][a-z0-9_-]*$"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+          },
+          "source": {
+            "$ref": "#/$defs/source"
+          },
+          "requestedRevision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hash": {
+            "$ref": "#/$defs/hash"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^(\\*|\\^?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*))$",
+          "default": "*"
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "git": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "archive": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "description": "A dependency without a transport uses the root catalog. Otherwise exactly one non-null path, git or archive is allowed; Git requires revision. Semantic checks are described in the format reference."
+    }
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Propack schema 1 manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name"
+  ],
+  "properties": {
+    "schema": {
+      "const": 1,
+      "default": 1
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*/[a-z][a-z0-9_-]*$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+      "default": "0.1.0"
+    },
+    "engine": {
+      "enum": [
+        "dotprolog",
+        "swi"
+      ],
+      "default": "dotprolog"
+    },
+    "catalog": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "engines": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^(\\*|\\^?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*))$"
+      },
+      "default": {}
+    },
+    "modules": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][a-zA-Z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": {}
+    },
+    "dependencies": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_-]*/[a-z][a-z0-9_-]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/source"
+      },
+      "default": {}
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^(\\*|\\^?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*))$",
+          "default": "*"
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "git": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "archive": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "description": "A dependency without a transport uses the root catalog. Otherwise exactly one non-null path, git or archive is allowed; Git requires revision. Semantic checks are described in the format reference."
+    }
+  }
+}
