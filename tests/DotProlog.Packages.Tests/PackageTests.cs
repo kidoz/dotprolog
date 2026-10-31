@@ -841,7 +841,7 @@ public sealed class PackageTests : IDisposable
 
     private static void Commit(string source)
     {
-        Git("-C", source, "add", "--force", ".");
+        Git("-C", source, "-c", "core.autocrlf=false", "add", "--force", ".");
         var hooks = Path.Combine(source, ".git", "propack-test-hooks");
         Directory.CreateDirectory(hooks);
         Git(
