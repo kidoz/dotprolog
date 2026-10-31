@@ -8,6 +8,9 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Added
 
+- `propack.policy.json` supplies a vulnerability list and a license allow list. When the file is
+  present, restore, update, check, and compilation reject a matching advisory or a declared
+  `UPSTREAM.json` license outside the allow list. The lock is left unchanged.
 - Stable `propack` release 0.17.0 provides a .NET tool package and native ZIPs for Linux x64,
   Windows x64, and macOS ARM64, with checksums and a software bill of materials. The dedicated
   release workflow validates clean installation and the pinned upstream `heaps` library under

@@ -3,7 +3,11 @@
 The `propack` tool restores pure Prolog source packages independently of a Prolog
 engine. The same manifest and lock work with SWI-Prolog, `dotnet prolog`, and DotProlog SDK projects.
 The stable release is version 0.17.2. It has dedicated native binaries and a .NET tool package.
-The [schema 1 format reference](../reference/propack-format.md) defines the manifest and lock contract.
+The [schema 1 format reference](../reference/propack-format.md) defines the manifest, lock, and optional
+`propack.policy.json` contract. The [policy guide](check-package-policy.md) covers `propack.policy.json`: known-bad package versions
+or tree hashes, and an optional `UPSTREAM.json` license allow list. `propack check` runs those
+filters against the existing lock. Restore, update, and compilation run them whenever the policy
+file is present.
 
 ## Install propack 0.17.2
 

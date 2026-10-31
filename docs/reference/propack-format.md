@@ -157,6 +157,34 @@ which must be outside the root project. A complete cache permits locked restore 
 Git/archive origins or reading the catalog. There is no separate offline mode that forbids fetching
 missing content. Compilation and graph inspection never fetch packages.
 
+## Vulnerability and license policy
+
+`propack.policy.json` is a root project file. It is not a schema 1 manifest, catalog, or lock field.
+When the file is absent, restore and compilation behave as before. When it is present, `restore`,
+`update`, `check`, `tree`, `run`, and every compile path that reads the lock apply it after the
+bytes match the lock. A policy failure leaves an existing lock unchanged and does not write a new one.
+`check` reports that the filters were not applied when the file is absent.
+
+The policy object uses schema 1. Unknown fields are rejected.
+
+| Field | Meaning |
+|---|---|
+| `schema` | `1` |
+| `advisories` | Known-bad packages. Each has `id`, `package`, `summary`, and a `version` or 64-digit `hash` |
+| `advisoryFiles` | Advisory files relative to the project. Each is `{ "schema": 1, "advisories": [] }` |
+| `ignore` | Advisory ids to accept. An id that is missing from the loaded advisories is an error |
+| `licenses` | SPDX identifiers that may be declared. Omit the field to skip the license filter |
+
+An advisory matches a locked dependency when the package name matches and every supplied version and
+tree hash matches. The root application is included; its hash is the included-file tree hash when an
+advisory supplies one. There is no network advisory feed. The committed files are the whole database.
+
+The license filter reads the `license` string from each package's `UPSTREAM.json`, including the
+root. `LICENSE.txt` remains human-readable text and is not parsed. The expression uses SPDX `AND`,
+`OR`, `WITH`, and parentheses. `OR` passes when one side is allowed. `AND` passes when both sides
+are allowed. `Apache-2.0 WITH LLVM-exception` is one allow-list entry. A missing or blank
+declaration fails the check.
+
 ## Execution and exit codes
 
 Restore requires no Prolog engine. `run` uses `swipl` or `dotnet-prolog` on PATH. DotProlog's Modern
