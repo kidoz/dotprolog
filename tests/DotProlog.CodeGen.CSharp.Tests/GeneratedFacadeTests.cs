@@ -15,6 +15,23 @@ namespace DotProlog.CodeGen.CSharp.Tests;
 public sealed class GeneratedFacadeTests
 {
     [Theory]
+    [InlineData(":- initialization(loop). loop :- loop. test_ok.")]
+    [InlineData("loop :- loop. :- loop. test_ok.")]
+    public void GeneratedFactoryInitializationIsTimedAndItsWorkerStops(string program)
+    {
+        var source = EntryPointGenerator.GenerateTestHost("Generated.Tests", [("tests.pl", program)]);
+        Type type = CompileGenerated(source).GetType("Generated.Tests.PrologProgram")!;
+        var factory = type.GetMethod("CreateEngine", BindingFlags.NonPublic | BindingFlags.Static)!
+            .CreateDelegate<Func<CancellationToken, Compiler.PrologEngine>>();
+        var runner = new Testing.PrologTestRunner(factory) { Timeout = TimeSpan.FromMilliseconds(250) };
+        TimeoutException discovery = Assert.Throws<TimeoutException>(() => runner.Discover());
+        Assert.Contains("worker stopped after cancellation", discovery.Message, StringComparison.Ordinal);
+        Testing.PrologTestResult result = runner.Run(new Testing.PrologTest("test_ok", 0));
+        Assert.False(result.Succeeded);
+        Assert.Contains("worker stopped after cancellation", result.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void DeepSourceReturnsPositionedDiagnostics(bool testHost)
@@ -42,6 +59,26 @@ public sealed class GeneratedFacadeTests
         Assert.Equal("deep.pl", diagnostic.FileName);
         Assert.Equal(1, diagnostic.Span.Line);
     }
+
+    [Fact]
+    public void GeneratedBlocksObserveCancellation()
+    {
+        ContractReadResult contract = ContractReader.Read(
+            ":- clr_module('Loop'). :- clr_export(loop/0, semidet, []).",
+            "Generated.Loop"
+        );
+        var source = FacadeGenerator.Generate(contract.Contract!, "loop :- loop.", "loop.pl");
+        Type type = CompileGenerated(source).GetType("Generated.Loop.LoopModule")!;
+        using var engine = new Compiler.PrologEngine();
+        object module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
+        using var cancellation = new CancellationTokenSource();
+        engine.Machine.CancellationToken = cancellation.Token;
+        cancellation.CancelAfter(TimeSpan.FromMilliseconds(100));
+        TargetInvocationException thrown = Assert.Throws<TargetInvocationException>(() => Call(module, type, "Loop"));
+        Assert.IsType<OperationCanceledException>(thrown.InnerException);
+        Assert.False(engine.Machine.IsRunning);
+    }
+
     private static readonly string[] SplitInput = ["a", "b"];
     private static readonly Runtime.PrologFlagOverrides CodesOverride = new() { DoubleQuotes = Runtime.DoubleQuotesMode.Codes };
 
@@ -174,6 +211,7 @@ public sealed class GeneratedFacadeTests
             MetadataReference.CreateFromFile(Path.Combine(runtime, "System.Linq.dll")),
             MetadataReference.CreateFromFile(Path.Combine(runtime, "System.Collections.dll")),
             MetadataReference.CreateFromFile(Path.Combine(runtime, "System.Runtime.Numerics.dll")),
+            MetadataReference.CreateFromFile(typeof(Testing.PrologTestHost).Assembly.Location),
             MetadataReference.CreateFromFile(typeof(Runtime.Machine).Assembly.Location),
             MetadataReference.CreateFromFile(typeof(Compiler.PrologEngine).Assembly.Location),
         ];

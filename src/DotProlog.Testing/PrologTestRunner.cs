@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.ExceptionServices;
 using DotProlog.Compiler;
 using DotProlog.Runtime;
 
@@ -28,14 +29,14 @@ public sealed class PrologTestRunner
 
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(60);
 
-    private readonly Func<PrologEngine> _engineFactory;
+    private readonly Func<CancellationToken, PrologEngine> _engineFactory;
 
     /// <summary>Creates a runner over the given Prolog sources.</summary>
     /// <param name="sources">Each source file's name and contents.</param>
     public PrologTestRunner(IReadOnlyList<(string Name, string Text)> sources)
     {
         ArgumentNullException.ThrowIfNull(sources);
-        _engineFactory = () =>
+        _engineFactory = cancellationToken =>
         {
             // Muted while loading: directive output belongs to no single test, and during
             // discovery it would repeat once per scan.
@@ -45,30 +46,54 @@ public sealed class PrologTestRunner
                 Error = TextWriter.Null,
                 Input = TextReader.Null,
             };
-            foreach ((var name, var text) in sources)
+            engine.Machine.CancellationToken = cancellationToken;
+            try
             {
-                engine.ConsultOrThrow(text, name);
-            }
+                foreach ((var name, var text) in sources)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    engine.ConsultOrThrow(text, name);
+                }
 
-            engine.RunPendingGoals();
-            return engine;
+                engine.RunPendingGoals();
+                return engine;
+            }
+            catch
+            {
+                engine.Dispose();
+                throw;
+            }
         };
     }
 
-    /// <summary>Creates a runner over a build-time-generated engine factory.</summary>
+    /// <summary>Creates a runner over an engine factory.</summary>
+    /// <remarks>
+    /// The timeout covers factory invocation, but cancellation cannot reach its engine until it
+    /// returns. Use the token-aware overload for factories that run Prolog during initialization.
+    /// </remarks>
     public PrologTestRunner(Func<PrologEngine> engineFactory)
+    {
+        ArgumentNullException.ThrowIfNull(engineFactory);
+        _engineFactory = _ => engineFactory();
+    }
+
+    /// <summary>Creates a runner whose factory observes cancellation while loading and initializing.</summary>
+    public PrologTestRunner(Func<CancellationToken, PrologEngine> engineFactory)
     {
         ArgumentNullException.ThrowIfNull(engineFactory);
         _engineFactory = engineFactory;
     }
 
-    /// <summary>How long one test may run before it is reported as failed and abandoned.</summary>
+    /// <summary>How long discovery or one test, including initialization, may run.</summary>
     public TimeSpan Timeout { get; set; } = ConfiguredTimeout();
 
     /// <summary>Finds every test predicate, in the order the sources declare them.</summary>
-    public IReadOnlyList<PrologTest> Discover()
+    public IReadOnlyList<PrologTest> Discover() => RunTimed("Test discovery", Discover);
+
+    private IReadOnlyList<PrologTest> Discover(CancellationToken cancellationToken)
     {
-        PrologEngine engine = _engineFactory();
+        using PrologEngine engine = _engineFactory(cancellationToken);
+        engine.Machine.CancellationToken = cancellationToken;
         engine.Output = TextWriter.Null;
         engine.Input = TextReader.Null;
 
@@ -96,49 +121,75 @@ public sealed class PrologTestRunner
 
     /// <summary>Runs one test in a fresh engine and reports what happened.</summary>
     /// <remarks>
-    /// The goal runs on its own thread so a looping test can be reported as failed rather than
-    /// hanging the run. The engine is not thread-safe and cannot be reclaimed mid-run, so on a
-    /// timeout it is asked to halt and abandoned with its thread, which is a background thread
-    /// precisely so an unstoppable loop cannot keep the process alive.
+    /// Cancellation is cooperative. Bytecode and compiled dispatch observe it, but arbitrary host
+    /// code or blocking I/O requires its own cancellation support. Process isolation is required
+    /// for a hard termination guarantee. Only the worker disposes its engine and streams.
     /// </remarks>
     public PrologTestResult Run(PrologTest test)
     {
-        var output = new StringWriter();
-        var error = new StringWriter();
-        // Input is empty rather than the console: a test that reads would otherwise block the run.
-        PrologEngine engine = _engineFactory();
-        engine.Output = output;
-        engine.Error = error;
-        engine.Input = TextReader.Null;
+        try
+        {
+            return RunTimed(
+                test.Name,
+                cancellationToken =>
+                {
+                    using var output = new StringWriter();
+                    using var error = new StringWriter();
+                    using PrologEngine engine = _engineFactory(cancellationToken);
+                    engine.Machine.CancellationToken = cancellationToken;
+                    engine.Output = output;
+                    engine.Error = error;
+                    engine.Input = TextReader.Null;
+                    return Execute(engine, test, output, error);
+                }
+            );
+        }
+        catch (TimeoutException error)
+        {
+            return PrologTestResult.Failed(error.Message, string.Empty, string.Empty);
+        }
+    }
 
-        PrologTestResult? result = null;
-        var worker = new Thread(() => result = Execute(engine, test, output, error))
+    private T RunTimed<T>(string name, Func<CancellationToken, T> action)
+    {
+        using var cancellation = new CancellationTokenSource();
+        CancellationToken token = cancellation.Token;
+        T result = default!;
+        ExceptionDispatchInfo? failure = null;
+        var worker = new Thread(() =>
+        {
+            try
+            {
+                result = action(token);
+            }
+            catch (Exception error)
+            {
+                // Marshal host failures back to the caller instead of terminating the process
+                // with an unhandled exception on a background thread.
+                failure = ExceptionDispatchInfo.Capture(error);
+            }
+        })
         {
             IsBackground = true,
-            Name = $"DotProlog test {test.Name}",
+            Name = $"DotProlog {name}",
         };
 
         worker.Start();
         if (worker.Join(Timeout))
         {
-            return result!;
+            failure?.Throw();
+            return result;
         }
 
-        try
-        {
-            engine.Machine.RequestHalt(1);
-        }
-        catch (IOException)
-        {
-            // Halting closes the machine's streams while the abandoned thread may still use them;
-            // the halt is best effort, so a closing race is not this test's failure.
-        }
-
-        // The writers are still owned by the abandoned thread, so their contents are not read here.
-        return PrologTestResult.Failed(
-            $"{test.Name} did not complete within {Timeout.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture)} seconds and was abandoned.",
-            string.Empty,
-            string.Empty
+        cancellation.Cancel();
+        var stopped = worker.Join(TimeSpan.FromSeconds(1));
+        throw new TimeoutException(
+            $"{name} did not complete within {Timeout.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture)} seconds; "
+                + (
+                    stopped
+                        ? "the worker stopped after cancellation."
+                        : "the worker did not stop after cancellation and was abandoned."
+                )
         );
     }
 

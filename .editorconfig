@@ -82,6 +82,12 @@ dotnet_diagnostic.CA1822.severity = none
 # BenchmarkDotNet requires public benchmark classes and settable [Params] properties.
 dotnet_diagnostic.CA1515.severity = none
 dotnet_diagnostic.CA1051.severity = none
+
+[src/DotProlog.Testing/PrologTestRunner.cs]
+# The worker boundary captures every host exception and rethrows it on the caller via
+# ExceptionDispatchInfo. Letting one escape the thread would terminate the entire test process.
+dotnet_diagnostic.CA1031.severity = none
+
 [tests/Integration/LogtalkConformanceTests.cs]
 # TryGetSourceEngine returns a borrowed cached engine through an out parameter. The engines
 # dictionary owns these instances and the run's finally block disposes every cached engine.

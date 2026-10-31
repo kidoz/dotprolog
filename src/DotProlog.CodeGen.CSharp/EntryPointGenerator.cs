@@ -87,7 +87,9 @@ public static class EntryPointGenerator
         text.AppendLine("    private static global::System.Threading.Tasks.Task<int> Main(string[] args) =>");
         text.AppendLine("        global::DotProlog.Testing.PrologTestHost.RunAsync(args, CreateEngine);");
         text.AppendLine();
-        text.AppendLine("    private static global::DotProlog.Compiler.PrologEngine CreateEngine()");
+        text.AppendLine(
+            "    private static global::DotProlog.Compiler.PrologEngine CreateEngine(global::System.Threading.CancellationToken cancellationToken)"
+        );
         text.AppendLine("    {");
         text.AppendLine("        // Muted while loading: directive output belongs to no single test, and during");
         text.AppendLine("        // discovery it would repeat once per scan. The runner attaches per-test writers.");
@@ -100,13 +102,21 @@ public static class EntryPointGenerator
         text.AppendLine("            Error = global::System.IO.TextWriter.Null,");
         text.AppendLine("            Input = global::System.IO.TextReader.Null,");
         text.AppendLine("        };");
-        text.AppendLine("        int[] initialization = __CompiledTests.Install(engine);");
-        text.AppendLine("        foreach (int target in initialization)");
+        text.AppendLine("        engine.Machine.CancellationToken = cancellationToken;");
+        text.AppendLine("        try");
         text.AppendLine("        {");
-        text.AppendLine("            engine.Machine.Run(target);");
+        text.AppendLine("            int[] initialization = __CompiledTests.Install(engine);");
+        text.AppendLine("            foreach (int target in initialization)");
+        text.AppendLine("            {");
+        text.AppendLine("                engine.Machine.Run(target);");
+        text.AppendLine("            }");
+        text.AppendLine("            return engine;");
         text.AppendLine("        }");
-        text.AppendLine();
-        text.AppendLine("        return engine;");
+        text.AppendLine("        catch");
+        text.AppendLine("        {");
+        text.AppendLine("            engine.Dispose();");
+        text.AppendLine("            throw;");
+        text.AppendLine("        }");
         text.AppendLine("    }");
         text.AppendLine();
         text.Append(compiledProgram);

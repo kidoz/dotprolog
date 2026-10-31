@@ -11,6 +11,36 @@ namespace DotProlog.CodeGen.IL.Tests;
 
 public sealed class IlAssemblyEmitterTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CompiledDispatchObservesCancellation(bool fuseBlocks)
+    {
+        using var image = new MemoryStream();
+        Assert.Empty(IlAssemblyEmitter.Emit([("loop.pl", "loop :- loop.")], "Cancellation", image, fuseBlocks));
+        var context = new System.Runtime.Loader.AssemblyLoadContext(null, isCollectible: true);
+        try
+        {
+            image.Position = 0;
+            var install = context
+                .LoadFromStream(image)
+                .GetType(IlAssemblyEmitter.ProgramTypeName)!
+                .GetMethod("Install")!
+                .CreateDelegate<Func<PrologEngine, int[]>>();
+            using var engine = new PrologEngine();
+            install(engine);
+            using var cancellation = new CancellationTokenSource();
+            engine.Machine.CancellationToken = cancellation.Token;
+            cancellation.CancelAfter(TimeSpan.FromMilliseconds(100));
+            Assert.Throws<OperationCanceledException>(() => engine.Query("loop").Prove());
+            Assert.False(engine.Machine.IsRunning);
+        }
+        finally
+        {
+            context.Unload();
+        }
+    }
+
     [Fact]
     public void DeepSourceReturnsPositionedDiagnosticsWithoutAnAssembly()
     {
@@ -23,6 +53,7 @@ public sealed class IlAssemblyEmitterTests
         Assert.Equal(1, diagnostic.Span.Line);
         Assert.Equal(0, output.Length);
     }
+
     [Fact]
     public void ContentHashPreservesBlobSlicesAndOrder()
     {

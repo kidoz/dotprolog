@@ -26,6 +26,10 @@ public sealed class PrologTestFramework : ITestFramework, IDataProducer
     public PrologTestFramework(Func<DotProlog.Compiler.PrologEngine> engineFactory) =>
         _runner = new PrologTestRunner(engineFactory);
 
+    /// <summary>Creates a framework whose generated factory observes initialization cancellation.</summary>
+    public PrologTestFramework(Func<CancellationToken, DotProlog.Compiler.PrologEngine> engineFactory) =>
+        _runner = new PrologTestRunner(engineFactory);
+
     /// <inheritdoc />
     public string Uid => "DotProlog.TestFramework";
 
