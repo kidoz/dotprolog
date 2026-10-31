@@ -35,6 +35,8 @@ at(rope, gatehouse).
 at(moonleaf, herb_garden).
 at(spring_water, well_house).
 at(watch_oath, archive).
+at(rune_codex, scriptorium).
+at(ember_dust, sunken_crypt).
 
 alive(mire_goblin).
 alive(oathless_knight).
@@ -67,6 +69,9 @@ room_title(well_house, 'The Old Well House').
 room_title(prison, 'The Forgotten Prison').
 room_title(archive, 'The Keep Archive').
 room_title(bell_tower, 'The Three Bells').
+room_title(scriptorium, 'The Star Scriptorium').
+room_title(observatory, 'The Starless Observatory').
+room_title(sunken_crypt, 'The Sunken Crypt').
 
 room_description(village_square,
     'Rain needles the roofs of Greymere. The villagers have barred their doors, and Reeve Elowen waits beneath the dead ash tree.').
@@ -89,7 +94,7 @@ room_description(crypt_stair,
 room_description(ossuary,
     'Skulls fill alcoves from floor to ceiling. A door of red stone waits to the north, and dark water glimmers to the east.').
 room_description(flooded_vault,
-    'Knee-deep water hides the vault floor. A sealed crystal flask floats inside an open coffer.').
+    'Knee-deep water hides the vault floor. A sealed crystal flask floats inside an open coffer. A mosaic stair descends into a sunless crypt.').
 room_description(inner_sanctum,
     'Embers orbit a basalt throne. Lord Morvane stands before it, neither living nor dead, with Greymere''s stolen crown burning above his hand.').
 
@@ -100,9 +105,15 @@ room_description(well_house,
 room_description(prison,
     'A narrow cell lies beneath the well. A torn blanket and tally marks tell of a long captivity.').
 room_description(archive,
-    'A watch oath lies on a lectern. A mural shows the bell ritual: birth at DAWN, death at DUSK, rebirth at NOON. Stairs climb to the bells.').
+    'A watch oath lies on a lectern. A mural shows the bell ritual: birth at DAWN, death at DUSK, rebirth at NOON. Stairs climb to the bells; a scriptorium lies east.').
 room_description(bell_tower,
     'Three bells hang above the valley: dawn, noon, and dusk. Ring them in the order of the life painted in the archive to break the sun seal.').
+room_description(scriptorium,
+    'Copper star charts cover the walls. A black rune codex rests on a lectern, and ashes glitter between the floor tiles. A narrow stair climbs to the observatory.').
+room_description(observatory,
+    'A great brass telescope points into a roof open to the red star. Three empty sockets surround its lens mount, and the ghost of Astronomer Lyra studies the heavens.').
+room_description(sunken_crypt,
+    'The medallion reveals a chamber below the flood. Broken funerary masks gleam under the water, and something angular lies inside a collapsed stone hand.').
 
 % Each passage is stated once. exit/3 reasons out the reverse direction.
 passage(village_square, north, old_road).
@@ -121,6 +132,9 @@ passage(outer_courtyard, west, well_house).
 passage(well_house, down, prison).
 passage(great_hall, north, archive).
 passage(archive, up, bell_tower).
+passage(archive, east, scriptorium).
+passage(scriptorium, up, observatory).
+passage(flooded_vault, down, sunken_crypt).
 
 opposite(north, south).
 opposite(south, north).
@@ -154,19 +168,34 @@ item_name(spring_water, 'bottle of spring water').
 item_name(herbal_tonic, 'moonleaf tonic').
 item_name(watch_oath, 'oath of the watch').
 item_name(ash_ward, 'bellkeeper''s ash ward').
+item_name(rune_codex, 'astronomer''s rune codex').
+item_name(ember_dust, 'pinch of ember dust').
+item_name(star_lens, 'lens of the red star').
+item_name(dawn_prism, 'dawn prism').
+item_name(ember_draught, 'ember draught').
 
 item_description(rope,
     'A sturdy coil. Use it at the well house to replace the broken ladder.').
 item_description(moonleaf,
     'A medicinal herb. Mara can teach you to brew it with spring water.').
 item_description(spring_water,
-    'Clean water sealed in a bottle, suitable for a herbal tonic.').
+    'Clean water sealed in a bottle, suitable for a herbal tonic or ember draught.').
 item_description(herbal_tonic,
     'A single dose that restores eight health, up to fourteen.').
 item_description(watch_oath,
     'Stand between the dark and the door. Use this oath before the oathless knight to remind him whom he served.').
 item_description(ash_ward,
     'Tomas made this charm against Morvane. Carrying it reduces every blow from the wraith by two.').
+item_description(rune_codex,
+    'Lyra''s grammar maps runes to plain words. Try translate([star,crown,wolf]). Those three signs also open the observatory lens mount.').
+item_description(ember_dust,
+    'Warm ash gathered from a fallen star. Lyra knows how to brew it with spring water.').
+item_description(star_lens,
+    'A crystal lens cut into three facets. It belongs in the observatory telescope.').
+item_description(dawn_prism,
+    'A captive sunrise in crystal. It adds 3 damage against Morvane and reduces his blows by 1.').
+item_description(ember_draught,
+    'A golden restorative brewed from ember dust and spring water. It restores ten health, up to fourteen.').
 
 item_description(hunter_knife,
     'A practical blade. It has dressed more rabbits than monsters, but the edge is honest.').
@@ -277,6 +306,8 @@ help :-
     writeln('Commands (remember the final period):'),
     writeln('  look.                 describe your location'),
     writeln('  go(north).            travel north, south, east, west, up, or down'),
+    writeln('  route_to(archive).    find a path through places you have visited'),
+    writeln('  search.               search once for concealed objects and clues'),
     writeln('  talk(reeve).          speak to someone nearby'),
     writeln('  take(lantern).        pick up a visible item'),
     writeln('  drop(lantern).        put down a carried item'),
@@ -284,7 +315,9 @@ help :-
     writeln('  attack.               fight the creature in your location'),
     writeln('  guard.                brace against the next enemy attack'),
     writeln('  ring(dawn).           ring dawn, noon, or dusk in the bell tower'),
-    writeln('  brew(herbal_tonic).    combine ingredients after learning a recipe'),
+    writeln('  translate([star]).    decode runes while carrying the codex'),
+    writeln('  attune([star,crown,wolf]). align the observatory telescope'),
+    writeln('  brew(herbal_tonic).   combine ingredients after learning a recipe'),
     writeln('  rest.                 recover your health in the village'),
     writeln('  journal.              review your quests and clues'),
     writeln('  map.                  list explored places and their paths'),
@@ -294,8 +327,8 @@ help :-
     writeln('  graphics(on).         enable ANSI colors and illustrations'),
     writeln('  graphics(ascii).      show illustrations without colors'),
     writeln('  graphics(off).        return to plain text'),
-    writeln('  help.                  show these commands'),
-    writeln('  quit.                  leave the story').
+    writeln('  help.                 show these commands'),
+    writeln('  quit.                 leave the story').
 
 inventory :-
     nl,
@@ -321,6 +354,10 @@ status :-
     ),
     (   holding(ash_ward)
     ->  writeln('The ash ward reduces damage from Morvane by 2 (minimum damage: 1).')
+    ;   true
+    ),
+    (   holding(dawn_prism)
+    ->  writeln('The dawn prism adds 3 damage against Morvane and reduces his blows by 1.')
     ;   true
     ),
     (   flag(counter_ready)
@@ -400,11 +437,80 @@ can_cross(ossuary, inner_sanctum) :-
     ;   writeln('The red door has no ordinary lock. The ossuary''s guardian may hold its secret.'),
         fail
     ).
+can_cross(flooded_vault, sunken_crypt) :-
+    !,
+    (   holding(sun_medallion)
+    ->  writeln('Sunlight reveals the mosaic stair beneath the water.')
+    ;   writeln('The submerged stair is invisible in the dark. A sun-blessed light could reveal it.'),
+        fail
+    ).
 can_cross(_, _).
 
 % ---------------------------------------------------------------------------
 % Exploration and conversation
 % ---------------------------------------------------------------------------
+
+hidden_at(star_lens, sunken_crypt).
+
+search_lore(scriptorium,
+    'Behind a loose chart, Lyra wrote: The red star is a lock. Dawn is its key.').
+search_lore(sunken_crypt,
+    'The stone hand bears Lyra''s sigil. She hid the lens before Morvane took the keep.').
+
+search :-
+    here(Room),
+    (   enemy_here(Room, Enemy)
+    ->  enemy_name(Enemy, Name),
+        format('The ~w will not let you search in peace.~n', [Name])
+    ;   flag(searched(Room))
+    ->  writeln('You have already searched this place thoroughly.')
+    ;   findall(Item, hidden_at(Item, Room), Hidden),
+        remember_flag(searched(Room)),
+        reveal_hidden(Room, Hidden),
+        (   search_lore(Room, Lore)
+        ->  writeln(Lore)
+        ;   Hidden == []
+        ->  writeln('You find nothing concealed here.')
+        ;   true
+        )
+    ).
+
+reveal_hidden(Room, Items) :-
+    forall(
+        member(Item, Items),
+        (   assertz(at(Item, Room)),
+            item_name(Item, Name),
+            format('Your search reveals the ~w!~n', [Name])
+        )
+    ).
+
+route_to(Destination) :-
+    here(Start),
+    (   Start == Destination
+    ->  writeln('You are already there.')
+    ;   \+ room_title(Destination, _)
+    ->  writeln('That place is not recorded in your map.')
+    ;   \+ visited(Destination)
+    ->  writeln('Explore that place before asking for a route to it.')
+    ;   find_route(Start, Destination, [Start], Route)
+    ->  room_title(Destination, Title),
+        format('Route to ~w:~n', [Title]),
+        show_route(Route)
+    ;   writeln('No route connects your explored places yet.')
+    ).
+
+find_route(Destination, Destination, _, []).
+find_route(From, Destination, Seen, [step(Direction, Next)|Route]) :-
+    exit(From, Direction, Next),
+    visited(Next),
+    \+ member(Next, Seen),
+    find_route(Next, Destination, [Next|Seen], Route).
+
+show_route(Route) :-
+    forall(
+        member(step(Direction, Room), Route),
+        (room_title(Room, Title), format('  ~w -> ~w~n', [Direction, Title]))
+    ).
 
 take(Item) :-
     here(Room),
@@ -458,8 +564,23 @@ talk(bellkeeper) :-
     here(prison),
     !,
     rescue_bellkeeper.
+talk(astronomer) :-
+    here(observatory),
+    !,
+    speak_with_astronomer.
 talk(Person) :-
     format('There is no ~w here to answer you.~n', [Person]).
+
+speak_with_astronomer :-
+    flag(ember_recipe),
+    !,
+    writeln('Lyra says, "My lens lies below the flooded vault. The medallion will reveal the stair; search the stone hand."'),
+    writeln('"Translate the codex, restore the lens, and attune star, crown, wolf. Dawn will answer."').
+speak_with_astronomer :-
+    remember_flag(ember_recipe),
+    writeln('The ghost studies you. "I am Lyra. I hid my star_lens below the flooded vault before Morvane came."'),
+    writeln('"Take my codex from the scriptorium. Its grammar turns runes into words, and its three signs align this telescope."'),
+    writeln('"I can also teach you ember_draught: brew ember_dust with spring_water to restore ten health."').
 
 speak_with_reeve :-
     holding(ember_crown),
@@ -497,6 +618,9 @@ guard_reduction(0).
 ward_reduction(morvane, 2) :- holding(ash_ward), !.
 ward_reduction(_, 0).
 
+prism_reduction(morvane, 1) :- holding(dawn_prism), !.
+prism_reduction(_, 0).
+
 counter_bonus(2) :- retract(flag(counter_ready)), !.
 counter_bonus(0).
 
@@ -520,6 +644,9 @@ holy_bonus(Enemy, 2) :-
     !.
 holy_bonus(_, 0).
 
+prism_bonus(morvane, 3) :- holding(dawn_prism), !.
+prism_bonus(_, 0).
+
 attack :-
     here(Room),
     (   enemy_here(Room, Enemy)
@@ -530,8 +657,9 @@ attack :-
 player_attack(Room, Enemy) :-
     weapon_damage(WeaponDamage),
     holy_bonus(Enemy, HolyDamage),
+    prism_bonus(Enemy, PrismDamage),
     counter_bonus(CounterDamage),
-    Damage is WeaponDamage + HolyDamage + CounterDamage,
+    Damage is WeaponDamage + HolyDamage + PrismDamage + CounterDamage,
     enemy_hp(Enemy, OldHealth),
     NewHealth is OldHealth - Damage,
     enemy_name(Enemy, Name),
@@ -570,8 +698,9 @@ enemy_turn(Enemy) :-
     ),
     shield_reduction(Shield),
     ward_reduction(Enemy, Ward),
+    prism_reduction(Enemy, Prism),
     guard_reduction(Guard),
-    ReducedDamage is RawDamage - Shield - Ward - Guard,
+    ReducedDamage is RawDamage - Shield - Ward - Prism - Guard,
     (   ReducedDamage < 1
     ->  Damage = 1
     ;   Damage = ReducedDamage
@@ -625,10 +754,11 @@ use(watch_oath) :-
     assertz(enemy_hp(oathless_knight, 0)),
     remember_flag(knight_redeemed),
     writeln('You speak the watch oath. The knight kneels: "I remember. Take my arms, and keep the door." His spirit passes into the dawn.').
-use(herbal_tonic) :-
-    holding(herbal_tonic),
+use(Item) :-
+    holding(Item),
+    recipe(Item, _, Amount, _),
     !,
-    drink(herbal_tonic, 8).
+    drink(Item, Amount).
 use(healing_draught) :-
     holding(healing_draught),
     !,
@@ -709,6 +839,20 @@ show_landmarks(inner_sanctum) :-
     enemy_ready(morvane),
     !,
     writeln('Cinders gather around Morvane. His next attack is charged: guard!').
+show_landmarks(scriptorium) :-
+    !,
+    writeln('Take the rune codex and search the floor before climbing to Lyra''s observatory.').
+show_landmarks(observatory) :-
+    flag(prism_attuned),
+    !,
+    writeln('The dawn prism shines inside the telescope. Lyra''s work is complete.').
+show_landmarks(observatory) :-
+    !,
+    writeln('Talk to the astronomer. Bring the star lens, then attune the three signs from the codex.').
+show_landmarks(sunken_crypt) :-
+    \+ flag(searched(sunken_crypt)),
+    !,
+    writeln('The collapsed stone hand may be worth a search.').
 show_landmarks(_).
 
 rescue_bellkeeper :-
@@ -722,22 +866,92 @@ rescue_bellkeeper :-
     writeln('"It softens Morvane''s fire. When he gathers cinders, guard, then counterattack."'),
     writeln('"The archive records our bells: dawn, dusk, noon. Ring them in that order."').
 
-brew(herbal_tonic) :-
+rune(star, wake).
+rune(crown, rule).
+rune(wolf, guard).
+rune(dawn, illuminate).
+rune(ash, remember).
+
+rune_translation([]) --> [].
+rune_translation([Word|Words]) -->
+    [Rune],
+    {rune(Rune, Word)},
+    rune_translation(Words).
+
+attunement --> [star, crown, wolf].
+
+translate(Runes) :-
+    (   \+ holding(rune_codex)
+    ->  writeln('You need Lyra''s rune codex to translate the signs.')
+    ;   \+ is_list(Runes)
+    ->  writeln('Give the runes in a list, such as translate([star,crown,wolf]).')
+    ;   phrase(rune_translation(Words), Runes)
+    ->  atomic_list_concat(Words, ' / ', Translation),
+        format('The codex reads: ~w.~n', [Translation])
+    ;   writeln('The codex contains no translation for that sequence.')
+    ).
+
+attune(Runes) :-
+    (   \+ here(observatory)
+    ->  writeln('There is no star instrument here to attune.')
+    ;   flag(prism_attuned)
+    ->  writeln('The telescope is already aligned, and the dawn prism is yours.')
+    ;   \+ holding(star_lens)
+    ->  writeln('The telescope needs its missing star lens. Lyra knows where it lies.')
+    ;   \+ is_list(Runes)
+    ->  writeln('Name all three signs in a list, in the order taught by the codex.')
+    ;   phrase(attunement, Runes)
+    ->  retract(holding(star_lens)),
+        remember_flag(prism_attuned),
+        assertz(holding(dawn_prism)),
+        writeln('Star, crown, wolf: the lens turns, and the red star splits into a clean ray of dawn.'),
+        writeln('You take the dawn prism from the telescope. Its light will wound and shield you from Morvane.')
+    ;   writeln('The lenses grind against one another. Read the codex and try the three signs again.')
+    ).
+
+recipe(herbal_tonic, [moonleaf, spring_water], 8, tonic_recipe).
+recipe(ember_draught, [ember_dust, spring_water], 10, ember_recipe).
+
+brew(Item) :-
+    recipe(Item, Ingredients, _, RecipeFlag),
     !,
-    (   \+ flag(tonic_recipe)
-    ->  writeln('You do not know this recipe. Talk to the herbalist in Greymere.')
+    (   \+ flag(RecipeFlag)
+    ->  writeln('You do not know this recipe. Ask Mara or Lyra for instruction.')
     ;   here(Room), enemy_here(Room, _)
     ->  writeln('You cannot brew medicine with an enemy watching you.')
-    ;   holding(moonleaf), holding(spring_water)
-    ->  retract(holding(moonleaf)),
-        retract(holding(spring_water)),
-        assertz(holding(herbal_tonic)),
-        remember_flag(tonic_brewed),
-        writeln('You steep moonleaf in spring water and bottle a healing tonic.')
-    ;   writeln('You need both moonleaf and spring_water to brew a herbal_tonic.')
+    ;   missing_ingredients(Ingredients, []),
+        consume_ingredients(Ingredients),
+        assertz(holding(Item)),
+        record_brew(Item),
+        brew_message(Item)
+    ;   Item == herbal_tonic
+    ->  writeln('You need both moonleaf and spring_water to brew a herbal_tonic.')
+    ;   missing_ingredients(Ingredients, Missing),
+        format('You are missing ingredients for ~w: ~w.~n', [Item, Missing])
     ).
+
+missing_ingredients(Ingredients, Missing) :-
+    findall(
+        Ingredient,
+        (member(Ingredient, Ingredients), \+ holding(Ingredient)),
+        Missing
+    ).
+
+consume_ingredients(Ingredients) :-
+    forall(member(Ingredient, Ingredients), retract(holding(Ingredient))).
+
+record_brew(herbal_tonic) :- !, remember_flag(tonic_brewed).
+record_brew(ember_draught) :- !, remember_flag(brewed_ember).
+record_brew(_).
+
+brew_message(herbal_tonic) :-
+    !,
+    writeln('You steep moonleaf in spring water and bottle a healing tonic.').
+brew_message(ember_draught) :-
+    writeln('The ember dust turns the water to liquid gold. You bottle an ember draught.').
+
 brew(_) :-
-    writeln('The only recipe is brew(herbal_tonic). Ask the village herbalist.').
+    writeln('You know no such recipe. Mara and Lyra teach different medicines.').
 
 rest :-
     (   here(village_square)
@@ -805,6 +1019,10 @@ journal :-
     ),
     quest_line(tonic_brewed, 'You brewed a moonleaf tonic.',
         'Optional: ask the herbalist about moonleaf and spring water.'),
+    quest_line(prism_attuned, 'Lyra''s telescope produced a dawn prism.',
+        'Optional: explore east of the archive, meet Lyra, and recover her lens below the flooded vault.'),
+    quest_line(brewed_ember, 'You brewed Lyra''s ember draught.',
+        'Optional: Lyra can teach you to combine ember dust and spring water.'),
     (   holding(ember_crown)
     ->  writeln('Return the Ember Crown to the reeve in Greymere.')
     ;   writeln('Recover the crown below the keep. Take light and the sun medallion; the warden holds the bone key.')
@@ -835,6 +1053,10 @@ victory_epilogue :-
     ->  writeln('At the keep, a white wolf banner stirs. The watch can rest at last.')
     ;   writeln('The broken armor in the keep stands as a memorial to its lost watch.')
     ),
+    (   flag(prism_attuned)
+    ->  writeln('Lyra charts a sky without the red star, then fades contentedly into the dawn.')
+    ;   writeln('Above the ruined observatory, Lyra continues her lonely study of the heavens.')
+    ),
     nl.
 
 % ---------------------------------------------------------------------------
@@ -852,6 +1074,10 @@ do(Command) :-
     writeln('Use a complete command without variables, such as take(rope).').
 do(journal) :- !, journal.
 do(map) :- !, world_map.
+do(route_to(Room)) :- !, route_to(Room).
+do(search) :- !, search.
+do(translate(Runes)) :- !, translate(Runes).
+do(attune(Runes)) :- !, attune(Runes).
 do(rest) :- !, rest.
 do(guard) :- !, guard.
 do(ring(Bell)) :- !, ring(Bell).

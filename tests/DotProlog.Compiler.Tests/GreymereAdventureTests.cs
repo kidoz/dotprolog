@@ -328,6 +328,96 @@ public sealed partial class GreymereAdventureTests
         Assert.True(retreated.Query("greymere_adventure:enemy_hp(mire_goblin, 2), greymere_adventure:player_hp(10)").Prove());
     }
 
+    [Fact]
+    public void ObservatoryQuestCombinesRuneGrammarSearchAlchemyAndRoutes()
+    {
+        const string reachArchive =
+            ReachCourtyard
+            + ClearGatehouse
+            + "go(west).\ntake(spring_water).\ngo(east).\ngo(north).\ngo(east).\ntake(sun_medallion).\ngo(west).\ngo(north).\n";
+        const string learnRunes =
+            "go(east).\ntake(rune_codex).\ntranslate(star).\ntranslate([star,crown,wolf]).\ntranslate([unknown]).\ngo(up).\ntalk(astronomer).\n";
+        const string recoverLens =
+            "go(down).\ngo(west).\ngo(south).\ngo(down).\ngo(down).\ngo(east).\ngo(down).\nsearch.\nsearch.\ntake(star_lens).\ntake(ember_dust).\n";
+        const string returnToObservatory = "go(up).\ngo(west).\ngo(up).\ngo(up).\ngo(north).\ngo(east).\ngo(up).\n";
+        const string finishQuest =
+            "attune(star).\nattune([wolf,crown,star]).\nattune([star,crown,wolf]).\nbrew(ember_draught).\nuse(ember_draught).\nroute_to(sunken_crypt).\njournal.\n";
+
+        (PrologEngine engine, var output) = Play(
+            "graphics(ascii).\n" + reachArchive + learnRunes + recoverLens + returnToObservatory + finishQuest
+        );
+
+        Assert.True(
+            engine
+                .Query(
+                    "greymere_adventure:here(observatory), greymere_adventure:holding(dawn_prism), greymere_adventure:player_hp(14), greymere_adventure:flag(prism_attuned), greymere_adventure:flag(brewed_ember), greymere_adventure:flag(searched(sunken_crypt))"
+                )
+                .Prove()
+        );
+        Assert.False(
+            engine
+                .Query(
+                    "greymere_adventure:holding(star_lens); greymere_adventure:holding(ember_dust); greymere_adventure:holding(spring_water); greymere_adventure:holding(ember_draught)"
+                )
+                .Prove()
+        );
+        Assert.Contains("The codex reads: wake / rule / guard.", output, StringComparison.Ordinal);
+        Assert.Contains("Give the runes in a list", output, StringComparison.Ordinal);
+        Assert.Contains("no translation", output, StringComparison.Ordinal);
+        Assert.Contains("already searched", output, StringComparison.Ordinal);
+        Assert.Contains("Name all three signs in a list", output, StringComparison.Ordinal);
+        Assert.Contains("lenses grind", output, StringComparison.Ordinal);
+        Assert.Contains("health rises from 12 to 14", output, StringComparison.Ordinal);
+        Assert.Contains("down -> The Sunken Crypt", output, StringComparison.Ordinal);
+        Assert.Contains("[done] Lyra's telescope", output, StringComparison.Ordinal);
+        foreach (var line in output.Split('\n').Where(line => line.StartsWith('|') || line.StartsWith('+')))
+        {
+            Assert.Equal(60, line.Length);
+        }
+    }
+
+    [Fact]
+    public void DawnPrismChangesBossDamageAndAddsVictoryEpilogue()
+    {
+        const string archiveDetour =
+            "go(down).\ngo(east).\ntake(rune_codex).\ngo(up).\ntalk(astronomer).\ngo(down).\ngo(west).\ngo(up).\n";
+        const string cryptDetour =
+            "go(down).\nsearch.\ntake(star_lens).\ngo(up).\ngo(west).\ngo(up).\ngo(up).\ngo(north).\ngo(east).\ngo(up).\nattune([star,crown,wolf]).\ngo(down).\ngo(west).\ngo(south).\ngo(down).\ngo(down).\ngo(east).\n";
+        var path = File.ReadAllText(SamplePath("winning_path.txt"));
+        path = path.Replace("ring(noon).\n", "ring(noon).\n" + archiveDetour, StringComparison.Ordinal);
+        path = path.Replace("use(healing_draught).\n", "use(healing_draught).\n" + cryptDetour, StringComparison.Ordinal);
+
+        (PrologEngine engine, var output) = Play("graphics(ascii).\n" + path);
+
+        Assert.EndsWith("*** YOU ARE VICTORIOUS ***\n", output);
+        Assert.True(
+            engine
+                .Query(
+                    "greymere_adventure:flag(victory), greymere_adventure:holding(dawn_prism), greymere_adventure:player_hp(13)"
+                )
+                .Prove()
+        );
+        Assert.Contains("You strike the Lord Morvane, the Cinder Wraith for 9 damage.", output, StringComparison.Ordinal);
+        Assert.Contains("You strike the Lord Morvane, the Cinder Wraith for 11 damage.", output, StringComparison.Ordinal);
+        Assert.Contains("Lyra charts a sky without the red star", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RouteFindingRejectsUnknownAndUnvisitedDestinations()
+    {
+        var output = Play(
+            "route_to(archive).\nroute_to(nowhere).\n"
+                + ReachCourtyard
+                + "route_to(village_square).\nroute_to(outer_courtyard).\n"
+        ).Output;
+
+        Assert.Contains("Explore that place before asking", output, StringComparison.Ordinal);
+        Assert.Contains("not recorded in your map", output, StringComparison.Ordinal);
+        Assert.Contains("Route to Greymere Village Square:", output, StringComparison.Ordinal);
+        Assert.Contains("south -> Gate of Gloamwatch Keep", output, StringComparison.Ordinal);
+        Assert.Contains("You are already there.", output, StringComparison.Ordinal);
+    }
+
     private static string StripColors(string output) => AnsiSgr().Replace(output, string.Empty);
 
     [GeneratedRegex("\u001b\\[[0-9;]*m")]
