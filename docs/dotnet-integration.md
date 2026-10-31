@@ -13,7 +13,7 @@ page describes their contracts. For complete procedures, see [embed Prolog in C#
 using DotProlog.Compiler;
 using DotProlog.Runtime;
 
-var engine = new PrologEngine(PrologLanguageMode.StrictIso);
+using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
 engine.ConsultText("colour(red). colour(green). colour(blue).");
 
 foreach (PrologSolution solution in engine.Query("colour(C)").Solutions())

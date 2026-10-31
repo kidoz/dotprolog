@@ -4,6 +4,23 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Excessive source nesting produces positioned `DPL0012` diagnostics across linting, consultation,
+  generated C#, and direct IL instead of overflowing the process stack.
+- Marshalling cyclic answers to .NET raises `representation_error(cyclic_term)` instead of growing
+  an unbounded traversal. Shared finite terms remain supported.
+- Prolog test timeouts cover loading and initialization. Cooperative cancellation stops bytecode
+  and compiled loops, and the worker closes its streams after execution ends.
+- The SDK reports `.pl` compilation diagnostics through MSBuild with file names and positions
+  instead of failing the generation task with an argument exception.
+- `PrologEngine` and `Machine` support deterministic disposal of program-owned streams while
+  leaving host-owned standard streams open.
+- CI and release actions are pinned to full commit hashes. Release write permissions are scoped
+  to the GitHub release job.
+
 ## [0.16.0] — 2026-10-31
 
 ### Added
@@ -837,6 +854,7 @@ binary: a published executable can consult a `.pl` file it has never seen and ru
 
 **Full Changelog**: https://github.com/kidoz/dotprolog/commits/v0.1.0
 
+[Unreleased]: https://github.com/kidoz/dotprolog/compare/v0.16.0...HEAD
 [0.16.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.16.0
 [0.15.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.15.0
 [0.14.2]: https://github.com/kidoz/dotprolog/releases/tag/v0.14.2

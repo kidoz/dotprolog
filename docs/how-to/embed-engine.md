@@ -14,7 +14,7 @@ Replace `PrologHostApp/Program.cs` with:
 using DotProlog.Compiler;
 using DotProlog.Runtime;
 
-var engine = new PrologEngine(PrologLanguageMode.StrictIso);
+using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
 var loaded = engine.ConsultText("colour(red). colour(green). colour(blue).");
 if (!loaded.Success)
 {
@@ -44,6 +44,19 @@ and goal once the host works. Check consultation diagnostics before querying.
 Finish enumerating or dispose the current query before starting another goal on that engine.
 Use separate engines for independent concurrent callers. See the
 [embedding reference](../dotnet-integration.md#embed-the-engine) for value lifetimes and mode selection.
+
+Dispose the engine after execution stops to flush and close streams opened by Prolog. Host-owned
+standard input, output, and error remain open. `using` gives the engine that lifetime automatically.
+When creating a typed facade over an existing engine, keep the engine alive for every facade call.
+
+Host values are finite detached trees. Returning a cyclic term through `PrologQuery`,
+`PrologHost.CallOnce`, or `PrologHost.CallAll` raises `representation_error(cyclic_term)`.
+Shared finite subterms remain supported.
+
+Set `engine.Machine.CancellationToken` before starting work to cancel execution cooperatively.
+Cancellation raises `OperationCanceledException` between bytecode instructions or compiled blocks.
+After cancellation, wait for execution to finish before disposing the engine. Blocking host code
+and I/O require their own cancellation support; process isolation is needed for hard termination.
 
 For repeated calls with .NET values, use [predicate binding](../dotnet-integration.md#bind-a-predicate).
 For generated methods such as `pricing.Discount(100.0, 15)`, follow

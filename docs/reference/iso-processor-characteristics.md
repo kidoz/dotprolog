@@ -36,6 +36,16 @@ The bundled implementation library is trusted below this boundary so it may use 
 to implement standardized predicates. User-defined predicate names are unrestricted. The default
 mode is `Modern`, which keeps the documented extensions.
 
+## Source depth
+
+The reader accepts at most 512 nested parser calls and a resulting term depth of 512 in both
+language modes. The latter includes list spines, left-associative operator chains, and quoted
+text when `double_quotes` turns it into a character or code list. Excessive depth produces the
+positioned diagnostic `DPL0012`; the program reader recovers at the next clause terminator.
+Runtime term input reports the same rejection through its syntax-error channel. These limits
+protect the reader and subsequent compiler passes. A thread with insufficient remaining stack
+may report the diagnostic sooner. Terms built by a running Prolog program have no such depth limit.
+
 ## Representation limits
 
 | Characteristic | DotProlog value or behavior |

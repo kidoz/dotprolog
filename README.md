@@ -58,7 +58,7 @@ configurable source-layout checks. See
 ## Calling Prolog from C#
 
 ```csharp
-var engine = new PrologEngine();
+using var engine = new PrologEngine();
 engine.ConsultText("colour(red).  colour(green).  colour(blue).");
 
 foreach (PrologSolution solution in engine.Query("colour(C)").Solutions())
