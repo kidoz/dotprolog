@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -14,6 +15,14 @@ public static partial class PackageCommands
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
+        if (arguments is ["--version"])
+        {
+            var version = typeof(PackageCommands)
+                .Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!
+                .InformationalVersion.Split('+')[0];
+            output.WriteLine("propack " + version);
+            return 0;
+        }
         try
         {
             var args = arguments.ToList();
@@ -29,6 +38,7 @@ public static partial class PackageCommands
                 output.WriteLine(
                     "propack remove owner/name | restore [--locked] | update | tree | run main.pl [--engine swi|dotprolog]"
                 );
+                output.WriteLine("propack --version");
                 output.WriteLine(
                     "All commands accept --project DIR and --cache DIR. Run requires an installed engine; restore does not."
                 );

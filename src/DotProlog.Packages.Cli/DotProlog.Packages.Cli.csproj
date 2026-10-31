@@ -2,8 +2,24 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <AssemblyName>propack</AssemblyName>
+        <ToolCommandName>propack</ToolCommandName>
+        <PackAsTool>true</PackAsTool>
+        <!-- Preview artifacts are explicitly requested; solution pack and release keep their existing package set. -->
+        <IsPackable Condition="'$(PropackPreview)' == 'true'">true</IsPackable>
+        <PackageId>DotProlog.Packages.Cli</PackageId>
+        <Title>Portable Prolog package manager preview</Title>
+        <Description>Restores locked Prolog source packages and runs them with SWI-Prolog or DotProlog.</Description>
+        <IncludeSymbols>false</IncludeSymbols>
+        <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+        <PublishDocumentationFiles>false</PublishDocumentationFiles>
     </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="../DotProlog.Packages/DotProlog.Packages.csproj" />
     </ItemGroup>
+    <Target Name="RemovePreviewDebugFiles" AfterTargets="Publish" BeforeTargets="PackTool" Condition="'$(_IsPacking)' == 'true'">
+        <ItemGroup>
+            <_PreviewDebugFile Include="$(PublishDir)**/*.pdb;$(PublishDir)**/*.dbg;$(PublishDir)**/*.dSYM/**/*" />
+        </ItemGroup>
+        <Delete Files="@(_PreviewDebugFile)" />
+    </Target>
 </Project>

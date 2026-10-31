@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/SWI-Prolog/swipl-devel",
+  "revision": "18168e629eab641c3ff5ff6359db5855a0128c96",
+  "path": "library/heaps.pl",
+  "url": "https://raw.githubusercontent.com/SWI-Prolog/swipl-devel/18168e629eab641c3ff5ff6359db5855a0128c96/library/heaps.pl",
+  "sha256": "521285cc586352e3111855a3ee23d1fb0fd57a4fc55a075d17f30c9657000621",
+  "license": "BSD-2-Clause",
+  "changes": "None to heaps.pl; packaging metadata and consumer probes added by DotProlog."
+}

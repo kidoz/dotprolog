@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "name": "swi/heaps",
+  "version": "1.0.0",
+  "engines": {
+    "dotprolog": "*",
+    "swi": "*"
+  },
+  "modules": {
+    "heaps": "heaps.pl"
+  }
+}
