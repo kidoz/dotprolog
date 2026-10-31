@@ -24,7 +24,7 @@ The standalone `propack` tool restores pure Prolog packages for SWI-Prolog and D
 with explicit dependency resolution, a shared lockfile, local/Git/ZIP sources, and module
 conflict checks. DotProlog's CLI and SDK consume the same restored graph. See the
 [package guide](docs/how-to/manage-packages.md) and `samples/PortablePackages` for a runnable
-transitive dependency example. Stable propack 0.17.1 provides a .NET tool package and native binaries for Linux, Windows, and macOS. Install with `dotnet tool install --global DotProlog.Packages.Cli --version 0.17.1`.
+transitive dependency example. Stable propack 0.17.2 provides a .NET tool package and native binaries for Linux, Windows, and macOS. Install with `dotnet tool install --global DotProlog.Packages.Cli --version 0.17.2`.
 
 ## Hello, world
 

@@ -67,6 +67,7 @@ nav:
       - Language: language-guide.md
       - Linting and diagnostics: linting.md
       - .NET integration: dotnet-integration.md
+      - Propack 0.17.2 release: releases/propack-0.17.2.md
       - Propack 0.17.1 release: releases/propack-0.17.1.md
       - Propack 0.17.0 release: releases/propack-0.17.0.md
       - Portable package format: reference/propack-format.md
