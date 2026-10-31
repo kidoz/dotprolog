@@ -49,11 +49,14 @@ public sealed partial class PackageWorkspace
         var catalog = ReadCatalog(manifest);
         Dictionary<string, Candidate> selected = new(StringComparer.Ordinal);
         Dictionary<string, Candidate> acquired = new(StringComparer.Ordinal);
+        Dictionary<string, string> unavailable = new(StringComparer.Ordinal);
         var pending = manifest.Dependencies.Select(p => new Request(p.Key, p.Value, _root, manifest.Name)).ToList();
         var failure = "No compatible dependency graph.";
         var steps = 0;
         if (!Solve(pending, selected))
-            throw new InvalidDataException(failure);
+            throw new InvalidDataException(
+                string.Join('\n', new[] { failure }.Concat(unavailable.Values).Distinct(StringComparer.Ordinal))
+            );
         var result = new PackageLock
         {
             ManifestHash = PackageFiles.HashFile(ManifestPath),
@@ -93,9 +96,34 @@ public sealed partial class PackageWorkspace
             foreach (var source in candidates)
             {
                 var key = JsonSerializer.Serialize(source, PackageJsonContext.Default.PackageSource);
+                if (!explicitSource && unavailable.TryGetValue(key, out var transportFailure))
+                {
+                    failure = transportFailure;
+                    continue;
+                }
                 if (!acquired.TryGetValue(key, out var candidate))
                 {
-                    var (directory, pinned) = PackageFiles.Acquire(source, _cache);
+                    (string directory, PackageSource pinned) fetched;
+                    try
+                    {
+                        fetched = PackageFiles.Acquire(source, _cache);
+                    }
+                    catch (Exception exception)
+                        when (!explicitSource
+                            && exception
+                                is IOException
+                                    or HttpRequestException
+                                    or OperationCanceledException
+                                    or System.ComponentModel.Win32Exception
+                                    or UnauthorizedAccessException
+                        )
+                    {
+                        failure =
+                            $"Cannot acquire {request.Name} {source.Version}, required by {request.Parent}: {exception.Message}";
+                        unavailable.Add(key, failure);
+                        continue;
+                    }
+                    var (directory, pinned) = fetched;
                     var package = ReadManifest(directory);
                     ValidatePackageFiles(directory, package);
                     if (package.Name != request.Name)

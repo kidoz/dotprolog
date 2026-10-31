@@ -325,6 +325,75 @@ public sealed class PackageTests : IDisposable
         Assert.Single(Workspace.GetLibraries());
     }
 
+    [Theory]
+    [InlineData("path")]
+    [InlineData("git")]
+    [InlineData("archive")]
+    public void Catalog_transport_failure_tries_an_older_candidate(string transport)
+    {
+        var good = Package("good", "demo/lib", "1.0.0", "lib", "ok.");
+        var missing = Path.Combine(_directory, "missing");
+        var failed = transport switch
+        {
+            "path" => new PackageSource { Version = "2.0.0", Path = missing },
+            "git" => new PackageSource
+            {
+                Version = "2.0.0",
+                Git = missing,
+                Revision = "HEAD",
+            },
+            _ => new PackageSource { Version = "2.0.0", Archive = missing },
+        };
+        UseCatalog(failed, new PackageSource { Version = "1.0.0", Path = good });
+        Workspace.Restore();
+        Assert.Contains("demo/lib 1.0.0", Workspace.Describe(), StringComparison.Ordinal);
+        Assert.Single(Workspace.GetLibraries());
+    }
+
+    [Fact]
+    public void All_catalog_transport_failures_report_candidates_and_preserve_lock()
+    {
+        var good = Package("good", "demo/lib", "1.0.0", "lib", "ok.");
+        UseCatalog(new PackageSource { Version = "1.0.0", Path = good });
+        Workspace.Restore();
+        var original = File.ReadAllText(Path.Combine(Root, "propack.lock.json"));
+        UseCatalog(
+            new PackageSource { Version = "2.0.0", Path = Path.Combine(_directory, "missing-two") },
+            new PackageSource { Version = "3.0.0", Archive = Path.Combine(_directory, "missing-three.zip") }
+        );
+        var error = Assert.Throws<InvalidDataException>(() => Workspace.Restore(update: true));
+        Assert.Contains("demo/lib 2.0.0", error.Message, StringComparison.Ordinal);
+        Assert.Contains("demo/lib 3.0.0", error.Message, StringComparison.Ordinal);
+        Assert.Equal(original, File.ReadAllText(Path.Combine(Root, "propack.lock.json")));
+    }
+
+    [Fact]
+    public void Explicit_source_failure_does_not_fall_back_to_catalog()
+    {
+        var good = Package("good", "demo/lib", "1.0.0", "lib", "ok.");
+        UseCatalog(new PackageSource { Version = "1.0.0", Path = good });
+        var manifest = PackageWorkspace.ReadManifest(Root);
+        manifest.Dependencies["demo/lib"] = new PackageSource { Path = Path.Combine(_directory, "missing") };
+        Write(Root, manifest);
+        Assert.ThrowsAny<IOException>(() => Workspace.Restore());
+        Assert.False(File.Exists(Path.Combine(Root, "propack.lock.json")));
+    }
+
+    [Fact]
+    public void Catalog_checksum_failure_is_fatal_instead_of_selecting_older_bytes()
+    {
+        var good = Package("good", "demo/lib", "1.0.0", "lib", "ok.");
+        var newer = Package("newer", "demo/lib", "2.0.0", "lib", "newer.");
+        var archive = Source(newer, "zip") with { Version = "2.0.0", Sha256 = new string('0', 64) };
+        UseCatalog(archive, new PackageSource { Version = "1.0.0", Path = good });
+        Assert.Contains(
+            "SHA-256 mismatch",
+            Assert.Throws<InvalidDataException>(() => Workspace.Restore()).Message,
+            StringComparison.Ordinal
+        );
+        Assert.False(File.Exists(Path.Combine(Root, "propack.lock.json")));
+    }
+
     [Fact]
     public void Archive_traversal_and_bad_checksums_fail_without_lock()
     {
@@ -460,6 +529,39 @@ public sealed class PackageTests : IDisposable
             Path.Combine(directory, "propack.json"),
             JsonSerializer.Serialize(manifest, PackageJsonContext.Default.PackageManifest)
         );
+
+    private PackageSource Source(string directory, string transport)
+    {
+        if (transport == "path")
+            return new PackageSource { Path = directory };
+        if (transport == "zip")
+        {
+            var zip = Path.Combine(_directory, "package.zip");
+            ZipFile.CreateFromDirectory(directory, zip);
+            return new PackageSource { Archive = zip };
+        }
+        Git("init", "--quiet", directory);
+        Commit(directory);
+        return new PackageSource { Git = directory, Revision = "HEAD" };
+    }
+
+    private void UseCatalog(params PackageSource[] sources)
+    {
+        Write(
+            Root,
+            new PackageManifest
+            {
+                Name = "demo/app",
+                Catalog = "catalog.json",
+                Dependencies = new() { ["demo/lib"] = new() },
+            }
+        );
+        Dictionary<string, List<PackageSource>> catalog = new() { ["demo/lib"] = [.. sources] };
+        File.WriteAllText(
+            Path.Combine(Root, "catalog.json"),
+            JsonSerializer.Serialize(catalog, PackageJsonContext.Default.DictionaryStringListPackageSource)
+        );
+    }
 
     private static void Git(params string[] args) => PackageFiles.ProcessOutput("git", args);
 
