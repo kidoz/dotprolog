@@ -35,7 +35,7 @@ a corpus of ledger goals against SWI-Prolog itself and asserts the outputs agree
 | SWI feature | DotProlog status |
 |---|---|
 | ISO Part 1 core | Supported and independently verified — see [COMPATIBILITY.md on GitHub](https://github.com/kidoz/dotprolog/blob/main/COMPATIBILITY.md) for the claim, which is `StrictIso`'s, not SWI alignment |
-| Module system (Quintus/SWI spellings `module/2`, `use_module/1,2`, `meta_predicate/1`) | Supported, alongside the ISO Part 2 forms |
+| Module system (Quintus/SWI spellings `module/2`, `use_module/1,2`, `meta_predicate/1`) | Supported, alongside the ISO Part 2 forms; `library(Name)` imports use explicit host aliases, verified by `PackageTests.Library_imports_are_explicit_engine_scoped_and_remain_modern_only` |
 | DCGs, `phrase/2,3`, pushback | Supported (ISO TS 13211-3), plus soft cut in grammar bodies outside strict mode |
 | Exceptions, `catch/3` | Supported |
 | Soft cut `*->/2` | Supported |

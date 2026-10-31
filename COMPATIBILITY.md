@@ -314,3 +314,6 @@ samples and exercise NativeAOT.
 
 Built and tested on .NET 10. NativeAOT publishing is exercised on the host platform of whatever
 machine runs the acceptance test; the packages themselves are platform-neutral.
+
+Portable source packages can supply explicit `use_module(library(Name))` aliases in Modern mode.
+See [the package guide](docs/how-to/manage-packages.md) for restoration and engine compatibility limits.

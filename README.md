@@ -18,6 +18,14 @@ IL directly and can publish a native executable with NativeAOT. It can be packed
 The packages have been on NuGet.org since 0.2.0 and the current release is 0.16.1: see
 [CHANGELOG.md](CHANGELOG.md) and [COMPATIBILITY.md](COMPATIBILITY.md).
 
+## Experimental portable packages
+
+The standalone `propack` tool restores pure Prolog packages for SWI-Prolog and DotProlog,
+with explicit dependency resolution, a shared lockfile, local/Git/ZIP sources, and module
+conflict checks. DotProlog's CLI and SDK consume the same restored graph. See the
+[package guide](docs/how-to/manage-packages.md) and `samples/PortablePackages` for a runnable
+transitive dependency example. This tool is built from source and has not been published.
+
 ## Hello, world
 
 ```prolog
@@ -342,7 +350,7 @@ A `.dplproj` selects its mode with `<DotPrologLanguageMode>`. See the
 | Grammars | `-->/2` with `{}/1`, `!`, `\+//1`, `->//2`, `call//1`, `phrase//1`, semicontexts and pushback lists; `phrase/2`, `phrase/3`; `Name//Arity` indicators |
 | Streams | `open/3,4` text and binary streams, `close/1,2`, configurable EOF actions, `current_stream/1`, `stream_property/2`, `set_stream_position/2`, current-stream selection, EOF inspection, flushing |
 | Reading | term, character, character-code, and byte input/output; `read_term_from_atom/3`, `term_to_atom/2`, `atom_to_term/3`; `char_conversion/2`, `current_char_conversion/2` |
-| Modules | ISO interfaces and bodies with `module/1`, `body/1`, export/import/re-export, `metapredicate/1`, reflection, and `Module:Goal`; Quintus-style declarations in Modern mode |
+| Modules | ISO interfaces and bodies with `module/1`, `body/1`, export/import/re-export, `metapredicate/1`, reflection, and `Module:Goal`; Quintus-style declarations and explicit `use_module(library(Name))` aliases in Modern mode |
 | Directives | `:- Goal`, `:- initialization(Goal)`, SWI's `:- initialization(Goal, When)` in Modern mode, `halt/0`, `halt/1` |
 
 Control constructs are compiled in place inside a clause body, so cut scopes the way ISO specifies: opaque in the condition of if-then-else, transparent in its branches, clause-scoped elsewhere. A bootstrap library written in Prolog makes the same constructs reachable when a goal is assembled at run time and passed to `call/1`.

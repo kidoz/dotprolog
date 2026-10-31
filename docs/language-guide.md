@@ -185,3 +185,6 @@ sets, AVL association lists, and the `library(error)` validation predicates arou
 
 For the detailed and continually updated compatibility record, see
 [COMPATIBILITY.md on GitHub](https://github.com/kidoz/dotprolog/blob/main/COMPATIBILITY.md).
+
+Portable source packages can supply explicit `use_module(library(Name))` aliases in Modern mode.
+See [the package guide](how-to/manage-packages.md) for restoration and engine compatibility limits.

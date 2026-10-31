@@ -4,6 +4,18 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- An experimental standalone `propack` tool restores pure Prolog source packages from local
+  directories, Git revisions, ZIP archives, and local version catalogs. Lockfiles pin the graph
+  and content hashes; conflicting requirements, duplicate module names, and changed cached
+  content produce errors.
+- DotProlog's CLI and SDK consume the same package lock without downloading during compilation.
+  Modern `use_module(library(Name))` resolves explicit host-supplied aliases. The portable package
+  sample runs a transitive dependency under SWI-Prolog, DotProlog, and a compiled SDK application.
+
 ## [0.16.1] — 2026-10-31
 
 ### Fixed

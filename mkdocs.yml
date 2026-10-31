@@ -60,6 +60,7 @@ nav:
       - Reference a Prolog project: how-to/reference-project.md
       - Configure language modes and flags: how-to/configure-language.md
       - Lint source locally and in CI: how-to/lint-source.md
+      - Manage portable packages: how-to/manage-packages.md
       - Run Prolog tests: how-to/run-tests.md
       - Publish with NativeAOT: how-to/publish-nativeaot.md
   - Reference:

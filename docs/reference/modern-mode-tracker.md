@@ -166,7 +166,7 @@ is closed. The other 15:
 | EXT-06 | 5.5.2 | Modern-only operators: `op(1150, fx, Op)` for `dynamic`, `discontiguous`, `ensure_loaded`, `include`, `initialization`, and `multifile`; `op(990, xfx, :=)`; `op(400, yfx, rdiv)`; `op(100, yfx, '.')`; `op(1, fx, $)` | Named without priorities (MGAP-05) |
 | EXT-07 | 5.5.2 | Operators in both modes: `op(500, yfx, xor)`, `op(1050, xfy, *->)`, and `op(1150, fx, Op)` for `module`, `use_module`, and `meta_predicate`. In `StrictIso` they are GAP-01 | No (MGAP-05) |
 | EXT-08 | 5.5.4 | The string type. A string has one type and sorts after the numbers and before the atoms, so 5.5.4 a and b hold | Syntax and writing are documented; clause conversion and evaluation are not (MGAP-05) |
-| EXT-09 | 5.5.5 | The directives `module/2`, `use_module/1,2`, and `meta_predicate/1`. `use_module/1` takes file names only: `use_module(library(lists))` is rejected with DPL1008 | Yes |
+| EXT-09 | 5.5.5 | The directives `module/2`, `use_module/1,2`, and `meta_predicate/1`. `use_module/1,2` accepts filenames and explicit host-configured `library(Name)` aliases; missing aliases produce DPL1009 and malformed specifications produce DPL1008 | Yes |
 | EXT-10 | 5.5.5 | `initialization/2` with `now`, `after_load`, or `main` | Yes |
 | EXT-11 | 5.5.5 | Any callable term as a directive; GAP-12 in `StrictIso` | Yes |
 | EXT-12 | 5.5.6 | Side effects of extension predicates: global variables, `freeze/2` wakeups, `print_message/2` output with the `message_hook/3` hook, process exit from `initialization(_, main)`, and the `format/3` and `with_output_to/2` sinks | Yes |
