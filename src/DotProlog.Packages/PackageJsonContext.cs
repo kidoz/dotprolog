@@ -10,5 +10,7 @@ namespace DotProlog.Packages;
 )]
 [JsonSerializable(typeof(PackageManifest))]
 [JsonSerializable(typeof(PackageLock))]
+[JsonSerializable(typeof(PackagePolicy))]
+[JsonSerializable(typeof(PackageAdvisoryFile))]
 [JsonSerializable(typeof(Dictionary<string, List<PackageSource>>))]
 internal sealed partial class PackageJsonContext : JsonSerializerContext;

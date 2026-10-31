@@ -440,7 +440,7 @@ internal static class Program
         output.WriteLine($"  dotnet prolog run [--mode {LanguageModeNames}] [--flag name=value] <file.pl>");
         output.WriteLine("      consult a file and run its goals; --packages DIR uses a verified package lock");
         output.WriteLine("  dotnet prolog restore [--locked] [--project DIR]");
-        output.WriteLine("  dotnet prolog package <command> (init, add, remove, restore, update, tree, run)");
+        output.WriteLine("  dotnet prolog package <command> (init, add, remove, restore, update, check, tree, run)");
         output.WriteLine($"  dotnet prolog lint [--mode {LanguageModeNames}] [--flag name=value] [--profile {LintProfileNames}]");
         output.WriteLine("      [--warnings-as-errors] <file.pl>...");
         output.WriteLine("      analyze source without consulting it or executing directives");

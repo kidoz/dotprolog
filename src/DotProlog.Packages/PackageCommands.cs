@@ -35,9 +35,8 @@ public static partial class PackageCommands
                 output.WriteLine(
                     "propack init owner/name | add owner/name [--version ^1.2.3] [--path DIR | --git URL --rev REV | --archive ZIP --sha256 HASH]"
                 );
-                output.WriteLine(
-                    "propack remove owner/name | restore [--locked] | update | tree | run main.pl [--engine swi|dotprolog]"
-                );
+                output.WriteLine("propack remove owner/name | restore [--locked] | update | check");
+                output.WriteLine("propack tree | run main.pl [--engine swi|dotprolog]");
                 output.WriteLine("propack --version");
                 output.WriteLine(
                     "All commands accept --project DIR and --cache DIR. Run requires an installed engine; restore does not."
@@ -92,6 +91,10 @@ public static partial class PackageCommands
                     RequireCount(args, 0);
                     workspace.Restore(update: true);
                     output.WriteLine("Dependency lock updated.");
+                    return 0;
+                case "check":
+                    RequireCount(args, 0);
+                    output.WriteLine(workspace.Check());
                     return 0;
                 case "tree":
                     RequireCount(args, 0);

@@ -64,6 +64,7 @@ public sealed partial class PackageWorkspace
             Packages = selected.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => p.Value.Locked).ToList(),
         };
         ValidateGraph(manifest, result);
+        EnforcePolicy(manifest, result);
         PackageFiles.WriteAtomic(LockPath, JsonSerializer.Serialize(result, PackageJsonContext.Default.PackageLock) + "\n");
 
         bool Solve(List<Request> requests, Dictionary<string, Candidate> graph)
@@ -201,6 +202,16 @@ public sealed partial class PackageWorkspace
             ) + "\n";
     }
 
+    /// <summary>Validates the lock and, when a policy file exists, its vulnerability and license rules.</summary>
+    public string Check()
+    {
+        var manifest = ReadManifest(_root);
+        ValidateLock(manifest, acquire: false);
+        return PackagePolicyChecker.Exists(_root)
+            ? "Vulnerability and license policy verified."
+            : "No propack.policy.json; vulnerability and license checks were not applied.";
+    }
+
     internal string DefaultEngine => ReadManifest(_root).Engine;
 
     private PackageLock ValidateLock(PackageManifest manifest, bool acquire)
@@ -232,7 +243,16 @@ public sealed partial class PackageWorkspace
                 throw new InvalidDataException($"Corrupt cached package {package.Name}.");
         }
         ValidateGraph(manifest, locked);
+        EnforcePolicy(manifest, locked);
         return locked;
+    }
+
+    private void EnforcePolicy(PackageManifest manifest, PackageLock locked)
+    {
+        List<PolicyPackage> packages = [new(manifest.Name, manifest.Version, null, _root)];
+        foreach (var package in locked.Packages)
+            packages.Add(new(package.Name, package.Version, package.Hash, CachePath(package.Hash)));
+        PackagePolicyChecker.Enforce(_root, packages);
     }
 
     private void ValidateGraph(PackageManifest root, PackageLock locked)
@@ -431,7 +451,7 @@ public sealed partial class PackageWorkspace
         };
     }
 
-    private static void ValidateName(string name)
+    internal static void ValidateName(string name)
     {
         if (!PackageNamePattern().IsMatch(name))
             throw new InvalidDataException($"Invalid package name '{name}'; expected owner/name.");

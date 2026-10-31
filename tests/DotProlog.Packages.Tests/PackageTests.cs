@@ -749,6 +749,117 @@ public sealed class PackageTests : IDisposable
     public void Caret_ranges_follow_stable_semver(string actual, string range, bool expected) =>
         Assert.Equal(expected, PackageVersions.Matches(actual, range));
 
+    [Fact]
+    public void Policy_blocks_a_known_vulnerability_before_writing_the_lock()
+    {
+        var package = Package("source", "demo/lib", "1.0.0", "lib", "ok.");
+        Write(
+            Root,
+            new PackageManifest
+            {
+                Name = "demo/app",
+                Dependencies = new() { ["demo/lib"] = new() { Path = package } },
+            }
+        );
+        WritePolicy(
+            """
+            {
+              "advisories": [
+                { "id": "PROPACK-1", "package": "demo/lib", "version": "1.0.0", "summary": "Known bad release." }
+              ]
+            }
+            """
+        );
+        Assert.Contains(
+            "PROPACK-1",
+            Assert.Throws<InvalidDataException>(() => Workspace.Restore()).Message,
+            StringComparison.Ordinal
+        );
+        Assert.False(File.Exists(Path.Combine(Root, "propack.lock.json")));
+        WritePolicy(
+            """
+            {
+              "advisories": [
+                {
+                  "id": "PROPACK-1",
+                  "package": "demo/lib",
+                  "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+                  "summary": "Different tree."
+                }
+              ]
+            }
+            """
+        );
+        Workspace.Restore();
+        var locked = File.ReadAllText(Path.Combine(Root, "propack.lock.json"));
+        WritePolicy(
+            """
+            {
+              "advisoryFiles": ["feed.json"],
+              "ignore": ["PROPACK-1"],
+              "advisories": [
+                { "id": "PROPACK-2", "package": "demo/lib", "version": "1.0.0", "summary": "Still bad." }
+              ]
+            }
+            """
+        );
+        File.WriteAllText(
+            Path.Combine(Root, "feed.json"),
+            """
+            { "advisories": [ { "id": "PROPACK-1", "package": "demo/lib", "version": "1.0.0", "summary": "Ignored." } ] }
+            """
+        );
+        Assert.Contains(
+            "PROPACK-2",
+            Assert.Throws<InvalidDataException>(() => Workspace.Restore()).Message,
+            StringComparison.Ordinal
+        );
+        Assert.Equal(locked, File.ReadAllText(Path.Combine(Root, "propack.lock.json")));
+        File.Delete(Path.Combine(Root, "propack.policy.json"));
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        Assert.Equal(0, PackageCommands.Execute(["check", "--project", Root, "--cache", Cache], output, error));
+        Assert.Contains("not applied", output.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Policy_filters_declared_licenses_on_restore_and_compilation()
+    {
+        var package = Package("source", "demo/lib", "1.0.0", "lib", "ok.");
+        File.WriteAllText(Path.Combine(package, "UPSTREAM.json"), """{ "license": "(MIT OR GPL-3.0) AND BSD-2-Clause" }""");
+        File.WriteAllText(Path.Combine(Root, "UPSTREAM.json"), """{ "license": "MIT WITH LLVM-exception" }""");
+        Write(
+            Root,
+            new PackageManifest
+            {
+                Name = "demo/app",
+                Dependencies = new() { ["demo/lib"] = new() { Path = package } },
+            }
+        );
+        WritePolicy("""{ "licenses": ["MIT", "BSD-2-Clause", "MIT WITH LLVM-exception"] }""");
+        Workspace.Restore();
+        Assert.Contains("verified", Workspace.Check(), StringComparison.Ordinal);
+        WritePolicy("""{ "licenses": ["MIT"] }""");
+        Assert.Contains(
+            "not allowed",
+            Assert.Throws<InvalidDataException>(() => Workspace.GetLibraries()).Message,
+            StringComparison.Ordinal
+        );
+        Assert.Contains(
+            "not allowed",
+            Assert.Throws<InvalidDataException>(() => Workspace.Restore()).Message,
+            StringComparison.Ordinal
+        );
+        WritePolicy("""{ "licenses": ["MIT"], "ignore": ["ABSENT"] }""");
+        Assert.Contains(
+            "not listed",
+            Assert.Throws<InvalidDataException>(() => Workspace.Check()).Message,
+            StringComparison.Ordinal
+        );
+    }
+
+    private void WritePolicy(string json) => File.WriteAllText(Path.Combine(Root, "propack.policy.json"), json);
+
     private void PortableGraph()
     {
         Package("words", "demo/words", "1.0.0", "words", "word(hello).", "word/1");
