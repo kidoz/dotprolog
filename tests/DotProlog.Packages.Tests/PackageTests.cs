@@ -395,6 +395,32 @@ public sealed class PackageTests : IDisposable
     }
 
     [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("bad")]
+    public void HTTPS_archive_requires_a_valid_digest_before_fetching(string? digest)
+    {
+        Write(
+            Root,
+            new PackageManifest
+            {
+                Name = "demo/app",
+                Dependencies = new()
+                {
+                    ["demo/lib"] = new PackageSource { Archive = "https://example.invalid/package.zip", Sha256 = digest },
+                },
+            }
+        );
+        Assert.Contains(
+            "SHA-256",
+            Assert.Throws<InvalidDataException>(() => Workspace.Restore()).Message,
+            StringComparison.Ordinal
+        );
+        Assert.False(Directory.Exists(Cache));
+        Assert.False(File.Exists(Path.Combine(Root, "propack.lock.json")));
+    }
+
+    [Theory]
     [InlineData("/* first */\n% line\n :- module ( lib , []).", true)]
     [InlineData(":- module(lib\n, []).", true)]
     [InlineData("/* unterminated", false)]

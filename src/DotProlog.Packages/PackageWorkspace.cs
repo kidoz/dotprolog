@@ -354,6 +354,7 @@ public sealed partial class PackageWorkspace
             ValidateName(name);
             if (source is null)
                 throw new InvalidDataException($"Missing dependency specification for {name}.");
+            PackageFiles.ValidateSourceText(source);
             PackageVersions.Matches("0.0.0", source.Version);
             var sources = (source.Path is null ? 0 : 1) + (source.Git is null ? 0 : 1) + (source.Archive is null ? 0 : 1);
             if (
@@ -411,6 +412,7 @@ public sealed partial class PackageWorkspace
 
     private static PackageSource Normalize(PackageSource source, string directory)
     {
+        PackageFiles.ValidateSourceText(source);
         if ((source.Path is null ? 0 : 1) + (source.Git is null ? 0 : 1) + (source.Archive is null ? 0 : 1) != 1)
             throw new InvalidDataException("Specify exactly one of path, git, archive.");
         string Location(string value)

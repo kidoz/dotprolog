@@ -164,6 +164,7 @@ internal static class PackageFiles
 
     public static (string Directory, PackageSource Source) Acquire(PackageSource source, string cache)
     {
+        ValidateSourceText(source);
         var staging = System.IO.Path.Combine(cache, "stage-" + Guid.NewGuid().ToString("N"));
         var snapshot = staging + "-snapshot";
         Directory.CreateDirectory(staging);
@@ -217,11 +218,7 @@ internal static class PackageFiles
                 {
                     if (Uri.TryCreate(source.Archive, UriKind.Absolute, out var uri) && uri.Scheme == "https")
                     {
-                        using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
-                        using var stream = client.GetStreamAsync(uri).GetAwaiter().GetResult();
-                        using var output = File.Create(zipPath);
-                        long archiveBytes = 0;
-                        CopyBounded(stream, output, ref archiveBytes);
+                        DownloadArchive(uri, zipPath).GetAwaiter().GetResult();
                     }
                     else
                     {
@@ -292,6 +289,24 @@ internal static class PackageFiles
         }
     }
 
+    internal static void ValidateSourceText(PackageSource source)
+    {
+        foreach (var value in new[] { source.Git, source.Revision, source.Archive })
+            if (value is not null && value.Any(char.IsControl))
+                throw new InvalidDataException(
+                    "Git locations, revisions and archive locations cannot contain control characters."
+                );
+        if (source.Sha256 is not null && (source.Sha256.Length != 64 || source.Sha256.Any(c => !Uri.IsHexDigit(c))))
+            throw new InvalidDataException("Archive SHA-256 must contain exactly 64 hexadecimal digits.");
+        if (
+            source.Archive is not null
+            && Uri.TryCreate(source.Archive, UriKind.Absolute, out var uri)
+            && uri.Scheme == "https"
+            && source.Sha256 is null
+        )
+            throw new InvalidDataException("HTTPS archives require an explicit SHA-256 digest before downloading.");
+    }
+
     internal static void DeleteDirectory(string directory)
     {
         foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
@@ -312,6 +327,31 @@ internal static class PackageFiles
             }
         }
         Directory.Delete(directory);
+    }
+
+    internal static async Task DownloadArchive(Uri uri, string path, HttpClientHandler? handler = null)
+    {
+        using var transport = handler ?? new HttpClientHandler();
+        transport.AllowAutoRedirect = false;
+        transport.CheckCertificateRevocationList = true;
+        using var client = new HttpClient(transport, disposeHandler: false) { Timeout = TimeSpan.FromMinutes(2) };
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        using var response = await client
+            .GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, timeout.Token)
+            .ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        using var input = await response.Content.ReadAsStreamAsync(timeout.Token).ConfigureAwait(false);
+        using var output = File.Create(path);
+        var buffer = new byte[81920];
+        long total = 0;
+        int count;
+        while ((count = await input.ReadAsync(buffer, timeout.Token).ConfigureAwait(false)) != 0)
+        {
+            total += count;
+            if (total > MaxBytes)
+                throw new InvalidDataException("Archive exceeds 128 MiB.");
+            await output.WriteAsync(buffer.AsMemory(0, count), timeout.Token).ConfigureAwait(false);
+        }
     }
 
     internal static void CopyBounded(Stream input, Stream output, ref long total)
