@@ -1,4 +1,5 @@
 using DotProlog.CodeGen.CSharp;
+using DotProlog.Packages;
 using DotProlog.Runtime;
 using DotProlog.Syntax;
 using Microsoft.Build.Framework;
@@ -45,6 +46,9 @@ public sealed class GeneratePrologFacade : Task
     /// <summary>Initial flag overrides layered over the mode; see <c>DotPrologFlags</c>.</summary>
     public string Flags { get; set; } = string.Empty;
 
+    /// <summary>Optional package workspace, restored explicitly before building.</summary>
+    public string PackageDirectory { get; set; } = string.Empty;
+
     /// <summary>The generated C# files, to be added to <c>Compile</c>.</summary>
     [Output]
     public ITaskItem[] GeneratedFiles { get; private set; } = [];
@@ -84,6 +88,29 @@ public sealed class GeneratePrologFacade : Task
             return false;
         }
 
+        IReadOnlyDictionary<string, string>? libraryFiles = null;
+        if (PackageDirectory.Length > 0)
+        {
+            try
+            {
+                var version = typeof(GeneratePrologFacade).Assembly.GetName().Version!;
+                libraryFiles = new PackageWorkspace(PackageDirectory).GetLibraries(
+                    "dotprolog",
+                    $"{version.Major}.{version.Minor}.{version.Build}"
+                );
+            }
+            catch (Exception exception)
+                when (exception
+                        is InvalidDataException
+                            or IOException
+                            or UnauthorizedAccessException
+                            or System.Text.Json.JsonException
+                )
+            {
+                Log.LogError($"Package validation failed: {exception.Message}");
+                return false;
+            }
+        }
         Directory.CreateDirectory(OutputPath);
         List<ITaskItem> generated = [];
 
@@ -99,8 +126,22 @@ public sealed class GeneratePrologFacade : Task
             var entryPoint = Path.Combine(OutputPath, $"{EntryPointGenerator.TypeName}.g.cs");
             IReadOnlyList<Diagnostic> diagnostics;
             var sourceText = GenerateTestHost
-                ? EntryPointGenerator.GenerateTestHost(RootNamespace, sources, languageMode, flagOverrides, out diagnostics)
-                : EntryPointGenerator.Generate(RootNamespace, sources, languageMode, flagOverrides, out diagnostics);
+                ? EntryPointGenerator.GenerateTestHost(
+                    RootNamespace,
+                    sources,
+                    languageMode,
+                    flagOverrides,
+                    out diagnostics,
+                    libraryFiles
+                )
+                : EntryPointGenerator.Generate(
+                    RootNamespace,
+                    sources,
+                    languageMode,
+                    flagOverrides,
+                    out diagnostics,
+                    libraryFiles
+                );
             ReportDiagnostics(diagnostics, string.Empty);
             if (!diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
             {
@@ -145,7 +186,8 @@ public sealed class GeneratePrologFacade : Task
                 sourcePath,
                 languageMode,
                 flagOverrides,
-                out var sourceDiagnostics
+                out var sourceDiagnostics,
+                libraryFiles
             );
 
             ReportDiagnostics(sourceDiagnostics, sourcePath);

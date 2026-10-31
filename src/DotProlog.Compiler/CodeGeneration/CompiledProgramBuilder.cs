@@ -11,7 +11,8 @@ internal static class CompiledProgramBuilder
         PrologLanguageMode languageMode,
         PrologFlagOverrides flagOverrides,
         out IReadOnlyList<Diagnostic> diagnostics,
-        bool indexFirstArgument = false
+        bool indexFirstArgument = false,
+        IReadOnlyDictionary<string, string>? libraryFiles = null
     )
     {
         using var engine = new PrologEngine(languageMode, flagOverrides)
@@ -20,6 +21,9 @@ internal static class CompiledProgramBuilder
             Error = TextWriter.Null,
             Input = TextReader.Null,
         };
+
+        if (libraryFiles is not null)
+            engine.LibraryFiles = libraryFiles;
 
         // Generated C# retains clause chains; direct IL can preserve the loader's indexes.
         engine.Program.EmitFirstArgumentIndexing = indexFirstArgument;

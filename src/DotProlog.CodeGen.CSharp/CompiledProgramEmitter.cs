@@ -36,7 +36,8 @@ internal static class CompiledProgramEmitter
         IReadOnlyList<(string Name, int Arity)> hostBuiltins,
         PrologLanguageMode languageMode,
         PrologFlagOverrides flagOverrides,
-        out IReadOnlyList<Diagnostic> diagnostics
+        out IReadOnlyList<Diagnostic> diagnostics,
+        IReadOnlyDictionary<string, string>? libraryFiles = null
     )
     {
         CompiledProgramModel? model = CompiledProgramBuilder.Compile(
@@ -44,7 +45,8 @@ internal static class CompiledProgramEmitter
             hostBuiltins,
             languageMode,
             flagOverrides,
-            out diagnostics
+            out diagnostics,
+            libraryFiles: libraryFiles
         );
         return model is null ? string.Empty : Emit(model, typeName, languageMode, model.InitialDoubleQuotes);
     }

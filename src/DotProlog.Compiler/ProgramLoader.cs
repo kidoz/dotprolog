@@ -14,6 +14,7 @@ public sealed class ProgramLoader
     private readonly Machine? _machine;
     private readonly ModuleTable _modules;
     private readonly bool _userPredicates;
+    private readonly IReadOnlyDictionary<string, string>? _libraryFiles;
 
     /// <summary>Creates a loader that appends to <paramref name="program"/>.</summary>
     /// <param name="program">The program to load into.</param>
@@ -35,6 +36,16 @@ public sealed class ProgramLoader
         ModuleTable? modules = null,
         bool userPredicates = true
     )
+        : this(program, machine, modules, userPredicates, null) { }
+
+    /// <summary>Creates a loader using explicit library aliases supplied by the host.</summary>
+    public ProgramLoader(
+        BytecodeProgram program,
+        Machine? machine,
+        ModuleTable? modules,
+        bool userPredicates,
+        IReadOnlyDictionary<string, string>? libraryFiles
+    )
     {
         ArgumentNullException.ThrowIfNull(program);
         _program = program;
@@ -42,6 +53,7 @@ public sealed class ProgramLoader
         _machine = machine;
         _modules = modules ?? new ModuleTable(program.Modules);
         _userPredicates = userPredicates;
+        _libraryFiles = libraryFiles;
     }
 
     /// <summary>Lowers <paramref name="clauses"/> into the program.</summary>
@@ -1442,25 +1454,38 @@ public sealed class ProgramLoader
     /// <summary>Loads the file a <c>use_module</c> names and imports what it exports.</summary>
     private void UseModule(CompoundTerm import, LoadUnit unit, List<Diagnostic> diagnostics, string? fileName)
     {
-        if (import.Arguments[0] is not AtomTerm file)
+        string? path;
+        string sourceName;
+        if (import.Arguments[0] is CompoundTerm { Name: "library", Arity: 1 } library && library.Arguments[0] is AtomTerm alias)
+        {
+            sourceName = $"library({alias.Name})";
+            path =
+                _libraryFiles is not null && _libraryFiles.TryGetValue(alias.Name, out var resolved) && File.Exists(resolved)
+                    ? Path.GetFullPath(resolved)
+                    : null;
+        }
+        else if (import.Arguments[0] is AtomTerm file)
+        {
+            sourceName = file.Name;
+            path = ResolvePath(file.Name, fileName);
+        }
+        else
         {
             Report(
                 diagnostics,
                 CompilerDiagnosticIds.InvalidModuleDeclaration,
-                "use_module needs a file name.",
+                "use_module needs a file name or library(Name).",
                 import.Span,
                 fileName
             );
             return;
         }
-
-        var path = ResolvePath(file.Name, fileName);
         if (path is null)
         {
             Report(
                 diagnostics,
                 CompilerDiagnosticIds.ModuleNotFound,
-                $"No file for use_module({file.Name}).",
+                $"No file for use_module({sourceName}).",
                 import.Span,
                 fileName
             );

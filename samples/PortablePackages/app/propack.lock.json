@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "manifestHash": "28849242aa4b060a7262e0800ae1b95f240d66358f07f2edfaf2724871e1a0f5",
+  "engine": "dotprolog",
+  "packages": [
+    {
+      "name": "example/greeting",
+      "version": "1.0.0",
+      "source": {
+        "version": "^1.0.0",
+        "path": "../greeting",
+        "git": null,
+        "revision": null,
+        "archive": null,
+        "sha256": null
+      },
+      "requestedRevision": null,
+      "hash": "01e8f7a0f014c012ef83118bb2bccc2c656ed72da5e444a39053e78242767273"
+    },
+    {
+      "name": "example/words",
+      "version": "1.0.0",
+      "source": {
+        "version": "^1.0.0",
+        "path": "../words",
+        "git": null,
+        "revision": null,
+        "archive": null,
+        "sha256": null
+      },
+      "requestedRevision": null,
+      "hash": "f444b53908083415c244f7c7e24d79a9f69768201d415168282d5b30da6dc0a2"
+    }
+  ]
+}

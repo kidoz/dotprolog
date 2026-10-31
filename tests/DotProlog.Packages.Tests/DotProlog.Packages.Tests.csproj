@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <ItemGroup>
+        <ProjectReference Include="../../src/DotProlog.CodeGen.IL/DotProlog.CodeGen.IL.csproj" />
+        <ProjectReference Include="../../src/DotProlog.Packages/DotProlog.Packages.csproj" />
+        <ProjectReference Include="../../src/DotProlog.Tool/DotProlog.Tool.csproj" />
+    </ItemGroup>
+</Project>

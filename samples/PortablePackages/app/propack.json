@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "name": "example/app",
+  "version": "1.0.0",
+  "dependencies": {
+    "example/greeting": {
+      "version": "^1.0.0",
+      "path": "../greeting"
+    }
+  }
+}

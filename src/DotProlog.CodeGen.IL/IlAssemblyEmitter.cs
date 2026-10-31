@@ -31,7 +31,17 @@ public static class IlAssemblyEmitter
         Stream output,
         PrologLanguageMode languageMode = PrologLanguageMode.Modern,
         PrologFlagOverrides? flagOverrides = null
-    ) => Emit(sources, assemblyName, output, true, languageMode, flagOverrides);
+    ) => Emit(sources, assemblyName, output, null, languageMode, flagOverrides);
+
+    /// <summary>Writes an assembly using explicit library aliases available during compilation.</summary>
+    public static IReadOnlyList<Diagnostic> Emit(
+        IReadOnlyList<(string Name, string Text)> sources,
+        string assemblyName,
+        Stream output,
+        IReadOnlyDictionary<string, string>? libraryFiles,
+        PrologLanguageMode languageMode = PrologLanguageMode.Modern,
+        PrologFlagOverrides? flagOverrides = null
+    ) => Emit(sources, assemblyName, output, true, languageMode, flagOverrides, libraryFiles: libraryFiles);
 
     // Retain the instruction-per-block path as a semantic and performance reference for tests.
     internal static IReadOnlyList<Diagnostic> Emit(
@@ -42,7 +52,8 @@ public static class IlAssemblyEmitter
         PrologLanguageMode languageMode = PrologLanguageMode.Modern,
         PrologFlagOverrides? flagOverrides = null,
         bool indexFirstArgument = true,
-        bool linearVariableFallback = true
+        bool linearVariableFallback = true,
+        IReadOnlyDictionary<string, string>? libraryFiles = null
     )
     {
         ArgumentNullException.ThrowIfNull(sources);
@@ -54,7 +65,8 @@ public static class IlAssemblyEmitter
             languageMode,
             flagOverrides ?? PrologFlagOverrides.None,
             out var diagnostics,
-            indexFirstArgument
+            indexFirstArgument,
+            libraryFiles
         );
         if (model is null)
         {

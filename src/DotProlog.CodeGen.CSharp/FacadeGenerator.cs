@@ -67,6 +67,17 @@ public static class FacadeGenerator
         PrologLanguageMode languageMode,
         PrologFlagOverrides flagOverrides,
         out IReadOnlyList<Diagnostic> diagnostics
+    ) => Generate(contract, prologSource, sourceName, languageMode, flagOverrides, out diagnostics, null);
+
+    /// <summary>Generates source using explicit library aliases, returning positioned diagnostics.</summary>
+    public static string Generate(
+        ModuleContract contract,
+        string prologSource,
+        string sourceName,
+        PrologLanguageMode languageMode,
+        PrologFlagOverrides flagOverrides,
+        out IReadOnlyList<Diagnostic> diagnostics,
+        IReadOnlyDictionary<string, string>? libraryFiles
     )
     {
         ArgumentNullException.ThrowIfNull(contract);
@@ -91,7 +102,8 @@ public static class FacadeGenerator
             [],
             languageMode,
             flagOverrides,
-            out diagnostics
+            out diagnostics,
+            libraryFiles
         );
         if (diagnostics.Any(diagnostic => diagnostic.Severity == DotProlog.Syntax.DiagnosticSeverity.Error))
         {

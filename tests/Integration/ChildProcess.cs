@@ -27,11 +27,13 @@ internal static class ChildProcess
     /// <param name="fileName">Executable to run.</param>
     /// <param name="arguments">Arguments, passed without shell interpretation.</param>
     /// <param name="workingDirectory">Directory to run in.</param>
+    /// <param name="environment">Optional child-only environment overrides.</param>
     /// <exception cref="TimeoutException">The child did not finish within <see cref="Limit"/>.</exception>
     internal static async Task<(int ExitCode, string Log)> RunAsync(
         string fileName,
         IReadOnlyList<string> arguments,
-        string workingDirectory
+        string workingDirectory,
+        IReadOnlyDictionary<string, string?>? environment = null
     )
     {
         var start = new ProcessStartInfo(fileName)
@@ -41,6 +43,10 @@ internal static class ChildProcess
             RedirectStandardError = true,
             RedirectStandardInput = true,
         };
+
+        if (environment is not null)
+            foreach (var (key, value) in environment)
+                start.Environment[key] = value;
 
         foreach (var argument in arguments)
         {

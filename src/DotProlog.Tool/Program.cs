@@ -1,4 +1,5 @@
 using DotProlog.Compiler;
+using DotProlog.Packages;
 using DotProlog.Runtime;
 using DotProlog.Syntax;
 
@@ -33,6 +34,8 @@ internal static class Program
 
         return args[0] switch
         {
+            "package" => PackageCommands.Execute(args[1..], output, error),
+            "restore" => PackageCommands.Execute(args, output, error),
             "lint" => Lint(args.AsSpan(1), error),
             "run" => Run(args.AsSpan(1), output, error),
             _ => UnknownCommand(args[0], error),
@@ -44,10 +47,22 @@ internal static class Program
         PrologLanguageMode languageMode = PrologLanguageMode.Modern;
         List<string> flagEntries = [];
         List<string> paths = [];
+        string? packageDirectory = null;
 
         for (var index = 0; index < args.Length; index++)
         {
             var argument = args[index];
+            if (argument == "--packages")
+            {
+                if (++index >= args.Length)
+                {
+                    error.WriteLine("error: missing directory after --packages");
+                    return ExitUsage;
+                }
+                packageDirectory = args[index];
+                continue;
+            }
+
             if (argument == "--mode")
             {
                 if (index + 1 >= args.Length)
@@ -112,6 +127,14 @@ internal static class Program
         // an initialization goal.
         try
         {
+            if (packageDirectory is not null)
+            {
+                var version = typeof(Program).Assembly.GetName().Version!;
+                engine.LibraryFiles = new PackageWorkspace(packageDirectory).GetLibraries(
+                    "dotprolog",
+                    $"{version.Major}.{version.Minor}.{version.Build}"
+                );
+            }
             LoadResult loaded = engine.ConsultFile(path);
             foreach (Diagnostic diagnostic in loaded.Diagnostics)
             {
@@ -132,6 +155,17 @@ internal static class Program
                 RunResult.Failure => ExitGoalFailed,
                 _ => ExitSuccess,
             };
+        }
+        catch (Exception exception)
+            when (exception
+                    is InvalidDataException
+                        or IOException
+                        or UnauthorizedAccessException
+                        or System.Text.Json.JsonException
+            )
+        {
+            error.WriteLine($"error: {exception.Message}");
+            return ExitCompileError;
         }
         catch (PrologException exception)
         {
@@ -404,7 +438,9 @@ internal static class Program
         output.WriteLine();
         output.WriteLine("Usage:");
         output.WriteLine($"  dotnet prolog run [--mode {LanguageModeNames}] [--flag name=value] <file.pl>");
-        output.WriteLine("      consult a file and run its goals");
+        output.WriteLine("      consult a file and run its goals; --packages DIR uses a verified package lock");
+        output.WriteLine("  dotnet prolog restore [--locked] [--project DIR]");
+        output.WriteLine("  dotnet prolog package <command> (init, add, remove, restore, update, tree, run)");
         output.WriteLine($"  dotnet prolog lint [--mode {LanguageModeNames}] [--flag name=value] [--profile {LintProfileNames}]");
         output.WriteLine("      [--warnings-as-errors] <file.pl>...");
         output.WriteLine("      analyze source without consulting it or executing directives");

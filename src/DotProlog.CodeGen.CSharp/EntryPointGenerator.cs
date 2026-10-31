@@ -59,6 +59,16 @@ public static class EntryPointGenerator
         PrologLanguageMode languageMode,
         PrologFlagOverrides flagOverrides,
         out IReadOnlyList<Diagnostic> diagnostics
+    ) => GenerateTestHost(@namespace, sources, languageMode, flagOverrides, out diagnostics, null);
+
+    /// <summary>Generates source using explicit library aliases, returning positioned diagnostics.</summary>
+    public static string GenerateTestHost(
+        string @namespace,
+        IReadOnlyList<(string Name, string Text)> sources,
+        PrologLanguageMode languageMode,
+        PrologFlagOverrides flagOverrides,
+        out IReadOnlyList<Diagnostic> diagnostics,
+        IReadOnlyDictionary<string, string>? libraryFiles
     )
     {
         ArgumentNullException.ThrowIfNull(@namespace);
@@ -71,7 +81,8 @@ public static class EntryPointGenerator
             [],
             languageMode,
             flagOverrides,
-            out diagnostics
+            out diagnostics,
+            libraryFiles
         );
         if (diagnostics.Any(diagnostic => diagnostic.Severity == DotProlog.Syntax.DiagnosticSeverity.Error))
         {
@@ -172,6 +183,16 @@ public static class EntryPointGenerator
         PrologLanguageMode languageMode,
         PrologFlagOverrides flagOverrides,
         out IReadOnlyList<Diagnostic> diagnostics
+    ) => Generate(@namespace, sources, languageMode, flagOverrides, out diagnostics, null);
+
+    /// <summary>Generates source using explicit library aliases, returning positioned diagnostics.</summary>
+    public static string Generate(
+        string @namespace,
+        IReadOnlyList<(string Name, string Text)> sources,
+        PrologLanguageMode languageMode,
+        PrologFlagOverrides flagOverrides,
+        out IReadOnlyList<Diagnostic> diagnostics,
+        IReadOnlyDictionary<string, string>? libraryFiles
     )
     {
         ArgumentNullException.ThrowIfNull(@namespace);
@@ -184,7 +205,8 @@ public static class EntryPointGenerator
             [],
             languageMode,
             flagOverrides,
-            out diagnostics
+            out diagnostics,
+            libraryFiles
         );
         if (diagnostics.Any(diagnostic => diagnostic.Severity == DotProlog.Syntax.DiagnosticSeverity.Error))
         {

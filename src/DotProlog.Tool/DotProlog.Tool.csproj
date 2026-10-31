@@ -38,10 +38,12 @@
 
     <ItemGroup>
         <ProjectReference Include="..\DotProlog.Compiler\DotProlog.Compiler.csproj" />
+        <ProjectReference Include="../DotProlog.Packages/DotProlog.Packages.csproj" />
     </ItemGroup>
 
     <ItemGroup>
         <InternalsVisibleTo Include="DotProlog.Tool.Tests" />
+        <InternalsVisibleTo Include="DotProlog.Packages.Tests" />
     </ItemGroup>
 
     <!--

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "name": "example/greeting",
+  "version": "1.0.0",
+  "engines": {
+    "dotprolog": "^0.16.0",
+    "swi": "*"
+  },
+  "modules": {
+    "portable_greeting": "portable_greeting.pl"
+  },
+  "dependencies": {
+    "example/words": {
+      "version": "^1.0.0",
+      "path": "../words"
+    }
+  }
+}

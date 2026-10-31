@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "name": "example/words",
+  "version": "1.0.0",
+  "engines": {
+    "dotprolog": "^0.16.0",
+    "swi": "*"
+  },
+  "modules": {
+    "portable_words": "portable_words.pl"
+  }
+}

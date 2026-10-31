@@ -69,6 +69,32 @@
         Condition="'$(MSBuildRuntimeType)' == 'Core'"
     />
 
+    <UsingTask
+        TaskName="DotProlog.Build.Tasks.ValidatePrologPackages"
+        AssemblyFile="$(DotPrologTasksAssembly)"
+        Runtime="NET"
+        TaskFactory="TaskHostFactory"
+        Condition="'$(MSBuildRuntimeType)' == 'Full'"
+    />
+    <UsingTask
+        TaskName="DotProlog.Build.Tasks.ValidatePrologPackages"
+        AssemblyFile="$(DotPrologTasksAssembly)"
+        Runtime="NET"
+        Condition="'$(MSBuildRuntimeType)' == 'Core'"
+    />
+    <PropertyGroup>
+        <DotPrologPackageDirectory
+            Condition="'$(DotPrologPackageDirectory)' == '' and Exists('$(MSBuildProjectDirectory)/propack.json')"
+            >$(MSBuildProjectDirectory)</DotPrologPackageDirectory>
+    </PropertyGroup>
+    <Target
+        Name="ValidatePrologPackages"
+        BeforeTargets="GeneratePrologFacade"
+        Condition="'$(DotPrologPackageDirectory)' != '' and '$(DesignTimeBuild)' != 'true'"
+    >
+        <ValidatePrologPackages PackageDirectory="$(DotPrologPackageDirectory)" />
+    </Target>
+
     <!--
       Timestamps cannot see a deleted or renamed source: the file is simply absent from the glob,
       and every remaining input is older than the stamp. Writing the input list to a file — only
@@ -78,9 +104,12 @@
     <Target Name="_DotPrologRecordInputs" BeforeTargets="GeneratePrologFacade">
         <MakeDir Directories="$(DotPrologGeneratedPath)" />
 
+        <ItemGroup Condition="'$(DotPrologPackageDirectory)' != ''">
+            <_DotPrologPackageInput Include="$(DotPrologPackageDirectory)/propack.json;$(DotPrologPackageDirectory)/propack.lock.json" />
+        </ItemGroup>
         <WriteLinesToFile
             File="$(DotPrologGeneratedPath).inputs"
-            Lines="language-mode=$(DotPrologLanguageMode);flags=$(DotPrologFlags);@(PrologCompile->'%(FullPath)');@(PrologContract->'%(FullPath)')"
+            Lines="package-directory=$(DotPrologPackageDirectory);language-mode=$(DotPrologLanguageMode);flags=$(DotPrologFlags);@(PrologCompile->'%(FullPath)');@(PrologContract->'%(FullPath)')"
             Overwrite="true"
             WriteOnlyWhenDifferent="true"
         />
@@ -94,7 +123,7 @@
     <Target
         Name="GeneratePrologFacade"
         BeforeTargets="BeforeCompile;CoreCompile"
-        Inputs="@(PrologCompile);@(PrologContract);$(DotPrologTasksAssembly);$(MSBuildProjectFullPath);$(DotPrologGeneratedPath).inputs"
+        Inputs="@(_DotPrologPackageInput);@(PrologCompile);@(PrologContract);$(DotPrologTasksAssembly);$(MSBuildProjectFullPath);$(DotPrologGeneratedPath).inputs"
         Outputs="$(DotPrologGeneratedPath).generated"
     >
         <Error
@@ -113,6 +142,7 @@
             GenerateTestHost="$(DotPrologTestProject)"
             LanguageMode="$(DotPrologLanguageMode)"
             Flags="$(DotPrologFlags)"
+            PackageDirectory="$(DotPrologPackageDirectory)"
         >
             <Output TaskParameter="GeneratedFiles" ItemName="DotPrologGeneratedCompile" />
         </GeneratePrologFacade>

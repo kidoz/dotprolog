@@ -101,6 +101,10 @@ public sealed class PrologEngine : IRuntimeCompiler, IDisposable
     /// <summary>The program this engine loads into.</summary>
     public BytecodeProgram Program { get; }
 
+    /// <summary>Explicit library aliases resolved by use_module(library(Name)); no network access occurs.</summary>
+    public IReadOnlyDictionary<string, string> LibraryFiles { get; set; } =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
     /// <summary>The machine that executes the program.</summary>
     public Machine Machine { get; }
 
@@ -152,7 +156,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IDisposable
             return new LoadResult(parsed.Diagnostics, [], []);
         }
 
-        var loader = new ProgramLoader(Program, Machine, _modules);
+        var loader = new ProgramLoader(Program, Machine, _modules, userPredicates: true, libraryFiles: LibraryFiles);
         LoadResult loaded = loader.Load(parsed.Clauses, fileName, Machine.IsRunning ? null : ExecutePreparationDirective);
         List<Diagnostic> diagnostics = [.. parsed.Diagnostics, .. loaded.Diagnostics];
 
@@ -189,7 +193,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IDisposable
             return new LoadResult(parsed.Diagnostics, [], []);
         }
 
-        var loader = new ProgramLoader(Program, Machine, _modules);
+        var loader = new ProgramLoader(Program, Machine, _modules, userPredicates: true, libraryFiles: LibraryFiles);
         LoadResult loaded = loader.Load(
             parsed.Clauses,
             fileName,
