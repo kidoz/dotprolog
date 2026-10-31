@@ -93,7 +93,9 @@ internal static class PackageFiles
         return result;
     }
 
-    public static List<string> Files(string root)
+    internal static bool IsExcludedName(string name) => name is ".git" or "bin" or "obj" or ".propack" or "propack.lock.json";
+
+    public static List<string> Files(string root, bool requireSnapshot = false)
     {
         List<string> result = [];
         long total = 0;
@@ -107,13 +109,22 @@ internal static class PackageFiles
             foreach (var entry in Directory.EnumerateFileSystemEntries(directory).Order(StringComparer.Ordinal))
             {
                 var name = System.IO.Path.GetFileName(entry);
-                if (name is ".git" or "bin" or "obj" or ".propack" or "propack.lock.json")
+                if (IsExcludedName(name))
+                {
+                    if (requireSnapshot)
+                        throw new InvalidDataException($"Corrupt cached package: excluded path {entry}.");
                     continue;
+                }
                 var attributes = File.GetAttributes(entry);
                 if ((attributes & FileAttributes.ReparsePoint) != 0)
                     throw new InvalidDataException($"Symbolic links are not package inputs: {entry}");
                 if ((attributes & FileAttributes.Directory) != 0)
+                {
+                    var count = result.Count;
                     Walk(entry);
+                    if (requireSnapshot && result.Count == count)
+                        throw new InvalidDataException($"Corrupt cached package: empty directory {entry}.");
+                }
                 else
                 {
                     total += new FileInfo(entry).Length;
@@ -125,11 +136,11 @@ internal static class PackageFiles
         }
     }
 
-    public static string HashTree(string root)
+    public static string HashTree(string root, bool requireSnapshot = false)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         long total = 0;
-        foreach (var file in Files(root))
+        foreach (var file in Files(root, requireSnapshot))
         {
             var (digest, bytes) = HashInput(root, file, MaxBytes - total);
             total += bytes;
@@ -154,12 +165,11 @@ internal static class PackageFiles
     public static (string Directory, PackageSource Source) Acquire(PackageSource source, string cache)
     {
         var staging = System.IO.Path.Combine(cache, "stage-" + Guid.NewGuid().ToString("N"));
+        var snapshot = staging + "-snapshot";
         Directory.CreateDirectory(staging);
         try
         {
-            if (source.Path is not null)
-                CopyTree(source.Path, staging);
-            else if (source.Git is not null)
+            if (source.Git is not null)
             {
                 if (string.IsNullOrWhiteSpace(source.Revision) || source.Revision.StartsWith('-'))
                     throw new InvalidDataException("Git sources require an explicit revision.");
@@ -255,19 +265,21 @@ internal static class PackageFiles
                         File.Delete(zipPath);
                 }
             }
-            else
+            else if (source.Path is null)
                 throw new InvalidDataException("Package source must specify path, git, or archive.");
-            var digest = HashTree(staging);
+            Directory.CreateDirectory(snapshot);
+            CopyTree(source.Path ?? staging, snapshot);
+            var digest = HashTree(snapshot, requireSnapshot: true);
             var final = System.IO.Path.Combine(cache, digest);
             if (!Directory.Exists(final))
             {
                 try
                 {
-                    Directory.Move(staging, final);
+                    Directory.Move(snapshot, final);
                 }
                 catch (IOException) when (Directory.Exists(final)) { }
             }
-            if (HashTree(final) != digest)
+            if (HashTree(final, requireSnapshot: true) != digest)
                 throw new InvalidDataException($"Corrupt cached package: {digest}");
             return (final, source);
         }
@@ -275,6 +287,8 @@ internal static class PackageFiles
         {
             if (Directory.Exists(staging))
                 DeleteDirectory(staging);
+            if (Directory.Exists(snapshot))
+                DeleteDirectory(snapshot);
         }
     }
 

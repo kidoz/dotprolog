@@ -138,7 +138,7 @@ public sealed partial class PackageWorkspace
                             Version = package.Version,
                             Source = Portable(pinned),
                             RequestedRevision = source.Revision,
-                            Hash = PackageFiles.HashTree(directory),
+                            Hash = PackageFiles.HashTree(directory, requireSnapshot: true),
                         },
                         source.Path ?? directory
                     );
@@ -223,12 +223,12 @@ public sealed partial class PackageWorkspace
             if (!Directory.Exists(directory) && acquire)
             {
                 var fetched = PackageFiles.Acquire(source, _cache);
-                if (PackageFiles.HashTree(fetched.Directory) != package.Hash)
+                if (PackageFiles.HashTree(fetched.Directory, requireSnapshot: true) != package.Hash)
                     throw new InvalidDataException($"Content hash mismatch for {package.Name}.");
             }
             if (!Directory.Exists(directory))
                 throw new InvalidDataException($"Missing cached package {package.Name}; run restore --locked.");
-            if (PackageFiles.HashTree(directory) != package.Hash)
+            if (PackageFiles.HashTree(directory, requireSnapshot: true) != package.Hash)
                 throw new InvalidDataException($"Corrupt cached package {package.Name}.");
         }
         ValidateGraph(manifest, locked);
@@ -393,6 +393,8 @@ public sealed partial class PackageWorkspace
             if (!ModuleNamePattern().IsMatch(name))
                 throw new InvalidDataException($"Invalid module name '{name}'; use a lowercase identifier.");
             var file = PackageFiles.Inside(directory, relative);
+            if (Path.GetRelativePath(directory, file).Replace('\\', '/').Split('/').Any(PackageFiles.IsExcludedName))
+                throw new InvalidDataException($"Module {name} uses an excluded package path: {relative}");
             if (Path.GetFileName(file) != name + ".pl" || !File.Exists(file))
                 throw new InvalidDataException($"Missing Prolog module {name}: {relative}");
             if (!PackageModuleHeader.Matches(PackageFiles.ReadHeader(directory, relative), name))

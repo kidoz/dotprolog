@@ -440,6 +440,149 @@ public sealed class PackageTests : IDisposable
         Assert.Equal(64 * 1024, PackageFiles.ReadHeader(Root, "lib.pl").Length);
     }
 
+    [Theory]
+    [InlineData("path")]
+    [InlineData("git")]
+    [InlineData("zip")]
+    public void Every_transport_publishes_only_included_files(string transport)
+    {
+        var package = Package("source", "demo/lib", "1.0.0", "lib", "ok.");
+        foreach (
+            var relative in new[]
+            {
+                "bin/ignored.inc",
+                "nested/obj/ignored.inc",
+                "nested/.propack/ignored.inc",
+                "nested/propack.lock.json",
+            }
+        )
+        {
+            var file = Path.Combine(package, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+            File.WriteAllText(file, "excluded");
+        }
+        Directory.CreateDirectory(Path.Combine(package, "empty"));
+        var acquired = PackageFiles.Acquire(Source(package, transport), Cache);
+        Assert.Equal(2, Directory.GetFiles(acquired.Directory).Length);
+        Assert.True(File.Exists(Path.Combine(acquired.Directory, "lib.pl")));
+        Assert.True(File.Exists(Path.Combine(acquired.Directory, "propack.json")));
+        Assert.Empty(Directory.GetDirectories(acquired.Directory));
+        Assert.Equal(PackageFiles.HashTree(package), PackageFiles.HashTree(acquired.Directory, requireSnapshot: true));
+        Assert.Single(Directory.GetDirectories(Cache));
+    }
+
+    [Theory]
+    [InlineData("path", "bin")]
+    [InlineData("git", "bin")]
+    [InlineData("zip", "bin")]
+    [InlineData("zip", "nested/obj")]
+    [InlineData("zip", "nested/.propack")]
+    [InlineData("zip", "nested/.git")]
+    [InlineData("zip", "nested/propack.lock.json")]
+    public void Modules_in_excluded_paths_are_rejected(string transport, string excluded)
+    {
+        var package = Package("source", "demo/lib", "1.0.0", "lib", "ok.");
+        Directory.CreateDirectory(Path.Combine(package, excluded));
+        File.Move(Path.Combine(package, "lib.pl"), Path.Combine(package, excluded, "lib.pl"));
+        var manifest = PackageWorkspace.ReadManifest(package);
+        manifest.Modules["lib"] = excluded + "/lib.pl";
+        Write(package, manifest);
+        Write(
+            Root,
+            new PackageManifest
+            {
+                Name = "demo/app",
+                Dependencies = new() { ["demo/lib"] = Source(package, transport) },
+            }
+        );
+        Assert.Contains(
+            "excluded",
+            Assert.Throws<InvalidDataException>(() => Workspace.Restore()).Message,
+            StringComparison.Ordinal
+        );
+        Assert.False(File.Exists(Path.Combine(Root, "propack.lock.json")));
+    }
+
+    [Fact]
+    public void Root_modules_cannot_use_excluded_paths()
+    {
+        Directory.CreateDirectory(Path.Combine(Root, "bin"));
+        File.WriteAllText(Path.Combine(Root, "bin/lib.pl"), ":- module(lib, []).");
+        Write(
+            Root,
+            new PackageManifest
+            {
+                Name = "demo/app",
+                Modules = new() { ["lib"] = "bin/lib.pl" },
+            }
+        );
+        Assert.Contains(
+            "excluded",
+            Assert.Throws<InvalidDataException>(() => Workspace.Restore()).Message,
+            StringComparison.Ordinal
+        );
+    }
+
+    [Theory]
+    [InlineData("bin/hidden.inc", false)]
+    [InlineData("nested/obj/hidden.inc", false)]
+    [InlineData("nested/.git/hidden.inc", false)]
+    [InlineData("nested/.propack/hidden.inc", false)]
+    [InlineData("nested/propack.lock.json", false)]
+    [InlineData("bin", true)]
+    [InlineData("unexpected-empty", true)]
+    public void Cache_hits_reject_unhashed_paths(string relative, bool emptyDirectory)
+    {
+        PortableGraph();
+        Workspace.Restore();
+        var snapshot = Path.GetDirectoryName(Workspace.GetLibraries()["words"])!;
+        var added = Path.Combine(snapshot, relative);
+        Directory.CreateDirectory(emptyDirectory ? added : Path.GetDirectoryName(added)!);
+        if (!emptyDirectory)
+            File.WriteAllText(added, "tampered");
+        Assert.Contains(
+            "Corrupt",
+            Assert.Throws<InvalidDataException>(() => Workspace.GetLibraries()).Message,
+            StringComparison.Ordinal
+        );
+        Assert.Throws<InvalidDataException>(() => Workspace.Restore(locked: true));
+        Assert.Throws<InvalidDataException>(() => Workspace.Restore(update: true));
+    }
+
+    [Fact]
+    public void Archives_with_equal_included_files_share_only_those_files()
+    {
+        var package = Package("source", "demo/lib", "1.0.0", "lib", "ok.");
+        Directory.CreateDirectory(Path.Combine(package, "bin"));
+        File.WriteAllText(Path.Combine(package, "bin/hidden.inc"), "first");
+        var first = PackageFiles.Acquire(Source(package, "zip"), Cache);
+        File.WriteAllText(Path.Combine(package, "bin/hidden.inc"), "second");
+        var secondZip = Path.Combine(_directory, "second.zip");
+        ZipFile.CreateFromDirectory(package, secondZip);
+        var second = PackageFiles.Acquire(new PackageSource { Archive = secondZip }, Cache);
+        Assert.NotEqual(first.Source.Sha256, second.Source.Sha256);
+        Assert.Equal(first.Directory, second.Directory);
+        Assert.False(Directory.Exists(Path.Combine(second.Directory, "bin")));
+        Assert.Equal(2, Directory.GetFiles(second.Directory, "*", SearchOption.AllDirectories).Length);
+    }
+
+    [Fact]
+    public void Existing_archive_cache_with_excluded_content_is_rejected()
+    {
+        var package = Package("source", "demo/lib", "1.0.0", "lib", "ok.");
+        Directory.CreateDirectory(Path.Combine(package, "bin"));
+        File.WriteAllText(Path.Combine(package, "bin/hidden.inc"), "legacy snapshot");
+        var source = Source(package, "zip");
+        var legacy = Path.Combine(Cache, PackageFiles.HashTree(package));
+        ZipFile.ExtractToDirectory(source.Archive!, legacy);
+        Assert.Contains(
+            "Corrupt",
+            Assert.Throws<InvalidDataException>(() => PackageFiles.Acquire(source, Cache)).Message,
+            StringComparison.Ordinal
+        );
+        Assert.Single(Directory.GetDirectories(Cache));
+    }
+
     [Fact]
     public void Archive_traversal_and_bad_checksums_fail_without_lock()
     {
@@ -613,7 +756,9 @@ public sealed class PackageTests : IDisposable
 
     private static void Commit(string source)
     {
-        Git("-C", source, "add", "propack.json", "lib.pl");
+        Git("-C", source, "add", "--force", ".");
+        var hooks = Path.Combine(source, ".git", "propack-test-hooks");
+        Directory.CreateDirectory(hooks);
         Git(
             "-C",
             source,
@@ -622,7 +767,7 @@ public sealed class PackageTests : IDisposable
             "-c",
             "user.email=package@example.invalid",
             "-c",
-            "core.hooksPath=/dev/null",
+            "core.hooksPath=" + hooks,
             "commit",
             "--quiet",
             "-m",
