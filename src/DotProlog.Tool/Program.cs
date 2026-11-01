@@ -184,6 +184,7 @@ internal static class Program
         int? maxLineLength = null;
         int? maxClauseLines = null;
         List<string> flagEntries = [];
+        List<string> enabledRules = [];
         List<string> paths = [];
 
         for (var index = 0; index < args.Length; index++)
@@ -222,6 +223,27 @@ internal static class Program
                     return ExitUsage;
                 }
 
+                continue;
+            }
+
+            if (argument == "--enable-rule")
+            {
+                if (index + 1 >= args.Length)
+                {
+                    error.WriteLine("error: missing diagnostic identifier after --enable-rule");
+                    error.WriteLine($"       expected: {LintDiagnosticIds.PossibleNonSteadfastClause}");
+                    return ExitUsage;
+                }
+
+                var selected = args[++index];
+                if (!selected.Equals(LintDiagnosticIds.PossibleNonSteadfastClause, StringComparison.OrdinalIgnoreCase))
+                {
+                    error.WriteLine($"error: unsupported lint rule: {selected}");
+                    error.WriteLine($"       expected: {LintDiagnosticIds.PossibleNonSteadfastClause}");
+                    return ExitUsage;
+                }
+
+                enabledRules.Add(LintDiagnosticIds.PossibleNonSteadfastClause);
                 continue;
             }
 
@@ -312,6 +334,7 @@ internal static class Program
             IndentSize = indentSize ?? lintOptions.IndentSize,
             MaxLineLength = maxLineLength ?? lintOptions.MaxLineLength,
             MaxClauseLines = maxClauseLines ?? lintOptions.MaxClauseLines,
+            EnabledRules = enabledRules,
         };
 
         var foundErrors = false;
@@ -432,7 +455,9 @@ internal static class Program
         output.WriteLine("  dotnet prolog restore [--locked] [--project DIR]");
         output.WriteLine("  dotnet prolog package <command> (init, add, remove, restore, update, check, tree, run)");
         output.WriteLine($"  dotnet prolog lint [--mode {LanguageModeNames}] [--flag name=value] [--profile {LintProfileNames}]");
-        output.WriteLine("      [--warnings-as-errors] <file.pl>...");
+        output.WriteLine(
+            $"      [--enable-rule {LintDiagnosticIds.PossibleNonSteadfastClause}] [--warnings-as-errors] <file.pl>..."
+        );
         output.WriteLine("      analyze source without consulting it or executing directives");
         output.WriteLine();
         output.WriteLine("Language modes:");
@@ -456,6 +481,8 @@ internal static class Program
             $"Usage: dotnet prolog lint [--mode {LanguageModeNames}] [--flag name=value] [--profile {LintProfileNames}]"
         );
         output.WriteLine("       [--indent-size N] [--max-line-length N] [--max-clause-lines N]");
-        output.WriteLine("       [--warnings-as-errors] <file.pl>...");
+        output.WriteLine(
+            $"       [--enable-rule {LintDiagnosticIds.PossibleNonSteadfastClause}] [--warnings-as-errors] <file.pl>..."
+        );
     }
 }

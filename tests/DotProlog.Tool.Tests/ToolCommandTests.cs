@@ -206,8 +206,43 @@ public sealed class ToolCommandTests : IDisposable
         Assert.Contains("DPL3005", error, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void NonSteadfastRuleIsDisabledUnlessExplicitlyEnabled()
+    {
+        var path = Source("max.pl", "max(X, Y, X) :- X >= Y, !.\nmax(_, Y, Y).\n");
+
+        (var defaultExit, _, var defaultError) = Execute("lint", path);
+        (var enabledExit, _, var enabledError) = Execute("lint", "--enable-rule", "DPL3037", "--warnings-as-errors", path);
+
+        Assert.Equal(0, defaultExit);
+        Assert.Empty(defaultError);
+        Assert.Equal(1, enabledExit);
+        Assert.Contains("DPL3037", enabledError, StringComparison.Ordinal);
+        Assert.Contains("max/3", enabledError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RepeatingEnableRuleDoesNotDuplicateDiagnostics()
+    {
+        var path = Source("max.pl", "max(X, Y, X) :- X >= Y, !.\n");
+
+        (var exitCode, _, var error) = Execute(
+            "lint",
+            "--enable-rule",
+            "DPL3037",
+            "--enable-rule",
+            "dpl3037",
+            "--warnings-as-errors",
+            path
+        );
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal(1, error.Split("DPL3037", StringSplitOptions.None).Length - 1);
+    }
+
     [Theory]
     [InlineData("--profile", "unknown", "unknown lint profile")]
+    [InlineData("--enable-rule", "DPL3001", "unsupported lint rule")]
     [InlineData("--indent-size", "0", "invalid value")]
     [InlineData("--max-line-length", "word", "invalid value")]
     [InlineData("--max-clause-lines", "-1", "invalid value")]
@@ -223,6 +258,7 @@ public sealed class ToolCommandTests : IDisposable
 
     [Theory]
     [InlineData("--profile", "missing lint profile")]
+    [InlineData("--enable-rule", "missing diagnostic identifier")]
     [InlineData("--indent-size", "missing positive integer")]
     [InlineData("--max-line-length", "missing positive integer")]
     [InlineData("--max-clause-lines", "missing positive integer")]
