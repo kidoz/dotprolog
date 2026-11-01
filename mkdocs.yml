@@ -81,6 +81,7 @@ nav:
   - Explanation:
       - Runtime architecture: architecture/index.md
       - Language modes and text: explanation/language-modes.md
+      - Runtime performance: explanation/runtime-performance.md
   - Contributing: contributing.md
 
 markdown_extensions:

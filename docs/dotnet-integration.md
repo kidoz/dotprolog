@@ -132,6 +132,34 @@ Generated code records its language mode and initial `double_quotes` value and r
 into an engine that starts elsewhere. This keeps build-time validation and runtime consultation
 under the same language contract.
 
+## Engine lifetime and memory
+
+Reuse an engine for repeated calls over a bounded vocabulary. Synchronous `PrologHost.Prove` and
+`CallOnce` accept `params ReadOnlySpan<PrologInput>`; on C# 14, expanded arguments select this
+allocation-saving overload. Existing array overloads remain available. `CallAll` continues to use
+arrays for lazy enumeration. Detached output values still allocate as needed.
+
+The heap is reset between top-level calls, but the program has a longer lifetime:
+
+- Distinct atoms, string texts, floats, big integers, and rationals stay interned. Arithmetic can
+  create these entries even when a result is discarded. `SymbolTable.AtomCount`, `FloatCount`,
+  `BigIntegerCount`, and `RationalCount` expose their counts; atom and string text share a table.
+- Retraction retains clauses needed by suspended calls under logical update view. Batched collection
+  unlinks dead clause records after their last protected generation is released. A long-running
+  top-level call conservatively protects all clauses visible when it began.
+- Asserted and consulted bytecode, constants, and compiled query code remain append-only. Clause
+  record collection reduces scans and detached term retention, but does not bound total program memory.
+
+For services processing unbounded distinct input, use a fresh engine for each request or a bounded
+batch, reinstall the static program, and carry application state through detached `PrologValue`
+values or an external store. A request limit or a measured memory/count threshold can trigger rotation.
+Finish or abandon enumeration before rotation. Dispose the old engine and release references to it,
+its host, queries, machine, and program so the GC can collect them; disposal alone closes streams.
+Cells, predicate handles, and compiled goal addresses belong to their original program.
+
+For reproducible growth and lookup measurements, run the benchmark project's `--profile-churn`
+command described in [runtime performance measurements](explanation/runtime-performance.md).
+
 ## NativeAOT behavior
 
 NativeAOT applications may consult previously unseen `.pl` files at run time. Those predicates are

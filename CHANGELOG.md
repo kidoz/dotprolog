@@ -4,6 +4,19 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Standard-order comparison handles atomic terms directly and reuses machine-owned scratch for
+  compound terms, reducing allocation during comparison and sorting.
+- Generated C# uses first-argument clause indexes. Large static tables use keyed lookup while
+  preserving source order and variable-headed fallback.
+- Retracted dynamic clause records are collected when no retained call generation can see them.
+  Emitted bytecode and constants remain append-only.
+- Synchronous typed host calls accept span inputs without argument-array allocation. Symbol-table
+  counts expose retained text and numeric values for hosts managing engine lifetimes.
+
 ## [0.17.0] — 2026-11-01
 
 ### Added
@@ -904,6 +917,7 @@ binary: a published executable can consult a `.pl` file it has never seen and ru
 
 **Full Changelog**: https://github.com/kidoz/dotprolog/commits/v0.1.0
 
+[Unreleased]: https://github.com/kidoz/dotprolog/compare/v0.17.0...HEAD
 [0.17.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.17.0
 [0.16.1]: https://github.com/kidoz/dotprolog/releases/tag/v0.16.1
 [0.16.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.16.0

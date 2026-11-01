@@ -65,6 +65,19 @@ registers in a small frame, runs the recorded goals through the library's `'$wak
 returns through a reserved instruction that runs the interrupted instruction again, on the bytecode
 and the generated-C# paths alike.
 
+Static clause indexes retain source-ordered addresses and keys. Tables with at least 32 clauses
+also build keyed ordinal buckets and a wildcard bucket. Bound entry and redo merge the next matching
+and wildcard ordinals; unbound calls advance directly. Small tables retain linear filtering.
+
+Term comparison handles atomic terms directly. Compound comparison uses separate machine-owned
+work and cycle-detection collections, cleared on every exit. It remains iterative for deep terms.
+
+Dynamic clause records carry birth and death generations. Retraction marks death immediately;
+batched collection unlinks records invisible to every retained top-level call. Machines sharing a
+program register weakly, and suspended answers protect their generation until reset, exhaustion or
+disposal. Inactive choice-point cursor roots are cleared before collection. Emitted bytecode and
+constants keep stable addresses and are not reclaimed; see [engine lifetime](../dotnet-integration.md#engine-lifetime-and-memory).
+
 ## Loading and rewriting
 
 `ProgramLoader` first establishes the unit's module, imports, exports, and defined predicates. A
@@ -98,7 +111,7 @@ source continues to become DotProlog bytecode. Both target the same explicit hea
 environment, choice-point, and continuation state, so either path can call the other. Both also
 share one front end — the reader, the loader, and the clause compiler — and there is no separate
 intermediate representation: the generated C# is translated from the clause compiler's bytecode
-instructions, emitted without the VM's first-argument index dispatch.
+instructions, including the VM's first-argument index dispatch.
 
 ```text
 SDK build  : reader -> loader -> bytecode -> generated C# -> Roslyn -> IL
@@ -124,7 +137,7 @@ Direct IL preserves the loader's first-argument indexes for multi-clause static 
 Installation relocates clause targets and term keys into the receiving engine before running
 directives. Selection and redo reuse the VM's index machinery: candidate clauses retain source
 order, variables match every key, and a single candidate creates no choice point. Generated C#
-continues to use unindexed clause chains. The versioned installation reader also accepts older
+uses the same relocated tables. The versioned installation reader also accepts older
 images without index tables.
 
 Fused IL uses an alternate clause chain when the first argument is unbound. The index-entry

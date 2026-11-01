@@ -175,9 +175,10 @@ sets, AVL association lists, and the `library(error)` validation predicates arou
 
 ## Known limits
 
-- Clause selection uses first-argument indexing in the bytecode VM: a call with a bound first
-  argument skips clauses whose first argument could never unify, and creates no choice point when
-  only one clause can match. Build-time generated C# still tries clauses in order.
+- Bytecode, generated C#, and direct IL use first-argument indexing for static predicates.
+  Bound calls skip incompatible clauses, preserve source order and variable-headed fallback, and
+  leave no choice point when only one clause can match. Large tables use keyed buckets; unbound
+  calls enumerate the clauses in order. Dynamic predicates filter their clause lists by key.
 - Runtime-loaded source compiles to DotProlog bytecode, not new CLR IL.
 - Build-time source compiles to direct-threaded generated C# blocks sharing the same explicit
   machine state as runtime bytecode.
