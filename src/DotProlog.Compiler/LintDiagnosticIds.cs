@@ -117,4 +117,7 @@ public static class LintDiagnosticIds
 
     /// <summary>No recognized entry point reaches a grammar nonterminal through static calls.</summary>
     public const string PossibleUnreferencedNonterminal = "DPL3036";
+
+    /// <summary>Distinct head arguments share variables and the clause body contains a same-scope cut.</summary>
+    public const string PossibleNonSteadfastClause = "DPL3037";
 }

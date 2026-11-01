@@ -1,6 +1,6 @@
 namespace DotProlog.Compiler;
 
-/// <summary>Configures optional source-text rules for <see cref="PrologLinter"/>.</summary>
+/// <summary>Configures optional source-text and semantic rules for <see cref="PrologLinter"/>.</summary>
 public sealed record PrologLintOptions
 {
     /// <summary>The original source-local semantic rules, with no layout policy.</summary>
@@ -46,4 +46,9 @@ public sealed record PrologLintOptions
 
     /// <summary>Whether spaces or tabs immediately before a line ending are rejected.</summary>
     public bool CheckTrailingWhitespace { get; init; }
+
+    /// <summary>Diagnostic identifiers of additional opt-in semantic rules.</summary>
+    public IReadOnlyCollection<string> EnabledRules { get; init; } = [];
+
+    internal bool Enables(string diagnosticId) => EnabledRules.Contains(diagnosticId, StringComparer.OrdinalIgnoreCase);
 }

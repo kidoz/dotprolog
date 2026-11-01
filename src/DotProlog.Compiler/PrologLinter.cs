@@ -49,7 +49,7 @@ public static class PrologLinter
     /// <param name="source">The exact source from which <paramref name="clauses"/> were read.</param>
     /// <param name="clauses">Parsed clauses and directives in source order.</param>
     /// <param name="fileName">Source file used in diagnostics, when known.</param>
-    /// <param name="options">Layout policy; semantic-only analysis is used when omitted.</param>
+    /// <param name="options">Layout policy and opt-in semantic rules; defaults are used when omitted.</param>
     /// <param name="initialDoubleQuotes">
     /// The <c>double_quotes</c> value the file starts under; the default mode's <c>chars</c> when omitted.
     /// </param>
@@ -70,6 +70,7 @@ public static class PrologLinter
         ArgumentNullException.ThrowIfNull(clauses);
 
         List<Diagnostic> diagnostics = [.. Analyze(clauses, fileName, initialDoubleQuotes)];
+        PrologNonSteadfastLinter.Analyze(clauses, fileName, options, diagnostics);
         PrologLayoutLinter.Analyze(source, clauses, options ?? PrologLintOptions.SemanticOnly, fileName, diagnostics, codePoints);
 
         return [.. diagnostics.OrderBy(diagnostic => diagnostic.Span.Start).ThenBy(diagnostic => diagnostic.Id)];
@@ -77,7 +78,7 @@ public static class PrologLinter
 
     /// <summary>Analyzes explicitly supplied files as one program without consulting them.</summary>
     /// <param name="sources">Physical source units to analyze together.</param>
-    /// <param name="options">Optional source-layout policy.</param>
+    /// <param name="options">Optional source-layout policy and opt-in semantic rules.</param>
     public static IReadOnlyList<Diagnostic> AnalyzeProgram(
         IReadOnlyList<PrologLintSource> sources,
         PrologLintOptions? options = null
@@ -89,6 +90,7 @@ public static class PrologLinter
             .. sources.GroupBy(source => source.FileName, PathComparer).Select(group => group.First()),
         ];
         PrologLintProgramModel model = PrologLintProgramModel.Build(distinct);
+        PrologLintOptions? localOptions = options is null ? null : options with { EnabledRules = [] };
         List<Diagnostic> diagnostics = [];
         foreach (PrologLintSource source in distinct)
         {
@@ -104,7 +106,7 @@ public static class PrologLinter
                             source.Source,
                             [.. clauses.Select(item => item.clause)],
                             clauses.Key,
-                            options,
+                            localOptions,
                             source.InitialDoubleQuotes,
                             source.CodePoints
                         )
@@ -118,6 +120,7 @@ public static class PrologLinter
             }
         }
 
+        PrologNonSteadfastLinter.Analyze(model, options, diagnostics);
         PrologCallGraphLinter.Analyze(model, diagnostics);
         PrologReachabilityLinter.Analyze(model, diagnostics);
         PrologUnusedImportLinter.Analyze(model, diagnostics);
