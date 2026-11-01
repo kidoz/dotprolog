@@ -63,4 +63,16 @@ public static class LintDiagnosticIds
 
     /// <summary>A goal is statically determined to fail whenever execution reaches it.</summary>
     public const string AlwaysFalseGoal = "DPL3018";
+
+    /// <summary>An existentially qualified variable does not occur in the qualified goal.</summary>
+    public const string UnusedExistentialVariable = "DPL3019";
+
+    /// <summary>An all-solutions template and goal share no named variables.</summary>
+    public const string UnsharedAllSolutionsTemplate = "DPL3020";
+
+    /// <summary>A variable occurs only once inside a bagof or setof goal.</summary>
+    public const string AllSolutionsSingleton = "DPL3021";
+
+    /// <summary>A findall call is followed directly by failure and is used only for backtracking.</summary>
+    public const string FindallBacktracking = "DPL3022";
 }
