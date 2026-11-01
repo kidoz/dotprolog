@@ -76,7 +76,20 @@ fi
 test "$lint_exit" -eq 1
 
 # Cross-file semantic analysis must ship in the packed tool as well as the source-tree command.
-printf '%s\n' ':- module(main, []). :- use_module('\''lint-other.pl'\''). go :- helper.' >HelloProlog/lint-main.pl
+printf '%s\n' ':- module(main, [go/0]). :- use_module('\''lint-other.pl'\''). go :- helper.' >HelloProlog/lint-main.pl
 printf '%s\n' ':- module(other, [helper/0]). helper.' >HelloProlog/lint-other.pl
 dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
     --warnings-as-errors HelloProlog/lint-main.pl HelloProlog/lint-other.pl
+
+# Advisory reachability analysis uses the same compiler-owned diagnostics in the packed tool.
+printf '%s\n' ':- module(m, [go/0]). go. unused.' >HelloProlog/lint-reachability.pl
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --warnings-as-errors HelloProlog/lint-reachability.pl 2>&1); then
+    echo "lint unexpectedly accepted an unreferenced predicate" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3034'
+printf '%s\n' "$lint_output" | grep -F 'm:unused/0'
