@@ -8,6 +8,11 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+        if (args.Length > 0 && args[0] == "--profile-churn")
+        {
+            return RuntimeChurnProfile.Run(args.AsSpan(1));
+        }
+
         if (args.Length > 0 && args[0] == "--measure-startup")
         {
             return StartupBenchmarks.Measure(args.AsSpan(1));
