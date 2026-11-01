@@ -124,6 +124,19 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void LintReportsAPossiblyUnreferencedNonterminal()
+    {
+        var path = Source("grammar.pl", ":- module(m, []).\ndead_grammar --> [a].\n");
+
+        (var exitCode, _, var error) = Execute("lint", "--warnings-as-errors", path);
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("DPL3036", error, StringComparison.Ordinal);
+        Assert.Contains("m:dead_grammar//0", error, StringComparison.Ordinal);
+        Assert.Contains("may be unreferenced", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LintReportsAPossiblyUnusedImport()
     {
         var main = Source("main.pl", ":- module(main, [go/0]). :- use_module('other.pl', [helper/0]). go.\n");

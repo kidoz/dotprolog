@@ -2,7 +2,7 @@ using DotProlog.Syntax;
 
 namespace DotProlog.Compiler;
 
-/// <summary>Reports ordinary predicates unreachable from recognized static entry points.</summary>
+/// <summary>Reports predicates and nonterminals unreachable from recognized static entry points.</summary>
 internal static class PrologReachabilityLinter
 {
     internal static void Analyze(PrologLintProgramModel model, List<Diagnostic> diagnostics)
@@ -60,6 +60,35 @@ internal static class PrologReachabilityLinter
                     LintDiagnosticIds.PossibleUnreferencedPredicate,
                     DiagnosticSeverity.Warning,
                     $"No reachable static call references predicate {definition.Key.Module}:{LintSyntax.Display(definition.Key.Predicate)}; it may be unreferenced.",
+                    LintSyntax.ClauseHead(first.Clause).Span,
+                    first.Source.FileName
+                )
+            );
+        }
+
+        HashSet<PredicateNode> ordinaryNodes =
+        [
+            .. model
+                .Clauses.Where(clause => !clause.Grammar && clause.Clause is not CompoundTerm { Name: ":-", Arity: 1 })
+                .Select(clause => new PredicateNode(clause.Module, clause.Indicator)),
+        ];
+        foreach (
+            IGrouping<PredicateNode, PrologLintProgramModel.ClauseContext> definition in model
+                .Clauses.Where(clause => clause.Grammar)
+                .GroupBy(clause => new PredicateNode(clause.Module, clause.Indicator))
+        )
+        {
+            if (reachable.Contains(definition.Key) || ordinaryNodes.Contains(definition.Key))
+            {
+                continue;
+            }
+
+            PrologLintProgramModel.ClauseContext first = definition.First();
+            diagnostics.Add(
+                new Diagnostic(
+                    LintDiagnosticIds.PossibleUnreferencedNonterminal,
+                    DiagnosticSeverity.Warning,
+                    $"No reachable static call references nonterminal {definition.Key.Module}:{LintSyntax.Display(definition.Key.Predicate, nonterminal: true)}; it may be unreferenced.",
                     LintSyntax.ClauseHead(first.Clause).Span,
                     first.Source.FileName
                 )

@@ -114,4 +114,7 @@ public static class LintDiagnosticIds
 
     /// <summary>An imported predicate or nonterminal has no static reference in its importing module.</summary>
     public const string PossiblyUnusedImport = "DPL3035";
+
+    /// <summary>No recognized entry point reaches a grammar nonterminal through static calls.</summary>
+    public const string PossibleUnreferencedNonterminal = "DPL3036";
 }

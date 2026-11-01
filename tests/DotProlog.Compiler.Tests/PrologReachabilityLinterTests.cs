@@ -95,14 +95,125 @@ public sealed class PrologReachabilityLinterTests : IDisposable
         );
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleUnreferencedPredicate));
+        AssertUnreferencedNonterminals(diagnostics, "dead_grammar//0");
     }
 
     [Fact]
-    public void UnreferencedNonterminalsAreNotFindingsInThisSlice()
+    public void ReportsAnUnreferencedNonterminalOnceAtItsFirstGrammarHead()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(":- module(m, []). dead_grammar --> [a].");
+        IReadOnlyList<Diagnostic> diagnostics = Lint(":- module(m, []).\ndead_grammar --> [a].\ndead_grammar --> [b].\n");
 
+        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleUnreferencedNonterminal));
+        Assert.Equal(2, warning.Span.Line);
+        Assert.Equal(1, warning.Span.Column);
+        Assert.Contains("m:dead_grammar//0", warning.Message, StringComparison.Ordinal);
+        Assert.Contains("may be unreferenced", warning.Message, StringComparison.Ordinal);
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleUnreferencedPredicate));
+    }
+
+    [Fact]
+    public void PhraseRootsTheReferencedNonterminal()
+    {
+        IReadOnlyList<Diagnostic> diagnostics = Lint(":- module(m, [go/1]). go(X) :- phrase(grammar, X). grammar --> [a].");
+
+        Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleUnreferencedNonterminal));
+    }
+
+    [Fact]
+    public void DcgCallRootsTheReferencedNonterminal()
+    {
+        IReadOnlyList<Diagnostic> diagnostics = Lint(":- module(m, [go//0]). go --> call(helper). helper --> [a].");
+
+        Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleUnreferencedNonterminal));
+    }
+
+    [Fact]
+    public void RecursiveAndMutuallyRecursiveNonterminalsCanBeUnreachable()
+    {
+        IReadOnlyList<Diagnostic> diagnostics = Lint(":- module(m, []). dead --> dead. left --> right. right --> left.");
+
+        AssertUnreferencedNonterminals(diagnostics, "dead//0", "left//0", "right//0");
+    }
+
+    [Fact]
+    public void NonModuleNonterminalsAreExternalEntryPoints()
+    {
+        IReadOnlyList<Diagnostic> diagnostics = Lint("dead_grammar --> [a].");
+
+        Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleUnreferencedNonterminal));
+    }
+
+    [Fact]
+    public void DynamicAndMultifileNonterminalsAreEntryPoints()
+    {
+        IReadOnlyList<Diagnostic> diagnostics = Lint(
+            ":- module(m, []). :- dynamic(dynamic_grammar//0). :- multifile(multi_grammar//0). "
+                + "dynamic_grammar --> [a]. multi_grammar --> [b]."
+        );
+
+        Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleUnreferencedNonterminal));
+    }
+
+    [Fact]
+    public void TestDiscoveryDoesNotRootANonterminal()
+    {
+        IReadOnlyList<Diagnostic> diagnostics = Lint(":- module(m, []). test_grammar --> [a].");
+
+        AssertUnreferencedNonterminals(diagnostics, "test_grammar//0");
+    }
+
+    [Fact]
+    public void MixedLoweredIdentitySuppressesOnlyTheNonterminalFinding()
+    {
+        IReadOnlyList<Diagnostic> diagnostics = Lint(":- module(m, []). p(_, _, _). p(_) --> [a].");
+
+        Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleUnreferencedNonterminal));
+        AssertUnreferenced(diagnostics, "p/3");
+    }
+
+    [Fact]
+    public void SourceKindConfusionStillMakesTheLoweredIdentityReachable()
+    {
+        IReadOnlyList<Diagnostic> diagnostics = Lint(":- module(m, [go/2]). go(A, B) :- p(A, B). p --> [a].");
+
+        Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleUnreferencedNonterminal));
+        Assert.Contains(diagnostics, Id(LintDiagnosticIds.PredicateNonterminalMismatch));
+    }
+
+    [Fact]
+    public void IncludedNonterminalRetainsItsPhysicalSourceOwner()
+    {
+        Source("parts.pl", "dead_grammar --> [a].\n");
+        Source("main.pl", ":- module(m, []). :- include('parts.pl').\n");
+
+        IReadOnlyList<Diagnostic> diagnostics = Load("main.pl");
+
+        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleUnreferencedNonterminal));
+        Assert.Equal(Path.Combine(_directory, "parts.pl"), warning.FileName);
+        Assert.Equal(1, warning.Span.Line);
+    }
+
+    [Theory]
+    [InlineData(PrologLanguageMode.Modern)]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    public void BothLanguageModesReportUnreferencedNonterminals(PrologLanguageMode mode)
+    {
+        var source =
+            mode == PrologLanguageMode.Modern
+                ? ":- module(m, []). dead_grammar --> [a]."
+                : ":- module(m). :- end_module(m). :- body(m). dead_grammar --> [a]. :- end_body(m).";
+
+        IReadOnlyList<Diagnostic> diagnostics = Lint(mode, source);
+
+        AssertUnreferencedNonterminals(diagnostics, "dead_grammar//0");
+    }
+
+    [Fact]
+    public void IncompleteAnalysisSuppressesNonterminalFindings()
+    {
+        IReadOnlyList<Diagnostic> diagnostics = Lint(":- module(m, []). go(G) :- G. dead_grammar --> [a].");
+
+        Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleUnreferencedNonterminal));
     }
 
     [Theory]
@@ -231,6 +342,22 @@ public sealed class PrologReachabilityLinterTests : IDisposable
         [
             .. diagnostics
                 .Where(diagnostic => diagnostic.Id == LintDiagnosticIds.PossibleUnreferencedPredicate)
+                .Select(warning => warning.Message)
+                .Order(StringComparer.Ordinal),
+        ];
+        Assert.Equal(expected.Length, actual.Length);
+        foreach (string indicator in expected)
+        {
+            Assert.Contains(actual, message => message.Contains(indicator, StringComparison.Ordinal));
+        }
+    }
+
+    private static void AssertUnreferencedNonterminals(IReadOnlyList<Diagnostic> diagnostics, params string[] expected)
+    {
+        string[] actual =
+        [
+            .. diagnostics
+                .Where(diagnostic => diagnostic.Id == LintDiagnosticIds.PossibleUnreferencedNonterminal)
                 .Select(warning => warning.Message)
                 .Order(StringComparer.Ordinal),
         ];
