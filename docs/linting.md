@@ -67,6 +67,7 @@ These rules run in every profile:
 | `DPL3033` | No supplied clause head matches a statically resolved ground call |
 | `DPL3034` | No recognized entry point reaches an ordinary predicate through static calls |
 | `DPL3035` | An imported predicate or nonterminal has no static reference in its importing module |
+| `DPL3036` | No recognized entry point reaches a grammar nonterminal through static calls |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -147,15 +148,22 @@ dynamic or multifile predicates are entry roots. Reachability follows resolved i
 constructs, module-qualified calls, DCGs, `phrase/2,3`, and declared meta-predicate closures.
 Recursive and mutually recursive predicates are reported when no root reaches their cycle.
 
-The finding says that a predicate may be unreferenced; it is not proof that deleting it is safe.
-Nonterminals contribute edges and exported nonterminals are roots, but unreferenced nonterminals do
-not receive findings. Unused imports are also outside this rule.
+The `DPL3034` finding says that a predicate may be unreferenced; it is not proof that deleting it is
+safe. Unused imports are outside this rule.
+
+`DPL3036` applies the same analysis to grammar nonterminals. It emits at most one warning per
+`module:Name//Arity`, at the first grammar-rule head. Exported, non-module, dynamic, and multifile
+nonterminals are roots. Grammar bodies, `phrase/2,3`, and DCG `call/1` contribute edges. Test
+discovery does not root a nonterminal. Reachability uses the lowered predicate identity with two
+added arguments, so a resolved call reaches that identity even when `DPL3031` also reports
+source-kind confusion. When ordinary clauses and grammar rules share one lowered identity, the
+nonterminal finding is suppressed and only the ordinary definitions remain eligible for `DPL3034`.
 
 Reachability requires a complete static call graph. Unresolved includes or imports, unknown calls or
 modules, variable goals, unsupported meta-closures, runtime database mutation or source loading,
-conditional compilation, source expansion, and unavailable source suppress `DPL3034` for the entire
-analysis unit. Other diagnostics still run. As with every lint rule, no clause, directive,
-initialization goal, or expansion is executed.
+conditional compilation, source expansion, and unavailable source suppress `DPL3034` and `DPL3036`
+for the entire analysis unit. Other diagnostics still run. As with every lint rule, no clause,
+directive, initialization goal, or expansion is executed.
 
 ### Possibly unused imports
 
@@ -239,5 +247,5 @@ Name every module file whose definitions should participate in cross-file analys
 are read only through `include/1` expansion.
 
 The layout profile reports warnings only. It does not rewrite source. Naming conventions, comment
-quality rules, unreferenced nonterminal definitions, and automatic fixes are not implemented.
-DotProlog does not yet retain the comments and exact whitespace needed for a lossless formatter.
+quality rules, non-steadfast analysis, and automatic fixes are not implemented. DotProlog does not
+yet retain the comments and exact whitespace needed for a lossless formatter.

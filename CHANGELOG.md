@@ -24,6 +24,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - Unused-import linting reports possibly unused predicate and nonterminal bindings with `DPL3035`.
   Selective imports produce per-binding findings, whole-module imports are reported only when no
   binding is used, and reexports or sources with reader and initialization effects are excluded.
+- Grammar reachability linting reports possibly unreferenced nonterminals with `DPL3036`, including
+  `Name//Arity` source identities, DCG and `phrase` references, and conservative handling of mixed
+  ordinary and grammar definitions that share a lowered predicate identity.
 
 ### Changed
 

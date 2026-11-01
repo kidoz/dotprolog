@@ -26,10 +26,15 @@ calls. Exports, non-module predicates, initialization goals, zero-arity `test_*`
 dynamic or multifile predicates are entry points. Calls through imports, DCGs, and declared
 meta-predicate closures contribute reachability edges.
 
-This is an advisory refactoring hint, not proof that deletion is safe. Unreferenced nonterminal
-definitions are not reported. If missing source, unresolved calls, runtime goal construction,
-database mutation, conditional compilation, or source expansion could hide call edges, the linter
-suppresses `DPL3034` for the whole analysis unit while retaining other diagnostics.
+`DPL3036` applies the same advisory analysis to unreferenced grammar nonterminals, displayed as
+`Name//Arity`. Exported, non-module, dynamic, and multifile nonterminals are roots. Grammar bodies,
+`phrase/2,3`, and DCG `call/1` count as references. Mixed ordinary and grammar definitions sharing
+one lowered predicate identity do not produce a nonterminal finding.
+
+These findings are refactoring hints, not proof that deletion is safe. If missing source, unresolved
+calls, runtime goal construction, database mutation, conditional compilation, or source expansion
+could hide call edges, the linter suppresses `DPL3034` and `DPL3036` for the whole analysis unit
+while retaining other diagnostics.
 
 ## Review possibly unused imports
 
