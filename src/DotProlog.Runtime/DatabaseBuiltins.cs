@@ -475,9 +475,10 @@ internal static class DatabaseBuiltins
 
             machine.Unify(pattern, candidate);
 
-            if (erase)
+            if (erase && clause.Death == int.MaxValue)
             {
                 clause.Death = machine.Program.NextGeneration();
+                machine.Program.NoteRetraction();
             }
 
             return true;
@@ -511,6 +512,7 @@ internal static class DatabaseBuiltins
             if (machine.CanUnify(head, candidateHead))
             {
                 clause.Death = machine.Program.NextGeneration();
+                machine.Program.NoteRetraction();
             }
         }
 

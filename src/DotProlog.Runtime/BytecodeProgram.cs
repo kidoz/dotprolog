@@ -43,6 +43,55 @@ public sealed class BytecodeProgram
     private bool[] _userPredicates = new bool[64];
     private int _constantCount;
     private readonly Dictionary<int, DynamicPredicate> _dynamicPredicates = [];
+    private readonly List<WeakReference<Machine>> _machines = [];
+    private readonly List<DynamicPredicate> _retiredPredicates = [];
+    private int _retiredClauses;
+    private int _reclamationDebt;
+
+    internal void RegisterMachine(Machine machine)
+    {
+        if (_machines.Count >= 64)
+            _machines.RemoveAll(reference => !reference.TryGetTarget(out _));
+        _machines.Add(new WeakReference<Machine>(machine));
+    }
+
+    internal void NoteRetraction(int count = 1)
+    {
+        _retiredClauses += count;
+        _reclamationDebt += count;
+        if (_reclamationDebt >= 64)
+            ReclaimDynamicClauses();
+    }
+
+    internal bool HasRetiredClauses => _retiredClauses != 0;
+
+    internal void ReclaimDynamicClauses()
+    {
+        if (_retiredClauses == 0)
+            return;
+        _reclamationDebt = 0;
+        var oldest = Generation;
+        for (var i = _machines.Count - 1; i >= 0; i--)
+        {
+            if (!_machines[i].TryGetTarget(out var machine))
+                _machines.RemoveAt(i);
+            else if (machine.RetainedGeneration is int generation)
+                oldest = Math.Min(oldest, generation);
+            else
+                machine.ReleaseDynamicCursors();
+        }
+        // Aliases share one list; a second visit merely finds no additional dead clauses.
+        foreach (var predicate in _dynamicPredicates.Values)
+            _retiredClauses -= predicate.Reclaim(oldest);
+        for (var i = _retiredPredicates.Count - 1; i >= 0; i--)
+        {
+            var predicate = _retiredPredicates[i];
+            _retiredClauses -= predicate.Reclaim(oldest);
+            if (predicate.First is null)
+                _retiredPredicates.RemoveAt(i);
+        }
+    }
+
     private readonly Dictionary<int, HashSet<int>> _staticAliases = [];
     private readonly Dictionary<int, int> _staticAliasTargets = [];
     private readonly List<(CompiledPredicateBlock Block, CompiledProgram Program)> _compiledBlocks = [];
@@ -380,7 +429,9 @@ public sealed class BytecodeProgram
             return false;
         }
 
-        predicate.Abolish(NextGeneration());
+        var retired = predicate.Abolish(NextGeneration());
+        if (predicate.First is not null)
+            _retiredPredicates.Add(predicate);
 
         List<int> aliases = [];
         foreach ((var alias, DynamicPredicate candidate) in _dynamicPredicates)
@@ -398,6 +449,7 @@ public sealed class BytecodeProgram
             _userPredicates[alias] = false;
         }
 
+        NoteRetraction(retired);
         return true;
     }
 

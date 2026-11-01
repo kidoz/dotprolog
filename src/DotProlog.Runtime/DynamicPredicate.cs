@@ -48,15 +48,45 @@ internal sealed class DynamicPredicate
     }
 
     /// <summary>Marks every current clause dead at <paramref name="generation"/>.</summary>
-    internal void Abolish(int generation)
+    internal int Abolish(int generation)
     {
+        var count = 0;
         for (DynamicClause? clause = First; clause is not null; clause = clause.Next)
         {
             if (clause.Death == int.MaxValue)
             {
                 clause.Death = generation;
+                count++;
             }
         }
+        return count;
+    }
+
+    // No surviving call can see a clause that died at or before the oldest call generation.
+    internal int Reclaim(int oldestGeneration)
+    {
+        var count = 0;
+        DynamicClause? previous = null;
+        var clause = First;
+        while (clause is not null)
+        {
+            var next = clause.Next;
+            if (clause.Death != int.MaxValue && clause.Death <= oldestGeneration)
+            {
+                if (previous is null)
+                    First = next;
+                else
+                    previous.Next = next;
+                if (ReferenceEquals(Last, clause))
+                    Last = previous;
+                clause.Next = null;
+                count++;
+            }
+            else
+                previous = clause;
+            clause = next;
+        }
+        return count;
     }
 
     /// <summary>

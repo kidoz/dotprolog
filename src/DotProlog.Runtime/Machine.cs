@@ -81,6 +81,7 @@ public sealed class Machine : IDisposable
     private bool _disposed;
     private bool _forceTrail;
     private bool _solutionPending;
+    private int _callGeneration;
     private int _currentBuiltin = -1;
     private readonly int _callFunctor;
     private readonly int _wakeupFunctor;
@@ -95,6 +96,7 @@ public sealed class Machine : IDisposable
         ArgumentNullException.ThrowIfNull(program);
         _program = program;
         _symbols = program.Symbols;
+        program.RegisterMachine(this);
         _callFunctor = _symbols.InternFunctor("call", 1);
         _wakeupFunctor = _symbols.InternFunctor("$wakeup", 1);
         _wakePairFunctor = _symbols.InternFunctor("-", 2);
@@ -115,6 +117,9 @@ public sealed class Machine : IDisposable
 
         Streams.CloseAll();
         _disposed = true;
+        _solutionPending = false;
+        ReleaseDynamicCursors();
+        _program.ReclaimDynamicClauses();
     }
 
     /// <summary>The streams this program has open.</summary>
@@ -1906,6 +1911,15 @@ public sealed class Machine : IDisposable
         return true;
     }
 
+    internal int? RetainedGeneration => !_disposed && (IsRunning || _solutionPending) ? _callGeneration : null;
+
+    internal void ReleaseDynamicCursors()
+    {
+        for (var i = 0; i < _choicePoints.Length; i++)
+            _choicePoints[i].NextClause = null;
+        BuiltinCursor = null;
+    }
+
     private void ResetState()
     {
         // Backtrackable global assignments must not outlive their top-level goal: fire the whole
@@ -1932,6 +1946,9 @@ public sealed class Machine : IDisposable
         _hasFrozen = false;
         _wokenCount = 0;
         ExitCode = 0;
+        if (_program.HasRetiredClauses)
+            _program.ReclaimDynamicClauses();
+        _callGeneration = _program.Generation;
     }
 
     private bool TryEntryPoint(int functorId, out int entry)
