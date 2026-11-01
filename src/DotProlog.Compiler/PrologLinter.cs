@@ -37,6 +37,7 @@ public static class PrologLinter
         PrologLiteralLinter.Analyze(clauses, fileName, diagnostics);
         PrologAllSolutionsLinter.Analyze(clauses, fileName, diagnostics);
         PrologStructureLinter.Analyze(clauses, fileName, diagnostics);
+        PrologSemanticSingletonLinter.Analyze(clauses, fileName, diagnostics);
 
         return [.. diagnostics.OrderBy(diagnostic => diagnostic.Span.Start).ThenBy(diagnostic => diagnostic.Id)];
     }

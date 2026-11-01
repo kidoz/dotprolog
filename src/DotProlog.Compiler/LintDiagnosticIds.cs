@@ -90,4 +90,7 @@ public static class LintDiagnosticIds
 
     /// <summary>A discontiguous or meta-predicate declaration has no file-local definition.</summary>
     public const string DeclaredButUndefined = "DPL3027";
+
+    /// <summary>A variable occurs once in each alternative branch and nowhere outside them.</summary>
+    public const string SemanticSingletonVariable = "DPL3028";
 }
