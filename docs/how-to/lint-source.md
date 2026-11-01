@@ -26,10 +26,22 @@ calls. Exports, non-module predicates, initialization goals, zero-arity `test_*`
 dynamic or multifile predicates are entry points. Calls through imports, DCGs, and declared
 meta-predicate closures contribute reachability edges.
 
-This is an advisory refactoring hint, not proof that deletion is safe. Unreferenced nonterminals and
-unused imports are not reported. If missing source, unresolved calls, runtime goal construction,
+This is an advisory refactoring hint, not proof that deletion is safe. Unreferenced nonterminal
+definitions are not reported. If missing source, unresolved calls, runtime goal construction,
 database mutation, conditional compilation, or source expansion could hide call edges, the linter
 suppresses `DPL3034` for the whole analysis unit while retaining other diagnostics.
+
+## Review possibly unused imports
+
+`DPL3035` reports imported predicates and nonterminals without static references in the importing
+module. A selective `use_module/2` or `import/2` receives one warning per unused indicator. A
+whole-module `use_module/1` or `import/1` receives one warning only when none of its bindings is
+used. References through DCGs, meta-closures, initialization goals, and otherwise dead code count;
+explicitly qualified calls and usage by other modules do not.
+
+Reexports are excluded. Imports whose sources contain reader or initialization side effects are also
+excluded, including transitive effects through other imports. Incomplete static analysis suppresses
+the rule. A finding is an advisory hint, not a certificate that removing the import is safe.
 
 ## Fail CI on warnings
 

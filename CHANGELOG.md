@@ -21,6 +21,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - Advisory reachability linting reports possibly unreferenced ordinary predicates with `DPL3034`.
   Exports, scripts, initialization goals, discovered tests, and dynamic or multifile predicates are
   entry points; incomplete or runtime-dependent call information suppresses the rule.
+- Unused-import linting reports possibly unused predicate and nonterminal bindings with `DPL3035`.
+  Selective imports produce per-binding findings, whole-module imports are reported only when no
+  binding is used, and reexports or sources with reader and initialization effects are excluded.
 
 ### Changed
 

@@ -66,6 +66,7 @@ These rules run in every profile:
 | `DPL3032` | An include cannot be read, forms a cycle, or exceeds the expansion limit |
 | `DPL3033` | No supplied clause head matches a statically resolved ground call |
 | `DPL3034` | No recognized entry point reaches an ordinary predicate through static calls |
+| `DPL3035` | An imported predicate or nonterminal has no static reference in its importing module |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -156,6 +157,27 @@ conditional compilation, source expansion, and unavailable source suppress `DPL3
 analysis unit. Other diagnostics still run. As with every lint rule, no clause, directive,
 initialization goal, or expansion is executed.
 
+### Possibly unused imports
+
+`DPL3035` reports imported predicates and nonterminals without statically resolved references in
+their importing module. Selective `use_module/2` and `import/2` declarations produce one finding per
+unused indicator, located at that indicator. Whole-module `use_module/1` and `import/1` declarations
+produce one finding at the source or module argument only when none of their bindings is used; the
+rule does not enumerate the remaining unused bindings when another binding is referenced. Empty
+selective lists and all `reexport/1,2` declarations are excluded.
+
+References can occur in any supplied clause or initialization goal, including code that `DPL3034`
+reports as unreachable. Direct calls, DCGs, `phrase/2,3`, and declared meta-closures count when they
+resolve through the import. Calls resolved locally, to another module, to `user`, or to a built-in
+do not count. Explicitly qualified calls and usage by other modules do not count for the import
+site. Predicate/nonterminal mismatches do not count as usage.
+
+An import whose supplied source has operator, character-conversion, flag, initialization, or other
+executable effects is excluded, including effects propagated through nested imports. The same
+whole-unit incomplete-analysis conditions as reachability suppress `DPL3035` without suppressing
+other diagnostics. A finding is an advisory hint, not proof that removing the import preserves
+behavior.
+
 ### Double-quoted text
 
 `DPL3011` and `DPL3012` judge each double-quoted literal by the `double_quotes` value in force where
@@ -217,5 +239,5 @@ Name every module file whose definitions should participate in cross-file analys
 are read only through `include/1` expansion.
 
 The layout profile reports warnings only. It does not rewrite source. Naming conventions, comment
-quality rules, unused-import analysis, and automatic fixes are not implemented. DotProlog does not
-yet retain the comments and exact whitespace needed for a lossless formatter.
+quality rules, unreferenced nonterminal definitions, and automatic fixes are not implemented.
+DotProlog does not yet retain the comments and exact whitespace needed for a lossless formatter.
