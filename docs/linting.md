@@ -64,6 +64,7 @@ These rules run in every profile:
 | `DPL3030` | An exported or declared predicate has no definition in the supplied program |
 | `DPL3031` | A predicate is called as a nonterminal, or a nonterminal as a predicate |
 | `DPL3032` | An include cannot be read, forms a cycle, or exceeds the expansion limit |
+| `DPL3033` | No supplied clause head matches a statically resolved ground call |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -126,7 +127,14 @@ Predicate identity includes module, name, and arity. DCG nonterminals additional
 templates guide goal traversal and closure arity. Variable goals, runtime-constructed calls,
 unavailable imports, unknown modules, and dynamic declarations remain unknown rather than producing
 `DPL3029`. `DPL3030` covers exports and declarations without definitions, while `DPL3031` covers
-ordinary-predicate/nonterminal confusion. Trivial-failure and dead-code analysis are not implemented.
+ordinary-predicate/nonterminal confusion.
+
+`DPL3033` checks direct ground calls against every supplied clause head of the resolved static
+predicate. Atoms, numbers, concrete strings, compounds, and lists are compared without running any
+code. Head variables may match ground arguments, and repeated named variables must bind consistently.
+Dynamic and multifile predicates, variable-containing calls, reader-dependent double-quoted terms,
+built-ins, meta-closures, and unknown resolutions are skipped. A matching rule head counts even when
+its body would fail or throw, because bodies are never evaluated. Dead-code analysis is not implemented.
 
 ### Double-quoted text
 
@@ -189,5 +197,5 @@ Name every module file whose definitions should participate in cross-file analys
 are read only through `include/1` expansion.
 
 The layout profile reports warnings only. It does not rewrite source. Naming conventions, comment
-quality rules, trivial-failure analysis, dead-code analysis, and automatic fixes are not implemented.
-DotProlog does not yet retain the comments and exact whitespace needed for a lossless formatter.
+quality rules, dead-code analysis, and automatic fixes are not implemented. DotProlog does not yet
+retain the comments and exact whitespace needed for a lossless formatter.

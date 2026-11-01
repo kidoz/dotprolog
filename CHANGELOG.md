@@ -15,6 +15,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - `dotnet prolog lint` analyzes named files as one program, resolving modules, imports and includes
   without execution. It reports undefined calls, missing exported or declared definitions, and
   predicate/nonterminal confusion while leaving unavailable imports and dynamic targets unknown.
+- Ground-call linting reports when no supplied clause head matches, with repeated-variable
+  consistency and conservative suppression for dynamic, multifile, variable, meta-call, and
+  representation-dependent cases. Clause bodies are never evaluated.
 
 ### Changed
 
