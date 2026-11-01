@@ -316,6 +316,7 @@ internal static class Program
 
         var foundErrors = false;
         var foundWarnings = false;
+        List<PrologLintSource> sources = [];
         foreach (var path in paths)
         {
             if (!File.Exists(path))
@@ -339,32 +340,21 @@ internal static class Program
             }
 
             var program = new BytecodeProgram(languageMode, flagOverrides);
-            ParseResult parsed = TermReader.ReadProgram(
-                source,
-                absolute,
-                program.Operators,
-                program.CharacterConversions,
-                program.Flags
-            );
-            IReadOnlyList<Diagnostic> diagnostics =
-            [
-                .. parsed.Diagnostics,
-                .. PrologLinter.AnalyzeSource(
-                    source,
-                    parsed.Clauses,
-                    absolute,
-                    lintOptions,
-                    program.InitialDoubleQuotes,
-                    program.Flags.CodePointCharacters
-                ),
-            ];
-
-            foreach (Diagnostic diagnostic in diagnostics)
+            PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(absolute, source, program);
+            sources.Add(loaded.Source);
+            foreach (Diagnostic diagnostic in loaded.Diagnostics)
             {
                 error.WriteLine(diagnostic.ToString());
                 foundErrors |= diagnostic.Severity == DiagnosticSeverity.Error;
                 foundWarnings |= diagnostic.Severity == DiagnosticSeverity.Warning;
             }
+        }
+
+        foreach (Diagnostic diagnostic in PrologLinter.AnalyzeProgram(sources, lintOptions))
+        {
+            error.WriteLine(diagnostic.ToString());
+            foundErrors |= diagnostic.Severity == DiagnosticSeverity.Error;
+            foundWarnings |= diagnostic.Severity == DiagnosticSeverity.Warning;
         }
 
         if (foundErrors)

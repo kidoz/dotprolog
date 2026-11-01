@@ -76,6 +76,41 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void LintResolvesNamedFilesAsOneProgram()
+    {
+        var main = Source("main.pl", ":- module(main, []). :- use_module('other.pl'). go :- helper.\n");
+        var other = Source("other.pl", ":- module(other, [helper/0]). helper.\n");
+
+        (var exitCode, _, var error) = Execute("lint", "--warnings-as-errors", main, other);
+
+        Assert.Equal(0, exitCode);
+        Assert.Empty(error);
+    }
+
+    [Fact]
+    public void LintReportsAnUndefinedCrossFileCall()
+    {
+        var main = Source("main.pl", ":- module(main, []). :- use_module('other.pl'). go :- missing.\n");
+        var other = Source("other.pl", ":- module(other, [helper/0]). helper.\n");
+
+        (var exitCode, _, var error) = Execute("lint", "--warnings-as-errors", main, other);
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("DPL3029", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LintReportsAnUnresolvedInclude()
+    {
+        var main = Source("main.pl", ":- include('missing.pl').\n");
+
+        (var exitCode, _, var error) = Execute("lint", "--warnings-as-errors", main);
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("DPL3032", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LintDoesNotExecuteDirectives()
     {
         var path = Source("directive.pl", ":- initialization(halt(9)).\nsafe.\n");
