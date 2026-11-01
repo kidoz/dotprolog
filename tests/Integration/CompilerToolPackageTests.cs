@@ -51,6 +51,7 @@ public sealed class CompilerToolPackageTests
                         "DotProlog.Compiler",
                         "DotProlog.Syntax",
                         "DotProlog.Runtime",
+                        "DotProlog.Packages",
                     }
                 )
                 {
@@ -92,29 +93,58 @@ public sealed class CompilerToolPackageTests
             Assert.True(helpExit == 0, helpLog);
             Assert.Contains("Usage: plc", helpLog, StringComparison.Ordinal);
 
+            var workspace = Path.Combine(consumer, "package workspace");
+            var cache = Path.Combine(consumer, "package cache");
+            Directory.CreateDirectory(workspace);
+            await File.WriteAllTextAsync(
+                Path.Combine(workspace, "propack.json"),
+                "{\"name\":\"demo/app\",\"version\":\"1.0.0\",\"modules\":{\"words\":\"words.pl\"}}",
+                TestContext.Current.CancellationToken
+            );
+            await File.WriteAllTextAsync(
+                Path.Combine(workspace, "words.pl"),
+                ":- module(words, [word/1]).\nword(hello).\n",
+                TestContext.Current.CancellationToken
+            );
+            new DotProlog.Packages.PackageWorkspace(workspace, cache).Restore();
             var source = Path.Combine(consumer, "program with spaces.pl");
             await File.WriteAllTextAsync(
                 source,
                 """
+                :- use_module(library(words)).
                 parent(a,b).
                 parent(b,c).
                 ancestor(X,Y) :- parent(X,Y).
                 ancestor(X,Y) :- parent(X,Z), ancestor(Z,Y).
-                main :- findall(X,ancestor(a,X),[b,c]), writeln('installed-plc: passed').
+                main :- findall(X,ancestor(a,X),[b,c]), word(hello), writeln('installed-plc: passed').
                 :- initialization(main).
                 """,
                 TestContext.Current.CancellationToken
             );
             var (compileExit, compileLog) = await ChildProcess.RunAsync(
                 compiler,
-                ["program with spaces.pl", "--output", "output with spaces", "--aot"],
+                ["program with spaces.pl", "--output", "output with spaces", "--packages", workspace, "--aot"],
                 consumer
             );
             Assert.True(compileExit == 0, compileLog);
             Assert.DoesNotContain("warning IL", compileLog, StringComparison.Ordinal);
             var output = Path.Combine(consumer, "output with spaces");
+            Assert.True(File.Exists(Path.Combine(output, "PrologProgram.pdb")));
+            var intermediateSymbols = Assert.Single(
+                Directory.GetFiles(Path.Combine(output, "obj"), "PrologProgram.pdb", SearchOption.AllDirectories)
+            );
+            Assert.Equal(
+                await File.ReadAllBytesAsync(Path.Combine(output, "PrologProgram.pdb"), TestContext.Current.CancellationToken),
+                await File.ReadAllBytesAsync(intermediateSymbols, TestContext.Current.CancellationToken)
+            );
+            var compilerArguments = Assert.Single(
+                Directory.GetFiles(Path.Combine(output, "obj"), "PrologProgram.ilc.rsp", SearchOption.AllDirectories)
+            );
+            Assert.Contains("-g", await File.ReadAllLinesAsync(compilerArguments, TestContext.Current.CancellationToken));
             Assert.Empty(Directory.GetFiles(output, "*.cs", SearchOption.AllDirectories));
             File.Delete(source);
+            Directory.Delete(workspace, recursive: true);
+            Directory.Delete(cache, recursive: true);
             var (managedExit, managedLog) = await ChildProcess.RunAsync(
                 "dotnet",
                 [Path.Combine(output, "PrologProgram.dll")],

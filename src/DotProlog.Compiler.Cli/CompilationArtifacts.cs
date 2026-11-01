@@ -2,7 +2,12 @@ namespace DotProlog.Compiler.Cli;
 
 internal static class CompilationArtifacts
 {
-    internal static async Task WriteAsync(string destination, byte[] assembly, CancellationToken cancellationToken)
+    internal static async Task WriteAsync(
+        string destination,
+        byte[] assembly,
+        byte[] symbols,
+        CancellationToken cancellationToken
+    )
     {
         var parent = Path.GetDirectoryName(destination)!;
         Directory.CreateDirectory(parent);
@@ -11,6 +16,8 @@ internal static class CompilationArtifacts
         try
         {
             await File.WriteAllBytesAsync(Path.Combine(staging, "PrologProgram.dll"), assembly, cancellationToken)
+                .ConfigureAwait(false);
+            await File.WriteAllBytesAsync(Path.Combine(staging, "PrologProgram.pdb"), symbols, cancellationToken)
                 .ConfigureAwait(false);
             PublishingProject.Write(staging);
             cancellationToken.ThrowIfCancellationRequested();

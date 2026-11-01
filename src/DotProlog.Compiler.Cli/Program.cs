@@ -47,7 +47,7 @@ internal static class Program
         {
             await output
                 .WriteLineAsync(
-                    "Usage: plc <source.pl> [more.pl ...] --output <new-directory> [--aot] [--rid <RID>] [--mode modern|strict-iso] [--flag name=value]"
+                    "Usage: plc <source.pl> [more.pl ...] --output <new-directory> [--aot] [--rid <RID>] [--mode modern|strict-iso] [--flag name=value] [--packages DIR]"
                 )
                 .ConfigureAwait(false);
             await output
@@ -60,6 +60,7 @@ internal static class Program
         List<string> flags = [];
         string? destination = null;
         string? rid = null;
+        string? packageDirectory = null;
         var mode = PrologLanguageMode.Modern;
         var aot = false;
         for (var i = 0; i < args.Length; i++)
@@ -70,7 +71,7 @@ internal static class Program
                 aot = true;
                 continue;
             }
-            if (argument is "--output" or "-o" or "--rid" or "--mode" or "--flag")
+            if (argument is "--output" or "-o" or "--rid" or "--mode" or "--flag" or "--packages")
             {
                 if (++i == args.Length)
                 {
@@ -88,6 +89,9 @@ internal static class Program
                         break;
                     case "--flag":
                         flags.Add(value);
+                        break;
+                    case "--packages":
+                        packageDirectory = value;
                         break;
                     case "--mode":
                         if (!PrologLanguageModes.TryParse(value, out mode))
@@ -132,8 +136,33 @@ internal static class Program
             {
                 inputs.Add((Path.GetFullPath(path), await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false)));
             }
+            IReadOnlyDictionary<string, string>? libraryFiles = null;
+            if (packageDirectory is not null)
+            {
+                try
+                {
+                    var version = typeof(Program).Assembly.GetName().Version!;
+                    libraryFiles = new DotProlog.Packages.PackageWorkspace(packageDirectory).GetLibraries(
+                        "dotprolog",
+                        $"{version.Major}.{version.Minor}.{version.Build}"
+                    );
+                }
+                catch (Exception exception)
+                    when (exception
+                            is InvalidDataException
+                                or IOException
+                                or UnauthorizedAccessException
+                                or ArgumentException
+                                or System.Text.Json.JsonException
+                    )
+                {
+                    await error.WriteLineAsync($"error: {exception.Message}").ConfigureAwait(false);
+                    return 65;
+                }
+            }
             using var assembly = new MemoryStream();
-            var diagnostics = IlAssemblyEmitter.Emit(inputs, "PrologProgram", assembly, mode, overrides);
+            using var symbols = new MemoryStream();
+            var diagnostics = IlAssemblyEmitter.Emit(inputs, "PrologProgram", assembly, libraryFiles, mode, overrides, symbols);
             foreach (var diagnostic in diagnostics)
             {
                 await error.WriteLineAsync(diagnostic.ToString()).ConfigureAwait(false);
@@ -143,7 +172,9 @@ internal static class Program
                 return 65;
             }
             cancellationToken.ThrowIfCancellationRequested();
-            await CompilationArtifacts.WriteAsync(destination, assembly.ToArray(), cancellationToken).ConfigureAwait(false);
+            await CompilationArtifacts
+                .WriteAsync(destination, assembly.ToArray(), symbols.ToArray(), cancellationToken)
+                .ConfigureAwait(false);
             await output.WriteLineAsync($"IL assembly: {Path.Combine(destination, "PrologProgram.dll")}").ConfigureAwait(false);
             if (!aot)
             {

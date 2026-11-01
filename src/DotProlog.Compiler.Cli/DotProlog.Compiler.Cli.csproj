@@ -14,6 +14,7 @@
     </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="../DotProlog.CodeGen.IL/DotProlog.CodeGen.IL.csproj" />
+        <ProjectReference Include="../DotProlog.Packages/DotProlog.Packages.csproj" />
         <InternalsVisibleTo Include="DotProlog.CodeGen.IL.Tests" />
     </ItemGroup>
 </Project>

@@ -33,7 +33,7 @@ internal static class PublishingProject
                 new XElement("GenerateAssemblyInfo", "false"),
                 new XElement("GenerateTargetFrameworkAttribute", "false"),
                 new XElement("ProduceReferenceAssembly", "false"),
-                new XElement("DebugType", "none"),
+                new XElement("DebugType", "portable"),
                 new XElement("PublishAot", "true"),
                 new XElement("InvariantGlobalization", "true"),
                 new XElement("TreatWarningsAsErrors", "true"),
@@ -56,6 +56,11 @@ internal static class PublishingProject
                     "Copy",
                     new XAttribute("SourceFiles", "$(MSBuildProjectDirectory)/PrologProgram.dll"),
                     new XAttribute("DestinationFiles", "@(IntermediateAssembly)")
+                ),
+                new XElement(
+                    "Copy",
+                    new XAttribute("SourceFiles", "$(MSBuildProjectDirectory)/PrologProgram.pdb"),
+                    new XAttribute("DestinationFiles", "$(IntermediateOutputPath)PrologProgram.pdb")
                 )
             )
         );
