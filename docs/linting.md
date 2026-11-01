@@ -44,6 +44,22 @@ These rules run in every profile:
 | `DPL3002` | An underscore-prefixed singleton marker occurs more than once in its clause |
 | `DPL3011` | Double-quoted text is passed to a conversion that needs a different list kind |
 | `DPL3012` | Double-quoted text read as characters is parsed by a grammar that compares character codes |
+| `DPL3013` | A literal format string, argument count, or argument type is invalid |
+| `DPL3014` | A literal predicate option or option value is invalid |
+| `DPL3015` | An arithmetic expression contains a statically invalid function or operand |
+| `DPL3016` | A call has no matching built-in or file-local predicate signature |
+| `DPL3017` | A goal succeeds without changing bindings or producing another observable effect |
+| `DPL3018` | A goal always fails when execution reaches it |
+| `DPL3019` | An existentially qualified variable does not occur in its goal |
+| `DPL3020` | An all-solutions template and goal share no named variables |
+| `DPL3021` | A variable occurs only once inside a `bagof/3` or `setof/3` goal |
+| `DPL3022` | A `findall/3` call is followed directly by failure |
+| `DPL3023` | Clauses of one predicate are separated without a `discontiguous/1` declaration |
+| `DPL3024` | A clause or grammar rule duplicates an earlier one up to variable renaming |
+| `DPL3025` | A predicate declaration is duplicated |
+| `DPL3026` | A clause or grammar rule starts with a variant of its own head |
+| `DPL3027` | A `discontiguous/1` or `meta_predicate/1` declaration has no file-local definition |
+| `DPL3028` | A variable occurs once in every alternative branch and nowhere outside them |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -53,6 +69,42 @@ head(_Ignored) :-
 ```
 
 The anonymous variable `_` is always exempt because every occurrence denotes a fresh variable.
+`DPL3028` additionally recognizes semantic singletons. In `(first(X) ; second(X))`, `X` occurs twice
+syntactically but communicates no binding between alternatives. Variables used outside the branches,
+variables repeated within one branch, and variables occurring in an if-then-else condition are not
+reported by this rule.
+
+### Literal calls and predetermined goals
+
+`DPL3013` checks literal `format/1,2,3` strings and proper argument lists, including `~*`, `~W`, and
+`~@` argument consumption. It skips dynamic format strings and argument lists. `DPL3014` checks
+literal options for `open/4`, `close/2`, `read_term/2,3`, and `write_term/2,3`, including options
+nested in `~W`. `DPL3015` checks arithmetic used by `is/2` and arithmetic comparisons for unknown
+functions, non-evaluable operands, and literal zero divisors.
+
+`DPL3016` compares calls with the native built-in registry, bundled Prolog library signatures, and
+predicates defined in the same file. It is advisory: a same-named user predicate supplied by another
+file can make the finding unnecessary because imports are not resolved.
+
+`DPL3017` reports goals such as `X = X` or `atom(foo)` that succeed without a useful effect.
+`DPL3018` reports statically predetermined failures such as `a = b`, two fresh variables compared by
+`==/2`, or `atom(42)`. Goal-shaped terms nested in ordinary data are not treated as executable goals.
+
+### All-solutions predicates
+
+`DPL3019` checks `^/2` existential quantifiers, `DPL3020` checks that template and goal share a
+variable, and `DPL3021` reports goal-local singletons that also occur elsewhere in the clause so the
+finding does not duplicate the ordinary singleton warning. `DPL3022` recognizes a `findall/3` call
+whose collected result is discarded by immediate failure; a clearer failure-driven loop may be more
+appropriate when collection was not intended.
+
+### Clauses and declarations
+
+`DPL3023` checks clause grouping and honors `discontiguous/1`. `DPL3024` compares clauses and grammar
+rules up to variable renaming, while `DPL3025` compares declarations exactly; different
+`meta_predicate/1` templates are not exact duplicates. `DPL3026` is limited to a leftmost goal that is
+a variant of the head, not every recursive call. `DPL3027` applies only to `discontiguous/1` and
+`meta_predicate/1`; a dynamic predicate may intentionally start with no clauses.
 
 ### Double-quoted text
 
@@ -115,5 +167,5 @@ files, or perform whole-program call analysis. Name those files explicitly when 
 linted.
 
 The layout profile reports warnings only. It does not rewrite source. Naming conventions, comment
-quality rules, predicate call analysis, and automatic fixes are not implemented in this phase.
+quality rules, whole-program predicate call analysis, and automatic fixes are not implemented.
 DotProlog does not yet retain the comments and exact whitespace needed for a lossless formatter.

@@ -6,6 +6,13 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Source linting now validates literal format calls, predicate options and arithmetic expressions;
+  reports possible built-in arity mismatches and predetermined goals; checks all-solutions variable
+  usage; and detects discontiguous, duplicate, directly left-recursive, undefined-declaration, and
+  semantic-singleton patterns without executing source.
+
 ### Changed
 
 - Standard-order comparison handles atomic terms directly and reuses machine-owned scratch for
