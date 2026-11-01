@@ -14,8 +14,10 @@ Review diagnostics at their reported file, line, and column. For an intentionall
 variable, prefix its name with an underscore; the anonymous variable `_` is always exempt.
 See the [diagnostic reference](../linting.md#semantic-diagnostics) for each rule.
 
-The command reads each named file independently. Name imported and included files explicitly
-when they should also be checked.
+Named files form one analysis unit, so list the modules whose calls should resolve together.
+Modern `use_module/1,2` imports resolve among those files. `include/1` is expanded relative to the
+including file without executing its contents. Unavailable imports and dynamic call targets remain
+unknown rather than being reported as undefined.
 
 ## Fail CI on warnings
 

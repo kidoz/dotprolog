@@ -60,6 +60,10 @@ These rules run in every profile:
 | `DPL3026` | A clause or grammar rule starts with a variant of its own head |
 | `DPL3027` | A `discontiguous/1` or `meta_predicate/1` declaration has no file-local definition |
 | `DPL3028` | A variable occurs once in every alternative branch and nowhere outside them |
+| `DPL3029` | A statically resolved predicate or nonterminal call has no definition in the supplied program |
+| `DPL3030` | An exported or declared predicate has no definition in the supplied program |
+| `DPL3031` | A predicate is called as a nonterminal, or a nonterminal as a predicate |
+| `DPL3032` | An include cannot be read, forms a cycle, or exceeds the expansion limit |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -82,9 +86,8 @@ literal options for `open/4`, `close/2`, `read_term/2,3`, and `write_term/2,3`, 
 nested in `~W`. `DPL3015` checks arithmetic used by `is/2` and arithmetic comparisons for unknown
 functions, non-evaluable operands, and literal zero divisors.
 
-`DPL3016` compares calls with the native built-in registry, bundled Prolog library signatures, and
-predicates defined in the same file. It is advisory: a same-named user predicate supplied by another
-file can make the finding unnecessary because imports are not resolved.
+`DPL3016` is the file-local form of possible arity analysis used by the reusable single-file API.
+The command-line whole-program path suppresses it in favor of `DPL3029` when it can resolve calls.
 
 `DPL3017` reports goals such as `X = X` or `atom(foo)` that succeed without a useful effect.
 `DPL3018` reports statically predetermined failures such as `a = b`, two fresh variables compared by
@@ -105,6 +108,25 @@ rules up to variable renaming, while `DPL3025` compares declarations exactly; di
 `meta_predicate/1` templates are not exact duplicates. `DPL3026` is limited to a leftmost goal that is
 a variant of the head, not every recursive call. `DPL3027` applies only to `discontiguous/1` and
 `meta_predicate/1`; a dynamic predicate may intentionally start with no clauses.
+
+### Whole-program call analysis
+
+Every named file joins one analysis unit. Modern `module/2` exports and `use_module/1,2` imports
+resolve among those files; ISO `module/1`, `export/1`, `import/1,2`, and `reexport/1,2` declarations
+are also modeled. Local definitions take priority over imports, visible `user` predicates, and
+built-ins. Explicit `Module:Goal` calls resolve only when the module is known.
+
+`include/1` expands relative to the including file with a depth limit and cycle detection. Included
+clauses retain their physical file names and source spans. `DPL3032` reports an unreadable include,
+a cycle, or an exceeded limit. Layout checks apply to explicitly named source text; semantic checks
+also cover expanded clauses.
+
+Predicate identity includes module, name, and arity. DCG nonterminals additionally retain their
+`Name//Arity` identity and the two added predicate arguments. Built-in and declared meta-predicate
+templates guide goal traversal and closure arity. Variable goals, runtime-constructed calls,
+unavailable imports, unknown modules, and dynamic declarations remain unknown rather than producing
+`DPL3029`. `DPL3030` covers exports and declarations without definitions, while `DPL3031` covers
+ordinary-predicate/nonterminal confusion. Trivial-failure and dead-code analysis are not implemented.
 
 ### Double-quoted text
 
@@ -162,10 +184,10 @@ A numeric option also enables that individual check when the profile is `semanti
 appear in any order. Comma analysis ignores quoted text and comments; all diagnostics retain exact
 source locations, including in CRLF files.
 
-The command analyzes each named file independently. It does not resolve imports, expand included
-files, or perform whole-program call analysis. Name those files explicitly when they should also be
-linted.
+The command does not perform ambient module lookup, restore packages, or resolve library aliases.
+Name every module file whose definitions should participate in cross-file analysis. Included files
+are read only through `include/1` expansion.
 
 The layout profile reports warnings only. It does not rewrite source. Naming conventions, comment
-quality rules, whole-program predicate call analysis, and automatic fixes are not implemented.
+quality rules, trivial-failure analysis, dead-code analysis, and automatic fixes are not implemented.
 DotProlog does not yet retain the comments and exact whitespace needed for a lossless formatter.

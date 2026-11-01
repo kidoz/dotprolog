@@ -12,6 +12,9 @@ All notable changes to DotProlog are recorded here. The format follows
   reports possible built-in arity mismatches and predetermined goals; checks all-solutions variable
   usage; and detects discontiguous, duplicate, directly left-recursive, undefined-declaration, and
   semantic-singleton patterns without executing source.
+- `dotnet prolog lint` analyzes named files as one program, resolving modules, imports and includes
+  without execution. It reports undefined calls, missing exported or declared definitions, and
+  predicate/nonterminal confusion while leaving unavailable imports and dynamic targets unknown.
 
 ### Changed
 
