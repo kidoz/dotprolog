@@ -108,4 +108,7 @@ public static class LintDiagnosticIds
 
     /// <summary>No supplied clause head can unify with a statically resolved ground call.</summary>
     public const string TrivialCallFailure = "DPL3033";
+
+    /// <summary>No recognized entry point reaches an ordinary predicate through static calls.</summary>
+    public const string PossibleUnreferencedPredicate = "DPL3034";
 }

@@ -21,6 +21,7 @@ internal sealed class PrologLintProgramModel
     }
 
     internal IReadOnlyList<PrologLintSource> Sources { get; }
+    internal bool HasUnresolvedImports => _unresolvedImportModules.Count > 0 || _unresolvedImportPredicates.Count > 0;
     internal ModuleTable Modules { get; }
     internal List<ClauseContext> Clauses { get; } = [];
     internal List<DeclarationSite> Declarations { get; } = [];
@@ -83,6 +84,9 @@ internal sealed class PrologLintProgramModel
         _ordinary.Contains((module, predicate)) || LintBuiltinCatalog.Contains(predicate);
 
     internal bool IsNonterminal(string module, PredicateIndicator predicate) => _nonterminals.Contains((module, predicate));
+
+    internal bool IsDynamicOrMultifile(string module, PredicateIndicator predicate) =>
+        _dynamicOrMultifile.Contains((module, predicate));
 
     internal int[]? MetaArgumentsOf(string module, PredicateIndicator predicate) => Modules.MetaArgumentsOf(module, predicate);
 
@@ -386,19 +390,21 @@ internal sealed class PrologLintProgramModel
 
     internal readonly record struct LintResolution
     {
-        private LintResolution(bool known, string? module)
+        private LintResolution(bool known, string? module, bool unknown = false)
         {
             Known = known;
             Module = module;
+            IsUnknown = unknown;
         }
 
         internal static readonly LintResolution Undefined = new(false, null);
-        internal static readonly LintResolution Unknown = new(true, null);
+        internal static readonly LintResolution Unknown = new(true, null, unknown: true);
 
         internal bool Known { get; }
         internal string? Module { get; }
+        internal bool IsUnknown { get; }
         internal bool IsDefined => Known && Module is not null;
-        internal bool IsBuiltin => Known && Module is null;
+        internal bool IsBuiltin => Known && Module is null && !IsUnknown;
 
         internal static LintResolution Defined(string? module) => new(true, module);
     }

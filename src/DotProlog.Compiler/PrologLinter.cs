@@ -119,6 +119,7 @@ public static class PrologLinter
         }
 
         PrologCallGraphLinter.Analyze(model, diagnostics);
+        PrologReachabilityLinter.Analyze(model, diagnostics);
         return
         [
             .. diagnostics

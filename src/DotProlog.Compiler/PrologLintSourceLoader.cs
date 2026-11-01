@@ -27,7 +27,10 @@ public static class PrologLintSourceLoader
             program.InitialDoubleQuotes,
             program.Flags.CodePointCharacters,
             clauseFiles
-        );
+        )
+        {
+            HasAnalysisGaps = parsed.Diagnostics.Count > 0,
+        };
         return new PrologLintSourceLoadResult(unit, parsed.Diagnostics);
     }
 

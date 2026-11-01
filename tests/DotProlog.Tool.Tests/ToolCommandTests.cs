@@ -78,7 +78,7 @@ public sealed class ToolCommandTests : IDisposable
     [Fact]
     public void LintResolvesNamedFilesAsOneProgram()
     {
-        var main = Source("main.pl", ":- module(main, []). :- use_module('other.pl'). go :- helper.\n");
+        var main = Source("main.pl", ":- module(main, [go/0]). :- use_module('other.pl'). go :- helper.\n");
         var other = Source("other.pl", ":- module(other, [helper/0]). helper.\n");
 
         (var exitCode, _, var error) = Execute("lint", "--warnings-as-errors", main, other);
@@ -108,6 +108,19 @@ public sealed class ToolCommandTests : IDisposable
 
         Assert.Equal(1, exitCode);
         Assert.Contains("DPL3033", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LintReportsAPossiblyUnreferencedPredicate()
+    {
+        var path = Source("reachability.pl", ":- module(m, [go/0]).\ngo.\nunused.\n");
+
+        (var exitCode, _, var error) = Execute("lint", "--warnings-as-errors", path);
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("DPL3034", error, StringComparison.Ordinal);
+        Assert.Contains("m:unused/0", error, StringComparison.Ordinal);
+        Assert.Contains("may be unreferenced", error, StringComparison.Ordinal);
     }
 
     [Fact]
