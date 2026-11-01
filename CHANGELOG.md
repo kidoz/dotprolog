@@ -22,6 +22,15 @@ All notable changes to DotProlog are recorded here. The format follows
 - DotProlog's CLI and SDK consume the same package lock without downloading during compilation.
   Modern `use_module(library(Name))` resolves explicit host-supplied aliases. The portable package
   sample runs a transitive dependency under SWI-Prolog, DotProlog, and a compiled SDK application.
+- `plc --packages DIR` compiles standalone applications against the same verified package workspaces.
+  Package sources are embedded in the direct IL output, so the resulting application runs without the
+  workspace or cache.
+- Direct IL compilation emits a deterministic Portable PDB with Prolog source documents and sequence
+  points preserved through block fusion, including nested source includes. `plc` stages
+  `PrologProgram.pdb` beside the managed assembly and preserves it through publication so NativeAOT
+  can emit source debugging information.
+- `DotProlog.Compiler.Cli` is published as a .NET tool, making the standalone `plc` compiler available
+  from NuGet.org alongside the existing DotProlog packages.
 
 ### Fixed
 
