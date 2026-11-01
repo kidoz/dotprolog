@@ -73,8 +73,8 @@ internal static class Program
             """
             :- dynamic transient/1.
             transient(live).
-            churn(0) :- !.
-            churn(N) :- assertz(transient(N)), retract(transient(N)), M is N-1, churn(M).
+            churn(0, _) :- !.
+            churn(N,I) :- assertz(transient(I)), retract(transient(I)), M is N-1, J is I+1, churn(M,J).
             ordered :-
                 sort([f(2),f(1),f(2)], [f(1),f(2)]),
                 keysort([f(2)-a,f(1)-b,f(2)-c], [f(1)-b,f(2)-a,f(2)-c]),
@@ -83,10 +83,27 @@ internal static class Program
             "performance-paths.pl"
         );
         var host = new PrologHost(engine.Machine);
-        return host.Prove(host.Bind("churn", 1), PrologInput.Integer(128))
-            && host.Prove(host.Bind("ordered", 0))
-            && host.Prove(host.Bind("transient", 1), PrologInput.Atom("live"))
-            && host.CallAll(host.Bind("transient", 1), PrologInput.Output).Count() == 1;
+        var churn = host.Bind("churn", 2);
+        var goal = engine.CompileGoal("ordered, transient(live)", out _);
+        if (
+            goal < 0
+            || !host.Prove(churn, PrologInput.Integer(128), PrologInput.Integer(1))
+            || engine.Machine.Run(goal) != RunResult.Success
+        )
+            return false;
+        var code = engine.Program.CodeLength;
+        var constants = engine.Program.ConstantCount;
+        for (var batch = 1; batch <= 4; batch++)
+        {
+            if (
+                !host.Prove(churn, PrologInput.Integer(128), PrologInput.Integer(batch * 128 + 1))
+                || engine.Machine.Run(goal) != RunResult.Success
+                || engine.Program.CodeLength != code
+                || engine.Program.ConstantCount != constants
+            )
+                return false;
+        }
+        return host.CallAll(host.Bind("transient", 1), PrologInput.Output).Count() == 1;
     }
 
     private static int Main(string[] args)
