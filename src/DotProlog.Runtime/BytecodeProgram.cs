@@ -124,8 +124,7 @@ public sealed class BytecodeProgram
 
     /// <summary>
     /// Whether the loader dispatches multi-clause static predicates through a first-argument
-    /// clause index. The generated-C# emitter turns this off, because its instruction translator
-    /// consumes the loader's try/retry/trust form; the bytecode VM path leaves it on.
+    /// clause index. Reference benchmark paths can turn it off to retain try/retry/trust chains.
     /// </summary>
     internal bool EmitFirstArgumentIndexing { get; set; } = true;
 
@@ -403,13 +402,63 @@ public sealed class BytecodeProgram
     }
 
     /// <summary>The clause addresses and first-argument keys of one indexed static predicate.</summary>
-    internal readonly struct StaticClauseIndex(int[] addresses, Cell[] keys)
+    internal sealed class StaticClauseIndex
     {
-        /// <summary>Entry address of each clause, in source order.</summary>
-        internal int[] Addresses { get; } = addresses;
+        private readonly Dictionary<Cell, int[]>? _buckets;
+        private readonly int[] _wildcards = [];
 
-        /// <summary>First-argument key of each clause, parallel to <see cref="Addresses"/>.</summary>
-        internal Cell[] Keys { get; } = keys;
+        internal StaticClauseIndex(int[] addresses, Cell[] keys)
+        {
+            Addresses = addresses;
+            Keys = keys;
+            // Keep tiny tables on the compact linear path; larger bound lookups use buckets.
+            if (keys.Length < 32)
+                return;
+
+            Dictionary<Cell, List<int>> buckets = [];
+            List<int> wildcards = [];
+            for (var i = 0; i < keys.Length; i++)
+            {
+                if (keys[i].IsReference)
+                    wildcards.Add(i);
+                else
+                {
+                    if (!buckets.TryGetValue(keys[i], out var entries))
+                    {
+                        entries = [];
+                        buckets.Add(keys[i], entries);
+                    }
+                    entries.Add(i);
+                }
+            }
+            _buckets = buckets.ToDictionary(pair => pair.Key, pair => pair.Value.ToArray());
+            _wildcards = [.. wildcards];
+        }
+
+        internal int[] Addresses { get; }
+        internal Cell[] Keys { get; }
+
+        internal int NextMatch(int from, Cell key)
+        {
+            if (key.IsReference)
+                return from < Addresses.Length ? from : -1;
+            if (_buckets is null)
+                return ClauseIndexing.NextMatch(Keys, from, key);
+
+            var matching = _buckets.TryGetValue(key, out var entries) ? AtOrAfter(entries, from) : -1;
+            var fallback = AtOrAfter(_wildcards, from);
+            return matching < 0 ? fallback
+                : fallback < 0 ? matching
+                : Math.Min(matching, fallback);
+        }
+
+        private static int AtOrAfter(int[] entries, int from)
+        {
+            var position = Array.BinarySearch(entries, from);
+            if (position < 0)
+                position = ~position;
+            return position < entries.Length ? entries[position] : -1;
+        }
     }
 
     /// <summary>

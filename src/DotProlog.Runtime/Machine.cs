@@ -521,7 +521,7 @@ public sealed class Machine : IDisposable
                     ChoicePoint point = _choicePoints[_b - 1];
                     BytecodeProgram.StaticClauseIndex table = _program.StaticIndex(point.IndexTable);
                     var current = point.IndexNext;
-                    var following = ClauseIndexing.NextMatch(table.Keys, current + 1, point.IndexKey);
+                    var following = table.NextMatch(current + 1, point.IndexKey);
 
                     if (following < 0)
                     {
@@ -1493,13 +1493,13 @@ public sealed class Machine : IDisposable
         BytecodeProgram.StaticClauseIndex table = _program.StaticIndex(tableId);
         Cell callKey = ClauseIndexing.CallKey(this, _x[0]);
 
-        var first = ClauseIndexing.NextMatch(table.Keys, 0, callKey);
+        var first = table.NextMatch(0, callKey);
         if (first < 0)
         {
             return false;
         }
 
-        var following = ClauseIndexing.NextMatch(table.Keys, first + 1, callKey);
+        var following = table.NextMatch(first + 1, callKey);
         if (following >= 0)
         {
             PushChoicePoint(BytecodeProgram.NextStaticClauseAddress);

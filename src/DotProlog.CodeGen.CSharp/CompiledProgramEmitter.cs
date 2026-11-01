@@ -46,6 +46,7 @@ internal static class CompiledProgramEmitter
             languageMode,
             flagOverrides,
             out diagnostics,
+            indexFirstArgument: true,
             libraryFiles: libraryFiles
         );
         return model is null ? string.Empty : Emit(model, typeName, languageMode, model.InitialDoubleQuotes);
@@ -90,9 +91,10 @@ internal static class CompiledProgramEmitter
         AppendFunctors(text, model);
         AppendBuiltins(text, model);
         text.AppendLine("        global::DotProlog.Runtime.Cell[] constants = CreateConstants(symbols);");
+        text.AppendLine(CultureInfo.InvariantCulture, $"        int[] staticIndexes = new int[{model.StaticIndexes.Count}];");
         text.AppendLine(
             CultureInfo.InvariantCulture,
-            $"        var compiled = new global::DotProlog.Runtime.CompiledProgram(functors, builtins, constants, {model.Instructions.Count});"
+            $"        var compiled = new global::DotProlog.Runtime.CompiledProgram(functors, builtins, constants, {model.Instructions.Count}, staticIndexes);"
         );
         AppendModules(text, model);
         text.AppendLine();
@@ -102,6 +104,17 @@ internal static class CompiledProgramEmitter
             text.AppendLine(
                 CultureInfo.InvariantCulture,
                 $"        compiled.SetTarget({i}, runtime.RegisterCompiledBlock(Block{i}, compiled));"
+            );
+        }
+
+        for (var i = 0; i < model.StaticIndexes.Count; i++)
+        {
+            var (entries, keys) = model.StaticIndexes[i];
+            var targets = string.Join(", ", entries.Select(index => $"compiled.Target({index})"));
+            var cells = string.Join(", ", keys.Select(cell => TermCell(cell, "compiled")));
+            text.AppendLine(
+                CultureInfo.InvariantCulture,
+                $"        staticIndexes[{i}] = runtime.AddStaticIndex([{targets}], [{cells}]);"
             );
         }
 
@@ -431,6 +444,7 @@ internal static class CompiledProgramEmitter
             OpCode.PutStructureArgument =>
                 $"execution.PutStructureArgument(program.Functor({instruction.FirstReference}), {b}, {next})",
             OpCode.PutStructureSlot => $"execution.PutStructureSlot(program.Functor({instruction.FirstReference}), {b}, {next})",
+            OpCode.EnterStatic => $"execution.EnterStatic(program.StaticIndex({instruction.FirstReference}))",
             OpCode.EnterDynamic => $"execution.EnterDynamic(program.Functor({instruction.FirstReference}))",
             OpCode.Fail => "execution.Fail()",
             _ => throw new InvalidOperationException($"Opcode {instruction.OpCode} cannot be emitted as compiled C#."),
@@ -448,7 +462,7 @@ internal static class CompiledProgramEmitter
             CellTag.Reference => $"global::DotProlog.Runtime.Cell.Reference({cell.Value})",
             CellTag.Structure => $"global::DotProlog.Runtime.Cell.Structure({cell.Value})",
             CellTag.Functor => $"global::DotProlog.Runtime.Cell.Functor({program}.Functor({cell.Value}))",
-            CellTag.Atom or CellTag.Integer or CellTag.BigInteger or CellTag.Float or CellTag.String =>
+            CellTag.Atom or CellTag.Integer or CellTag.BigInteger or CellTag.Rational or CellTag.Float or CellTag.String =>
                 $"{program}.Constant({cell.Value})",
             _ => throw new InvalidOperationException($"Term cell tag {cell.Tag} cannot be generated."),
         };

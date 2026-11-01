@@ -11,6 +11,18 @@ namespace DotProlog.Compiler.Tests;
 public sealed class ClauseIndexingTests
 {
     [Fact]
+    public void LargeBucketsMergeWildcardAndRepeatedKeysInSourceOrder()
+    {
+        var source =
+            "p(_, first).\n"
+            + string.Join('\n', Enumerable.Range(0, 80).Select(i => $"p({i}, {i})."))
+            + "\np(79, duplicate). p(_, last).\n";
+        Assert.Equal("[first,79,duplicate,last]", Run(source, "findall(V,p(79,V),Vs),write(Vs)"));
+        Assert.Equal("[first,last]", Run(source, "findall(V,p(missing,V),Vs),write(Vs)"));
+        Assert.Equal("83", Run(source, "findall(V,p(_,V),Vs),length(Vs,N),write(N)"));
+    }
+
+    [Fact]
     public void BoundFirstArgumentSelectsTheMatchingClause()
     {
         Assert.Equal("g", Run("colour(red, r). colour(green, g). colour(blue, b).", "colour(green, X), write(X)"));

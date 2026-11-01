@@ -25,7 +25,7 @@ internal static class CompiledProgramBuilder
         if (libraryFiles is not null)
             engine.LibraryFiles = libraryFiles;
 
-        // Generated C# retains clause chains; direct IL can preserve the loader's indexes.
+        // Backends preserve indexes; reference benchmark paths can request clause chains.
         engine.Program.EmitFirstArgumentIndexing = indexFirstArgument;
 
         foreach ((var name, var arity) in hostBuiltins)

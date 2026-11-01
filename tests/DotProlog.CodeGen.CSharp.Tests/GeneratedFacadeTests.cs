@@ -15,6 +15,40 @@ namespace DotProlog.CodeGen.CSharp.Tests;
 public sealed class GeneratedFacadeTests
 {
     [Theory]
+    [InlineData(Runtime.PrologLanguageMode.Modern)]
+    [InlineData(Runtime.PrologLanguageMode.StrictIso)]
+    public void GeneratedIndexesRelocateBucketsAndPreserveOrderAndFinalCleanup(Runtime.PrologLanguageMode mode)
+    {
+        var facts = string.Join('\n', Enumerable.Range(0, 80).Select(i => $"p({i}, {i}). only({i})."));
+        var program =
+            "p(_, first).\n"
+            + facts
+            + "\np(79, duplicate). p(_, last).\n"
+            + """
+                q(f(a), first). q(f(b), rejected). q(f(a), last).
+                test_index :-
+                    findall(V, p(79,V), [first,79,duplicate,last]),
+                    findall(V, p(missing,V), [first,last]),
+                    findall(V, q(f(a),V), [first,last]),
+                    only(79),
+                    \+ only(missing).
+                """;
+        var source = EntryPointGenerator.GenerateTestHost("Generated.Indexes", [("indexes.pl", program)], mode);
+        Assert.Contains("execution.EnterStatic", source, StringComparison.Ordinal);
+        var type = CompileGenerated(source).GetType("Generated.Indexes.PrologProgram")!;
+        var factory = type.GetMethod("CreateEngine", BindingFlags.NonPublic | BindingFlags.Static, [typeof(CancellationToken)])!
+            .CreateDelegate<Func<CancellationToken, Compiler.PrologEngine>>();
+        using var engine = factory(CancellationToken.None);
+        Assert.True(engine.Query("test_index").Prove());
+        Assert.Equal(83, engine.Query("p(_,V)").Solutions().Count());
+        if (mode == Runtime.PrologLanguageMode.Modern)
+            Assert.True(engine.Query("setup_call_cleanup(true, only(79), nb_setval(done,yes)), nb_getval(done,yes)").Prove());
+        var host = new Runtime.PrologHost(engine.Machine);
+        Assert.True(host.Prove(host.Bind("only", 1), Runtime.PrologInput.Integer(79)));
+        Assert.False(engine.Machine.HasAlternatives);
+    }
+
+    [Theory]
     [InlineData(":- initialization(loop). loop :- loop. test_ok.")]
     [InlineData("loop :- loop. :- loop. test_ok.")]
     public void GeneratedFactoryInitializationIsTimedAndItsWorkerStops(string program)
