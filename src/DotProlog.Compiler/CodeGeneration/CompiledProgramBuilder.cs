@@ -27,6 +27,8 @@ internal static class CompiledProgramBuilder
 
         // Backends preserve indexes; reference benchmark paths can request clause chains.
         engine.Program.EmitFirstArgumentIndexing = indexFirstArgument;
+        // Portable model extraction walks a linear, pinned instruction stream.
+        engine.Program.ReuseDynamicCode = false;
 
         foreach ((var name, var arity) in hostBuiltins)
         {

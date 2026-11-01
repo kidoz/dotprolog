@@ -16,6 +16,9 @@ internal sealed class ClauseCompiler
 {
     private readonly BytecodeProgram _program;
     private readonly ConstantPool _constants;
+    private readonly bool _reclaimableCode;
+
+    internal DynamicCodeBlock CodeStorage { get; private set; }
     private readonly List<Diagnostic> _diagnostics;
     private readonly string? _fileName;
     private readonly IReadOnlySet<int>? _unitDefinitions;
@@ -32,17 +35,21 @@ internal sealed class ClauseCompiler
 
     internal ClauseCompiler(
         BytecodeProgram program,
-        ConstantPool constants,
+        ConstantPool? constants,
         List<Diagnostic> diagnostics,
         string? fileName,
         IReadOnlySet<int>? unitDefinitions = null,
         bool trustedImplementation = false,
         bool allowQueryBindings = false,
-        CompilationSourceMap? sourceMap = null
+        CompilationSourceMap? sourceMap = null,
+        bool reclaimableCode = false
     )
     {
         _program = program;
-        _constants = constants;
+        _reclaimableCode = reclaimableCode;
+        _constants = reclaimableCode
+            ? new ConstantPool(program)
+            : constants ?? throw new ArgumentNullException(nameof(constants));
         _diagnostics = diagnostics;
         _fileName = fileName;
         _unitDefinitions = unitDefinitions;
@@ -56,6 +63,33 @@ internal sealed class ClauseCompiler
     /// clause's first instruction, or -1 if the clause could not be compiled.
     /// </summary>
     internal int Compile(SyntaxTerm head, SyntaxTerm? body)
+    {
+        CodeStorage = default;
+        if (!_reclaimableCode)
+            return CompileCore(head, body);
+
+        _constants.Reset();
+        var start = _program.CodeLength;
+        var constantStart = _program.ConstantCount;
+        try
+        {
+            var address = CompileCore(head, body);
+            if (address < 0)
+            {
+                _program.DiscardPrivateCompilation(start, constantStart);
+                return -1;
+            }
+            CodeStorage = _program.StoreDynamicCode(start, constantStart);
+            return CodeStorage.CodeStart;
+        }
+        catch
+        {
+            _program.DiscardPrivateCompilation(start, constantStart);
+            throw;
+        }
+    }
+
+    private int CompileCore(SyntaxTerm head, SyntaxTerm? body)
     {
         // Keep the variable-table capacity for sibling clauses, but no clause-local state.
         _slots.Clear();

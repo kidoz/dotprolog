@@ -14,6 +14,8 @@ internal sealed class DynamicClause
     /// <summary>Address of the clause's compiled code.</summary>
     internal int CodeAddress { get; init; }
 
+    internal DynamicCodeBlock CodeStorage { get; init; }
+
     /// <summary>The clause as a <c>Head :- Body</c> term, kept for <c>retract/1</c> to match against.</summary>
     internal TermBuffer Term { get; init; } = new();
 

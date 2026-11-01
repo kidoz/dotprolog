@@ -42,6 +42,11 @@ public sealed class BytecodeProgram
     private int[] _entryPoints = new int[64];
     private bool[] _userPredicates = new bool[64];
     private int _constantCount;
+    private readonly ReusableRanges _freeDynamicCode = new();
+    private readonly ReusableRanges _freeDynamicConstants = new();
+    private readonly Dictionary<int, int> _dynamicTrampolines = [];
+    internal bool ReuseDynamicCode { get; set; } = true;
+
     private readonly Dictionary<int, DynamicPredicate> _dynamicPredicates = [];
     private readonly List<WeakReference<Machine>> _machines = [];
     private readonly List<DynamicPredicate> _retiredPredicates = [];
@@ -82,11 +87,11 @@ public sealed class BytecodeProgram
         }
         // Aliases share one list; a second visit merely finds no additional dead clauses.
         foreach (var predicate in _dynamicPredicates.Values)
-            _retiredClauses -= predicate.Reclaim(oldest);
+            _retiredClauses -= predicate.Reclaim(this, oldest);
         for (var i = _retiredPredicates.Count - 1; i >= 0; i--)
         {
             var predicate = _retiredPredicates[i];
-            _retiredClauses -= predicate.Reclaim(oldest);
+            _retiredClauses -= predicate.Reclaim(this, oldest);
             if (predicate.First is null)
                 _retiredPredicates.RemoveAt(i);
         }
@@ -198,8 +203,14 @@ public sealed class BytecodeProgram
     /// </summary>
     public OperatorTable Operators { get; }
 
-    /// <summary>Number of instruction words emitted so far; also the address of the next emit.</summary>
+    /// <summary>
+    /// Length of the bytecode address space and address of the next append. Private dynamic-clause
+    /// ranges may be reused or released from its tail; pinned code addresses remain stable.
+    /// </summary>
     public int CodeLength { get; private set; }
+
+    /// <summary>Constant-pool slots below the current append position, including reusable gaps.</summary>
+    public int ConstantCount => _constantCount;
 
     internal int[] Code => _code;
 
@@ -340,8 +351,11 @@ public sealed class BytecodeProgram
             throw new PrologException($"permission_error(modify, static_procedure, {Symbols.DescribeFunctor(functorId)})");
         }
 
-        var trampoline = CodeLength;
-        Emit(OpCode.EnterDynamic, functorId);
+        if (!_dynamicTrampolines.TryGetValue(functorId, out var trampoline))
+        {
+            trampoline = Emit(OpCode.EnterDynamic, functorId);
+            _dynamicTrampolines.Add(functorId, trampoline);
+        }
 
         var predicate = new DynamicPredicate
         {
@@ -566,6 +580,82 @@ public sealed class BytecodeProgram
 
         _constants[_constantCount] = constant;
         return _constantCount++;
+    }
+
+    // The compiler has not published these tails. Its constant cache must be private to this
+    // clause: no permanent compiler or host may retain an index into the captured constant range.
+    internal DynamicCodeBlock StoreDynamicCode(int start, int constantStart)
+    {
+        var length = CodeLength - start;
+        var constantLength = _constantCount - constantStart;
+        var end = CodeLength;
+        for (var address = start; address < end; )
+        {
+            var code = (OpCode)_code[address];
+            var operands = BytecodeLayout.OperandCount(code);
+            if (address + operands >= end)
+                throw new InvalidOperationException("Incomplete private clause instruction.");
+            var target = BytecodeLayout.AddressOperand(code);
+            if (target != 0 && (_code[address + target] < start || _code[address + target] >= end))
+                throw new InvalidOperationException("Private clause branches must stay inside their allocation.");
+            if (
+                BytecodeLayout.HasConstantOperand(code)
+                && (_code[address + 1] < constantStart || _code[address + 1] >= _constantCount)
+            )
+                throw new InvalidOperationException("A private clause must own its constant operands.");
+            address += operands + 1;
+        }
+
+        var codeTarget = _freeDynamicCode.Allocate(length);
+        if (codeTarget < 0)
+            codeTarget = start;
+        var constantTarget = constantLength == 0 ? constantStart : _freeDynamicConstants.Allocate(constantLength);
+        if (constantTarget < 0)
+            constantTarget = constantStart;
+
+        var codeDelta = codeTarget - start;
+        var constantDelta = constantTarget - constantStart;
+        for (var address = start; address < end; )
+        {
+            var code = (OpCode)_code[address];
+            var target = BytecodeLayout.AddressOperand(code);
+            if (target != 0)
+                _code[address + target] += codeDelta;
+            if (BytecodeLayout.HasConstantOperand(code))
+                _code[address + 1] += constantDelta;
+            address += BytecodeLayout.OperandCount(code) + 1;
+        }
+        if (codeTarget != start)
+        {
+            Array.Copy(_code, start, _code, codeTarget, length);
+            Array.Fill(_code, (int)OpCode.Fail, start, length);
+            CodeLength = start;
+        }
+        if (constantTarget != constantStart)
+        {
+            Array.Copy(_constants, constantStart, _constants, constantTarget, constantLength);
+            Array.Clear(_constants, constantStart, constantLength);
+            _constantCount = constantStart;
+        }
+        return new DynamicCodeBlock(codeTarget, length, constantTarget, constantLength);
+    }
+
+    internal void DiscardPrivateCompilation(int start, int constantStart)
+    {
+        Array.Fill(_code, (int)OpCode.Fail, start, CodeLength - start);
+        Array.Clear(_constants, constantStart, _constantCount - constantStart);
+        CodeLength = start;
+        _constantCount = constantStart;
+    }
+
+    internal void ReleaseDynamicCode(DynamicCodeBlock block)
+    {
+        if (!block.IsAllocated)
+            return;
+        Array.Fill(_code, (int)OpCode.Fail, block.CodeStart, block.CodeLength);
+        Array.Clear(_constants, block.ConstantStart, block.ConstantCount);
+        CodeLength = _freeDynamicCode.Release(block.CodeStart, block.CodeLength, CodeLength);
+        _constantCount = _freeDynamicConstants.Release(block.ConstantStart, block.ConstantCount, _constantCount);
     }
 
     private int EmitWord(int word)

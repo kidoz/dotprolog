@@ -317,9 +317,9 @@ public sealed class Machine : IDisposable
 
     private RunResult Execute()
     {
-        // Cached for the dispatch loop. The program is append-only, so a stale array is safe for
-        // every address that existed when it was cached; each place that can append — builtins,
-        // meta-calls, and compiled predicates — refreshes the cache before a new address is read.
+        // Cached for dispatch. Published addresses stay stable; retained generations protect private
+        // clause code and constants. Builtins, meta-calls, and compiled predicates can replace the
+        // backing arrays and refresh this cache before newly emitted addresses are read.
         var code = _program.Code;
         Cell[] constants = _program.Constants;
 

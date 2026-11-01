@@ -1871,12 +1871,13 @@ public sealed class ProgramLoader
             (SyntaxTerm head, SyntaxTerm? body) = clauses[index];
             var compiler = new ClauseCompiler(
                 _program,
-                _constants,
+                _program.ReuseDynamicCode ? null : _constants,
                 diagnostics,
                 fileName,
                 unitDefinitions,
                 trustedImplementation: !_userPredicates,
-                sourceMap: SourceMap
+                sourceMap: SourceMap,
+                reclaimableCode: _program.ReuseDynamicCode
             );
             var address = compiler.Compile(head, body);
             if (address < 0)
@@ -1884,27 +1885,36 @@ public sealed class ProgramLoader
                 continue;
             }
 
-            // retract/1 matches against the clause as a term, so keep a detached copy of it.
-            Dictionary<string, Cell> variables = [];
-            Cell headCell = TermReifier.ToHeap(machine, storedClauses[index].Head, variables);
-            Cell bodyCell = storedClauses[index].Body is null
-                ? Cell.Atom(machine.Symbols.True)
-                : TermReifier.ToHeap(machine, storedClauses[index].Body!, variables);
+            try
+            {
+                // retract/1 matches against the clause as a term, so keep a detached copy of it.
+                Dictionary<string, Cell> variables = [];
+                Cell headCell = TermReifier.ToHeap(machine, storedClauses[index].Head, variables);
+                Cell bodyCell = storedClauses[index].Body is null
+                    ? Cell.Atom(machine.Symbols.True)
+                    : TermReifier.ToHeap(machine, storedClauses[index].Body!, variables);
 
-            var term = new TermBuffer();
-            Cell clause = machine.CreateStructure(rule, [headCell, bodyCell]);
-            var root = term.Copy(machine, DatabaseBuiltins.NormalizeClause(machine, clause));
+                var term = new TermBuffer();
+                Cell clause = machine.CreateStructure(rule, [headCell, bodyCell]);
+                var root = term.Copy(machine, DatabaseBuiltins.NormalizeClause(machine, clause));
 
-            predicate.Append(
-                new DynamicClause
-                {
-                    CodeAddress = address,
-                    Term = term,
-                    TermRoot = root,
-                    Birth = _program.Generation,
-                    IndexKey = FirstArgumentSyntaxKey(head),
-                }
-            );
+                predicate.Append(
+                    new DynamicClause
+                    {
+                        CodeAddress = address,
+                        CodeStorage = compiler.CodeStorage,
+                        Term = term,
+                        TermRoot = root,
+                        Birth = _program.Generation,
+                        IndexKey = FirstArgumentSyntaxKey(head),
+                    }
+                );
+            }
+            catch
+            {
+                _program.ReleaseDynamicCode(compiler.CodeStorage);
+                throw;
+            }
         }
     }
 

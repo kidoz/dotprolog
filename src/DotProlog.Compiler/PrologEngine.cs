@@ -12,7 +12,7 @@ namespace DotProlog.Compiler;
 /// never emits CLR IL, so it stays valid inside a NativeAOT process. The build-time path that turns
 /// Prolog into generated C# is a separate component.
 /// </remarks>
-public sealed class PrologEngine : IRuntimeCompiler, IDisposable
+public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler, IDisposable
 {
     private const int ControlGoalCacheLimit = 1024;
 
@@ -847,8 +847,8 @@ public sealed class PrologEngine : IRuntimeCompiler, IDisposable
     /// variables as arguments, so compiling the body in place preserves both aliasing and ISO cut
     /// scope without adding control state to the runtime machine. The compiled code depends only on
     /// the goal's shape with variables numbered by first occurrence, so one clause per shape is
-    /// cached: the program is append-only, and recompiling the same shape on every meta-call would
-    /// grow it without bound.
+    /// cached: anonymous control code stays pinned, and recompiling the same shape on every
+    /// meta-call would grow it without bound.
     /// </remarks>
     public int CompileControlGoal(Machine machine, Cell goal, Span<Cell> arguments, out int argumentCount)
     {
@@ -1030,11 +1030,22 @@ public sealed class PrologEngine : IRuntimeCompiler, IDisposable
     /// <inheritdoc />
     /// <remarks>
     /// This is the <c>assertz/1</c> path. It compiles into the same program the goal is running from,
-    /// which is only safe because the program is append-only and the dispatch loop refreshes its
-    /// cached arrays after every builtin.
+    /// and the dispatch loop refreshes its cached arrays after every builtin. Public compilation
+    /// stays pinned; assertion can request ownership of private code before publishing a clause.
     /// </remarks>
-    public int CompileClause(Machine machine, Cell clause, out int functorId)
+    public int CompileClause(Machine machine, Cell clause, out int functorId) =>
+        CompileClause(machine, clause, out functorId, false, out _);
+
+    int IReclaimableClauseCompiler.CompileDynamicClause(
+        Machine machine,
+        Cell clause,
+        out int functorId,
+        out DynamicCodeBlock storage
+    ) => CompileClause(machine, clause, out functorId, true, out storage);
+
+    private int CompileClause(Machine machine, Cell clause, out int functorId, bool reclaimableCode, out DynamicCodeBlock storage)
     {
+        storage = default;
         ArgumentNullException.ThrowIfNull(machine);
 
         // The clause is inspected as cells before it is reified, because an error raised here has
@@ -1131,8 +1142,15 @@ public sealed class PrologEngine : IRuntimeCompiler, IDisposable
             _ => throw PrologErrors.Type(machine, "callable", headCell),
         };
 
-        var compiler = new ClauseCompiler(Program, new ConstantPool(Program), diagnostics, null);
+        var compiler = new ClauseCompiler(
+            Program,
+            reclaimableCode ? null : new ConstantPool(Program),
+            diagnostics,
+            null,
+            reclaimableCode: reclaimableCode
+        );
         var address = compiler.Compile(head, body);
+        storage = compiler.CodeStorage;
 
         // ISO 8.9.1.3: a body that is not callable is type_error(callable, Body). Anything else the
         // compiler rejects is reported the same way, since the body is what could not be compiled.

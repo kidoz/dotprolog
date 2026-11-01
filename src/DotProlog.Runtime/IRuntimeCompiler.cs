@@ -24,7 +24,8 @@ public interface IRuntimeCompiler
     int CompileControlGoal(Machine machine, Cell goal, Span<Cell> arguments, out int argumentCount);
 
     /// <summary>
-    /// Compiles a clause term into the program and returns the address of its code.
+    /// Compiles a clause term into the program and returns a pinned code address. The code and
+    /// its constant slots remain valid for the program's lifetime.
     /// </summary>
     /// <param name="machine">Machine owning the heap the term lives on.</param>
     /// <param name="clause">A <c>Head :- Body</c> term, or a bare head.</param>

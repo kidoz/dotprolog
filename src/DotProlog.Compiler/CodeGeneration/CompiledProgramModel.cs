@@ -42,7 +42,7 @@ internal sealed class CompiledProgramModel
         for (var address = codeStart; address < program.CodeLength; )
         {
             var opCode = (OpCode)code[address];
-            var operands = OperandCount(opCode);
+            var operands = BytecodeLayout.OperandCount(opCode);
             var instruction = new CompiledInstruction
             {
                 Address = address,
@@ -339,35 +339,6 @@ internal sealed class CompiledProgramModel
             CellTag.Rational => new(constant.Tag, RationalText(program, constant.Index), 0, 0),
             CellTag.Float => new(constant.Tag, null, 0, program.Symbols.GetFloat(constant.Index)),
             _ => throw new InvalidOperationException($"Constant tag {constant.Tag} cannot be generated."),
-        };
-
-    private static int OperandCount(OpCode opCode) =>
-        opCode switch
-        {
-            OpCode.Stop
-            or OpCode.Deallocate
-            or OpCode.Proceed
-            or OpCode.Cut
-            or OpCode.MetaCall
-            or OpCode.TrustMe
-            or OpCode.NextClause
-            or OpCode.RedoBuiltin
-            or OpCode.Fail => 0,
-            OpCode.Allocate
-            or OpCode.MarkBarrier
-            or OpCode.Jump
-            or OpCode.CutTo
-            or OpCode.SoftCut
-            or OpCode.ReactivateCatch
-            or OpCode.TryMeElse
-            or OpCode.RetryMeElse
-            or OpCode.UnifyVariable
-            or OpCode.UnifyValue
-            or OpCode.UnifyConstant
-            or OpCode.InitVariable
-            or OpCode.EnterDynamic
-            or OpCode.EnterStatic => 1,
-            _ => 2,
         };
 
     private static string RationalText(BytecodeProgram program, int rationalId)

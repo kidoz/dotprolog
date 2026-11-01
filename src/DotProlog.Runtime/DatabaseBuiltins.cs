@@ -90,30 +90,49 @@ internal static class DatabaseBuiltins
         var term = new TermBuffer();
         var root = term.Copy(machine, normalized);
 
-        IRuntimeCompiler compiler = CompilerOf(machine);
-        var address = compiler.CompileClause(machine, clause, out var functorId);
-        RequireModifiable(machine, functorId);
-        DynamicPredicate predicate = machine.Program.DeclareDynamic(functorId);
-
-        var entry = new DynamicClause
+        DynamicCodeBlock storage = default;
+        try
         {
-            CodeAddress = address,
-            Term = term,
-            TermRoot = root,
-            Birth = machine.Program.NextGeneration(),
-            IndexKey = ClauseIndexing.ClauseKeyFromHeap(machine, normalized, machine.Symbols.InternFunctor(":-", 2), functorId),
-        };
+            IRuntimeCompiler compiler = CompilerOf(machine);
+            int functorId;
+            var address =
+                machine.Program.ReuseDynamicCode && compiler is IReclaimableClauseCompiler ownedCompiler
+                    ? ownedCompiler.CompileDynamicClause(machine, clause, out functorId, out storage)
+                    : compiler.CompileClause(machine, clause, out functorId);
+            RequireModifiable(machine, functorId);
+            DynamicPredicate predicate = machine.Program.DeclareDynamic(functorId);
 
-        if (atEnd)
-        {
-            predicate.Append(entry);
+            var entry = new DynamicClause
+            {
+                CodeAddress = address,
+                CodeStorage = storage,
+                Term = term,
+                TermRoot = root,
+                Birth = machine.Program.NextGeneration(),
+                IndexKey = ClauseIndexing.ClauseKeyFromHeap(
+                    machine,
+                    normalized,
+                    machine.Symbols.InternFunctor(":-", 2),
+                    functorId
+                ),
+            };
+
+            if (atEnd)
+            {
+                predicate.Append(entry);
+            }
+            else
+            {
+                predicate.Prepend(entry);
+            }
+
+            storage = default;
+            return true;
         }
-        else
+        finally
         {
-            predicate.Prepend(entry);
+            machine.Program.ReleaseDynamicCode(storage);
         }
-
-        return true;
     }
 
     private static bool ContextualAssert(Machine machine, bool atEnd)

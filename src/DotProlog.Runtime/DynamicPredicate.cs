@@ -63,7 +63,7 @@ internal sealed class DynamicPredicate
     }
 
     // No surviving call can see a clause that died at or before the oldest call generation.
-    internal int Reclaim(int oldestGeneration)
+    internal int Reclaim(BytecodeProgram program, int oldestGeneration)
     {
         var count = 0;
         DynamicClause? previous = null;
@@ -79,6 +79,7 @@ internal sealed class DynamicPredicate
                     previous.Next = next;
                 if (ReferenceEquals(Last, clause))
                     Last = previous;
+                program.ReleaseDynamicCode(clause.CodeStorage);
                 clause.Next = null;
                 count++;
             }
