@@ -180,11 +180,6 @@ jobs:
       - name: Pack
         run: dotnet pack DotProlog.slnx -c Release -o artifacts -p:ContinuousIntegrationBuild=true
 
-      # The standalone compiler packs and installs from a local feed, but stays off NuGet.org
-      # until it is announced, so its packages leave the release feed here.
-      - name: Hold back unannounced packages
-        run: rm -f artifacts/DotProlog.Compiler.Cli.*.nupkg artifacts/DotProlog.Compiler.Cli.*.snupkg
-
       - name: Test packed templates and tool
         run: tests/Integration/verify-packages.sh artifacts linux-x64
 
@@ -345,6 +340,24 @@ jobs:
           dotnet nuget push "artifacts/$pointer" \
             --source https://api.nuget.org/v3/index.json \
             --api-key "$NUGET_API_KEY"
+
+      - name: Verify plc installation from NuGet.org
+        run: |
+          set -euo pipefail
+          version="${{ inputs.version }}"
+          if [ -z "$version" ]; then
+            version=$(grep -oE '<VersionPrefix>[^<]+' Directory.Build.props | cut -d'>' -f2)
+          fi
+          for attempt in $(seq 1 20); do
+            if dotnet tool install DotProlog.Compiler.Cli --tool-path "$RUNNER_TEMP/plc-published" --version "$version" --no-http-cache; then
+              "$RUNNER_TEMP/plc-published/plc" --version | grep -Fx "plc $version"
+              "$RUNNER_TEMP/plc-published/plc" --help | grep -F -- "--packages DIR"
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::error::DotProlog.Compiler.Cli $version did not become installable from NuGet.org."
+          exit 1
 
   publish-propack:
     name: Publish propack to NuGet
