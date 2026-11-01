@@ -75,6 +75,62 @@ public static class PrologLinter
         return [.. diagnostics.OrderBy(diagnostic => diagnostic.Span.Start).ThenBy(diagnostic => diagnostic.Id)];
     }
 
+    /// <summary>Analyzes explicitly supplied files as one program without consulting them.</summary>
+    /// <param name="sources">Physical source units to analyze together.</param>
+    /// <param name="options">Optional source-layout policy.</param>
+    public static IReadOnlyList<Diagnostic> AnalyzeProgram(
+        IReadOnlyList<PrologLintSource> sources,
+        PrologLintOptions? options = null
+    )
+    {
+        ArgumentNullException.ThrowIfNull(sources);
+        PrologLintSource[] distinct =
+        [
+            .. sources.GroupBy(source => source.FileName, PathComparer).Select(group => group.First()),
+        ];
+        PrologLintProgramModel model = PrologLintProgramModel.Build(distinct);
+        List<Diagnostic> diagnostics = [];
+        foreach (PrologLintSource source in distinct)
+        {
+            foreach (
+                var clauses in source
+                    .Clauses.Select((clause, index) => (clause, index))
+                    .GroupBy(item => source.FileForClause(item.index))
+            )
+            {
+                IReadOnlyList<Diagnostic> local =
+                    clauses.Key == source.FileName
+                        ? AnalyzeSource(
+                            source.Source,
+                            [.. clauses.Select(item => item.clause)],
+                            clauses.Key,
+                            options,
+                            source.InitialDoubleQuotes,
+                            source.CodePoints
+                        )
+                        : Analyze([.. clauses.Select(item => item.clause)], clauses.Key, source.InitialDoubleQuotes);
+                diagnostics.AddRange(
+                    local.Where(diagnostic =>
+                        diagnostic.Id
+                            is not (LintDiagnosticIds.PossibleBuiltinArityMismatch or LintDiagnosticIds.DeclaredButUndefined)
+                    )
+                );
+            }
+        }
+
+        PrologCallGraphLinter.Analyze(model, diagnostics);
+        return
+        [
+            .. diagnostics
+                .OrderBy(diagnostic => diagnostic.FileName, StringComparer.Ordinal)
+                .ThenBy(diagnostic => diagnostic.Span.Start)
+                .ThenBy(diagnostic => diagnostic.Id),
+        ];
+    }
+
+    private static StringComparer PathComparer =>
+        OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+
     private static void AnalyzeClause(SyntaxTerm clause, string? fileName, List<Diagnostic> diagnostics)
     {
         List<VariableTerm> occurrences = VariableOccurrences(clause);

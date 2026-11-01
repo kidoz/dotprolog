@@ -93,4 +93,16 @@ public static class LintDiagnosticIds
 
     /// <summary>A variable occurs once in each alternative branch and nowhere outside them.</summary>
     public const string SemanticSingletonVariable = "DPL3028";
+
+    /// <summary>A statically resolved call has no definition in the supplied program.</summary>
+    public const string UndefinedPredicate = "DPL3029";
+
+    /// <summary>An exported or declared predicate has no definition in the supplied program.</summary>
+    public const string MissingPredicateDefinition = "DPL3030";
+
+    /// <summary>A predicate is called as a nonterminal, or a nonterminal as a predicate.</summary>
+    public const string PredicateNonterminalMismatch = "DPL3031";
+
+    /// <summary>An include cannot be read or exceeds the non-executing expansion limits.</summary>
+    public const string UnresolvedLintSource = "DPL3032";
 }
