@@ -61,6 +61,18 @@ public sealed class SymbolTable
     /// <summary>Whether a character is a Unicode code point rather than a UTF-16 code unit.</summary>
     public bool CodePoints { get; }
 
+    /// <summary>Number of distinct atom and string texts retained for this program's lifetime.</summary>
+    public int AtomCount => _atomNames.Count;
+
+    /// <summary>Number of distinct floating-point values retained for this program's lifetime.</summary>
+    public int FloatCount => _floats.Count;
+
+    /// <summary>Number of distinct big integers retained for this program's lifetime.</summary>
+    public int BigIntegerCount => _bigs.Count;
+
+    /// <summary>Number of distinct rationals retained for this program's lifetime.</summary>
+    public int RationalCount => _rationals.Count;
+
     /// <summary>Number of distinct functors interned so far.</summary>
     public int FunctorCount => _functors.Count;
 

@@ -9,6 +9,31 @@ namespace DotProlog.Compiler.Tests;
 public sealed class EmbeddingTests
 {
     [Fact]
+    public void SpanHostCallsPreserveOutputsFailureAndDetachedValuesAcrossReuse()
+    {
+        using PrologEngine engine = NewEngine("pair(1, a). pair(2, b).");
+        var host = new PrologHost(engine.Machine);
+        var predicate = host.Bind("pair", 2);
+        PrologInput[] inputs = [PrologInput.Integer(1), PrologInput.Output];
+        Assert.True(host.Prove(predicate, inputs.AsSpan()));
+        var first = Assert.Single(host.CallOnce(predicate, inputs.AsSpan())!);
+        inputs[0] = PrologInput.Integer(2);
+        Assert.Equal("b", Assert.Single(host.CallOnce(predicate, inputs.AsSpan())!).ToString());
+        Assert.Equal("a", first.ToString());
+        inputs[0] = PrologInput.Integer(3);
+        Assert.False(host.Prove(predicate, inputs.AsSpan()));
+        Assert.Null(host.CallOnce(predicate, inputs.AsSpan()));
+        Assert.Throws<PrologException>(() => host.Prove(predicate, ReadOnlySpan<PrologInput>.Empty));
+        Assert.True(host.Prove(predicate, PrologInput.Integer(1), PrologInput.Atom("a")));
+        Assert.Equal(2, host.CallAll(predicate, PrologInput.Output, PrologInput.Output).Count());
+
+        var oversized = new PrologPredicate(0, "oversized", Machine.ArgumentRegisterCount);
+        var tooMany = new PrologInput[Machine.ArgumentRegisterCount];
+        var error = Assert.Throws<PrologException>(() => host.Prove(oversized, tooMany.AsSpan()));
+        Assert.Contains("representation_error(max_arity)", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ConsultRejectsExcessiveSourceDepthAndRemainsUsable()
     {
         using var engine = new PrologEngine();

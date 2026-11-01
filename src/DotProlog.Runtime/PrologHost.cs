@@ -6,7 +6,7 @@ namespace DotProlog.Runtime;
 /// <remarks>
 /// <para>
 /// This is the surface a generated facade sits on. It deliberately says nothing about determinism:
-/// the caller picks <see cref="Prove"/>, <see cref="CallOnce"/>, or <see cref="CallAll"/> according to
+/// the caller picks <see cref="Prove(PrologPredicate, PrologInput[])"/>, <see cref="CallOnce(PrologPredicate, PrologInput[])"/>, or <see cref="CallAll"/> according to
 /// the contract, and the facade's signature follows from that choice.
 /// </para>
 /// <para>
@@ -50,8 +50,19 @@ public sealed class PrologHost
     }
 
     /// <summary>Proves the predicate once and reports whether it succeeded, ignoring any outputs.</summary>
-    public bool Prove(PrologPredicate predicate, params PrologInput[] arguments) =>
-        Start(predicate, arguments, out _) == RunResult.Success;
+    public bool Prove(PrologPredicate predicate, params PrologInput[] arguments)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        return Prove(predicate, arguments.AsSpan());
+    }
+
+    /// <summary>Proves a predicate using span inputs without allocating argument arrays.</summary>
+    public bool Prove(PrologPredicate predicate, params ReadOnlySpan<PrologInput> arguments)
+    {
+        ValidateArguments(predicate, arguments.Length);
+        Span<Cell> cells = stackalloc Cell[arguments.Length];
+        return Start(predicate, arguments, cells) == RunResult.Success;
+    }
 
     /// <summary>
     /// Calls the predicate and returns the values its output arguments took, or
@@ -59,7 +70,16 @@ public sealed class PrologHost
     /// </summary>
     public PrologValue[]? CallOnce(PrologPredicate predicate, params PrologInput[] arguments)
     {
-        RunResult result = Start(predicate, arguments, out Cell[] cells);
+        ArgumentNullException.ThrowIfNull(arguments);
+        return CallOnce(predicate, arguments.AsSpan());
+    }
+
+    /// <summary>Calls once with span inputs, allocating only the detached output values.</summary>
+    public PrologValue[]? CallOnce(PrologPredicate predicate, params ReadOnlySpan<PrologInput> arguments)
+    {
+        ValidateArguments(predicate, arguments.Length);
+        Span<Cell> cells = stackalloc Cell[arguments.Length];
+        RunResult result = Start(predicate, arguments, cells);
         return result == RunResult.Success ? ReadOutputs(arguments, cells) : null;
     }
 
@@ -82,24 +102,33 @@ public sealed class PrologHost
     {
         ArgumentNullException.ThrowIfNull(arguments);
 
-        if (arguments.Length != predicate.Arity)
-        {
-            throw new PrologException($"{predicate} takes {predicate.Arity} arguments, but {arguments.Length} were given.");
-        }
-
-        // The reset comes first, then the arguments are built on the cleared heap.
-        _machine.BeginCall();
-
+        ValidateArguments(predicate, arguments.Length);
         cells = new Cell[arguments.Length];
+        return Start(predicate, arguments, cells);
+    }
+
+    private void ValidateArguments(PrologPredicate predicate, int count)
+    {
+        if (count != predicate.Arity)
+        {
+            throw new PrologException($"{predicate} takes {predicate.Arity} arguments, but {count} were given.");
+        }
+        if (count >= Machine.ArgumentRegisterCount)
+            throw PrologErrors.Representation(_machine, "max_arity");
+    }
+
+    private RunResult Start(PrologPredicate predicate, ReadOnlySpan<PrologInput> arguments, Span<Cell> cells)
+    {
+        // Reset before building arguments, which may refer to the cleared heap.
+        _machine.BeginCall();
         for (var i = 0; i < arguments.Length; i++)
         {
             cells[i] = arguments[i].Build(_machine);
         }
-
         return _machine.Call(predicate.FunctorId, cells);
     }
 
-    private PrologValue[] ReadOutputs(PrologInput[] arguments, Cell[] cells)
+    private PrologValue[] ReadOutputs(ReadOnlySpan<PrologInput> arguments, ReadOnlySpan<Cell> cells)
     {
         var count = 0;
         foreach (PrologInput argument in arguments)
