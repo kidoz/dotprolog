@@ -10,4 +10,5 @@ internal sealed class CompiledInstruction
     internal int First { get; init; }
     internal int Second { get; init; }
     internal int FirstReference { get; set; } = -1;
+    internal CompiledSourceLocation? Source { get; init; }
 }

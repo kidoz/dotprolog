@@ -16,6 +16,8 @@ public sealed class ProgramLoader
     private readonly bool _userPredicates;
     private readonly IReadOnlyDictionary<string, string>? _libraryFiles;
 
+    internal CompilationSourceMap? SourceMap { get; set; }
+
     /// <summary>Creates a loader that appends to <paramref name="program"/>.</summary>
     /// <param name="program">The program to load into.</param>
     /// <param name="machine">
@@ -140,6 +142,7 @@ public sealed class ProgramLoader
             if (item is ClauseItem clause)
             {
                 SyntaxTerm resolvedHead = resolver.ResolveHead(clause.Head);
+                SourceMap?.SetDocument(resolvedHead, SourceMap.DocumentOf(clause.Head, fileName));
                 SyntaxTerm? resolvedBody = clause.Body is null ? null : resolver.ResolveGoal(clause.Body);
 
                 if (!TryGetHeadFunctor(resolvedHead, out var functorId))
@@ -194,6 +197,7 @@ public sealed class ProgramLoader
 
             FlushPredicates();
             SyntaxTerm goal = ((DirectiveItem)item).Goal;
+            var sourceFile = SourceMap?.DocumentOf(goal, fileName) ?? fileName;
             if (goal is CompoundTerm { Name: "ensure_loaded", Arity: 1 } ensureLoaded)
             {
                 EnsureLoaded(ensureLoaded, diagnostics, fileName);
@@ -213,7 +217,7 @@ public sealed class ProgramLoader
                         Arguments = [resolver.ResolveGoal(initializationGoal.Arguments[0])],
                     }
                     : resolver.ResolveGoal(goal);
-            var address = CompileDirective(resolvedDirective, diagnostics, out var deferred, fileName, unitDefinitions);
+            var address = CompileDirective(resolvedDirective, diagnostics, out var deferred, sourceFile, unitDefinitions);
             if (address < 0)
             {
                 continue;
@@ -1206,6 +1210,7 @@ public sealed class ProgramLoader
                     _program.Flags.DoubleQuotes = selected;
                 }
 
+                SourceMap?.SetDocument(goal, SourceMap.DocumentOf(rawClause, fileName));
                 unit.Items.Add(new DirectiveItem(goal));
                 continue;
             }
@@ -1290,6 +1295,7 @@ public sealed class ProgramLoader
                     continue;
             }
 
+            SourceMap?.SetDocument(head, SourceMap.DocumentOf(rawClause, fileName));
             unit.Items.Add(new ClauseItem(head, body));
         }
 
@@ -1869,7 +1875,8 @@ public sealed class ProgramLoader
                 diagnostics,
                 fileName,
                 unitDefinitions,
-                trustedImplementation: !_userPredicates
+                trustedImplementation: !_userPredicates,
+                sourceMap: SourceMap
             );
             var address = compiler.Compile(head, body);
             if (address < 0)
@@ -1954,7 +1961,8 @@ public sealed class ProgramLoader
             diagnostics,
             fileName,
             unitDefinitions,
-            trustedImplementation: !_userPredicates
+            trustedImplementation: !_userPredicates,
+            sourceMap: SourceMap
         );
         return compiler.Compile(new AtomTerm("$directive", actual.Span), actual);
     }
@@ -1981,7 +1989,8 @@ public sealed class ProgramLoader
             diagnostics,
             fileName,
             unitDefinitions,
-            trustedImplementation: !_userPredicates
+            trustedImplementation: !_userPredicates,
+            sourceMap: SourceMap
         );
 
         for (var i = 0; i < clauses.Count; i++)
@@ -2032,7 +2041,8 @@ public sealed class ProgramLoader
             diagnostics,
             fileName,
             unitDefinitions,
-            trustedImplementation: !_userPredicates
+            trustedImplementation: !_userPredicates,
+            sourceMap: SourceMap
         );
 
         foreach ((SyntaxTerm head, SyntaxTerm? body) in clauses)

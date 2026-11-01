@@ -41,6 +41,103 @@ public sealed class IlAssemblyEmitterTests
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PortablePdbPreservesDocumentsSequencePointsAndDeterminism(bool fuseBlocks)
+    {
+        (string Name, string Text)[] sources = [("first.pl", "p(a).\nq(X) :- p(X),\n    p(X).\n"), ("second.pl", "r(b).\n")];
+        using var assembly = new MemoryStream();
+        using var symbols = new MemoryStream();
+        Assert.Empty(IlAssemblyEmitter.Emit(sources, "DebugTest", assembly, fuseBlocks, pdbOutput: symbols));
+        using var secondAssembly = new MemoryStream();
+        using var secondSymbols = new MemoryStream();
+        Assert.Empty(IlAssemblyEmitter.Emit(sources, "DebugTest", secondAssembly, fuseBlocks, pdbOutput: secondSymbols));
+        Assert.Equal(assembly.ToArray(), secondAssembly.ToArray());
+        Assert.Equal(symbols.ToArray(), secondSymbols.ToArray());
+
+        assembly.Position = 0;
+        using var pe = new PEReader(assembly);
+        var debugEntries = pe.ReadDebugDirectory();
+        Assert.Contains(debugEntries, entry => entry.Type == DebugDirectoryEntryType.Reproducible);
+        var codeViewEntry = Assert.Single(debugEntries, entry => entry.Type == DebugDirectoryEntryType.CodeView);
+        Assert.Equal("DebugTest.pdb", pe.ReadCodeViewDebugDirectoryData(codeViewEntry).Path);
+
+        using var provider = MetadataReaderProvider.FromPortablePdbImage(
+            System.Collections.Immutable.ImmutableArray.Create(symbols.ToArray())
+        );
+        var reader = provider.GetMetadataReader();
+        Assert.Equal(pe.GetMetadataReader().MethodDefinitions.Count, reader.MethodDebugInformation.Count);
+        Assert.Equal(
+            ["first.pl", "second.pl"],
+            reader.Documents.Select(handle => reader.GetString(reader.GetDocument(handle).Name)).Order(StringComparer.Ordinal)
+        );
+        var points = reader
+            .MethodDebugInformation.SelectMany(handle => reader.GetMethodDebugInformation(handle).GetSequencePoints())
+            .ToArray();
+        Assert.Contains(
+            points,
+            point => point.StartLine == 2 && reader.GetString(reader.GetDocument(point.Document).Name) == "first.pl"
+        );
+        Assert.Contains(
+            points,
+            point => point.StartLine == 1 && reader.GetString(reader.GetDocument(point.Document).Name) == "second.pl"
+        );
+        Assert.All(points, point => Assert.True(point.Offset >= 0));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PortablePdbPreservesNestedIncludeDocumentsThroughLowering(bool fuseBlocks)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "dotprolog-pdb-includes-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var root = Path.Combine(directory, "root.pl");
+            var first = Path.Combine(directory, "first.pl");
+            var nested = Path.Combine(directory, "nested.pl");
+            const string source = """
+                :- module(root, [p/1, word/3]).
+                :- include('first.pl').
+                root_only.
+                :- initialization(p(a)).
+                """;
+            File.WriteAllText(root, source);
+            File.WriteAllText(first, "p(a).\n:- include('nested.pl').\n");
+            File.WriteAllText(nested, new string('\n', 100) + "p(b).\nword --> [hello].\n:- initialization(p(b)).\n");
+            using var assembly = new MemoryStream();
+            using var symbols = new MemoryStream();
+            Assert.Empty(IlAssemblyEmitter.Emit([(root, source)], "Includes", assembly, fuseBlocks, pdbOutput: symbols));
+            using var provider = MetadataReaderProvider.FromPortablePdbImage(
+                System.Collections.Immutable.ImmutableArray.Create(symbols.ToArray())
+            );
+            var reader = provider.GetMetadataReader();
+            Assert.Equal(
+                new[] { root, first, nested }.Order(StringComparer.Ordinal),
+                reader.Documents.Select(handle => reader.GetString(reader.GetDocument(handle).Name)).Order(StringComparer.Ordinal)
+            );
+            // Enumerating every point also validates the encoding of included spans beyond the
+            // length of the parent source, including translated DCGs and initialization goals.
+            var points = reader
+                .MethodDebugInformation.SelectMany(handle => reader.GetMethodDebugInformation(handle).GetSequencePoints())
+                .Select(point => (Document: reader.GetString(reader.GetDocument(point.Document).Name), Point: point))
+                .ToArray();
+            Assert.Contains(points, item => item.Document == root && item.Point.StartLine == 3);
+            Assert.Contains(points, item => item.Document == root && item.Point.StartLine == 4);
+            Assert.Contains(points, item => item.Document == first && item.Point.StartLine == 1);
+            Assert.Contains(points, item => item.Document == nested && item.Point.StartLine == 101);
+            Assert.Contains(points, item => item.Document == nested && item.Point.StartLine == 102);
+            Assert.Contains(points, item => item.Document == nested && item.Point.StartLine == 103);
+            Assert.All(points, item => Assert.False(item.Point.IsHidden));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [Fact]
     public void DeepSourceReturnsPositionedDiagnosticsWithoutAnAssembly()
     {

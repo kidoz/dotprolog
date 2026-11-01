@@ -33,6 +33,8 @@ internal static class CompiledProgramBuilder
             engine.Program.Builtins.Register(name, arity, static _ => false);
         }
 
+        var sourceMap = new CompilationSourceMap();
+        engine.SourceMap = sourceMap;
         var codeStart = engine.Program.CodeLength;
         List<Diagnostic> allDiagnostics = [];
         List<int> initialization = [];
@@ -55,7 +57,7 @@ internal static class CompiledProgramBuilder
             return null;
         }
 
-        return CompiledProgramModel.Create(engine.Program, codeStart, initialization, preparation);
+        return CompiledProgramModel.Create(engine.Program, codeStart, initialization, preparation, sourceMap);
     }
 
     private static List<(int Functor, int Entry)> SnapshotPredicates(BytecodeProgram program, int codeStart)

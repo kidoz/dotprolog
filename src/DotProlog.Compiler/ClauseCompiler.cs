@@ -21,6 +21,8 @@ internal sealed class ClauseCompiler
     private readonly IReadOnlySet<int>? _unitDefinitions;
     private readonly bool _enforceStrictIso;
     private readonly bool _allowQueryBindings;
+    private readonly CompilationSourceMap? _sourceMap;
+    private string? _sourceFileName;
     private readonly Dictionary<string, int> _slots = new(StringComparer.Ordinal);
     private int _slotCount;
     private bool _failed;
@@ -35,7 +37,8 @@ internal sealed class ClauseCompiler
         string? fileName,
         IReadOnlySet<int>? unitDefinitions = null,
         bool trustedImplementation = false,
-        bool allowQueryBindings = false
+        bool allowQueryBindings = false,
+        CompilationSourceMap? sourceMap = null
     )
     {
         _program = program;
@@ -45,6 +48,7 @@ internal sealed class ClauseCompiler
         _unitDefinitions = unitDefinitions;
         _enforceStrictIso = program.LanguageMode == PrologLanguageMode.StrictIso && !trustedImplementation;
         _allowQueryBindings = allowQueryBindings;
+        _sourceMap = sourceMap;
     }
 
     /// <summary>
@@ -58,6 +62,7 @@ internal sealed class ClauseCompiler
         _slotCount = 0;
         _failed = false;
         _cutSlot = -1;
+        _sourceFileName = _sourceMap?.DocumentOf(head, _fileName) ?? _fileName;
 
         head = TermNormalizer.Normalize(head, _program.Flags.DoubleQuotes, _program.Flags.CodePointCharacters);
         body = body is null
@@ -71,6 +76,7 @@ internal sealed class ClauseCompiler
         }
 
         var start = _program.Emit(OpCode.Allocate, 0);
+        _sourceMap?.Record(start, _sourceFileName, head.Span);
         var slotCountOperand = start + 1;
 
         CompileHead(head);
@@ -201,6 +207,7 @@ internal sealed class ClauseCompiler
 
     private void CompileGoal(SyntaxTerm goal, bool isLast)
     {
+        _sourceMap?.Record(_program.CodeLength, _sourceFileName, goal.Span);
         if (goal is AtomTerm { Name: "!" })
         {
             // A cut inside the condition of if-then-else is local to that condition; everywhere else

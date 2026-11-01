@@ -24,7 +24,8 @@ internal sealed class CompiledProgramModel
         BytecodeProgram program,
         int codeStart,
         IReadOnlyList<int> initialization,
-        IReadOnlyList<RawPreparationStep> preparation
+        IReadOnlyList<RawPreparationStep> preparation,
+        CompilationSourceMap? sourceMap = null
     )
     {
         var model = new CompiledProgramModel
@@ -49,6 +50,7 @@ internal sealed class CompiledProgramModel
                 OpCode = opCode,
                 First = operands > 0 ? code[address + 1] : 0,
                 Second = operands > 1 ? code[address + 2] : 0,
+                Source = sourceMap is not null && sourceMap.Locations.TryGetValue(address, out var source) ? source : null,
             };
             model.InstructionByAddress[address] = model.Instructions.Count;
             model.Instructions.Add(instruction);

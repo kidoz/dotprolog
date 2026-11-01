@@ -25,13 +25,15 @@ public static class IlAssemblyEmitter
     /// <param name="output">Destination stream, left open.</param>
     /// <param name="languageMode">Language profile used for source and the generated application.</param>
     /// <param name="flagOverrides">Initial flag overrides.</param>
+    /// <param name="pdbOutput">Optional Portable PDB destination stream, left open.</param>
     public static IReadOnlyList<Diagnostic> Emit(
         IReadOnlyList<(string Name, string Text)> sources,
         string assemblyName,
         Stream output,
         PrologLanguageMode languageMode = PrologLanguageMode.Modern,
-        PrologFlagOverrides? flagOverrides = null
-    ) => Emit(sources, assemblyName, output, null, languageMode, flagOverrides);
+        PrologFlagOverrides? flagOverrides = null,
+        Stream? pdbOutput = null
+    ) => Emit(sources, assemblyName, output, null, languageMode, flagOverrides, pdbOutput);
 
     /// <summary>Writes an assembly using explicit library aliases available during compilation.</summary>
     public static IReadOnlyList<Diagnostic> Emit(
@@ -40,8 +42,9 @@ public static class IlAssemblyEmitter
         Stream output,
         IReadOnlyDictionary<string, string>? libraryFiles,
         PrologLanguageMode languageMode = PrologLanguageMode.Modern,
-        PrologFlagOverrides? flagOverrides = null
-    ) => Emit(sources, assemblyName, output, true, languageMode, flagOverrides, libraryFiles: libraryFiles);
+        PrologFlagOverrides? flagOverrides = null,
+        Stream? pdbOutput = null
+    ) => Emit(sources, assemblyName, output, true, languageMode, flagOverrides, libraryFiles: libraryFiles, pdbOutput: pdbOutput);
 
     // Retain the instruction-per-block path as a semantic and performance reference for tests.
     internal static IReadOnlyList<Diagnostic> Emit(
@@ -53,7 +56,8 @@ public static class IlAssemblyEmitter
         PrologFlagOverrides? flagOverrides = null,
         bool indexFirstArgument = true,
         bool linearVariableFallback = true,
-        IReadOnlyDictionary<string, string>? libraryFiles = null
+        IReadOnlyDictionary<string, string>? libraryFiles = null,
+        Stream? pdbOutput = null
     )
     {
         ArgumentNullException.ThrowIfNull(sources);
@@ -72,7 +76,7 @@ public static class IlAssemblyEmitter
         {
             return diagnostics;
         }
-        WriteAssembly(model, assemblyName, output, fuseBlocks, linearVariableFallback);
+        WriteAssembly(model, assemblyName, output, fuseBlocks, linearVariableFallback, pdbOutput);
         return diagnostics;
     }
 
@@ -81,7 +85,8 @@ public static class IlAssemblyEmitter
         string name,
         Stream output,
         bool fuseBlocks = true,
-        bool linearVariableFallback = true
+        bool linearVariableFallback = true,
+        Stream? pdbOutput = null
     )
     {
         var metadata = new IlMetadata();
@@ -127,11 +132,13 @@ public static class IlAssemblyEmitter
             typeof(CompiledProgram)
         );
         var linearHeads = layout.LinearClauses.Select(clause => clause.Entry).ToHashSet();
+        var debug = pdbOutput is null ? null : new IlDebugInfo();
         var blockCode = new BlobBuilder();
         var blockFlow = new ControlFlowBuilder();
         List<Type> parameters = new(4);
         for (var i = 0; i < layout.BlockCount; i++)
         {
+            debug?.AddMethod();
             // AddMethod copies each completed body into the method stream. Reuse only
             // the scratch buffers, resetting both bytes and branch labels between blocks.
             blockCode.Clear();
@@ -144,6 +151,7 @@ public static class IlAssemblyEmitter
             var failed = il.DefineLabel();
             if (linear)
             {
+                debug?.AddSequencePoint(il.Offset, model.Instructions[start].Source);
                 var clause = layout.LinearClauses[i - layout.Starts.Count];
                 il.LoadArgument(0);
                 if (clause.Header != OpCode.TrustMe)
@@ -179,6 +187,7 @@ public static class IlAssemblyEmitter
             }
             for (var instruction = start; instruction < end; instruction++)
             {
+                debug?.AddSequencePoint(il.Offset, model.Instructions[instruction].Source);
                 EmitOperation(metadata, il, model, layout, model.Instructions[instruction], parameters);
                 if (instruction + 1 < end)
                 {
@@ -202,7 +211,9 @@ public static class IlAssemblyEmitter
                 inline: !linear && linearHeads.Contains(start) && IlBlockLayout.CanFuse(model.Instructions[start].OpCode)
             );
         }
+        debug?.AddMethod();
         var createBlocks = EmitBlockArray(metadata, bodies, layout.BlockCount);
+        debug?.AddMethod();
         var install = new InstructionEncoder(new BlobBuilder());
         install.LoadArgument(0);
         install.LoadString(builder.GetOrAddUserString(image));
@@ -220,6 +231,7 @@ public static class IlAssemblyEmitter
         );
         install.OpCode(ILOpCode.Ret);
         AddMethod(metadata, bodies, "Install", metadata.Signature(false, typeof(int[]), typeof(PrologEngine)), install);
+        debug?.AddMethod();
         var main = new InstructionEncoder(new BlobBuilder());
         main.LoadString(builder.GetOrAddUserString(image));
         main.Call(createBlocks);
@@ -235,10 +247,12 @@ public static class IlAssemblyEmitter
         );
         main.OpCode(ILOpCode.Ret);
         var entry = AddMethod(metadata, bodies, "Main", metadata.Signature(false, typeof(int)), main);
+        var debugDirectory = debug?.Write(builder, entry, pdbOutput!, name + ".pdb");
         var pe = new ManagedPEBuilder(
             PEHeaderBuilder.CreateExecutableHeader(),
             new MetadataRootBuilder(builder),
             bodies.Builder,
+            debugDirectoryBuilder: debugDirectory,
             entryPoint: entry,
             flags: CorFlags.ILOnly,
             deterministicIdProvider: HashContent

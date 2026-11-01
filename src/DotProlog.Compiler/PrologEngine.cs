@@ -24,6 +24,8 @@ public sealed class PrologEngine : IRuntimeCompiler, IDisposable
     private readonly Dictionary<string, (int Address, int ArgumentCount)> _controlGoals = new(StringComparer.Ordinal);
     private bool _preparationHalted;
 
+    internal CompilationSourceMap? SourceMap { get; set; }
+
     /// <summary>Creates a modern-mode engine with the core builtins registered and an empty program.</summary>
     public PrologEngine()
         : this(PrologLanguageMode.Modern) { }
@@ -156,7 +158,10 @@ public sealed class PrologEngine : IRuntimeCompiler, IDisposable
             return new LoadResult(parsed.Diagnostics, [], []);
         }
 
-        var loader = new ProgramLoader(Program, Machine, _modules, userPredicates: true, libraryFiles: LibraryFiles);
+        var loader = new ProgramLoader(Program, Machine, _modules, userPredicates: true, libraryFiles: LibraryFiles)
+        {
+            SourceMap = SourceMap,
+        };
         LoadResult loaded = loader.Load(parsed.Clauses, fileName, Machine.IsRunning ? null : ExecutePreparationDirective);
         List<Diagnostic> diagnostics = [.. parsed.Diagnostics, .. loaded.Diagnostics];
 
@@ -193,7 +198,10 @@ public sealed class PrologEngine : IRuntimeCompiler, IDisposable
             return new LoadResult(parsed.Diagnostics, [], []);
         }
 
-        var loader = new ProgramLoader(Program, Machine, _modules, userPredicates: true, libraryFiles: LibraryFiles);
+        var loader = new ProgramLoader(Program, Machine, _modules, userPredicates: true, libraryFiles: LibraryFiles)
+        {
+            SourceMap = SourceMap,
+        };
         LoadResult loaded = loader.Load(
             parsed.Clauses,
             fileName,
@@ -230,17 +238,24 @@ public sealed class PrologEngine : IRuntimeCompiler, IDisposable
             moduleReaderState.Complete();
         }
 
-        ParseResult ReadSource(string source, string? sourceName) =>
-            TermReader.ReadProgram(
+        ParseResult ReadSource(string source, string? sourceName)
+        {
+            SourceMap?.Register(sourceName, source);
+            return TermReader.ReadProgram(
                 source,
                 sourceName,
                 Program.Operators,
                 Program.CharacterConversions,
                 Program.Flags,
                 clause => ExpandInclude(clause, sourceName),
-                moduleReaderState.AtBoundary,
+                clause =>
+                {
+                    SourceMap?.SetDocument(clause, sourceName);
+                    moduleReaderState.AtBoundary(clause);
+                },
                 moduleReaderState.AfterReaderDirective
             );
+        }
 
         ParseResult? ExpandInclude(SyntaxTerm clause, string? includingFile)
         {
