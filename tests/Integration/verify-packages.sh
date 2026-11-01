@@ -74,3 +74,9 @@ else
     lint_exit=$?
 fi
 test "$lint_exit" -eq 1
+
+# Cross-file semantic analysis must ship in the packed tool as well as the source-tree command.
+printf '%s\n' ':- module(main, []). :- use_module('\''lint-other.pl'\''). go :- helper.' >HelloProlog/lint-main.pl
+printf '%s\n' ':- module(other, [helper/0]). helper.' >HelloProlog/lint-other.pl
+dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --warnings-as-errors HelloProlog/lint-main.pl HelloProlog/lint-other.pl
