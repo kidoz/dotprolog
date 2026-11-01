@@ -48,6 +48,31 @@ Reexports are excluded. Imports whose sources contain reader or initialization s
 excluded, including transitive effects through other imports. Incomplete static analysis suppresses
 the rule. A finding is an advisory hint, not a certificate that removing the import is safe.
 
+## Check for possible non-steadfast clauses
+
+Enable the non-steadfast heuristic explicitly:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint --enable-rule DPL3037 program.pl
+```
+
+`DPL3037` is off in every default profile. It reports ordinary clauses and grammar rules where two
+distinct head arguments share a named variable and the body contains a cut in the same clause scope.
+Nested head terms are inspected, but difference-list arguments added by DCG lowering are not.
+Multifile clauses are excluded; unrelated unresolved calls do not suppress this file-local rule.
+
+For example, the first clause below can incorrectly accept a smaller maximum, while the second
+pattern may be an intentional commitment to unification. Both match the heuristic and need review:
+
+```prolog
+max(X, Y, X) :- X >= Y, !.
+same(X, X) :- !.
+```
+
+The warning is not a proof of non-steadfastness or a recommendation to remove every cut. Cuts in
+if-then-else conditions, negation, all-solutions goals, and meta-calls have different scopes and are
+not treated as clause cuts by this rule.
+
 ## Fail CI on warnings
 
 ```console

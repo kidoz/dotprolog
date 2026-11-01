@@ -15,6 +15,7 @@ dotnet prolog lint [options] <file.pl> [more.pl ...]
 | `--warnings-as-errors` | Return `1` if warnings are reported; warnings are advisory by default |
 | `--profile semantic` | Default profile: source-local and whole-program semantic checks |
 | `--profile covington` | Add automatically checkable Covington layout guidelines 2.1–2.7 |
+| `--enable-rule DPL3037` | Enable the opt-in non-steadfast clause heuristic; repeatable |
 | `--mode modern` or `--mode strict-iso` | Seed the reader's language mode; default `modern` |
 | `--flag name=value` | Override a curated initial flag; repeatable |
 | `--indent-size N` | Positive indentation unit; Covington default `4` |
@@ -68,6 +69,7 @@ These rules run in every profile:
 | `DPL3034` | No recognized entry point reaches an ordinary predicate through static calls |
 | `DPL3035` | An imported predicate or nonterminal has no static reference in its importing module |
 | `DPL3036` | No recognized entry point reaches a grammar nonterminal through static calls |
+| `DPL3037` | Opt-in: distinct head arguments share variables and the clause contains a same-scope cut |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -186,6 +188,26 @@ whole-unit incomplete-analysis conditions as reachability suppress `DPL3035` wit
 other diagnostics. A finding is an advisory hint, not proof that removing the import preserves
 behavior.
 
+### Opt-in non-steadfast clauses
+
+`DPL3037` is disabled by default in every profile. Enable it with `--enable-rule DPL3037`; repeating
+the option does not duplicate findings, and unsupported identifiers are usage errors. The reusable
+`PrologLintOptions.EnabledRules` collection provides the same selection to compiler API callers.
+
+The rule reports an ordinary clause or grammar rule when two distinct source head arguments share a
+named variable and the body contains a cut in the clause's own scope. Nested terms are traversed, but
+repetition within only one argument and anonymous variables do not count. DCG analysis ignores the
+added difference-list arguments and semicontext. Each matching clause produces one warning at its
+first eligible cut; multifile clauses are excluded, while dynamic clauses are eligible.
+
+Conjunction, disjunction, and then/else branches can contain eligible cuts. If-then-else conditions
+and negation have their own cut barriers. Cuts inside all-solutions goals, meta-calls, or ordinary
+term data do not count. A bare soft-cut conditional is treated as the conjunction emitted by the
+compiler. Unrelated unresolved calls do not suppress this file-local rule, and no source is executed.
+
+This is a heuristic, not a proof of non-steadfastness or general mode/determinism analysis. Review
+whether committing to the head unification is intentional before changing the clause.
+
 ### Double-quoted text
 
 `DPL3011` and `DPL3012` judge each double-quoted literal by the `double_quotes` value in force where
@@ -247,5 +269,5 @@ Name every module file whose definitions should participate in cross-file analys
 are read only through `include/1` expansion.
 
 The layout profile reports warnings only. It does not rewrite source. Naming conventions, comment
-quality rules, non-steadfast analysis, and automatic fixes are not implemented. DotProlog does not
-yet retain the comments and exact whitespace needed for a lossless formatter.
+quality rules, general mode or determinism inference, and automatic fixes are not implemented.
+DotProlog does not yet retain the comments and exact whitespace needed for a lossless formatter.

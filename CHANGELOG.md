@@ -27,6 +27,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - Grammar reachability linting reports possibly unreferenced nonterminals with `DPL3036`, including
   `Name//Arity` source identities, DCG and `phrase` references, and conservative handling of mixed
   ordinary and grammar definitions that share a lowered predicate identity.
+- Opt-in non-steadfast linting reports shared variables across distinct head arguments combined with
+  a same-scope cut using `DPL3037`. Enable it explicitly with `--enable-rule DPL3037`; default lint
+  profiles remain unchanged.
 
 ### Changed
 
