@@ -19,79 +19,116 @@ public static class TermOrder
     {
         ArgumentNullException.ThrowIfNull(machine);
 
-        List<(Cell Left, Cell Right)> work = [(left, right)];
-        var visitedStructures = new HashSet<ulong>();
-
-        while (work.Count > 0)
+        left = machine.Dereference(left);
+        right = machine.Dereference(right);
+        if (left == right)
         {
-            (Cell a, Cell b) = work[^1];
-            work.RemoveAt(work.Count - 1);
+            return 0;
+        }
 
-            a = machine.Dereference(a);
-            b = machine.Dereference(b);
+        var rank = RankOf(left).CompareTo(RankOf(right));
+        if (rank != 0)
+        {
+            return rank;
+        }
 
-            if (a == b)
+        return left.Tag switch
+        {
+            CellTag.Reference => left.Index.CompareTo(right.Index),
+            CellTag.Atom or CellTag.String => CompareText(
+                machine,
+                machine.Symbols.AtomName(left.Index),
+                machine.Symbols.AtomName(right.Index)
+            ),
+            CellTag.Integer or CellTag.BigInteger or CellTag.Rational or CellTag.Float => CompareNumbers(machine, left, right),
+            _ => CompareCompounds(machine, left, right),
+        };
+    }
+
+    private static int CompareCompounds(Machine machine, Cell left, Cell right)
+    {
+        // Machine execution is single-threaded and non-reentrant. Scratch is private to comparison,
+        // separate from unification, and never survives a comparison with pending work.
+        var work = machine.ComparisonWork;
+        var visitedStructures = machine.ComparisonVisited;
+        work.Add((left, right));
+        try
+        {
+            while (work.Count > 0)
             {
-                continue;
-            }
+                (Cell a, Cell b) = work[^1];
+                work.RemoveAt(work.Count - 1);
 
-            var rank = RankOf(a).CompareTo(RankOf(b));
-            if (rank != 0)
-            {
-                return rank;
-            }
+                a = machine.Dereference(a);
+                b = machine.Dereference(b);
 
-            switch (a.Tag)
-            {
-                case CellTag.Reference:
-                    return a.Index.CompareTo(b.Index);
-
-                case CellTag.Atom:
-                case CellTag.String:
+                if (a == b)
                 {
-                    var names = CompareText(machine, machine.Symbols.AtomName(a.Index), machine.Symbols.AtomName(b.Index));
-                    if (names != 0)
-                    {
-                        return names;
-                    }
-
                     continue;
                 }
 
-                case CellTag.Integer:
-                case CellTag.BigInteger:
-                case CellTag.Rational:
-                case CellTag.Float:
+                var rank = RankOf(a).CompareTo(RankOf(b));
+                if (rank != 0)
                 {
-                    var numbers = CompareNumbers(machine, a, b);
-                    if (numbers != 0)
-                    {
-                        return numbers;
-                    }
-
-                    continue;
+                    return rank;
                 }
 
-                default:
+                switch (a.Tag)
                 {
-                    var pair = ((ulong)(uint)a.Index << 32) | (uint)b.Index;
-                    if (!visitedStructures.Add(pair))
+                    case CellTag.Reference:
+                        return a.Index.CompareTo(b.Index);
+
+                    case CellTag.Atom:
+                    case CellTag.String:
                     {
+                        var names = CompareText(machine, machine.Symbols.AtomName(a.Index), machine.Symbols.AtomName(b.Index));
+                        if (names != 0)
+                        {
+                            return names;
+                        }
+
                         continue;
                     }
 
-                    var structures = CompareStructures(machine, a, b, work);
-                    if (structures != 0)
+                    case CellTag.Integer:
+                    case CellTag.BigInteger:
+                    case CellTag.Rational:
+                    case CellTag.Float:
                     {
-                        return structures;
+                        var numbers = CompareNumbers(machine, a, b);
+                        if (numbers != 0)
+                        {
+                            return numbers;
+                        }
+
+                        continue;
                     }
 
-                    continue;
+                    default:
+                    {
+                        var pair = ((ulong)(uint)a.Index << 32) | (uint)b.Index;
+                        if (!visitedStructures.Add(pair))
+                        {
+                            continue;
+                        }
+
+                        var structures = CompareStructures(machine, a, b, work);
+                        if (structures != 0)
+                        {
+                            return structures;
+                        }
+
+                        continue;
+                    }
                 }
             }
+            return 0;
         }
-
-        return 0;
+        finally
+        {
+            work.Clear();
+            visitedStructures.Clear();
+        }
     }
 
     /// <summary>Whether two terms are identical under the standard order.</summary>

@@ -59,6 +59,9 @@ public sealed class Machine : IDisposable
     private Cell[] _savedArguments = new Cell[1 << 12];
     private int _savedTop;
 
+    internal List<(Cell Left, Cell Right)> ComparisonWork { get; } = [];
+    internal HashSet<ulong> ComparisonVisited { get; } = [];
+
     private Cell[] _unificationStack = new Cell[256];
     private int _unificationTop;
     private readonly HashSet<ulong> _unificationVisited = [];
