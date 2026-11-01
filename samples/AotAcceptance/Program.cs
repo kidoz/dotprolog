@@ -66,6 +66,29 @@ internal static class Program
         }
     }
 
+    private static bool ExerciseRuntimePerformancePaths()
+    {
+        using var engine = new PrologEngine { Output = TextWriter.Null };
+        engine.ConsultOrThrow(
+            """
+            :- dynamic transient/1.
+            transient(live).
+            churn(0) :- !.
+            churn(N) :- assertz(transient(N)), retract(transient(N)), M is N-1, churn(M).
+            ordered :-
+                sort([f(2),f(1),f(2)], [f(1),f(2)]),
+                keysort([f(2)-a,f(1)-b,f(2)-c], [f(1)-b,f(2)-a,f(2)-c]),
+                X = f(X,1), Y = f(Y,2), compare(<,X,Y).
+            """,
+            "performance-paths.pl"
+        );
+        var host = new PrologHost(engine.Machine);
+        return host.Prove(host.Bind("churn", 1), PrologInput.Integer(128))
+            && host.Prove(host.Bind("ordered", 0))
+            && host.Prove(host.Bind("transient", 1), PrologInput.Atom("live"))
+            && host.CallAll(host.Bind("transient", 1), PrologInput.Output).Count() == 1;
+    }
+
     private static int Main(string[] args)
     {
         var path = args.Length > 0 ? args[0] : Path.Combine(AppContext.BaseDirectory, "acceptance.pl");
@@ -73,7 +96,12 @@ internal static class Program
         IPricingModule pricing = PricingModule.Create(engine);
         var maxAritySource = $"f({string.Join(",", Enumerable.Repeat("a", 256))})";
 
-        if (!ExerciseHostBoundaries() || !ExerciseSystemErrors() || pricing.Discount(100.0, 10) != 90.0)
+        if (
+            !ExerciseHostBoundaries()
+            || !ExerciseRuntimePerformancePaths()
+            || !ExerciseSystemErrors()
+            || pricing.Discount(100.0, 10) != 90.0
+        )
         {
             return 1;
         }
