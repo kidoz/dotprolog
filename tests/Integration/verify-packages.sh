@@ -93,3 +93,17 @@ fi
 test "$lint_exit" -eq 1
 printf '%s\n' "$lint_output" | grep -F 'warning DPL3034'
 printf '%s\n' "$lint_output" | grep -F 'm:unused/0'
+
+# Selective import analysis retains its per-binding diagnostics in the packaged tool.
+printf '%s\n' ':- module(main, [go/0]). :- use_module('\''lint-unused.pl'\'', [helper/0]). go.' >HelloProlog/lint-import.pl
+printf '%s\n' ':- module(unused_source, [helper/0]). helper.' >HelloProlog/lint-unused.pl
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --warnings-as-errors HelloProlog/lint-import.pl HelloProlog/lint-unused.pl 2>&1); then
+    echo "lint unexpectedly accepted an unused selective import" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3035'
+printf '%s\n' "$lint_output" | grep -F 'helper/0'
