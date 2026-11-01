@@ -75,8 +75,21 @@ work and cycle-detection collections, cleared on every exit. It remains iterativ
 Dynamic clause records carry birth and death generations. Retraction marks death immediately;
 batched collection unlinks records invisible to every retained top-level call. Machines sharing a
 program register weakly, and suspended answers protect their generation until reset, exhaustion or
-disposal. Inactive choice-point cursor roots are cleared before collection. Emitted bytecode and
-constants keep stable addresses and are not reclaimed; see [engine lifetime](../dotnet-integration.md#engine-lifetime-and-memory).
+disposal. Inactive choice-point cursor roots are cleared before collection.
+
+The built-in compiler transfers private bytecode and constant ranges to asserted and runtime-loaded
+dynamic clauses. Collection releases both ranges with the clause record. Address-ordered free lists
+split and coalesce ranges and trim free tails. New, unpublished code can move into a hole after its
+internal branch and constant operands are relocated; published code never moves. Each private clause
+has an isolated constant-index cache. `BytecodeLayout` supplies operand metadata to relocation and
+the portable compiler model; dispatch has no new indirection or per-instruction ownership checks.
+
+An internal compiler interface transfers ownership without changing the public `IRuntimeCompiler`
+contract. Public compilation, static code, host goals and custom compiler output remain pinned.
+Build-time model extraction disables reuse to retain its linear code map and preparation snapshots;
+generated dynamic blocks have no reclaimable bytecode allocation. Trampolines are cached by real
+predicate functor across abolish/redeclare. See [engine lifetime](../dotnet-integration.md#engine-lifetime-and-memory)
+for the remaining pinned-code and intern-table limits.
 
 ## Loading and rewriting
 

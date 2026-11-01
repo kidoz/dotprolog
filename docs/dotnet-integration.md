@@ -147,8 +147,16 @@ The heap is reset between top-level calls, but the program has a longer lifetime
 - Retraction retains clauses needed by suspended calls under logical update view. Batched collection
   unlinks dead clause records after their last protected generation is released. A long-running
   top-level call conservatively protects all clauses visible when it began.
-- Asserted and consulted bytecode, constants, and compiled query code remain append-only. Clause
-  record collection reduces scans and detached term retention, but does not bound total program memory.
+- The built-in compiler also recycles privately owned bytecode and constant-pool ranges for
+  retracted asserted and runtime-loaded dynamic clauses. Live code stays at its original address.
+  Allocated arrays retain peak capacity; an old retained call can delay reuse.
+- Static code, host-compiled goals, public `IRuntimeCompiler.CompileClause` results, and custom
+  compiler output stay pinned. Build-time C#/IL methods also retain their existing lifetime.
+  Repeated query compilation can therefore still grow a program.
+
+`BytecodeProgram.CodeLength` and `ConstantCount` expose the current code and constant append
+positions, including reusable gaps. Private ranges released from the tail can reduce these counts;
+they do not count cumulative historical emission or distinct values.
 
 For services processing unbounded distinct input, use a fresh engine for each request or a bounded
 batch, reinstall the static program, and carry application state through detached `PrologValue`

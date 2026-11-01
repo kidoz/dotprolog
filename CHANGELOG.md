@@ -12,10 +12,13 @@ All notable changes to DotProlog are recorded here. The format follows
   compound terms, reducing allocation during comparison and sorting.
 - Generated C# uses first-argument clause indexes. Large static tables use keyed lookup while
   preserving source order and variable-headed fallback.
-- Retracted dynamic clause records are collected when no retained call generation can see them.
-  Emitted bytecode and constants remain append-only.
+- Retracted dynamic clauses release their records and privately owned bytecode and constant-pool
+  ranges when no retained call generation can see them. The built-in compiler reuses these ranges
+  without moving live code or host-compiled goals. Repeated abolish/redeclare reuses each predicate's
+  trampoline. Static code, custom compiler output, and interned values retain their existing lifetime.
 - Synchronous typed host calls accept span inputs without argument-array allocation. Symbol-table
-  counts expose retained text and numeric values for hosts managing engine lifetimes.
+  counts expose retained text and numeric values for hosts managing engine lifetimes, and
+  `BytecodeProgram.ConstantCount` exposes the constant-pool append position.
 
 ## [0.17.0] — 2026-11-01
 
