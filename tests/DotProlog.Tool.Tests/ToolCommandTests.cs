@@ -100,6 +100,17 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void LintReportsAGroundCallWithNoMatchingClauseHead()
+    {
+        var path = Source("trivial.pl", "p(a). go :- p(b).\n");
+
+        (var exitCode, _, var error) = Execute("lint", "--warnings-as-errors", path);
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("DPL3033", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LintReportsAnUnresolvedInclude()
     {
         var main = Source("main.pl", ":- include('missing.pl').\n");

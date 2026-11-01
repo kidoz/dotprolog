@@ -150,7 +150,15 @@ internal static class PrologCallGraphLinter
             case VariableTerm:
                 return;
             case AtomTerm atom:
-                CheckOrdinaryCall(atom, new PredicateIndicator(atom.Name, extraArguments), module, model, fileName, diagnostics);
+                CheckOrdinaryCall(
+                    atom,
+                    new PredicateIndicator(atom.Name, extraArguments),
+                    module,
+                    model,
+                    fileName,
+                    diagnostics,
+                    allowTrivialFailure: false
+                );
                 return;
             case CompoundTerm { Name: ":", Arity: 2 } qualified when qualified.Arguments[0] is AtomTerm target:
                 AnalyzeClosure(qualified.Arguments[1], extraArguments, target.Name, model, fileName, diagnostics);
@@ -162,7 +170,8 @@ internal static class PrologCallGraphLinter
                     module,
                     model,
                     fileName,
-                    diagnostics
+                    diagnostics,
+                    allowTrivialFailure: false
                 );
                 return;
         }
@@ -238,7 +247,8 @@ internal static class PrologCallGraphLinter
         string module,
         PrologLintProgramModel model,
         string fileName,
-        List<Diagnostic> diagnostics
+        List<Diagnostic> diagnostics,
+        bool allowTrivialFailure = true
     )
     {
         PrologLintProgramModel.LintResolution resolution = model.Resolve(module, predicate);
@@ -255,16 +265,25 @@ internal static class PrologCallGraphLinter
             return;
         }
 
-        if (resolution.Module is { } target && model.IsNonterminal(target, predicate) && !model.IsOrdinary(target, predicate))
+        if (resolution.Module is { } target)
         {
-            diagnostics.Add(
-                Warning(
-                    LintDiagnosticIds.PredicateNonterminalMismatch,
-                    $"Predicate {LintSyntax.Display(predicate)} is called as an ordinary predicate, but only a nonterminal with the corresponding arity is defined.",
-                    site.Span,
-                    fileName
-                )
-            );
+            if (model.IsNonterminal(target, predicate) && !model.IsOrdinary(target, predicate))
+            {
+                diagnostics.Add(
+                    Warning(
+                        LintDiagnosticIds.PredicateNonterminalMismatch,
+                        $"Predicate {LintSyntax.Display(predicate)} is called as an ordinary predicate, but only a nonterminal with the corresponding arity is defined.",
+                        site.Span,
+                        fileName
+                    )
+                );
+                return;
+            }
+
+            if (allowTrivialFailure)
+            {
+                PrologTrivialFailureLinter.CheckCall(site, predicate, target, model, fileName, diagnostics);
+            }
         }
     }
 

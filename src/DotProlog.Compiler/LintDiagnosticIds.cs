@@ -105,4 +105,7 @@ public static class LintDiagnosticIds
 
     /// <summary>An include cannot be read or exceeds the non-executing expansion limits.</summary>
     public const string UnresolvedLintSource = "DPL3032";
+
+    /// <summary>No supplied clause head can unify with a statically resolved ground call.</summary>
+    public const string TrivialCallFailure = "DPL3033";
 }

@@ -10,6 +10,7 @@ internal sealed class PrologLintProgramModel
     private readonly HashSet<(string Module, PredicateIndicator Predicate)> _unresolvedImportPredicates = [];
     private readonly HashSet<(string Module, PredicateIndicator Predicate)> _ordinary = [];
     private readonly HashSet<(string Module, PredicateIndicator Predicate)> _nonterminals = [];
+    private readonly HashSet<(string Module, PredicateIndicator Predicate)> _dynamicOrMultifile = [];
 
     private PrologLintProgramModel(IReadOnlyList<PrologLintSource> sources)
     {
@@ -84,6 +85,12 @@ internal sealed class PrologLintProgramModel
     internal bool IsNonterminal(string module, PredicateIndicator predicate) => _nonterminals.Contains((module, predicate));
 
     internal int[]? MetaArgumentsOf(string module, PredicateIndicator predicate) => Modules.MetaArgumentsOf(module, predicate);
+
+    internal bool TryStaticClauses(string module, PredicateIndicator predicate, out IReadOnlyList<ClauseContext> clauses)
+    {
+        clauses = [.. Clauses.Where(clause => clause.Module == module && clause.Indicator == predicate)];
+        return clauses.Count > 0 && !_dynamicOrMultifile.Contains((module, predicate));
+    }
 
     private void CollectDefinitions(PrologLintSource source, List<ImportRequest> imports)
     {
@@ -223,6 +230,7 @@ internal sealed class PrologLintProgramModel
             {
                 Modules.Define(module, indicator);
                 _ordinary.Add((module, indicator));
+                _dynamicOrMultifile.Add((module, indicator));
             }
 
             if (dynamic)
