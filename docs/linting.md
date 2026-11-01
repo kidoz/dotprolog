@@ -13,7 +13,7 @@ dotnet prolog lint [options] <file.pl> [more.pl ...]
 | Option | Contract |
 |---|---|
 | `--warnings-as-errors` | Return `1` if warnings are reported; warnings are advisory by default |
-| `--profile semantic` | Default profile: source-local variable and double-quoted text checks |
+| `--profile semantic` | Default profile: source-local and whole-program semantic checks |
 | `--profile covington` | Add automatically checkable Covington layout guidelines 2.1–2.7 |
 | `--mode modern` or `--mode strict-iso` | Seed the reader's language mode; default `modern` |
 | `--flag name=value` | Override a curated initial flag; repeatable |
@@ -65,6 +65,7 @@ These rules run in every profile:
 | `DPL3031` | A predicate is called as a nonterminal, or a nonterminal as a predicate |
 | `DPL3032` | An include cannot be read, forms a cycle, or exceeds the expansion limit |
 | `DPL3033` | No supplied clause head matches a statically resolved ground call |
+| `DPL3034` | No recognized entry point reaches an ordinary predicate through static calls |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -134,7 +135,26 @@ predicate. Atoms, numbers, concrete strings, compounds, and lists are compared w
 code. Head variables may match ground arguments, and repeated named variables must bind consistently.
 Dynamic and multifile predicates, variable-containing calls, reader-dependent double-quoted terms,
 built-ins, meta-closures, and unknown resolutions are skipped. A matching rule head counts even when
-its body would fail or throw, because bodies are never evaluated. Dead-code analysis is not implemented.
+its body would fail or throw, because bodies are never evaluated.
+
+### Advisory reachability
+
+`DPL3034` reports an ordinary predicate when no recognized entry point reaches it through static
+calls. It emits at most one warning per `module:name/arity`, at the first supplied clause head.
+Exports, predicates outside named modules, initialization goals, zero-arity `test_*` predicates, and
+dynamic or multifile predicates are entry roots. Reachability follows resolved imports, control
+constructs, module-qualified calls, DCGs, `phrase/2,3`, and declared meta-predicate closures.
+Recursive and mutually recursive predicates are reported when no root reaches their cycle.
+
+The finding says that a predicate may be unreferenced; it is not proof that deleting it is safe.
+Nonterminals contribute edges and exported nonterminals are roots, but unreferenced nonterminals do
+not receive findings. Unused imports are also outside this rule.
+
+Reachability requires a complete static call graph. Unresolved includes or imports, unknown calls or
+modules, variable goals, unsupported meta-closures, runtime database mutation or source loading,
+conditional compilation, source expansion, and unavailable source suppress `DPL3034` for the entire
+analysis unit. Other diagnostics still run. As with every lint rule, no clause, directive,
+initialization goal, or expansion is executed.
 
 ### Double-quoted text
 
@@ -197,5 +217,5 @@ Name every module file whose definitions should participate in cross-file analys
 are read only through `include/1` expansion.
 
 The layout profile reports warnings only. It does not rewrite source. Naming conventions, comment
-quality rules, dead-code analysis, and automatic fixes are not implemented. DotProlog does not yet
-retain the comments and exact whitespace needed for a lossless formatter.
+quality rules, unused-import analysis, and automatic fixes are not implemented. DotProlog does not
+yet retain the comments and exact whitespace needed for a lossless formatter.

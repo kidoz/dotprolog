@@ -18,6 +18,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - Ground-call linting reports when no supplied clause head matches, with repeated-variable
   consistency and conservative suppression for dynamic, multifile, variable, meta-call, and
   representation-dependent cases. Clause bodies are never evaluated.
+- Advisory reachability linting reports possibly unreferenced ordinary predicates with `DPL3034`.
+  Exports, scripts, initialization goals, discovered tests, and dynamic or multifile predicates are
+  entry points; incomplete or runtime-dependent call information suppresses the rule.
 
 ### Changed
 

@@ -19,6 +19,18 @@ Modern `use_module/1,2` imports resolve among those files. `include/1` is expand
 including file without executing its contents. Unavailable imports and dynamic call targets remain
 unknown rather than being reported as undefined.
 
+## Review possibly unreferenced predicates
+
+`DPL3034` reports an ordinary predicate when no recognized entry point reaches it through static
+calls. Exports, non-module predicates, initialization goals, zero-arity `test_*` predicates, and
+dynamic or multifile predicates are entry points. Calls through imports, DCGs, and declared
+meta-predicate closures contribute reachability edges.
+
+This is an advisory refactoring hint, not proof that deletion is safe. Unreferenced nonterminals and
+unused imports are not reported. If missing source, unresolved calls, runtime goal construction,
+database mutation, conditional compilation, or source expansion could hide call edges, the linter
+suppresses `DPL3034` for the whole analysis unit while retaining other diagnostics.
+
 ## Fail CI on warnings
 
 ```console
