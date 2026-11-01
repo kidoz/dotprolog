@@ -124,6 +124,20 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void LintReportsAPossiblyUnusedImport()
+    {
+        var main = Source("main.pl", ":- module(main, [go/0]). :- use_module('other.pl', [helper/0]). go.\n");
+        var other = Source("other.pl", ":- module(other, [helper/0]). helper.\n");
+
+        (var exitCode, _, var error) = Execute("lint", "--warnings-as-errors", main, other);
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("DPL3035", error, StringComparison.Ordinal);
+        Assert.Contains("helper/0", error, StringComparison.Ordinal);
+        Assert.Contains("may be unused", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LintReportsAnUnresolvedInclude()
     {
         var main = Source("main.pl", ":- include('missing.pl').\n");

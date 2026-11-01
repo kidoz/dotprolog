@@ -111,4 +111,7 @@ public static class LintDiagnosticIds
 
     /// <summary>No recognized entry point reaches an ordinary predicate through static calls.</summary>
     public const string PossibleUnreferencedPredicate = "DPL3034";
+
+    /// <summary>An imported predicate or nonterminal has no static reference in its importing module.</summary>
+    public const string PossiblyUnusedImport = "DPL3035";
 }

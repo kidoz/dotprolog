@@ -11,6 +11,7 @@ internal sealed class PrologLintProgramModel
     private readonly HashSet<(string Module, PredicateIndicator Predicate)> _ordinary = [];
     private readonly HashSet<(string Module, PredicateIndicator Predicate)> _nonterminals = [];
     private readonly HashSet<(string Module, PredicateIndicator Predicate)> _dynamicOrMultifile = [];
+    private readonly HashSet<string> _effectfulModules = new(StringComparer.Ordinal);
 
     private PrologLintProgramModel(IReadOnlyList<PrologLintSource> sources)
     {
@@ -25,6 +26,7 @@ internal sealed class PrologLintProgramModel
     internal ModuleTable Modules { get; }
     internal List<ClauseContext> Clauses { get; } = [];
     internal List<DeclarationSite> Declarations { get; } = [];
+    internal List<ImportSite> Imports { get; } = [];
 
     internal static PrologLintProgramModel Build(IReadOnlyList<PrologLintSource> sources)
     {
@@ -39,6 +41,23 @@ internal sealed class PrologLintProgramModel
         foreach (ImportRequest import in imports)
         {
             model.ResolveImport(import);
+        }
+
+        var propagated = true;
+        while (propagated)
+        {
+            propagated = false;
+            foreach (ImportSite import in model.Imports)
+            {
+                if (
+                    import.SourceModule is { } sourceModule
+                    && model._effectfulModules.Contains(sourceModule)
+                    && model._effectfulModules.Add(import.Importer)
+                )
+                {
+                    propagated = true;
+                }
+            }
         }
 
         return model;
@@ -88,6 +107,8 @@ internal sealed class PrologLintProgramModel
     internal bool IsDynamicOrMultifile(string module, PredicateIndicator predicate) =>
         _dynamicOrMultifile.Contains((module, predicate));
 
+    internal bool HasNonPredicateEffects(string module) => _effectfulModules.Contains(module);
+
     internal int[]? MetaArgumentsOf(string module, PredicateIndicator predicate) => Modules.MetaArgumentsOf(module, predicate);
 
     internal bool TryStaticClauses(string module, PredicateIndicator predicate, out IReadOnlyList<ClauseContext> clauses)
@@ -104,11 +125,18 @@ internal sealed class PrologLintProgramModel
             SyntaxTerm clause = source.Clauses[index];
             PrologLintSource owner =
                 source.FileForClause(index) == source.FileName ? source : source with { FileName = source.FileForClause(index) };
-            if (clause is CompoundTerm { Name: ":-", Arity: 1, Arguments: [CompoundTerm directive] })
+            if (clause is CompoundTerm { Name: ":-", Arity: 1, Arguments: [SyntaxTerm directiveTerm] })
             {
+                if (directiveTerm is not CompoundTerm directive)
+                {
+                    _effectfulModules.Add(module);
+                    continue;
+                }
+
                 if (directive.Name == "initialization")
                 {
                     Clauses.Add(new ClauseContext(owner, clause, module, default, false));
+                    _effectfulModules.Add(module);
                 }
 
                 module = CollectDirective(owner, directive, module, imports);
@@ -186,7 +214,13 @@ internal sealed class PrologLintProgramModel
             case ("meta_predicate", 1):
                 DeclareMetaPredicates(module, directive.Arguments[0], source);
                 return module;
+            case ("op", 3):
+            case ("set_prolog_flag", 2):
+            case ("char_conversion", 2):
+                _effectfulModules.Add(module);
+                return module;
             default:
+                _effectfulModules.Add(module);
                 return module;
         }
     }
@@ -302,16 +336,20 @@ internal sealed class PrologLintProgramModel
             if (sourceModule is null)
             {
                 MarkUnresolved(request, predicate: null);
+                Imports.Add(request.ToSite(sourceModule));
                 return;
             }
         }
         else if (sourceModule is null || !Modules.Catalog.Contains(sourceModule))
         {
             MarkUnresolved(request, predicate: null);
+            Imports.Add(request.ToSite(sourceModule));
             return;
         }
 
-        IEnumerable<PredicateIndicator> selected = request.Selective ? request.Predicates : Modules.ExportsOf(sourceModule);
+        IEnumerable<PredicateIndicator> selected = request.Selective
+            ? request.Bindings.Select(binding => binding.Indicator)
+            : Modules.ExportsOf(sourceModule);
         HashSet<PredicateIndicator> selectedSet = [.. selected];
         HashSet<PredicateIndicator> exports = [.. Modules.ExportsOf(sourceModule)];
         foreach (PredicateIndicator predicate in selectedSet)
@@ -334,6 +372,8 @@ internal sealed class PrologLintProgramModel
                 MarkUnresolved(request, predicate);
             }
         }
+
+        Imports.Add(request.ToSite(sourceModule));
     }
 
     private string? ResolveModulePath(ImportRequest request)
@@ -409,6 +449,18 @@ internal sealed class PrologLintProgramModel
         internal static LintResolution Defined(string? module) => new(true, module);
     }
 
+    internal sealed record ImportSite(
+        string Importer,
+        string? SourceModule,
+        bool Selective,
+        bool Reexport,
+        IReadOnlyList<ImportBinding> Bindings,
+        SyntaxTerm SourceTerm,
+        PrologLintSource Source
+    );
+
+    internal sealed record ImportBinding(PredicateIndicator Indicator, bool Nonterminal, SourceSpan Span);
+
     private sealed record ImportRequest(
         PrologLintSource Source,
         string Importer,
@@ -417,14 +469,15 @@ internal sealed class PrologLintProgramModel
         bool FileDirective,
         bool Selective,
         bool Reexport,
-        IReadOnlyList<PredicateIndicator> Predicates
+        CompoundTerm Directive,
+        IReadOnlyList<ImportBinding> Bindings
     )
     {
         internal static ImportRequest ForFile(PrologLintSource source, string importer, CompoundTerm directive)
         {
             var path = directive.Arguments[0] is AtomTerm atom ? atom.Name : null;
-            IReadOnlyList<PredicateIndicator> predicates = directive.Arity == 2 ? Indicators(directive.Arguments[1]) : [];
-            return new ImportRequest(source, importer, null, path, true, directive.Arity == 2, false, predicates);
+            IReadOnlyList<ImportBinding> bindings = directive.Arity == 2 ? Indicators(directive.Arguments[1]) : [];
+            return new ImportRequest(source, importer, null, path, true, directive.Arity == 2, false, directive, bindings);
         }
 
         internal static ImportRequest ForModule(
@@ -435,18 +488,21 @@ internal sealed class PrologLintProgramModel
         )
         {
             var module = directive.Arguments[0] is AtomTerm atom ? atom.Name : null;
-            IReadOnlyList<PredicateIndicator> predicates = directive.Arity == 2 ? Indicators(directive.Arguments[1]) : [];
-            return new ImportRequest(source, importer, module, null, false, directive.Arity == 2, reexport, predicates);
+            IReadOnlyList<ImportBinding> bindings = directive.Arity == 2 ? Indicators(directive.Arguments[1]) : [];
+            return new ImportRequest(source, importer, module, null, false, directive.Arity == 2, reexport, directive, bindings);
         }
 
-        private static List<PredicateIndicator> Indicators(SyntaxTerm term)
+        internal ImportSite ToSite(string? sourceModule) =>
+            new(Importer, sourceModule, Selective, Reexport, Bindings, Directive.Arguments[0], Source);
+
+        private static List<ImportBinding> Indicators(SyntaxTerm term)
         {
-            List<PredicateIndicator> result = [];
+            List<ImportBinding> result = [];
             foreach (SyntaxTerm item in LintSyntax.SequenceItems(term))
             {
-                if (LintSyntax.TryIndicator(item, out PredicateIndicator indicator, out _))
+                if (LintSyntax.TryIndicator(item, out PredicateIndicator indicator, out var nonterminal))
                 {
-                    result.Add(indicator);
+                    result.Add(new ImportBinding(indicator, nonterminal, item.Span));
                 }
             }
 
