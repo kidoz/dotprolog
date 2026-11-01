@@ -36,20 +36,19 @@ dotnet run --project src/DotProlog.Compiler.Cli -- samples/HelloProlog/hello.pl 
 ./artifacts/hello-native/native/PrologProgram
 ```
 
-You can also pack and install the compiler as a .NET tool. The new `DotProlog.Compiler.Cli` package
-has not yet been published to NuGet.org; build the local package first:
+Install the compiler from NuGet.org as the `DotProlog.Compiler.Cli` .NET tool:
 
 ```console
-dotnet pack src/DotProlog.Compiler.Cli -c Release -o artifacts/compiler
-dotnet tool install DotProlog.Compiler.Cli --add-source artifacts/compiler --tool-path artifacts/compiler-tools --version 0.16.1
+dotnet tool install DotProlog.Compiler.Cli --tool-path artifacts/compiler-tools --version 0.17.0
 ./artifacts/compiler-tools/plc --version
 ./artifacts/compiler-tools/plc samples/HelloProlog/hello.pl --output artifacts/installed-hello --aot
 ```
 
-Use the version printed by `dotnet pack` if it differs. Replace `--tool-path artifacts/compiler-tools`
-with `--global` to install `plc` on your tool PATH, or use `--local` inside a directory with a tool
-manifest. Run the installed command from any working directory; it includes the required DotProlog
-libraries. The compiler requires .NET 10. Native publishing also needs the SDK and native toolchain.
+Replace `--tool-path artifacts/compiler-tools` with `--global` to install `plc` on your tool PATH, or
+use `--local` inside a directory with a tool manifest. Run the installed command from any working
+directory; it includes the required DotProlog libraries. To test an unreleased checkout, pack the
+project and add `--add-source artifacts/compiler` to the installation command. The compiler requires
+.NET 10. Native publishing also needs the SDK and native toolchain.
 The installation options follow the [.NET tool installation reference](https://learn.microsoft.com/dotnet/core/tools/dotnet-tool-install).
 
 The output directory must not already exist. The native target defaults to the current host;
@@ -58,11 +57,15 @@ use `--rid` to select another target supported by your build toolchain. Windows 
 
 Omit `--aot` to emit the managed assembly and its publishing assets only, then run it with
 `dotnet artifacts/hello-native/PrologProgram.dll`. Multiple input files are compiled in argument
-order. The compiler also accepts `--mode strict-iso` and `--flag double_quotes=chars`.
+order. The compiler also accepts `--mode strict-iso` and `--flag double_quotes=chars`. Use
+`--packages DIR` to compile Modern `library(Name)` imports from a restored propack workspace; the
+lock and cache are verified without fetching, and the output runs without the workspace.
 
-This path emits no C# source and requires no `.dplproj`. NativeAOT consumes the emitted assembly
-through a generated SDK publishing project. Runtime consultation and standard-library startup
-use the existing bytecode engine; build-time predicates execute the emitted IL blocks.
+This path emits no C# source and requires no `.dplproj`. The managed output includes a deterministic
+Portable PDB mapping emitted IL to the original Prolog documents and source spans. NativeAOT consumes
+the emitted assembly through a generated SDK publishing project. Runtime consultation and
+standard-library startup use the existing bytecode engine; build-time predicates execute the emitted
+IL blocks.
 
 ## Verify runtime consultation
 

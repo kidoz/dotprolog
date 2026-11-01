@@ -12,10 +12,10 @@ Russian whose examples all run on DotProlog.
 **Status: early, but usable.** `dotnet new prolog-console` through `dotnet publish -p:PublishAot=true`
 works today, and `dotnet test` discovers Prolog tests under Microsoft.Testing.Platform. `.dplproj`
 predicate bodies compile to generated C# and ordinary CLR IL at build time; source consulted at run
-time compiles to bytecode for an AOT-safe VM. The standalone `plc` compiler in this checkout emits
-IL directly and can publish a native executable with NativeAOT. It can be packed and installed as
-`DotProlog.Compiler.Cli`; this new tool has not yet been published to NuGet.org.
-The packages have been on NuGet.org since 0.2.0 and the current release is 0.16.1: see
+time compiles to bytecode for an AOT-safe VM. The standalone `plc` compiler emits IL directly and
+can publish a native executable with NativeAOT. It is published as the `DotProlog.Compiler.Cli`
+.NET tool.
+The packages have been on NuGet.org since 0.2.0 and the current release is 0.17.0: see
 [CHANGELOG.md](CHANGELOG.md) and [COMPATIBILITY.md](COMPATIBILITY.md).
 
 ## Portable packages
@@ -164,22 +164,21 @@ dotnet run --project src/DotProlog.Compiler.Cli -- \
   samples/HelloProlog/hello.pl --output artifacts/hello-native --aot
 ```
 
-To install `plc` from a locally built package, run these commands from the repository root:
+Install `plc` from NuGet.org:
 
 ```sh
-dotnet pack src/DotProlog.Compiler.Cli -c Release -o artifacts/compiler
-dotnet tool install DotProlog.Compiler.Cli --add-source artifacts/compiler \
-  --tool-path artifacts/compiler-tools --version 0.16.1
+dotnet tool install DotProlog.Compiler.Cli \
+  --tool-path artifacts/compiler-tools --version 0.17.0
 ./artifacts/compiler-tools/plc --version
 ./artifacts/compiler-tools/plc samples/HelloProlog/hello.pl --output artifacts/installed-hello --aot
 ```
 
-Use the version produced by `dotnet pack` if you change the repository version. For a global
-installation, replace `--tool-path artifacts/compiler-tools` with `--global`; the command is then
-`plc` from any directory on your tool PATH. A project-local installation also works with
-`dotnet new tool-manifest` followed by `dotnet tool install --local` and the same package, source,
-and version arguments. The package includes all four DotProlog libraries needed by emitted programs;
-the installed compiler needs .NET 10, and `--aot` also needs the SDK and native build tools.
+For a global installation, replace `--tool-path artifacts/compiler-tools` with `--global`; the command
+is then `plc` from any directory on your tool PATH. A project-local installation also works with
+`dotnet new tool-manifest` followed by `dotnet tool install --local` and the same package and version
+arguments. To test an unreleased checkout, pack the project into `artifacts/compiler` and add
+`--add-source artifacts/compiler`. The package includes all four DotProlog libraries needed by emitted
+programs; the installed compiler needs .NET 10, and `--aot` also needs the SDK and native build tools.
 
 The native executable is `artifacts/hello-native/native/PrologProgram` (`PrologProgram.exe` on
 Windows). Publishing needs the .NET SDK and the platform's NativeAOT prerequisites. Running the
@@ -188,17 +187,20 @@ not supported by this command; use a build host for each target OS.
 
 - Pass source files in load order. Applications start with their `:- initialization(...)` goals.
 - `--mode modern|strict-iso` and `--flag double_quotes=codes|chars|atom|string` select source semantics.
+- `--packages DIR` resolves Modern `library(Name)` imports from a restored, verified propack workspace
+  without fetching during compilation. The emitted application does not need the workspace at run time.
 - `--rid <RID>` chooses the native target with `--aot`; it defaults to the host RID.
 - `--version` prints the compiler package version, including any prerelease suffix.
 - `--output` must name a new directory. Existing outputs are never overwritten.
-- The managed output includes the required DotProlog DLLs and `PrologProgram.csproj`. Its overridden
-  `CoreCompile` target supplies the already-emitted IL to the SDK. You can publish it later with
-  `dotnet publish artifacts/hello-il/PrologProgram.csproj -c Release -r <RID>`.
+- The managed output includes the required DotProlog DLLs, `PrologProgram.pdb`, and
+  `PrologProgram.csproj`. The Portable PDB maps emitted IL back to Prolog source documents and spans.
+  The project's overridden `CoreCompile` target supplies the already-emitted IL to the SDK. You can
+  publish it later with `dotnet publish artifacts/hello-il/PrologProgram.csproj -c Release -r <RID>`.
 - Compiled predicates are static IL methods sharing the existing machine. Runtime `consult/1`
   and assertions continue to use its bytecode path. The bundled standard library also retains
   its existing runtime initialization; this is not a bytecode-free runtime.
 - This compiler builds console applications from `.pl` files. `.dplproj`, `.dpli` facades, and
-  Prolog test projects continue to use the existing SDK backend. Portable PDBs are not emitted yet.
+  Prolog test projects continue to use the existing SDK backend.
 
 Compiler exit codes are 64 for usage errors, 65 for source diagnostics, 70 for I/O or host errors,
 and 130 for cancellation or publishing timeout. Native publishing failures propagate `dotnet`'s
@@ -576,7 +578,7 @@ typed library for C#, F#, and VB; and `prolog-test` creates a Prolog test execut
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
-  <Sdk Name="DotProlog.Sdk" Version="0.16.1" />
+  <Sdk Name="DotProlog.Sdk" Version="0.17.0" />
 ```
 
 A `.dplproj` publishes with NativeAOT like any other project:
@@ -585,7 +587,7 @@ A `.dplproj` publishes with NativeAOT like any other project:
 $ dotnet publish HelloProlog -c Release -r osx-arm64 -p:PublishAot=true
 ```
 
-The packages are published on NuGet.org as `DotProlog.*`, starting at 0.2.0 and currently at 0.16.1.
+The packages are published on NuGet.org as `DotProlog.*`, starting at 0.2.0 and currently at 0.17.0.
 The commands above are also verified against a local feed built by `dotnet pack`, so they work
 before a version ships.
 
@@ -662,7 +664,7 @@ version, because the release notes are extracted from it.
 # 1. Move the version's changelog heading from "unreleased" to today's date, and add its link ref.
 # 2. Set VersionPrefix in Directory.Build.props if the version is changing.
 # 3. Commit and push, wait for CI, then:
-git tag v0.16.1 && git push origin v0.16.1
+git tag v0.17.0 && git push origin v0.17.0
 ```
 
 The publication job authenticates by trusted publishing: it

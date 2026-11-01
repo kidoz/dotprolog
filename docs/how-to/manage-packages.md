@@ -80,8 +80,8 @@ dotnet run --project samples/PortablePackages/app/PortablePackages.dplproj
 Each execution prints `hello`. The application depends on `example/greeting`, which depends on
 `example/words`. SWI execution requires `swipl` on PATH. Standalone `propack run --engine dotprolog`
 requires `dotnet-prolog` on PATH with package support (either the native executable or a .NET tool shim); the source-tree command above
-uses the tool from this checkout. The NuGet-published DotProlog.Tool 0.16.1 predates package
-support; use the source-tree commands here or build `src/DotProlog.Tool` for `--engine dotprolog`.
+uses the tool from this checkout. The NuGet-published DotProlog.Tool 0.17.0 also includes package
+support.
 SWI-Prolog works with its regular installed executable.
 
 Build a standalone executable for your platform, for example:
