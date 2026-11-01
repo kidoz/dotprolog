@@ -75,4 +75,19 @@ public static class LintDiagnosticIds
 
     /// <summary>A findall call is followed directly by failure and is used only for backtracking.</summary>
     public const string FindallBacktracking = "DPL3022";
+
+    /// <summary>Clauses of one predicate are separated without a discontiguous declaration.</summary>
+    public const string DiscontiguousPredicate = "DPL3023";
+
+    /// <summary>A clause or grammar rule duplicates an earlier one up to variable renaming.</summary>
+    public const string DuplicateClause = "DPL3024";
+
+    /// <summary>A predicate declaration duplicates an earlier declaration.</summary>
+    public const string DuplicateDirective = "DPL3025";
+
+    /// <summary>A clause or grammar rule starts with a variant of its own head.</summary>
+    public const string DirectLeftRecursion = "DPL3026";
+
+    /// <summary>A discontiguous or meta-predicate declaration has no file-local definition.</summary>
+    public const string DeclaredButUndefined = "DPL3027";
 }
