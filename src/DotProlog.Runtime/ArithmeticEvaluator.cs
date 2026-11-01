@@ -96,6 +96,65 @@ public static class ArithmeticEvaluator
         };
     }
 
+    /// <summary>Whether <c>name/arity</c> is an evaluable function or constant in the full language surface.</summary>
+    internal static bool IsKnownEvaluable(string name, int arity) =>
+        (name, arity) switch
+        {
+            ("pi" or "e" or "inf" or "infinite" or "nan" or "max_tagged_integer" or "min_tagged_integer", 0) => true,
+            (
+                "+"
+                    or "-"
+                    or "abs"
+                    or "sign"
+                    or "float"
+                    or "integer"
+                    or "truncate"
+                    or "floor"
+                    or "ceiling"
+                    or "round"
+                    or "float_integer_part"
+                    or "float_fractional_part"
+                    or "sqrt"
+                    or "sin"
+                    or "cos"
+                    or "tan"
+                    or "asin"
+                    or "acos"
+                    or "atan"
+                    or "exp"
+                    or "log"
+                    or "\\"
+                    or "numerator"
+                    or "denominator"
+                    or "rational"
+                    or "rationalize",
+                1
+            ) => true,
+            (
+                "+"
+                    or "-"
+                    or "*"
+                    or "/"
+                    or "rdiv"
+                    or "//"
+                    or "div"
+                    or "mod"
+                    or "rem"
+                    or "min"
+                    or "max"
+                    or "**"
+                    or "^"
+                    or "atan2"
+                    or ">>"
+                    or "<<"
+                    or "/\\"
+                    or "\\/"
+                    or "xor",
+                2
+            ) => true,
+            _ => false,
+        };
+
     /// <summary>Converts an evaluated number back to a term cell.</summary>
     public static Cell ToCell(Machine machine, PrologNumber number)
     {

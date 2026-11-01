@@ -54,6 +54,9 @@ public sealed class BuiltinRegistry
     /// <summary>Returns the display name of builtin <paramref name="builtinId"/>, such as <c>write/1</c>.</summary>
     public string NameOf(int builtinId) => _names[builtinId];
 
+    /// <summary>The explicitly registered <c>name/arity</c> signatures, in registration order.</summary>
+    internal IReadOnlyList<string> RegisteredNames => _names;
+
     internal PrologBuiltin Implementation(int builtinId) => _implementations[builtinId];
 
     internal PrologRetry Retry(int builtinId) =>

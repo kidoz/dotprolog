@@ -31,6 +31,17 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void LintReportsLiteralSemanticWarningsThroughTheCli()
+    {
+        var path = Source("format.pl", "run :- format(\"~w\", [a, b]).\n");
+
+        (var exitCode, _, var error) = Execute("lint", "--warnings-as-errors", path);
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("DPL3013", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void WarningsAsErrorsReturnsOne()
     {
         var path = Source("singleton.pl", "value(X).\n");

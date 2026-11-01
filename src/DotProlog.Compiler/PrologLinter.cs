@@ -34,6 +34,7 @@ public static class PrologLinter
         }
 
         DoubleQuotesLinter.Analyze(clauses, initialDoubleQuotes, fileName, diagnostics);
+        PrologLiteralLinter.Analyze(clauses, fileName, diagnostics);
 
         return [.. diagnostics.OrderBy(diagnostic => diagnostic.Span.Start).ThenBy(diagnostic => diagnostic.Id)];
     }

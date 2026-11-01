@@ -45,4 +45,22 @@ public static class LintDiagnosticIds
     /// it compares character codes.
     /// </summary>
     public const string CodeGrammarOverCharacters = "DPL3012";
+
+    /// <summary>A literal format string, argument count, or argument type is invalid.</summary>
+    public const string InvalidFormatCall = "DPL3013";
+
+    /// <summary>A literal predicate option or option value is invalid.</summary>
+    public const string InvalidPredicateOption = "DPL3014";
+
+    /// <summary>An arithmetic expression contains a statically invalid function or operand.</summary>
+    public const string InvalidArithmeticExpression = "DPL3015";
+
+    /// <summary>A call has no matching built-in or file-local predicate signature.</summary>
+    public const string PossibleBuiltinArityMismatch = "DPL3016";
+
+    /// <summary>A goal succeeds without changing bindings or producing another observable effect.</summary>
+    public const string NoEffectGoal = "DPL3017";
+
+    /// <summary>A goal is statically determined to fail whenever execution reaches it.</summary>
+    public const string AlwaysFalseGoal = "DPL3018";
 }
