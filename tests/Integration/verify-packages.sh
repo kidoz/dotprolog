@@ -120,3 +120,17 @@ fi
 test "$lint_exit" -eq 1
 printf '%s\n' "$lint_output" | grep -F 'warning DPL3036'
 printf '%s\n' "$lint_output" | grep -F 'm:dead_grammar//0'
+
+# The non-steadfast heuristic remains off by default and runs only through explicit opt-in.
+printf '%s\n' 'max(X, Y, X) :- X >= Y, !.' 'max(_, Y, Y).' >HelloProlog/lint-steadfast.pl
+dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint HelloProlog/lint-steadfast.pl
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --enable-rule DPL3037 --warnings-as-errors HelloProlog/lint-steadfast.pl 2>&1); then
+    echo "lint unexpectedly accepted an enabled non-steadfast clause" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3037'
+printf '%s\n' "$lint_output" | grep -F 'max/3'
