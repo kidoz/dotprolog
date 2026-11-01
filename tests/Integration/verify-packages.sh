@@ -107,3 +107,16 @@ fi
 test "$lint_exit" -eq 1
 printf '%s\n' "$lint_output" | grep -F 'warning DPL3035'
 printf '%s\n' "$lint_output" | grep -F 'helper/0'
+
+# Grammar reachability retains source-level nonterminal identities in the packaged tool.
+printf '%s\n' ':- module(m, []). dead_grammar --> [a].' >HelloProlog/lint-grammar.pl
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --warnings-as-errors HelloProlog/lint-grammar.pl 2>&1); then
+    echo "lint unexpectedly accepted an unreferenced nonterminal" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3036'
+printf '%s\n' "$lint_output" | grep -F 'm:dead_grammar//0'
