@@ -93,8 +93,8 @@ all-solutions goals, cleanup goals, and meta-calls are excluded. Dynamic and mul
 are eligible.
 
 This is an optimization hint, not a correctness warning or a termination proof. Review whether an
-accumulator or another formulation would help before rewriting working code. Both opt-in rules can be
-enabled together by repeating `--enable-rule` with `DPL3037` and `DPL3038`.
+accumulator or another formulation would help before rewriting working code. Opt-in rules can be
+enabled together by repeating `--enable-rule` with their diagnostic identifiers.
 
 ## Check cuts in multifile clauses
 
@@ -113,6 +113,76 @@ The warning says that a cut may discard alternatives contributed by other source
 modularity review hint, not a correctness proof or a recommendation to remove every such cut.
 Dynamic multifile clauses are eligible, and unrelated unresolved calls do not suppress the rule.
 The same compiler-aware cut scopes as `DPL3037` apply, so opaque and meta-called cuts are excluded.
+
+## Check repeat loops without a same-scope cut
+
+Enable the repeat-loop heuristic explicitly:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint --enable-rule DPL3040 program.pl
+```
+
+`DPL3040` is off in every default profile. It reports one warning per ordinary clause or grammar rule
+at the first direct `repeat/0` when no cut occurs in that clause's own cut scope. A same-scope cut
+anywhere in the written body suppresses the finding; the rule does not prove that the cut is
+reachable or correctly placed.
+
+Direct control flow and DCG `{}` goals are inspected. Negation, all-solutions and cleanup goals,
+meta-calls, explicitly qualified goals, and term data are not. Static, dynamic, and multifile source
+clauses are eligible. The warning is a backtracking review hint, not proof of non-termination or a
+recommendation to add a cut.
+
+## Check final cuts in last supplied clauses
+
+Enable the final-cut heuristic explicitly:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint --enable-rule DPL3041 program.pl
+```
+
+`DPL3041` is off in every default profile. It reports each same-scope cut in a final control-flow
+position of the last supplied static clause for a predicate or nonterminal. Final positions include
+the rightmost conjunction and independent disjunction and then/else branches; conditions and earlier
+goals are not final.
+
+The last clause is selected across named files and includes using lowered predicate identity.
+Dynamic and multifile procedures are excluded because other clauses may follow at execution time;
+static discontiguous procedures remain eligible. The warning asks whether committing the remaining
+choice points is intentional. It does not prove that the cut is redundant or recommend removing it.
+
+## Check broad catch handlers
+
+Enable the catch-all heuristic explicitly:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint --enable-rule DPL3042 program.pl
+```
+
+`DPL3042` is off in every default profile. It reports each direct `catch/3` whose catcher is an
+anonymous or named variable, located at that variable. The warning says the catcher may match every
+thrown term; it does not assume the variable is unbound. A previously assigned or shared variable is
+therefore still reported as a syntactic review site.
+
+Atoms and compound catcher patterns are excluded. Direct control flow, DCG `{}` goals, and the goal
+and recovery arguments of nested `catch/3` calls are inspected; opaque and arbitrary meta-called goals
+are not. This is a broad-recovery review hint, not a correctness finding or a recommended rewrite.
+
+## Check conditionals without an explicit else
+
+Enable the missing-else heuristic explicitly:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint --enable-rule DPL3043 program.pl
+```
+
+`DPL3043` is off in every default profile. It reports each direct `->/2` or `*->/2` conditional that
+is not the left operand of its enclosing `;/2`. Any explicit else goal, including `true` or `fail`,
+suppresses the outer finding; nested conditionals are still reviewed independently. Findings are
+located at the conditional and identify the containing predicate or nonterminal.
+
+Direct control flow and DCG `{}` goals are inspected. Negation, all-solutions and cleanup goals,
+meta-calls, qualified goals, and term data are not. The warning asks whether condition-failure
+behavior is intentional; it does not claim that an else branch is required or rewrite the source.
 
 ## Fail CI on warnings
 

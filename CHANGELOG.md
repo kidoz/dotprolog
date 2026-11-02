@@ -36,6 +36,18 @@ All notable changes to DotProlog are recorded here. The format follows
 - Opt-in multifile-cut linting reports same-scope cuts that may discard alternatives contributed by
   other source units with `DPL3039`. Enable it with `--enable-rule DPL3039`; declarations resolve
   within one file, across named files, and through includes.
+- Opt-in repeat-loop linting reports direct `repeat/0` goals without a same-scope cut using
+  `DPL3040`. Enable it with `--enable-rule DPL3040`; ordinary clauses and DCGs are covered without
+  claiming non-termination or executing source.
+- Opt-in final-cut linting reports same-scope cuts in final positions of last supplied static clauses
+  with `DPL3041`. Enable it with `--enable-rule DPL3041`; source order spans named files and includes,
+  while dynamic and multifile procedures are excluded.
+- Opt-in catch-all linting reports direct `catch/3` goals with variable catchers using `DPL3042`.
+  Enable it with `--enable-rule DPL3042`; nested goal and recovery arguments are inspected without
+  assuming that a named catcher is unbound or executing source.
+- Opt-in missing-else linting reports direct hard and soft conditionals without an explicit else
+  branch using `DPL3043`. Enable it with `--enable-rule DPL3043`; nested conditionals and DCG ordinary
+  goals are reviewed without executing source or requiring an else branch.
 
 ### Changed
 

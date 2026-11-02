@@ -18,6 +18,10 @@ dotnet prolog lint [options] <file.pl> [more.pl ...]
 | `--enable-rule DPL3037` | Enable the opt-in non-steadfast clause heuristic; repeatable |
 | `--enable-rule DPL3038` | Enable the opt-in non-tail-recursion heuristic; repeatable |
 | `--enable-rule DPL3039` | Enable the opt-in multifile-cut heuristic; repeatable |
+| `--enable-rule DPL3040` | Enable the opt-in repeat-loop heuristic; repeatable |
+| `--enable-rule DPL3041` | Enable the opt-in final-cut heuristic; repeatable |
+| `--enable-rule DPL3042` | Enable the opt-in catch-all heuristic; repeatable |
+| `--enable-rule DPL3043` | Enable the opt-in missing-else heuristic; repeatable |
 | `--mode modern` or `--mode strict-iso` | Seed the reader's language mode; default `modern` |
 | `--flag name=value` | Override a curated initial flag; repeatable |
 | `--indent-size N` | Positive indentation unit; Covington default `4` |
@@ -74,6 +78,10 @@ These rules run in every profile:
 | `DPL3037` | Opt-in: distinct head arguments share variables and the clause contains a same-scope cut |
 | `DPL3038` | Opt-in: a direct self-call is outside a compiler tail position |
 | `DPL3039` | Opt-in: a same-scope cut occurs in a clause declared multifile |
+| `DPL3040` | Opt-in: a direct `repeat/0` goal occurs without a same-scope cut |
+| `DPL3041` | Opt-in: a same-scope cut is final in the last supplied static clause |
+| `DPL3042` | Opt-in: a direct `catch/3` goal has a variable catcher |
+| `DPL3043` | Opt-in: a direct hard or soft conditional has no explicit else branch |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -254,6 +262,92 @@ do not suppress this declaration-based rule.
 
 This is a modularity review hint, not a correctness proof or a recommendation to remove the cut. The
 linter does not evaluate which alternatives exist or classify the cut as red or green.
+
+### Opt-in repeat loops
+
+`DPL3040` is disabled by default in every profile. Enable it with `--enable-rule DPL3040`, alone or
+alongside other opt-in rules. It reports at most one warning per ordinary clause or grammar rule at
+the first direct `repeat/0` when no cut occurs in that clause's own cut scope. The message identifies
+the predicate or nonterminal and asks for review of backtracking and loop-exit behavior.
+
+Conjunction, disjunction, if-then-else conditions and branches, and soft-cut conditions and branches
+are inspected for direct repeat goals. DCG `{}` goals are inspected as ordinary goals. Negation,
+all-solutions goals, cleanup goals, opaque goals, arbitrary meta-calls, explicitly qualified goals,
+and ordinary term data are not traversed. Static, dynamic, and multifile clauses are eligible.
+
+The cut-scope traversal is shared with the other opt-in cut rules. A same-scope cut anywhere in the
+written body suppresses the finding, without attempting to prove its reachability or its position
+relative to the loop. Cuts behind cut barriers or inside opaque and meta-called goals do not count.
+
+This is a control-flow review hint, not proof of non-termination, a claim that every repeat loop
+requires a cut, or a recommendation that adding a cut is safe. No source is executed.
+
+### Opt-in final cuts
+
+`DPL3041` is disabled by default in every profile. Enable it with `--enable-rule DPL3041`, alone or
+alongside other opt-in rules. It reports each same-scope cut in a final control-flow position of the
+last supplied static clause for a predicate or nonterminal. Each finding is located at its cut and
+asks whether committing the remaining choice points is intentional.
+
+Procedure identity uses the module and lowered name/arity, with two added arguments for a grammar
+rule. Ordinary and grammar definitions sharing that identity form one procedure; the last clause's
+source kind determines the displayed identity. Whole-program order follows explicitly named files in
+their supplied order and included clauses at their expansion positions. Single-file analysis uses
+the supplied syntax list. A later fact or rule without a final cut suppresses an earlier finding.
+
+Dynamic and multifile procedures are excluded because runtime-created or externally contributed
+clauses can follow the supplied ones. Static discontiguous procedures remain eligible. Unrelated
+unresolved calls do not suppress this source-order rule.
+
+The rightmost conjunction position and independent disjunction and then/else branches have final
+positions. If-then-else and soft-cut conditions are not final. Only direct control flow and DCG `{}`
+goals are inspected; negation, all-solutions goals, cleanup goals, opaque goals, meta-calls, and
+ordinary term data do not expose final cuts. Multiple final branch cuts receive separate findings.
+
+This is a choice-point review hint, not proof that a cut is redundant or that removing it is safe.
+No source is executed, and runtime clause prediction and automatic cut removal are out of scope.
+
+### Opt-in catch-all handlers
+
+`DPL3042` is disabled by default in every profile. Enable it with `--enable-rule DPL3042`, alone or
+alongside other opt-in rules. It reports each direct `catch/3` goal whose catcher argument is a
+variable, located at that variable. The message identifies the containing predicate or nonterminal
+and states that the catcher may match every thrown term.
+
+Anonymous, underscore-prefixed, ordinary named, and shared variables are eligible. The rule performs
+no binding, alias, or data-flow analysis, so a named variable remains eligible even when earlier
+source may bind it. Atoms and compound catcher patterns are excluded, including compounds containing
+variables.
+
+Conjunction, disjunction, if-then-else conditions and branches, and soft-cut conditions and branches
+are inspected. DCG `{}` goals are inspected as ordinary goals. A direct `catch/3` also has its goal
+and recovery arguments inspected for nested handlers, while its catcher remains term data. Negation,
+all-solutions goals, cleanup goals, other opaque goals, arbitrary meta-calls, qualified calls, and
+ordinary term data are excluded. Static, dynamic, and multifile clauses are eligible.
+
+This is a broad-recovery review hint, not proof that the catcher is unbound, that an unexpected error
+is swallowed, or that a rewrite is required. No source is executed.
+
+### Opt-in missing else branches
+
+`DPL3043` is disabled by default in every profile. Enable it with `--enable-rule DPL3043`, alone or
+alongside other opt-in rules. It reports each direct `->/2` or `*->/2` conditional that is not the
+left operand of its enclosing `;/2`, located at the conditional goal. The message identifies the
+containing predicate or nonterminal and asks whether its condition-failure behavior is intentional.
+
+`(Condition -> Then ; Else)` and `(Condition *-> Then ; Else)` suppress the outer finding. Any else
+goal counts, including `true` or `fail`; the rule checks presence rather than judging usefulness.
+Condition, then, and else goals are inspected independently for nested unpaired conditionals. A bare
+soft conditional is included because it has no separate else path.
+
+Conjunction, disjunction, conditional conditions and branches, and DCG `{}` ordinary goals are
+traversed. Negation, all-solutions goals, cleanup goals, other opaque goals, arbitrary meta-calls,
+`call/1` and `call/N`, DCG `call//1`, explicitly qualified calls, and ordinary term data are excluded.
+Static, dynamic, and multifile clauses are eligible in both language modes. Unrelated unresolved calls
+do not suppress this file-local rule.
+
+This is a control-flow review hint, not a claim that every conditional requires an else branch or
+that inserting `; true` preserves the intended behavior. No source is executed or rewritten.
 
 ### Double-quoted text
 
