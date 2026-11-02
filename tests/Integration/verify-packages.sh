@@ -134,3 +134,17 @@ fi
 test "$lint_exit" -eq 1
 printf '%s\n' "$lint_output" | grep -F 'warning DPL3037'
 printf '%s\n' "$lint_output" | grep -F 'max/3'
+
+# Non-tail recursion is also opt-in and uses the same rule-selection path in the packed tool.
+printf '%s\n' 'p(N) :- N > 0, p(N), writeln(N).' >HelloProlog/lint-recursion.pl
+dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint HelloProlog/lint-recursion.pl
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --enable-rule DPL3038 --warnings-as-errors HelloProlog/lint-recursion.pl 2>&1); then
+    echo "lint unexpectedly accepted an enabled non-tail recursive call" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3038'
+printf '%s\n' "$lint_output" | grep -F 'p/1'
