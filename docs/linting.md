@@ -22,6 +22,7 @@ dotnet prolog lint [options] <file.pl> [more.pl ...]
 | `--enable-rule DPL3041` | Enable the opt-in final-cut heuristic; repeatable |
 | `--enable-rule DPL3042` | Enable the opt-in catch-all heuristic; repeatable |
 | `--enable-rule DPL3043` | Enable the opt-in missing-else heuristic; repeatable |
+| `--enable-rule DPL3044` | Enable the opt-in predicate naming heuristic; repeatable |
 | `--mode modern` or `--mode strict-iso` | Seed the reader's language mode; default `modern` |
 | `--flag name=value` | Override a curated initial flag; repeatable |
 | `--indent-size N` | Positive indentation unit; Covington default `4` |
@@ -82,6 +83,7 @@ These rules run in every profile:
 | `DPL3041` | Opt-in: a same-scope cut is final in the last supplied static clause |
 | `DPL3042` | Opt-in: a direct `catch/3` goal has a variable catcher |
 | `DPL3043` | Opt-in: a direct hard or soft conditional has no explicit else branch |
+| `DPL3044` | Opt-in: a user-defined predicate or nonterminal name is outside lower `snake_case` |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -348,6 +350,29 @@ do not suppress this file-local rule.
 
 This is a control-flow review hint, not a claim that every conditional requires an else branch or
 that inserting `; true` preserves the intended behavior. No source is executed or rewritten.
+
+### Opt-in predicate and nonterminal names
+
+`DPL3044` is disabled by default in every profile. Enable it with `--enable-rule DPL3044`, alone or
+alongside other opt-in rules. It reports a user-defined ordinary predicate or grammar nonterminal
+whose decoded atom name does not match `^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$`. Names therefore start with
+an ASCII lowercase letter and contain only lowercase letters, decimal digits, and single underscores
+between nonempty segments. Source quoting does not change the decoded name being checked.
+
+Facts, rules, and grammar rules with statically recognized heads are eligible, including static,
+dynamic, and multifile definitions. At most one warning is emitted per module and lowered name/arity,
+at the first supplied clause's name token. Ordinary and grammar definitions sharing a lowered
+identity do not produce duplicates. Whole-program order spans named files and includes, with findings
+retaining their physical source ownership.
+
+Declarations, exports, imports, calls, and declaration-only procedures do not independently produce
+findings. Symbolic names containing no alphanumeric character and `$`-prefixed implementation-private
+names are excluded. Variable, module, file, and foreign-function names are outside the rule. Both
+language modes use the same grammar, and unrelated unresolved calls do not affect it.
+
+This is a naming-convention review hint, not an invalid-Prolog diagnostic or proof that renaming is
+safe. Custom patterns, cross-project naming policy, and automatic renaming are out of scope. No source
+is executed or rewritten.
 
 ### Double-quoted text
 

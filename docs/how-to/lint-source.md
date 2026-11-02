@@ -184,6 +184,24 @@ Direct control flow and DCG `{}` goals are inspected. Negation, all-solutions an
 meta-calls, qualified goals, and term data are not. The warning asks whether condition-failure
 behavior is intentional; it does not claim that an else branch is required or rewrite the source.
 
+## Check predicate and nonterminal names
+
+Enable the naming heuristic explicitly:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint --enable-rule DPL3044 program.pl
+```
+
+`DPL3044` is off in every default profile. It reports user-defined predicate and DCG nonterminal
+names outside lower `snake_case`. Names must start with an ASCII lowercase letter and contain only
+lowercase letters, digits, and single underscores between nonempty segments. Quoting does not change
+the decoded name being checked.
+
+Facts, rules, dynamic and multifile definitions, modules, and includes are supported. Only the first
+supplied clause of each lowered procedure identity produces a finding. Declaration-only procedures,
+symbolic operator-style names, and `$`-prefixed private names are excluded. This is a convention
+review hint, not invalid-Prolog diagnostic or automatic rename.
+
 ## Fail CI on warnings
 
 ```console

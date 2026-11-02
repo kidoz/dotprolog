@@ -68,6 +68,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - Opt-in missing-else linting reports direct hard and soft conditionals without an explicit else
   branch using `DPL3043`. Enable it with `--enable-rule DPL3043`; nested conditionals and DCG ordinary
   goals are reviewed without executing source or requiring an else branch.
+- Opt-in naming linting reports user-defined predicate and nonterminal names outside lower
+  `snake_case` using `DPL3044`. Enable it with `--enable-rule DPL3044`; first supplied definitions are
+  checked across modules and includes without executing or renaming source.
 
 ### Changed
 
