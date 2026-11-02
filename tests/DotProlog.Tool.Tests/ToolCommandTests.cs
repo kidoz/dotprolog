@@ -331,11 +331,26 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void NamingRuleIsDisabledUnlessExplicitlyEnabled()
+    {
+        var path = Source("naming.pl", "badName.\n");
+
+        (var defaultExit, _, var defaultError) = Execute("lint", path);
+        (var enabledExit, _, var enabledError) = Execute("lint", "--enable-rule", "dpl3044", "--warnings-as-errors", path);
+
+        Assert.Equal(0, defaultExit);
+        Assert.DoesNotContain("DPL3044", defaultError, StringComparison.Ordinal);
+        Assert.Equal(1, enabledExit);
+        Assert.Contains("DPL3044", enabledError, StringComparison.Ordinal);
+        Assert.Contains("badName/0", enabledError, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MultipleOptInRulesCanBeEnabledTogether()
     {
         var path = Source(
             "heuristics.pl",
-            ":- multifile(p/0).\nmax(X, Y, X) :- X >= Y, !.\np :- !.\np(N) :- N > 0, p(N), writeln(N).\nq :- repeat.\nr :- true, !.\ns :- catch(true, _, true).\nt :- (true -> true).\n"
+            ":- multifile(p/0).\nmax(X, Y, X) :- X >= Y, !.\np :- !.\np(N) :- N > 0, p(N), writeln(N).\nq :- repeat.\nr :- true, !.\ns :- catch(true, _, true).\nt :- (true -> true).\nbadName.\n"
         );
 
         (var exitCode, _, var error) = Execute(
@@ -354,6 +369,8 @@ public sealed class ToolCommandTests : IDisposable
             "DPL3042",
             "--enable-rule",
             "DPL3043",
+            "--enable-rule",
+            "DPL3044",
             "--warnings-as-errors",
             path
         );
@@ -366,6 +383,7 @@ public sealed class ToolCommandTests : IDisposable
         Assert.Contains("DPL3041", error, StringComparison.Ordinal);
         Assert.Contains("DPL3042", error, StringComparison.Ordinal);
         Assert.Contains("DPL3043", error, StringComparison.Ordinal);
+        Assert.Contains("DPL3044", error, StringComparison.Ordinal);
     }
 
     [Theory]

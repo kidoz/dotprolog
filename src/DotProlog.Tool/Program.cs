@@ -23,7 +23,9 @@ internal static class Program
         + "|"
         + LintDiagnosticIds.PossibleCatchAll
         + "|"
-        + LintDiagnosticIds.PossibleMissingElse;
+        + LintDiagnosticIds.PossibleMissingElse
+        + "|"
+        + LintDiagnosticIds.NonSnakeCasePredicate;
     private const int ExitLintWarnings = 1;
     private const int ExitSuccess = 0;
     private const int ExitUsage = 64;
@@ -259,6 +261,7 @@ internal static class Program
                     LintDiagnosticIds.PossibleFinalCut => LintDiagnosticIds.PossibleFinalCut,
                     LintDiagnosticIds.PossibleCatchAll => LintDiagnosticIds.PossibleCatchAll,
                     LintDiagnosticIds.PossibleMissingElse => LintDiagnosticIds.PossibleMissingElse,
+                    LintDiagnosticIds.NonSnakeCasePredicate => LintDiagnosticIds.NonSnakeCasePredicate,
                     _ => null,
                 };
                 if (rule is null)
