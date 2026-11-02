@@ -42,7 +42,17 @@ public static class PrologLintSourceLoader
         var absolute = Path.GetFullPath(fileName);
         HashSet<string> activeIncludes = new(PathComparer);
         Dictionary<SyntaxTerm, string> owners = new(ReferenceEqualityComparer.Instance);
-        ParseResult parsed = ReadWithIncludes(source, absolute, program, activeIncludes, owners, readSource, cancellationToken);
+        List<(string FileName, SyntaxTerm? Clause)> sourceOrder = [];
+        ParseResult parsed = ReadWithIncludes(
+            source,
+            absolute,
+            program,
+            activeIncludes,
+            owners,
+            sourceOrder,
+            readSource,
+            cancellationToken
+        );
         cancellationToken.ThrowIfCancellationRequested();
         string[] clauseFiles = [.. parsed.Clauses.Select(clause => owners[clause])];
         var unit = new PrologLintSource(
@@ -55,6 +65,7 @@ public static class PrologLintSourceLoader
         )
         {
             HasAnalysisGaps = parsed.Diagnostics.Count > 0,
+            SourceOrder = sourceOrder,
         };
         return new PrologLintSourceLoadResult(unit, parsed.Diagnostics);
     }
@@ -65,6 +76,7 @@ public static class PrologLintSourceLoader
         BytecodeProgram program,
         HashSet<string> activeIncludes,
         Dictionary<SyntaxTerm, string> owners,
+        List<(string FileName, SyntaxTerm? Clause)> sourceOrder,
         Func<string, string> readSource,
         CancellationToken cancellationToken
     )
@@ -85,14 +97,29 @@ public static class PrologLintSourceLoader
                 );
             }
 
+            sourceOrder.Add((fileName, null));
             ParseResult parsed = TermReader.ReadProgram(
                 source,
                 fileName,
                 program.Operators,
                 program.CharacterConversions,
                 program.Flags,
-                directive => ExpandInclude(directive, fileName, program, activeIncludes, owners, readSource, cancellationToken),
-                clauseBoundary: _ => cancellationToken.ThrowIfCancellationRequested()
+                directive =>
+                    ExpandInclude(
+                        directive,
+                        fileName,
+                        program,
+                        activeIncludes,
+                        owners,
+                        sourceOrder,
+                        readSource,
+                        cancellationToken
+                    ),
+                clauseBoundary: clause =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    sourceOrder.Add((fileName, clause));
+                }
             );
             foreach (SyntaxTerm clause in parsed.Clauses)
             {
@@ -113,6 +140,7 @@ public static class PrologLintSourceLoader
         BytecodeProgram program,
         HashSet<string> activeIncludes,
         Dictionary<SyntaxTerm, string> owners,
+        List<(string FileName, SyntaxTerm? Clause)> sourceOrder,
         Func<string, string> readSource,
         CancellationToken cancellationToken
     )
@@ -157,7 +185,7 @@ public static class PrologLintSourceLoader
 
             cancellationToken.ThrowIfCancellationRequested();
             var source = readSource(path);
-            return ReadWithIncludes(source, path, program, activeIncludes, owners, readSource, cancellationToken);
+            return ReadWithIncludes(source, path, program, activeIncludes, owners, sourceOrder, readSource, cancellationToken);
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)

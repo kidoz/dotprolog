@@ -27,6 +27,7 @@ internal sealed class PrologLintProgramModel
     internal List<ClauseContext> Clauses { get; } = [];
     internal List<DeclarationSite> Declarations { get; } = [];
     internal List<ImportSite> Imports { get; } = [];
+    internal List<(string File, int Offset, string Module, int Context)> ModuleScopes { get; } = [];
 
     internal static PrologLintProgramModel Build(IReadOnlyList<PrologLintSource> sources)
     {
@@ -123,6 +124,7 @@ internal sealed class PrologLintProgramModel
     private void CollectDefinitions(PrologLintSource source, List<ImportRequest> imports)
     {
         var module = ModuleTable.UserModule;
+        CollectModuleScopes(source);
         for (var index = 0; index < source.Clauses.Count; index++)
         {
             SyntaxTerm clause = source.Clauses[index];
@@ -164,6 +166,38 @@ internal sealed class PrologLintProgramModel
             }
 
             Clauses.Add(new ClauseContext(owner, clause, module, indicator, grammar));
+        }
+    }
+
+    private void CollectModuleScopes(PrologLintSource source)
+    {
+        string module = ModuleTable.UserModule;
+        Dictionary<string, int> contexts = new(PathComparer);
+        IEnumerable<(string FileName, SyntaxTerm? Clause)> order =
+            source.SourceOrder
+            ?? source.Clauses.Select((clause, index) => (source.FileForClause(index), (SyntaxTerm?)clause)).ToArray();
+        foreach (var (file, clause) in order)
+        {
+            if (!contexts.TryGetValue(file, out int context) || clause is null)
+            {
+                context = ModuleScopes.Count;
+                contexts[file] = context;
+                ModuleScopes.Add((file, 0, module, context));
+            }
+            if (clause is null)
+                continue;
+            ModuleScopes.Add((file, clause.Span.Start, module, context));
+            if (clause is CompoundTerm { Name: ":-", Arity: 1, Arguments: [CompoundTerm directive] })
+            {
+                module = directive switch
+                {
+                    { Name: "module", Arity: 1 or 2, Arguments: [AtomTerm name, ..] } => name.Name,
+                    { Name: "body", Arity: 1, Arguments: [AtomTerm name] } => name.Name,
+                    { Name: "end_module" or "end_body", Arity: 1 } => ModuleTable.UserModule,
+                    _ => module,
+                };
+                ModuleScopes.Add((file, clause.Span.Start + clause.Span.Length, module, context));
+            }
         }
     }
 

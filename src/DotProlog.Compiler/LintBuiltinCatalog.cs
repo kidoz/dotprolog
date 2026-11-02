@@ -16,6 +16,8 @@ internal static class LintBuiltinCatalog
 
     internal static bool ContainsName(string name) => Names.Value.Contains(name);
 
+    internal static IEnumerable<PredicateIndicator> All => Signatures.Value;
+
     private static HashSet<PredicateIndicator> Build()
     {
         HashSet<PredicateIndicator> result = [];

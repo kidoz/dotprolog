@@ -21,6 +21,8 @@ public sealed record PrologLintSource(
 {
     internal bool HasAnalysisGaps { get; init; }
 
+    internal IReadOnlyList<(string FileName, SyntaxTerm? Clause)>? SourceOrder { get; init; }
+
     /// <summary>Returns the physical source file that owns the clause at <paramref name="index"/>.</summary>
     public string FileForClause(int index) =>
         ClauseFileNames is { } files && index >= 0 && index < files.Count ? files[index] : FileName;
