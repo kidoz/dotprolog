@@ -204,3 +204,8 @@ so a native executable can load and execute a `.pl` file it did not see during p
 | Engine entry point | [`src/DotProlog.Compiler/PrologEngine.cs`](https://github.com/kidoz/dotprolog/blob/main/src/DotProlog.Compiler/PrologEngine.cs) |
 | Facade generation | [`src/DotProlog.CodeGen.CSharp/FacadeGenerator.cs`](https://github.com/kidoz/dotprolog/blob/main/src/DotProlog.CodeGen.CSharp/FacadeGenerator.cs) |
 | SDK targets | [`src/DotProlog.Sdk/Sdk/Sdk.targets`](https://github.com/kidoz/dotprolog/blob/main/src/DotProlog.Sdk/Sdk/Sdk.targets) |
+
+## Editor tooling
+
+The [language server plan](language-server.md) describes the standalone stdio prototype, its
+file-local diagnostics, and the remaining workspace and editor integration stages.

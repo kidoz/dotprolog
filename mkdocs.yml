@@ -80,6 +80,7 @@ nav:
       - SWI compatibility ledger: reference/swi-compatibility.md
   - Explanation:
       - Runtime architecture: architecture/index.md
+      - Language server plan: architecture/language-server.md
       - Language modes and text: explanation/language-modes.md
       - Runtime performance: explanation/runtime-performance.md
   - Contributing: contributing.md

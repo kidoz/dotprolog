@@ -8,6 +8,26 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Added
 
+- A development language server prototype provides file-local parser and lint diagnostics for
+  unsaved documents over LSP stdio, with UTF-16 ranges and Modern or StrictIso mode selection.
+  Editor extensions and release packaging remain planned.
+- Language server file diagnostics now expand includes using unsaved buffers before disk,
+  reanalyze dependent files when buffers change or close, and clear findings when their last
+  including document closes. Included files retain their own diagnostic ranges and reader context.
+- Language server disk-change notifications now refresh include diagnostics for file creation,
+  edits and deletion while preserving open buffers. Clients supporting dynamic registration receive
+  a file-watch request after initialization.
+- The language server accepts `--project` and `--configuration`, evaluates MSBuild source items,
+  mode and flags without running build targets, and analyzes project files together with unsaved
+  buffer overrides. File-notification batches now reevaluate project settings and membership;
+  failed reevaluations retain the last valid settings, and unsaved buffers survive successful reloads.
+- Language server analysis now runs in a background worker with a 150 ms edit debounce,
+  cooperative cancellation and suppression of superseded results. Shutdown remains responsive
+  during project reevaluation and cancels the evaluator process tree.
+- The language server now provides predicate outlines through document-symbol requests, with
+  module and arity identities, individual clause entries, DCG source arities and precise name ranges.
+  Outlines honor unsaved buffers, includes and project settings, and pending requests can be cancelled.
+
 - Source linting now validates literal format calls, predicate options and arithmetic expressions;
   reports possible built-in arity mismatches and predetermined goals; checks all-solutions variable
   usage; and detects discontiguous, duplicate, directly left-recursive, undefined-declaration, and
