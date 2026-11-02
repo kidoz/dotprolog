@@ -232,3 +232,19 @@ fi
 test "$lint_exit" -eq 1
 printf '%s\n' "$lint_output" | grep -F 'warning DPL3044'
 printf '%s\n' "$lint_output" | grep -F 'badName/0'
+
+# Source-arity findings and their positive threshold override require explicit opt-in.
+printf '%s\n' 'p(A, B, C, D, E).' >HelloProlog/lint-arity.pl
+dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint --max-predicate-arity 1 HelloProlog/lint-arity.pl
+dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --enable-rule DPL3045 --max-predicate-arity 5 HelloProlog/lint-arity.pl
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --enable-rule DPL3045 --max-predicate-arity 4 --warnings-as-errors HelloProlog/lint-arity.pl 2>&1); then
+    echo "lint unexpectedly accepted an enabled excessive-arity definition" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3045'
+printf '%s\n' "$lint_output" | grep -F 'p/5'
