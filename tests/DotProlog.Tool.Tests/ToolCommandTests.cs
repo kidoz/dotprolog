@@ -271,11 +271,71 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void RepeatLoopRuleIsDisabledUnlessExplicitlyEnabled()
+    {
+        var path = Source("repeat.pl", "p :- repeat, fail.\n");
+
+        (var defaultExit, _, var defaultError) = Execute("lint", path);
+        (var enabledExit, _, var enabledError) = Execute("lint", "--enable-rule", "dpl3040", "--warnings-as-errors", path);
+
+        Assert.Equal(0, defaultExit);
+        Assert.Empty(defaultError);
+        Assert.Equal(1, enabledExit);
+        Assert.Contains("DPL3040", enabledError, StringComparison.Ordinal);
+        Assert.Contains("p/0", enabledError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FinalCutRuleIsDisabledUnlessExplicitlyEnabled()
+    {
+        var path = Source("final-cut.pl", "p :- true, !.\n");
+
+        (var defaultExit, _, var defaultError) = Execute("lint", path);
+        (var enabledExit, _, var enabledError) = Execute("lint", "--enable-rule", "dpl3041", "--warnings-as-errors", path);
+
+        Assert.Equal(0, defaultExit);
+        Assert.Empty(defaultError);
+        Assert.Equal(1, enabledExit);
+        Assert.Contains("DPL3041", enabledError, StringComparison.Ordinal);
+        Assert.Contains("p/0", enabledError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CatchAllRuleIsDisabledUnlessExplicitlyEnabled()
+    {
+        var path = Source("catch-all.pl", "p :- catch(true, _, true).\n");
+
+        (var defaultExit, _, var defaultError) = Execute("lint", path);
+        (var enabledExit, _, var enabledError) = Execute("lint", "--enable-rule", "dpl3042", "--warnings-as-errors", path);
+
+        Assert.Equal(0, defaultExit);
+        Assert.DoesNotContain("DPL3042", defaultError, StringComparison.Ordinal);
+        Assert.Equal(1, enabledExit);
+        Assert.Contains("DPL3042", enabledError, StringComparison.Ordinal);
+        Assert.Contains("p/0", enabledError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MissingElseRuleIsDisabledUnlessExplicitlyEnabled()
+    {
+        var path = Source("missing-else.pl", "p :- (true -> true).\n");
+
+        (var defaultExit, _, var defaultError) = Execute("lint", path);
+        (var enabledExit, _, var enabledError) = Execute("lint", "--enable-rule", "dpl3043", "--warnings-as-errors", path);
+
+        Assert.Equal(0, defaultExit);
+        Assert.DoesNotContain("DPL3043", defaultError, StringComparison.Ordinal);
+        Assert.Equal(1, enabledExit);
+        Assert.Contains("DPL3043", enabledError, StringComparison.Ordinal);
+        Assert.Contains("p/0", enabledError, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MultipleOptInRulesCanBeEnabledTogether()
     {
         var path = Source(
             "heuristics.pl",
-            ":- multifile(p/0).\nmax(X, Y, X) :- X >= Y, !.\np :- !.\np(N) :- N > 0, p(N), writeln(N).\n"
+            ":- multifile(p/0).\nmax(X, Y, X) :- X >= Y, !.\np :- !.\np(N) :- N > 0, p(N), writeln(N).\nq :- repeat.\nr :- true, !.\ns :- catch(true, _, true).\nt :- (true -> true).\n"
         );
 
         (var exitCode, _, var error) = Execute(
@@ -286,6 +346,14 @@ public sealed class ToolCommandTests : IDisposable
             "DPL3038",
             "--enable-rule",
             "DPL3039",
+            "--enable-rule",
+            "DPL3040",
+            "--enable-rule",
+            "DPL3041",
+            "--enable-rule",
+            "DPL3042",
+            "--enable-rule",
+            "DPL3043",
             "--warnings-as-errors",
             path
         );
@@ -294,6 +362,10 @@ public sealed class ToolCommandTests : IDisposable
         Assert.Contains("DPL3037", error, StringComparison.Ordinal);
         Assert.Contains("DPL3038", error, StringComparison.Ordinal);
         Assert.Contains("DPL3039", error, StringComparison.Ordinal);
+        Assert.Contains("DPL3040", error, StringComparison.Ordinal);
+        Assert.Contains("DPL3041", error, StringComparison.Ordinal);
+        Assert.Contains("DPL3042", error, StringComparison.Ordinal);
+        Assert.Contains("DPL3043", error, StringComparison.Ordinal);
     }
 
     [Theory]

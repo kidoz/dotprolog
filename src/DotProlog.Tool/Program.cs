@@ -15,7 +15,15 @@ internal static class Program
         + "|"
         + LintDiagnosticIds.PossibleNonTailRecursion
         + "|"
-        + LintDiagnosticIds.PossibleMultifileCut;
+        + LintDiagnosticIds.PossibleMultifileCut
+        + "|"
+        + LintDiagnosticIds.PossibleRepeatWithoutCut
+        + "|"
+        + LintDiagnosticIds.PossibleFinalCut
+        + "|"
+        + LintDiagnosticIds.PossibleCatchAll
+        + "|"
+        + LintDiagnosticIds.PossibleMissingElse;
     private const int ExitLintWarnings = 1;
     private const int ExitSuccess = 0;
     private const int ExitUsage = 64;
@@ -247,6 +255,10 @@ internal static class Program
                     LintDiagnosticIds.PossibleNonSteadfastClause => LintDiagnosticIds.PossibleNonSteadfastClause,
                     LintDiagnosticIds.PossibleNonTailRecursion => LintDiagnosticIds.PossibleNonTailRecursion,
                     LintDiagnosticIds.PossibleMultifileCut => LintDiagnosticIds.PossibleMultifileCut,
+                    LintDiagnosticIds.PossibleRepeatWithoutCut => LintDiagnosticIds.PossibleRepeatWithoutCut,
+                    LintDiagnosticIds.PossibleFinalCut => LintDiagnosticIds.PossibleFinalCut,
+                    LintDiagnosticIds.PossibleCatchAll => LintDiagnosticIds.PossibleCatchAll,
+                    LintDiagnosticIds.PossibleMissingElse => LintDiagnosticIds.PossibleMissingElse,
                     _ => null,
                 };
                 if (rule is null)
