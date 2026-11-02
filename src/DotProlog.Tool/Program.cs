@@ -10,6 +10,8 @@ internal static class Program
 {
     private const string LanguageModeNames = PrologLanguageModes.Names;
     private const string LintProfileNames = "semantic|covington";
+    private const string LintOptInRuleNames =
+        LintDiagnosticIds.PossibleNonSteadfastClause + "|" + LintDiagnosticIds.PossibleNonTailRecursion;
     private const int ExitLintWarnings = 1;
     private const int ExitSuccess = 0;
     private const int ExitUsage = 64;
@@ -231,19 +233,26 @@ internal static class Program
                 if (index + 1 >= args.Length)
                 {
                     error.WriteLine("error: missing diagnostic identifier after --enable-rule");
-                    error.WriteLine($"       expected: {LintDiagnosticIds.PossibleNonSteadfastClause}");
+                    error.WriteLine($"       expected one of: {LintOptInRuleNames}");
                     return ExitUsage;
                 }
 
                 var selected = args[++index];
-                if (!selected.Equals(LintDiagnosticIds.PossibleNonSteadfastClause, StringComparison.OrdinalIgnoreCase))
+                var nonSteadfast = selected.Equals(
+                    LintDiagnosticIds.PossibleNonSteadfastClause,
+                    StringComparison.OrdinalIgnoreCase
+                );
+                var nonTail = selected.Equals(LintDiagnosticIds.PossibleNonTailRecursion, StringComparison.OrdinalIgnoreCase);
+                if (!nonSteadfast && !nonTail)
                 {
                     error.WriteLine($"error: unsupported lint rule: {selected}");
-                    error.WriteLine($"       expected: {LintDiagnosticIds.PossibleNonSteadfastClause}");
+                    error.WriteLine($"       expected one of: {LintOptInRuleNames}");
                     return ExitUsage;
                 }
 
-                enabledRules.Add(LintDiagnosticIds.PossibleNonSteadfastClause);
+                enabledRules.Add(
+                    nonTail ? LintDiagnosticIds.PossibleNonTailRecursion : LintDiagnosticIds.PossibleNonSteadfastClause
+                );
                 continue;
             }
 
@@ -455,9 +464,7 @@ internal static class Program
         output.WriteLine("  dotnet prolog restore [--locked] [--project DIR]");
         output.WriteLine("  dotnet prolog package <command> (init, add, remove, restore, update, check, tree, run)");
         output.WriteLine($"  dotnet prolog lint [--mode {LanguageModeNames}] [--flag name=value] [--profile {LintProfileNames}]");
-        output.WriteLine(
-            $"      [--enable-rule {LintDiagnosticIds.PossibleNonSteadfastClause}] [--warnings-as-errors] <file.pl>..."
-        );
+        output.WriteLine($"      [--enable-rule {LintOptInRuleNames}] [--warnings-as-errors] <file.pl>...");
         output.WriteLine("      analyze source without consulting it or executing directives");
         output.WriteLine();
         output.WriteLine("Language modes:");
@@ -481,8 +488,6 @@ internal static class Program
             $"Usage: dotnet prolog lint [--mode {LanguageModeNames}] [--flag name=value] [--profile {LintProfileNames}]"
         );
         output.WriteLine("       [--indent-size N] [--max-line-length N] [--max-clause-lines N]");
-        output.WriteLine(
-            $"       [--enable-rule {LintDiagnosticIds.PossibleNonSteadfastClause}] [--warnings-as-errors] <file.pl>..."
-        );
+        output.WriteLine($"       [--enable-rule {LintOptInRuleNames}] [--warnings-as-errors] <file.pl>...");
     }
 }

@@ -240,6 +240,41 @@ public sealed class ToolCommandTests : IDisposable
         Assert.Equal(1, error.Split("DPL3037", StringSplitOptions.None).Length - 1);
     }
 
+    [Fact]
+    public void NonTailRecursionRuleIsDisabledUnlessExplicitlyEnabled()
+    {
+        var path = Source("recursive.pl", "p(N) :- N > 0, p(N), writeln(N).\n");
+
+        (var defaultExit, _, var defaultError) = Execute("lint", path);
+        (var enabledExit, _, var enabledError) = Execute("lint", "--enable-rule", "dpl3038", "--warnings-as-errors", path);
+
+        Assert.Equal(0, defaultExit);
+        Assert.Empty(defaultError);
+        Assert.Equal(1, enabledExit);
+        Assert.Contains("DPL3038", enabledError, StringComparison.Ordinal);
+        Assert.Contains("p/1", enabledError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MultipleOptInRulesCanBeEnabledTogether()
+    {
+        var path = Source("heuristics.pl", "max(X, Y, X) :- X >= Y, !.\np(N) :- N > 0, p(N), writeln(N).\n");
+
+        (var exitCode, _, var error) = Execute(
+            "lint",
+            "--enable-rule",
+            "DPL3037",
+            "--enable-rule",
+            "DPL3038",
+            "--warnings-as-errors",
+            path
+        );
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("DPL3037", error, StringComparison.Ordinal);
+        Assert.Contains("DPL3038", error, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("--profile", "unknown", "unknown lint profile")]
     [InlineData("--enable-rule", "DPL3001", "unsupported lint rule")]
