@@ -148,3 +148,17 @@ fi
 test "$lint_exit" -eq 1
 printf '%s\n' "$lint_output" | grep -F 'warning DPL3038'
 printf '%s\n' "$lint_output" | grep -F 'p/1'
+
+# Multifile cuts use the shared cut-scope analysis only after explicit opt-in.
+printf '%s\n' ':- multifile(p/0).' 'p :- !.' >HelloProlog/lint-multifile.pl
+dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint HelloProlog/lint-multifile.pl
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --enable-rule DPL3039 --warnings-as-errors HelloProlog/lint-multifile.pl 2>&1); then
+    echo "lint unexpectedly accepted an enabled multifile cut" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3039'
+printf '%s\n' "$lint_output" | grep -F 'p/0'
