@@ -27,7 +27,9 @@ internal static class Program
         + "|"
         + LintDiagnosticIds.NonSnakeCasePredicate
         + "|"
-        + LintDiagnosticIds.ExcessivePredicateArity;
+        + LintDiagnosticIds.ExcessivePredicateArity
+        + "|"
+        + LintDiagnosticIds.ExcessiveSubgoalCount;
     private const int ExitLintWarnings = 1;
     private const int ExitSuccess = 0;
     private const int ExitUsage = 64;
@@ -202,6 +204,7 @@ internal static class Program
         int? maxLineLength = null;
         int? maxClauseLines = null;
         int? maxPredicateArity = null;
+        int? maxClauseSubgoals = null;
         List<string> flagEntries = [];
         List<string> enabledRules = [];
         List<string> paths = [];
@@ -266,6 +269,7 @@ internal static class Program
                     LintDiagnosticIds.PossibleMissingElse => LintDiagnosticIds.PossibleMissingElse,
                     LintDiagnosticIds.NonSnakeCasePredicate => LintDiagnosticIds.NonSnakeCasePredicate,
                     LintDiagnosticIds.ExcessivePredicateArity => LintDiagnosticIds.ExcessivePredicateArity,
+                    LintDiagnosticIds.ExcessiveSubgoalCount => LintDiagnosticIds.ExcessiveSubgoalCount,
                     _ => null,
                 };
                 if (rule is null)
@@ -351,6 +355,17 @@ internal static class Program
                 continue;
             }
 
+            if (argument == "--max-clause-subgoals")
+            {
+                if (!TryReadPositiveLintInteger(args, ref index, argument, error, out var value))
+                {
+                    return ExitUsage;
+                }
+
+                maxClauseSubgoals = value;
+                continue;
+            }
+
             if (argument.StartsWith('-'))
             {
                 error.WriteLine($"error: unknown lint option: {argument}");
@@ -378,6 +393,7 @@ internal static class Program
             MaxLineLength = maxLineLength ?? lintOptions.MaxLineLength,
             MaxClauseLines = maxClauseLines ?? lintOptions.MaxClauseLines,
             MaxPredicateArity = maxPredicateArity ?? lintOptions.MaxPredicateArity,
+            MaxClauseSubgoals = maxClauseSubgoals ?? lintOptions.MaxClauseSubgoals,
             EnabledRules = enabledRules,
         };
 
@@ -523,7 +539,7 @@ internal static class Program
             $"Usage: dotnet prolog lint [--mode {LanguageModeNames}] [--flag name=value] [--profile {LintProfileNames}]"
         );
         output.WriteLine("       [--indent-size N] [--max-line-length N] [--max-clause-lines N]");
-        output.WriteLine("       [--max-predicate-arity N]");
+        output.WriteLine("       [--max-predicate-arity N] [--max-clause-subgoals N]");
         output.WriteLine($"       [--enable-rule {LintOptInRuleNames}] [--warnings-as-errors] <file.pl>...");
     }
 }

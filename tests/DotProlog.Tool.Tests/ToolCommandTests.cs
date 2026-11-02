@@ -395,11 +395,60 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void ExcessiveSubgoalCountRuleIsDisabledUnlessExplicitlyEnabled()
+    {
+        var path = Source("subgoals.pl", "p :- a,b,c,d,e,f,g,h,i.\n");
+
+        (var defaultExit, _, var defaultError) = Execute("lint", path);
+        (var enabledExit, _, var enabledError) = Execute("lint", "--enable-rule", "dpl3046", "--warnings-as-errors", path);
+
+        Assert.Equal(0, defaultExit);
+        Assert.DoesNotContain("DPL3046", defaultError, StringComparison.Ordinal);
+        Assert.Equal(1, enabledExit);
+        Assert.Contains("DPL3046", enabledError, StringComparison.Ordinal);
+        Assert.Contains("p/0", enabledError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExcessiveSubgoalLimitCanBeOverriddenAndIsInertWithoutRule()
+    {
+        var path = Source("subgoal-limit.pl", "p :- a,b,c,d,e,f,g,h,i.\n");
+
+        (var inertExit, _, var inertError) = Execute("lint", "--max-clause-subgoals", "1", path);
+        (var acceptedExit, _, var acceptedError) = Execute(
+            "lint",
+            "--enable-rule",
+            "DPL3046",
+            "--max-clause-subgoals",
+            "9",
+            path
+        );
+        (var repeatedExit, _, var repeatedError) = Execute(
+            "lint",
+            "--enable-rule",
+            "DPL3046",
+            "--max-clause-subgoals",
+            "9",
+            "--max-clause-subgoals",
+            "8",
+            "--warnings-as-errors",
+            path
+        );
+
+        Assert.Equal(0, inertExit);
+        Assert.DoesNotContain("DPL3046", inertError, StringComparison.Ordinal);
+        Assert.Equal(0, acceptedExit);
+        Assert.DoesNotContain("DPL3046", acceptedError, StringComparison.Ordinal);
+        Assert.Equal(1, repeatedExit);
+        Assert.Contains("maximum of 8", repeatedError, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MultipleOptInRulesCanBeEnabledTogether()
     {
         var path = Source(
             "heuristics.pl",
-            ":- multifile(p/0).\nmax(X, Y, X) :- X >= Y, !.\np :- !.\np(N) :- N > 0, p(N), writeln(N).\nq :- repeat.\nr :- true, !.\ns :- catch(true, _, true).\nt :- (true -> true).\nbadName.\nu(A, B, C, D, E).\n"
+            ":- multifile(p/0).\nmax(X, Y, X) :- X >= Y, !.\np :- !.\np(N) :- N > 0, p(N), writeln(N).\nq :- repeat.\nr :- true, !.\ns :- catch(true, _, true).\nt :- (true -> true).\nbadName.\nu(A, B, C, D, E).\nv :- a,b,c,d,e,f,g,h,i.\n"
         );
 
         (var exitCode, _, var error) = Execute(
@@ -422,6 +471,8 @@ public sealed class ToolCommandTests : IDisposable
             "DPL3044",
             "--enable-rule",
             "DPL3045",
+            "--enable-rule",
+            "DPL3046",
             "--warnings-as-errors",
             path
         );
@@ -436,6 +487,7 @@ public sealed class ToolCommandTests : IDisposable
         Assert.Contains("DPL3043", error, StringComparison.Ordinal);
         Assert.Contains("DPL3044", error, StringComparison.Ordinal);
         Assert.Contains("DPL3045", error, StringComparison.Ordinal);
+        Assert.Contains("DPL3046", error, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -448,6 +500,10 @@ public sealed class ToolCommandTests : IDisposable
     [InlineData("--max-predicate-arity", "-1", "invalid value")]
     [InlineData("--max-predicate-arity", "word", "invalid value")]
     [InlineData("--max-predicate-arity", "999999999999999999999999", "invalid value")]
+    [InlineData("--max-clause-subgoals", "0", "invalid value")]
+    [InlineData("--max-clause-subgoals", "-1", "invalid value")]
+    [InlineData("--max-clause-subgoals", "word", "invalid value")]
+    [InlineData("--max-clause-subgoals", "999999999999999999999999", "invalid value")]
     public void InvalidLintOptionValuesAreUsageErrors(string option, string value, string message)
     {
         var path = Source("clean.pl", "clean.\n");
@@ -465,6 +521,7 @@ public sealed class ToolCommandTests : IDisposable
     [InlineData("--max-line-length", "missing positive integer")]
     [InlineData("--max-clause-lines", "missing positive integer")]
     [InlineData("--max-predicate-arity", "missing positive integer")]
+    [InlineData("--max-clause-subgoals", "missing positive integer")]
     public void MissingLintOptionValuesAreUsageErrors(string option, string message)
     {
         (var exitCode, _, var error) = Execute("lint", option);
