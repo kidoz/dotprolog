@@ -202,6 +202,28 @@ supplied clause of each lowered procedure identity produces a finding. Declarati
 symbolic operator-style names, and `$`-prefixed private names are excluded. This is a convention
 review hint, not invalid-Prolog diagnostic or automatic rename.
 
+## Check predicate and nonterminal arity
+
+Enable the excessive-arity heuristic explicitly:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint --enable-rule DPL3045 program.pl
+```
+
+`DPL3045` is off in every default profile. It reports user-defined predicates and DCG nonterminals
+whose source arity exceeds `4`. DCGs use their written `Name//Arity`, not the two arguments added by
+lowering. Only the first supplied definition of each lowered procedure identity produces a finding.
+
+Override the limit with a positive integer:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint --enable-rule DPL3045 --max-predicate-arity 6 program.pl
+```
+
+The option is inert without the rule; repeating it uses the last value. Zero, negative, malformed,
+overflowing, and missing values are usage errors. This is an interface-review hint, not a correctness
+finding or a recommendation to regroup every argument list.
+
 ## Fail CI on warnings
 
 ```console

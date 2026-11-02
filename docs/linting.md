@@ -23,11 +23,13 @@ dotnet prolog lint [options] <file.pl> [more.pl ...]
 | `--enable-rule DPL3042` | Enable the opt-in catch-all heuristic; repeatable |
 | `--enable-rule DPL3043` | Enable the opt-in missing-else heuristic; repeatable |
 | `--enable-rule DPL3044` | Enable the opt-in predicate naming heuristic; repeatable |
+| `--enable-rule DPL3045` | Enable the opt-in excessive-arity heuristic; repeatable |
 | `--mode modern` or `--mode strict-iso` | Seed the reader's language mode; default `modern` |
 | `--flag name=value` | Override a curated initial flag; repeatable |
 | `--indent-size N` | Positive indentation unit; Covington default `4` |
 | `--max-line-length N` | Positive line limit; Covington default `80` |
 | `--max-clause-lines N` | Positive clause limit; Covington default `24` |
+| `--max-predicate-arity N` | Positive source-arity limit used by `DPL3045`; default `4`, last value wins, inert without the rule |
 
 Profile names are case-insensitive. Options may appear in any order. Language settings are defined
 in the [language reference](language-guide.md#language-modes). Strict-mode linting seeds the reader;
@@ -84,6 +86,7 @@ These rules run in every profile:
 | `DPL3042` | Opt-in: a direct `catch/3` goal has a variable catcher |
 | `DPL3043` | Opt-in: a direct hard or soft conditional has no explicit else branch |
 | `DPL3044` | Opt-in: a user-defined predicate or nonterminal name is outside lower `snake_case` |
+| `DPL3045` | Opt-in: a user-defined predicate or nonterminal exceeds the configured source-arity limit |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -373,6 +376,30 @@ language modes use the same grammar, and unrelated unresolved calls do not affec
 This is a naming-convention review hint, not an invalid-Prolog diagnostic or proof that renaming is
 safe. Custom patterns, cross-project naming policy, and automatic renaming are out of scope. No source
 is executed or rewritten.
+
+### Opt-in excessive arity
+
+`DPL3045` is disabled by default in every profile. Enable it with `--enable-rule DPL3045`, alone or
+alongside other opt-in rules. It reports a user-defined ordinary predicate or grammar nonterminal
+whose source arity is greater than the configured maximum. Arity equal to the maximum does not
+produce a finding. The default maximum is `4`; `--max-predicate-arity N` and
+`PrologLintOptions.MaxPredicateArity` select a positive override.
+
+Ordinary definitions use their written head arity. DCGs use their written `Name//Arity`, excluding
+the two difference-list arguments added by lowering. Facts, rules, and grammar rules are eligible,
+including static, dynamic, and multifile definitions in modules and includes. At most one warning is
+emitted per module and lowered name/arity at the first supplied clause's name token. A first
+definition at or below the limit suppresses later findings for the same identity.
+
+Declarations, exports, imports, calls, built-ins, and declaration-only procedures do not independently
+produce findings. Both language modes use the same analysis, and unrelated unresolved calls do not
+affect it. Reusable analysis rejects a nonpositive limit with `ArgumentOutOfRangeException` when the
+rule is enabled. The CLI rejects nonpositive, malformed, overflowing, or missing values as usage
+errors; repeating the option uses the last value, and supplying it without the rule has no effect.
+
+This is an interface-review hint, not invalid-Prolog diagnostic or proof that arguments should be
+regrouped. Call-site interface analysis and automatic refactoring are out of scope. No source is
+executed or rewritten.
 
 ### Double-quoted text
 

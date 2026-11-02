@@ -74,6 +74,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - Opt-in naming linting reports user-defined predicate and nonterminal names outside lower
   `snake_case` using `DPL3044`. Enable it with `--enable-rule DPL3044`; first supplied definitions are
   checked across modules and includes without executing or renaming source.
+- Opt-in excessive-arity linting reports predicate and nonterminal definitions above a source-arity
+  limit using `DPL3045`. Enable it with `--enable-rule DPL3045`; the default maximum is 4 and
+  `--max-predicate-arity N` supplies a positive override without executing source.
 
 ### Changed
 
