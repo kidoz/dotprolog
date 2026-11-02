@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <ItemGroup>
+        <ProjectReference Include="../../src/DotProlog.LanguageServer/DotProlog.LanguageServer.csproj" />
+    </ItemGroup>
+</Project>

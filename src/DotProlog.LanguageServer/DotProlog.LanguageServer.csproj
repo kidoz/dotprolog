@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <AssemblyName>dotprolog-lsp</AssemblyName>
+        <RootNamespace>DotProlog.LanguageServer</RootNamespace>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="../DotProlog.Compiler/DotProlog.Compiler.csproj" />
+        <PackageReference Include="StreamJsonRpc" Version="2.26.150" />
+        <InternalsVisibleTo Include="DotProlog.LanguageServer.Tests" />
+    </ItemGroup>
+</Project>

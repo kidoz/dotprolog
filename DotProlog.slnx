@@ -1,5 +1,6 @@
 <Solution>
     <Folder Name="/src/">
+        <Project Path="src/DotProlog.LanguageServer/DotProlog.LanguageServer.csproj" />
         <Project Path="src/DotProlog.CodeGen.IL/DotProlog.CodeGen.IL.csproj" />
         <Project Path="src/DotProlog.Compiler.Cli/DotProlog.Compiler.Cli.csproj" />
         <Project Path="src/DotProlog.Sdk/DotProlog.Sdk.csproj" />
@@ -15,6 +16,7 @@
         <Project Path="src/DotProlog.Syntax/DotProlog.Syntax.csproj" />
     </Folder>
     <Folder Name="/tests/">
+        <Project Path="tests/DotProlog.LanguageServer.Tests/DotProlog.LanguageServer.Tests.csproj" />
         <Project Path="tests/DotProlog.CodeGen.IL.Tests/DotProlog.CodeGen.IL.Tests.csproj" />
         <Project Path="tests/Integration/Integration.Tests.csproj" />
         <Project Path="tests/DotProlog.CodeGen.CSharp.Tests/DotProlog.CodeGen.CSharp.Tests.csproj" />
