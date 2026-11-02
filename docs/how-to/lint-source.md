@@ -224,6 +224,28 @@ The option is inert without the rule; repeating it uses the last value. Zero, ne
 overflowing, and missing values are usage errors. This is an interface-review hint, not a correctness
 finding or a recommendation to regroup every argument list.
 
+## Check clause subgoal counts
+
+Enable the excessive-subgoal-count heuristic explicitly:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint --enable-rule DPL3046 program.pl
+```
+
+`DPL3046` is off in every default profile. It reports rules with more than `8` direct subgoals.
+Conjunctions, disjunctions, conditionals, and DCG `{}` wrappers add no count themselves; their
+branches are counted. Every other direct goal counts once, while goal-shaped arguments remain opaque.
+Each clause is assessed independently, including multiple clauses of one procedure.
+
+Override the limit with a positive integer:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint --enable-rule DPL3046 --max-clause-subgoals 12 program.pl
+```
+
+The option is inert without the rule, and the last repeated value wins. This is a written-body-size
+review hint, not an execution-cost estimate, complexity score, or automatic decomposition proposal.
+
 ## Fail CI on warnings
 
 ```console

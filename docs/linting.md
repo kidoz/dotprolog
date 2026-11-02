@@ -24,12 +24,14 @@ dotnet prolog lint [options] <file.pl> [more.pl ...]
 | `--enable-rule DPL3043` | Enable the opt-in missing-else heuristic; repeatable |
 | `--enable-rule DPL3044` | Enable the opt-in predicate naming heuristic; repeatable |
 | `--enable-rule DPL3045` | Enable the opt-in excessive-arity heuristic; repeatable |
+| `--enable-rule DPL3046` | Enable the opt-in excessive-subgoal-count heuristic; repeatable |
 | `--mode modern` or `--mode strict-iso` | Seed the reader's language mode; default `modern` |
 | `--flag name=value` | Override a curated initial flag; repeatable |
 | `--indent-size N` | Positive indentation unit; Covington default `4` |
 | `--max-line-length N` | Positive line limit; Covington default `80` |
 | `--max-clause-lines N` | Positive clause limit; Covington default `24` |
 | `--max-predicate-arity N` | Positive source-arity limit used by `DPL3045`; default `4`, last value wins, inert without the rule |
+| `--max-clause-subgoals N` | Positive direct-subgoal limit used by `DPL3046`; default `8`, last value wins, inert without the rule |
 
 Profile names are case-insensitive. Options may appear in any order. Language settings are defined
 in the [language reference](language-guide.md#language-modes). Strict-mode linting seeds the reader;
@@ -87,6 +89,7 @@ These rules run in every profile:
 | `DPL3043` | Opt-in: a direct hard or soft conditional has no explicit else branch |
 | `DPL3044` | Opt-in: a user-defined predicate or nonterminal name is outside lower `snake_case` |
 | `DPL3045` | Opt-in: a user-defined predicate or nonterminal exceeds the configured source-arity limit |
+| `DPL3046` | Opt-in: a rule exceeds the configured direct-subgoal limit |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -399,6 +402,30 @@ errors; repeating the option uses the last value, and supplying it without the r
 
 This is an interface-review hint, not invalid-Prolog diagnostic or proof that arguments should be
 regrouped. Call-site interface analysis and automatic refactoring are out of scope. No source is
+executed or rewritten.
+
+### Opt-in excessive subgoal counts
+
+`DPL3046` is disabled by default in every profile. Enable it with `--enable-rule DPL3046`, alone or
+alongside other opt-in rules. It reports each ordinary rule or grammar rule whose direct-subgoal
+count exceeds the configured maximum. The default maximum is `8`; `--max-clause-subgoals N` and
+`PrologLintOptions.MaxClauseSubgoals` select a positive override. Facts and declaration-only
+procedures are not reported.
+
+Conjunction, disjunction, hard and soft conditional nodes add no count themselves; their conditions
+and branches are traversed. DCG `{}` wrappers likewise add no count. Every other direct body goal
+counts once, including cuts, variable goals, terminals, negation, all-solutions and cleanup goals,
+meta-calls, and qualified calls. Goal-shaped terms inside another goal's arguments are not traversed.
+The count sums all transparent branches rather than estimating execution steps or a longest path.
+
+Each statically recognized rule is assessed independently, including multiple and duplicate clauses
+of one procedure and dynamic or multifile rules. Findings occur at the predicate or nonterminal name
+token and retain physical ownership for includes. Both language modes use the same count. Reusable
+analysis rejects a nonpositive limit when enabled; the CLI applies the same positive-integer
+validation as the other rule limits, with last-value-wins and inert behavior without opt-in.
+
+This is a written-body-size review hint, not an invalid-Prolog diagnostic, runtime-cost estimate, or
+proof that decomposition is beneficial. Automatic predicate extraction is out of scope. No source is
 executed or rewritten.
 
 ### Double-quoted text

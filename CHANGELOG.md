@@ -81,6 +81,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - Opt-in excessive-arity linting reports predicate and nonterminal definitions above a source-arity
   limit using `DPL3045`. Enable it with `--enable-rule DPL3045`; the default maximum is 4 and
   `--max-predicate-arity N` supplies a positive override without executing source.
+- Opt-in subgoal-count linting reports rules above a direct-subgoal limit using `DPL3046`. Enable it
+  with `--enable-rule DPL3046`; the default maximum is 8 and `--max-clause-subgoals N` supplies a
+  positive override while transparent control flow and opaque goals are counted without execution.
 
 ### Changed
 
