@@ -126,4 +126,16 @@ public static class LintDiagnosticIds
 
     /// <summary>A same-scope cut occurs in a clause declared multifile.</summary>
     public const string PossibleMultifileCut = "DPL3039";
+
+    /// <summary>A direct repeat/0 goal occurs without a cut in the clause's own cut scope.</summary>
+    public const string PossibleRepeatWithoutCut = "DPL3040";
+
+    /// <summary>A same-scope cut occurs in a final position of the last supplied static clause.</summary>
+    public const string PossibleFinalCut = "DPL3041";
+
+    /// <summary>A direct catch/3 goal has a variable catcher that may match every thrown term.</summary>
+    public const string PossibleCatchAll = "DPL3042";
+
+    /// <summary>A direct hard or soft conditional has no explicit else branch.</summary>
+    public const string PossibleMissingElse = "DPL3043";
 }
