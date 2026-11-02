@@ -79,6 +79,7 @@ public static class PrologLinter
         PrologMissingElseLinter.Analyze(clauses, fileName, options, diagnostics);
         PrologNamingLinter.Analyze(clauses, fileName, options, diagnostics);
         PrologExcessiveArityLinter.Analyze(clauses, fileName, options, diagnostics);
+        PrologExcessiveSubgoalCountLinter.Analyze(clauses, fileName, options, diagnostics);
         PrologLayoutLinter.Analyze(source, clauses, options ?? PrologLintOptions.SemanticOnly, fileName, diagnostics, codePoints);
 
         return [.. diagnostics.OrderBy(diagnostic => diagnostic.Span.Start).ThenBy(diagnostic => diagnostic.Id)];
@@ -137,6 +138,7 @@ public static class PrologLinter
         PrologMissingElseLinter.Analyze(model, options, diagnostics);
         PrologNamingLinter.Analyze(model, options, diagnostics);
         PrologExcessiveArityLinter.Analyze(model, options, diagnostics);
+        PrologExcessiveSubgoalCountLinter.Analyze(model, options, diagnostics);
         PrologCallGraphLinter.Analyze(model, diagnostics);
         PrologReachabilityLinter.Analyze(model, diagnostics);
         PrologUnusedImportLinter.Analyze(model, diagnostics);

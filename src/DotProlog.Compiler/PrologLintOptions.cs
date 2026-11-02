@@ -50,6 +50,9 @@ public sealed record PrologLintOptions
     /// <summary>Maximum source arity allowed by the opt-in excessive-arity rule.</summary>
     public int MaxPredicateArity { get; init; } = 4;
 
+    /// <summary>Maximum direct-subgoal count allowed by the opt-in excessive-subgoal-count rule.</summary>
+    public int MaxClauseSubgoals { get; init; } = 8;
+
     /// <summary>Diagnostic identifiers of additional opt-in semantic rules.</summary>
     public IReadOnlyCollection<string> EnabledRules { get; init; } = [];
 

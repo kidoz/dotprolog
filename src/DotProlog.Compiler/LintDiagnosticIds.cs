@@ -144,4 +144,7 @@ public static class LintDiagnosticIds
 
     /// <summary>A user-defined predicate or nonterminal exceeds the configured source-arity limit.</summary>
     public const string ExcessivePredicateArity = "DPL3045";
+
+    /// <summary>A rule exceeds the configured direct-subgoal limit.</summary>
+    public const string ExcessiveSubgoalCount = "DPL3046";
 }
