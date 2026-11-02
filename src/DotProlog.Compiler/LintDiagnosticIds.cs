@@ -138,4 +138,7 @@ public static class LintDiagnosticIds
 
     /// <summary>A direct hard or soft conditional has no explicit else branch.</summary>
     public const string PossibleMissingElse = "DPL3043";
+
+    /// <summary>A user-defined predicate or nonterminal name does not follow lower snake_case.</summary>
+    public const string NonSnakeCasePredicate = "DPL3044";
 }
