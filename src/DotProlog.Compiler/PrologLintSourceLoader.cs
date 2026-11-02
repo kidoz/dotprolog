@@ -9,16 +9,41 @@ public static class PrologLintSourceLoader
     private const int MaxIncludeDepth = 64;
 
     /// <summary>Reads one physical source unit using the language state owned by <paramref name="program"/>.</summary>
-    public static PrologLintSourceLoadResult Load(string fileName, string source, BytecodeProgram program)
+    public static PrologLintSourceLoadResult Load(string fileName, string source, BytecodeProgram program) =>
+        Load(fileName, source, program, File.ReadAllText);
+
+    /// <summary>Reads source and includes using a caller-owned source provider, without executing goals.</summary>
+    /// <param name="fileName">Physical path of the root source.</param>
+    /// <param name="source">Root source text, including unsaved changes when applicable.</param>
+    /// <param name="program">Fresh language state for this source unit.</param>
+    /// <param name="readSource">Reads an absolute include path. I/O failures become source-resolution diagnostics.</param>
+    public static PrologLintSourceLoadResult Load(
+        string fileName,
+        string source,
+        BytecodeProgram program,
+        Func<string, string> readSource
+    ) => Load(fileName, source, program, readSource, CancellationToken.None);
+
+    /// <summary>Reads source and includes with cooperative cancellation at clause and include boundaries.</summary>
+    public static PrologLintSourceLoadResult Load(
+        string fileName,
+        string source,
+        BytecodeProgram program,
+        Func<string, string> readSource,
+        CancellationToken cancellationToken
+    )
     {
         ArgumentException.ThrowIfNullOrEmpty(fileName);
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(program);
+        ArgumentNullException.ThrowIfNull(readSource);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var absolute = Path.GetFullPath(fileName);
         HashSet<string> activeIncludes = new(PathComparer);
         Dictionary<SyntaxTerm, string> owners = new(ReferenceEqualityComparer.Instance);
-        ParseResult parsed = ReadWithIncludes(source, absolute, program, activeIncludes, owners);
+        ParseResult parsed = ReadWithIncludes(source, absolute, program, activeIncludes, owners, readSource, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         string[] clauseFiles = [.. parsed.Clauses.Select(clause => owners[clause])];
         var unit = new PrologLintSource(
             absolute,
@@ -39,9 +64,12 @@ public static class PrologLintSourceLoader
         string fileName,
         BytecodeProgram program,
         HashSet<string> activeIncludes,
-        Dictionary<SyntaxTerm, string> owners
+        Dictionary<SyntaxTerm, string> owners,
+        Func<string, string> readSource,
+        CancellationToken cancellationToken
     )
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!activeIncludes.Add(fileName))
         {
             return new ParseResult([], [ResolutionWarning($"Include cycle detected at {fileName}.", fileName, default)]);
@@ -63,7 +91,8 @@ public static class PrologLintSourceLoader
                 program.Operators,
                 program.CharacterConversions,
                 program.Flags,
-                directive => ExpandInclude(directive, fileName, program, activeIncludes, owners)
+                directive => ExpandInclude(directive, fileName, program, activeIncludes, owners, readSource, cancellationToken),
+                clauseBoundary: _ => cancellationToken.ThrowIfCancellationRequested()
             );
             foreach (SyntaxTerm clause in parsed.Clauses)
             {
@@ -83,7 +112,9 @@ public static class PrologLintSourceLoader
         string includingFile,
         BytecodeProgram program,
         HashSet<string> activeIncludes,
-        Dictionary<SyntaxTerm, string> owners
+        Dictionary<SyntaxTerm, string> owners,
+        Func<string, string> readSource,
+        CancellationToken cancellationToken
     )
     {
         if (
@@ -124,8 +155,9 @@ public static class PrologLintSourceLoader
                 );
             }
 
-            var source = File.ReadAllText(path);
-            return ReadWithIncludes(source, path, program, activeIncludes, owners);
+            cancellationToken.ThrowIfCancellationRequested();
+            var source = readSource(path);
+            return ReadWithIncludes(source, path, program, activeIncludes, owners, readSource, cancellationToken);
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
