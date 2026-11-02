@@ -123,4 +123,7 @@ public static class LintDiagnosticIds
 
     /// <summary>A direct self-call has remaining control flow that prevents last-call optimization.</summary>
     public const string PossibleNonTailRecursion = "DPL3038";
+
+    /// <summary>A same-scope cut occurs in a clause declared multifile.</summary>
+    public const string PossibleMultifileCut = "DPL3039";
 }

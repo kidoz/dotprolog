@@ -72,6 +72,7 @@ public static class PrologLinter
         List<Diagnostic> diagnostics = [.. Analyze(clauses, fileName, initialDoubleQuotes)];
         PrologNonSteadfastLinter.Analyze(clauses, fileName, options, diagnostics);
         PrologNonTailRecursionLinter.Analyze(clauses, fileName, options, diagnostics);
+        PrologMultifileCutLinter.Analyze(clauses, fileName, options, diagnostics);
         PrologLayoutLinter.Analyze(source, clauses, options ?? PrologLintOptions.SemanticOnly, fileName, diagnostics, codePoints);
 
         return [.. diagnostics.OrderBy(diagnostic => diagnostic.Span.Start).ThenBy(diagnostic => diagnostic.Id)];
@@ -123,6 +124,7 @@ public static class PrologLinter
 
         PrologNonSteadfastLinter.Analyze(model, options, diagnostics);
         PrologNonTailRecursionLinter.Analyze(model, options, diagnostics);
+        PrologMultifileCutLinter.Analyze(model, options, diagnostics);
         PrologCallGraphLinter.Analyze(model, diagnostics);
         PrologReachabilityLinter.Analyze(model, diagnostics);
         PrologUnusedImportLinter.Analyze(model, diagnostics);
