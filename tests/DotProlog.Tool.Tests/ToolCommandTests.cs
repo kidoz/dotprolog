@@ -346,11 +346,60 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void ExcessiveArityRuleIsDisabledUnlessExplicitlyEnabled()
+    {
+        var path = Source("arity.pl", "p(A, B, C, D, E).\n");
+
+        (var defaultExit, _, var defaultError) = Execute("lint", path);
+        (var enabledExit, _, var enabledError) = Execute("lint", "--enable-rule", "dpl3045", "--warnings-as-errors", path);
+
+        Assert.Equal(0, defaultExit);
+        Assert.DoesNotContain("DPL3045", defaultError, StringComparison.Ordinal);
+        Assert.Equal(1, enabledExit);
+        Assert.Contains("DPL3045", enabledError, StringComparison.Ordinal);
+        Assert.Contains("p/5", enabledError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExcessiveArityLimitCanBeOverriddenAndIsInertWithoutRule()
+    {
+        var path = Source("arity-limit.pl", "p(A, B, C, D, E).\n");
+
+        (var inertExit, _, var inertError) = Execute("lint", "--max-predicate-arity", "1", path);
+        (var acceptedExit, _, var acceptedError) = Execute(
+            "lint",
+            "--enable-rule",
+            "DPL3045",
+            "--max-predicate-arity",
+            "5",
+            path
+        );
+        (var repeatedExit, _, var repeatedError) = Execute(
+            "lint",
+            "--enable-rule",
+            "DPL3045",
+            "--max-predicate-arity",
+            "5",
+            "--max-predicate-arity",
+            "4",
+            "--warnings-as-errors",
+            path
+        );
+
+        Assert.Equal(0, inertExit);
+        Assert.DoesNotContain("DPL3045", inertError, StringComparison.Ordinal);
+        Assert.Equal(0, acceptedExit);
+        Assert.DoesNotContain("DPL3045", acceptedError, StringComparison.Ordinal);
+        Assert.Equal(1, repeatedExit);
+        Assert.Contains("maximum of 4", repeatedError, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MultipleOptInRulesCanBeEnabledTogether()
     {
         var path = Source(
             "heuristics.pl",
-            ":- multifile(p/0).\nmax(X, Y, X) :- X >= Y, !.\np :- !.\np(N) :- N > 0, p(N), writeln(N).\nq :- repeat.\nr :- true, !.\ns :- catch(true, _, true).\nt :- (true -> true).\nbadName.\n"
+            ":- multifile(p/0).\nmax(X, Y, X) :- X >= Y, !.\np :- !.\np(N) :- N > 0, p(N), writeln(N).\nq :- repeat.\nr :- true, !.\ns :- catch(true, _, true).\nt :- (true -> true).\nbadName.\nu(A, B, C, D, E).\n"
         );
 
         (var exitCode, _, var error) = Execute(
@@ -371,6 +420,8 @@ public sealed class ToolCommandTests : IDisposable
             "DPL3043",
             "--enable-rule",
             "DPL3044",
+            "--enable-rule",
+            "DPL3045",
             "--warnings-as-errors",
             path
         );
@@ -384,6 +435,7 @@ public sealed class ToolCommandTests : IDisposable
         Assert.Contains("DPL3042", error, StringComparison.Ordinal);
         Assert.Contains("DPL3043", error, StringComparison.Ordinal);
         Assert.Contains("DPL3044", error, StringComparison.Ordinal);
+        Assert.Contains("DPL3045", error, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -392,6 +444,10 @@ public sealed class ToolCommandTests : IDisposable
     [InlineData("--indent-size", "0", "invalid value")]
     [InlineData("--max-line-length", "word", "invalid value")]
     [InlineData("--max-clause-lines", "-1", "invalid value")]
+    [InlineData("--max-predicate-arity", "0", "invalid value")]
+    [InlineData("--max-predicate-arity", "-1", "invalid value")]
+    [InlineData("--max-predicate-arity", "word", "invalid value")]
+    [InlineData("--max-predicate-arity", "999999999999999999999999", "invalid value")]
     public void InvalidLintOptionValuesAreUsageErrors(string option, string value, string message)
     {
         var path = Source("clean.pl", "clean.\n");
@@ -408,6 +464,7 @@ public sealed class ToolCommandTests : IDisposable
     [InlineData("--indent-size", "missing positive integer")]
     [InlineData("--max-line-length", "missing positive integer")]
     [InlineData("--max-clause-lines", "missing positive integer")]
+    [InlineData("--max-predicate-arity", "missing positive integer")]
     public void MissingLintOptionValuesAreUsageErrors(string option, string message)
     {
         (var exitCode, _, var error) = Execute("lint", option);

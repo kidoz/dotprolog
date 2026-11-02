@@ -25,7 +25,9 @@ internal static class Program
         + "|"
         + LintDiagnosticIds.PossibleMissingElse
         + "|"
-        + LintDiagnosticIds.NonSnakeCasePredicate;
+        + LintDiagnosticIds.NonSnakeCasePredicate
+        + "|"
+        + LintDiagnosticIds.ExcessivePredicateArity;
     private const int ExitLintWarnings = 1;
     private const int ExitSuccess = 0;
     private const int ExitUsage = 64;
@@ -199,6 +201,7 @@ internal static class Program
         int? indentSize = null;
         int? maxLineLength = null;
         int? maxClauseLines = null;
+        int? maxPredicateArity = null;
         List<string> flagEntries = [];
         List<string> enabledRules = [];
         List<string> paths = [];
@@ -262,6 +265,7 @@ internal static class Program
                     LintDiagnosticIds.PossibleCatchAll => LintDiagnosticIds.PossibleCatchAll,
                     LintDiagnosticIds.PossibleMissingElse => LintDiagnosticIds.PossibleMissingElse,
                     LintDiagnosticIds.NonSnakeCasePredicate => LintDiagnosticIds.NonSnakeCasePredicate,
+                    LintDiagnosticIds.ExcessivePredicateArity => LintDiagnosticIds.ExcessivePredicateArity,
                     _ => null,
                 };
                 if (rule is null)
@@ -336,6 +340,17 @@ internal static class Program
                 continue;
             }
 
+            if (argument == "--max-predicate-arity")
+            {
+                if (!TryReadPositiveLintInteger(args, ref index, argument, error, out var value))
+                {
+                    return ExitUsage;
+                }
+
+                maxPredicateArity = value;
+                continue;
+            }
+
             if (argument.StartsWith('-'))
             {
                 error.WriteLine($"error: unknown lint option: {argument}");
@@ -362,6 +377,7 @@ internal static class Program
             IndentSize = indentSize ?? lintOptions.IndentSize,
             MaxLineLength = maxLineLength ?? lintOptions.MaxLineLength,
             MaxClauseLines = maxClauseLines ?? lintOptions.MaxClauseLines,
+            MaxPredicateArity = maxPredicateArity ?? lintOptions.MaxPredicateArity,
             EnabledRules = enabledRules,
         };
 
@@ -507,6 +523,7 @@ internal static class Program
             $"Usage: dotnet prolog lint [--mode {LanguageModeNames}] [--flag name=value] [--profile {LintProfileNames}]"
         );
         output.WriteLine("       [--indent-size N] [--max-line-length N] [--max-clause-lines N]");
+        output.WriteLine("       [--max-predicate-arity N]");
         output.WriteLine($"       [--enable-rule {LintOptInRuleNames}] [--warnings-as-errors] <file.pl>...");
     }
 }
