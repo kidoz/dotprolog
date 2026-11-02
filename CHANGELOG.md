@@ -33,6 +33,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - Opt-in recursion linting reports direct self-calls outside compiler tail positions with `DPL3038`.
   Enable it with `--enable-rule DPL3038`; ordinary predicates and DCGs follow branch-specific tail
   positions while indirect and meta-called recursion are excluded.
+- Opt-in multifile-cut linting reports same-scope cuts that may discard alternatives contributed by
+  other source units with `DPL3039`. Enable it with `--enable-rule DPL3039`; declarations resolve
+  within one file, across named files, and through includes.
 
 ### Changed
 

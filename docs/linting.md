@@ -17,6 +17,7 @@ dotnet prolog lint [options] <file.pl> [more.pl ...]
 | `--profile covington` | Add automatically checkable Covington layout guidelines 2.1–2.7 |
 | `--enable-rule DPL3037` | Enable the opt-in non-steadfast clause heuristic; repeatable |
 | `--enable-rule DPL3038` | Enable the opt-in non-tail-recursion heuristic; repeatable |
+| `--enable-rule DPL3039` | Enable the opt-in multifile-cut heuristic; repeatable |
 | `--mode modern` or `--mode strict-iso` | Seed the reader's language mode; default `modern` |
 | `--flag name=value` | Override a curated initial flag; repeatable |
 | `--indent-size N` | Positive indentation unit; Covington default `4` |
@@ -72,6 +73,7 @@ These rules run in every profile:
 | `DPL3036` | No recognized entry point reaches a grammar nonterminal through static calls |
 | `DPL3037` | Opt-in: distinct head arguments share variables and the clause contains a same-scope cut |
 | `DPL3038` | Opt-in: a direct self-call is outside a compiler tail position |
+| `DPL3039` | Opt-in: a same-scope cut occurs in a clause declared multifile |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -231,6 +233,27 @@ and unrelated unresolved calls do not suppress this file-local rule.
 
 This is an optimization hint, not a correctness fault, termination analysis, or proof that rewriting
 recursion will improve a workload.
+
+### Opt-in multifile cuts
+
+`DPL3039` is disabled by default in every profile. Enable it with `--enable-rule DPL3039`, alone or
+alongside other opt-in rules. It reports one warning per multifile clause at its first same-scope
+cut. No head-variable aliasing is required. The message identifies the predicate or nonterminal and
+states that the cut may discard alternatives contributed by other source units.
+
+Declarations match the current module, name, and arity, or `Name//Arity` plus two for a nonterminal.
+They are honored in the same physical file, in other explicitly named files, and through expanded
+includes. Merely placing clauses in several files without a `multifile` declaration does not trigger
+the rule. Dynamic multifile clauses are eligible.
+
+The cut-scope traversal is shared with `DPL3037`: eligible control branches count, while
+if-then-else conditions, negation, all-solutions goals, opaque goals, arbitrary meta-calls, and
+ordinary term data do not create findings. A bare soft-cut conditional follows the compiler's
+conjunction behavior, and DCG `{}` goals are inspected as ordinary goals. Unrelated unresolved calls
+do not suppress this declaration-based rule.
+
+This is a modularity review hint, not a correctness proof or a recommendation to remove the cut. The
+linter does not evaluate which alternatives exist or classify the cut as red or green.
 
 ### Double-quoted text
 

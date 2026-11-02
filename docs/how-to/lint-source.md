@@ -96,6 +96,24 @@ This is an optimization hint, not a correctness warning or a termination proof. 
 accumulator or another formulation would help before rewriting working code. Both opt-in rules can be
 enabled together by repeating `--enable-rule` with `DPL3037` and `DPL3038`.
 
+## Check cuts in multifile clauses
+
+Enable the multifile-cut heuristic explicitly:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint --enable-rule DPL3039 program.pl
+```
+
+`DPL3039` is off in every default profile. It reports one warning per multifile clause at its first
+same-scope cut. Ordinary predicates and grammar nonterminals are supported, and declarations are
+recognized in the current file, in other named files, and through includes. Clauses that occur in
+several files without a `multifile` declaration are not enough to trigger the rule.
+
+The warning says that a cut may discard alternatives contributed by other source units. It is a
+modularity review hint, not a correctness proof or a recommendation to remove every such cut.
+Dynamic multifile clauses are eligible, and unrelated unresolved calls do not suppress the rule.
+The same compiler-aware cut scopes as `DPL3037` apply, so opaque and meta-called cuts are excluded.
+
 ## Fail CI on warnings
 
 ```console
