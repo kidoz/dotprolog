@@ -23,6 +23,8 @@ internal sealed class Lexer
     private int _line = 1;
     private int _lineStart;
 
+    internal Action<int, int>? CommentRead { get; init; }
+
     internal Lexer(
         string text,
         string? fileName,
@@ -319,10 +321,12 @@ internal sealed class Lexer
             }
             else if (c == '%')
             {
+                int commentStart = _position;
                 while (_position < _text.Length && InputAt(_position) != '\n')
                 {
                     Advance();
                 }
+                CommentRead?.Invoke(commentStart, _position);
             }
             else if (c == '/' && Peek(1) == '*')
             {
@@ -336,10 +340,12 @@ internal sealed class Lexer
                 if (_position >= _text.Length)
                 {
                     Report(DiagnosticIds.UnterminatedQuoted, "Unterminated block comment.", SpanFrom(commentStart));
+                    CommentRead?.Invoke(commentStart, _position);
                 }
                 else
                 {
                     Advance(2);
+                    CommentRead?.Invoke(commentStart, _position - 1);
                 }
             }
             else
