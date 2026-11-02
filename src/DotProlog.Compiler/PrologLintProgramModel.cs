@@ -99,6 +99,9 @@ internal sealed class PrologLintProgramModel
         return LintResolution.Undefined;
     }
 
+    internal bool HasUnresolvedImport(string module, PredicateIndicator predicate) =>
+        _unresolvedImportModules.Contains(module) || _unresolvedImportPredicates.Contains((module, predicate));
+
     internal bool IsOrdinary(string module, PredicateIndicator predicate) =>
         _ordinary.Contains((module, predicate)) || LintBuiltinCatalog.Contains(predicate);
 
