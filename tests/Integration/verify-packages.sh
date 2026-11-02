@@ -162,3 +162,59 @@ fi
 test "$lint_exit" -eq 1
 printf '%s\n' "$lint_output" | grep -F 'warning DPL3039'
 printf '%s\n' "$lint_output" | grep -F 'p/0'
+
+# Repeat loops use the same opt-in rule-selection path without executing the source.
+printf '%s\n' 'p :- repeat, fail.' >HelloProlog/lint-repeat.pl
+dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint HelloProlog/lint-repeat.pl
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --enable-rule DPL3040 --warnings-as-errors HelloProlog/lint-repeat.pl 2>&1); then
+    echo "lint unexpectedly accepted an enabled repeat loop without a same-scope cut" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3040'
+printf '%s\n' "$lint_output" | grep -F 'p/0'
+
+# Final cuts are reported only in the last supplied static clause after explicit opt-in.
+printf '%s\n' 'p :- !.' 'p :- true, !.' >HelloProlog/lint-final-cut.pl
+dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint HelloProlog/lint-final-cut.pl
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --enable-rule DPL3041 --warnings-as-errors HelloProlog/lint-final-cut.pl 2>&1); then
+    echo "lint unexpectedly accepted an enabled final cut" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3041'
+printf '%s\n' "$lint_output" | grep -F 'p/0'
+
+# Variable catchers are reported as advisory broad-recovery sites only after explicit opt-in.
+printf '%s\n' 'p :- catch(true, _, true).' >HelloProlog/lint-catch-all.pl
+dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint HelloProlog/lint-catch-all.pl
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --enable-rule DPL3042 --warnings-as-errors HelloProlog/lint-catch-all.pl 2>&1); then
+    echo "lint unexpectedly accepted an enabled variable catcher" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3042'
+printf '%s\n' "$lint_output" | grep -F 'p/0'
+
+# Bare hard and soft conditionals are reviewed for an explicit else only after opt-in.
+printf '%s\n' 'p :- (true -> true).' >HelloProlog/lint-missing-else.pl
+dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint HelloProlog/lint-missing-else.pl
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --enable-rule DPL3043 --warnings-as-errors HelloProlog/lint-missing-else.pl 2>&1); then
+    echo "lint unexpectedly accepted an enabled conditional without an else branch" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3043'
+printf '%s\n' "$lint_output" | grep -F 'p/0'
