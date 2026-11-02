@@ -120,4 +120,7 @@ public static class LintDiagnosticIds
 
     /// <summary>Distinct head arguments share variables and the clause body contains a same-scope cut.</summary>
     public const string PossibleNonSteadfastClause = "DPL3037";
+
+    /// <summary>A direct self-call has remaining control flow that prevents last-call optimization.</summary>
+    public const string PossibleNonTailRecursion = "DPL3038";
 }
