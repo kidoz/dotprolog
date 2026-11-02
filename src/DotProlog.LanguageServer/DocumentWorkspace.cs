@@ -14,6 +14,7 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
 
     private Dictionary<string, SourceOutline> _outlines = new(DocumentSnapshot.KeyComparer);
     private CancellationToken _analysisCancellation;
+    private ReferenceIndex _references = new();
 
     internal JsonArray Symbols(string uri, bool hierarchical) =>
         DocumentSymbols.Convert(uri, _outlines.GetValueOrDefault(DocumentSnapshot.Key(uri)), hierarchical);
@@ -25,6 +26,12 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
             line,
             character
         );
+
+    internal JsonArray Definition(string uri, int line, int character, bool links) =>
+        DocumentDefinitions.Convert(_outlines.GetValueOrDefault(DocumentSnapshot.Key(uri)), _outlines, line, character, links);
+
+    internal JsonArray References(string uri, int line, int character, bool includeDeclaration) =>
+        _references.Find(_outlines.GetValueOrDefault(DocumentSnapshot.Key(uri)), line, character, includeDeclaration);
 
     internal JsonObject? Hover(string uri, int line, int character, bool markdown) =>
         DocumentHover.Convert(_outlines.GetValueOrDefault(DocumentSnapshot.Key(uri)), line, character, markdown);
@@ -38,6 +45,7 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
             copy._analyses.Add(item.Key, item.Value);
         copy._published = new Dictionary<string, DiagnosticPublication>(_published, DocumentSnapshot.KeyComparer);
         copy._outlines = new Dictionary<string, SourceOutline>(_outlines, DocumentSnapshot.KeyComparer);
+        copy._references = _references;
         return copy;
     }
 
@@ -292,6 +300,7 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
         var symbols = PrologSourceSymbols.Analyze(units, _analysisCancellation);
         var hovers = PrologBuiltinHovers.Analyze(units, languageMode, _analysisCancellation);
         var completions = PrologCompletionIndex.Create(units, languageMode, _analysisCancellation);
+        var definitions = PrologSourceDefinitions.Analyze(units, _analysisCancellation);
         return sources.ToDictionary(
             item => item.Key,
             item => new SourceOutline(
@@ -299,7 +308,8 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
                 symbols.Where(symbol => DocumentSnapshot.KeyComparer.Equals(symbol.FileName, item.Key)).ToArray(),
                 hovers.Where(hover => DocumentSnapshot.KeyComparer.Equals(hover.FileName, item.Key)).ToArray(),
                 PrologCompletionText.Create(item.Value, _analysisCancellation),
-                [completions]
+                [completions],
+                [definitions.Where(site => DocumentSnapshot.KeyComparer.Equals(site.FileName, item.Key)).ToArray()]
             ),
             DocumentSnapshot.KeyComparer
         );
@@ -325,6 +335,7 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
             if (!covered.Contains(key))
                 AddRoot(key);
 
+        _references = ReferenceIndex.Create(_outlines, _analysisCancellation);
         Dictionary<string, DiagnosticPublication> next = new(DocumentSnapshot.KeyComparer);
         foreach ((string key, JsonArray diagnostics) in merged)
         {
@@ -361,7 +372,8 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
                         previous.Symbols.Concat(outline.Symbols).Distinct().ToArray(),
                         previous.Hovers.Concat(outline.Hovers).Distinct().ToArray(),
                         outline.CompletionText,
-                        previous.Completions.Concat(outline.Completions).Distinct().ToArray()
+                        previous.Completions.Concat(outline.Completions).Distinct().ToArray(),
+                        previous.Definitions.Concat(outline.Definitions).ToArray()
                     )
                     : outline;
             }

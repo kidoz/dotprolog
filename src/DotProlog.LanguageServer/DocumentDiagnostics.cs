@@ -52,7 +52,8 @@ internal static class DocumentDiagnostics
                 PrologSourceSymbols.Analyze([source], cancellationToken),
                 PrologBuiltinHovers.Analyze([source], mode, cancellationToken),
                 PrologCompletionText.Create(text, cancellationToken),
-                [PrologCompletionIndex.Create([source], mode, cancellationToken)]
+                [PrologCompletionIndex.Create([source], mode, cancellationToken)],
+                [PrologSourceDefinitions.Analyze([source], cancellationToken)]
             )
         );
     }

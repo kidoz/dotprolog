@@ -20,6 +20,7 @@ internal sealed class LanguageServer(
     private readonly FileWatchRegistration _fileWatchRegistration = new();
     private bool _hierarchicalSymbols;
     private bool _markdownHover;
+    private bool _definitionLinks;
     private bool _initialized;
     private bool _shutdown;
 
@@ -116,6 +117,12 @@ internal sealed class LanguageServer(
                         }
                         var capabilities = RequireObject(RequireObject(body["params"])["capabilities"]);
                         _fileWatchRegistration.Configure(capabilities);
+                        _definitionLinks =
+                            capabilities["textDocument"] is JsonObject definitionText
+                            && definitionText["definition"] is JsonObject definitionCapabilities
+                            && definitionCapabilities["linkSupport"] is JsonValue linkSupport
+                            && linkSupport.TryGetValue<bool>(out var links)
+                            && links;
                         _hierarchicalSymbols =
                             capabilities["textDocument"] is JsonObject textCapabilities
                             && textCapabilities["documentSymbol"] is JsonObject symbolCapabilities
@@ -148,6 +155,8 @@ internal sealed class LanguageServer(
                                             ["positionEncoding"] = "utf-16",
                                             ["documentSymbolProvider"] = true,
                                             ["hoverProvider"] = true,
+                                            ["definitionProvider"] = true,
+                                            ["referencesProvider"] = true,
                                             ["completionProvider"] = new JsonObject
                                             {
                                                 ["resolveProvider"] = false,
@@ -196,6 +205,8 @@ internal sealed class LanguageServer(
                             )
                             .ConfigureAwait(false);
                         break;
+                    case "textDocument/references" when request:
+                    case "textDocument/definition" when request:
                     case "textDocument/completion" when request:
                     case "textDocument/hover" when request:
                         JsonObject positionParameters = RequireObject(body["params"]);
@@ -206,14 +217,35 @@ internal sealed class LanguageServer(
                         int character = RequireInteger(position["character"]);
                         if (line < 0 || character < 0)
                             throw new InvalidParametersException();
+                        bool includeDeclaration = false;
+                        if (method == "textDocument/references")
+                        {
+                            JsonNode? declaration = RequireObject(positionParameters["context"])["includeDeclaration"];
+                            if (declaration is not JsonValue value || !value.TryGetValue(out includeDeclaration))
+                                throw new InvalidParametersException();
+                        }
                         await analysis
                             .RequestAsync(
                                 new PendingAnalysisRequest(
                                     id!.ToJsonString(),
                                     workspace =>
-                                        method == "textDocument/completion"
-                                            ? workspace.Completion(positionUri, line, character)
-                                            : workspace.Hover(positionUri, line, character, _markdownHover),
+                                        method switch
+                                        {
+                                            "textDocument/references" => workspace.References(
+                                                positionUri,
+                                                line,
+                                                character,
+                                                includeDeclaration
+                                            ),
+                                            "textDocument/definition" => workspace.Definition(
+                                                positionUri,
+                                                line,
+                                                character,
+                                                _definitionLinks
+                                            ),
+                                            "textDocument/completion" => workspace.Completion(positionUri, line, character),
+                                            _ => workspace.Hover(positionUri, line, character, _markdownHover),
+                                        },
                                     (result, error) => ReplyAnalysisAsync(id, result, error),
                                     InvalidateOnChange: true
                                 )
