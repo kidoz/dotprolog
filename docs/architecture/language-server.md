@@ -141,7 +141,7 @@ cancellation terminates real MSBuild evaluation and its descendant. Establish pe
 measurements on a pinned corpus before accepting a latency target; 250 ms after debounce on a
 2,000-line file is a proposed initial target, not a measured claim.
 
-## Stage 3: symbols and navigation — document symbols implemented
+## Stage 3: symbols and navigation — document symbols and builtin hover implemented
 
 The first navigation increment provides a predicate outline through LSP 3.17
 `textDocument/documentSymbol`. Its requirements and acceptance checks are:
@@ -180,9 +180,48 @@ for DCGs. Hierarchical results group clauses; flat results navigate to the first
 No additional language semantics, completion, definitions/references, rename, formatting,
 `.dpli` services or editor extension are part of this increment.
 
-Remaining navigation work: builtin hover, local variables and predicate completion, then
-locations/references across imports, exports, reexports and multifile declarations. Preserve dynamic
-and meta-call uncertainty instead of claiming exhaustive references.
+### Builtin hover — implemented
+
+- **REQ-LSP-HOV-1:** Advertise `hoverProvider` and implement LSP 3.17 `textDocument/hover` with
+  a predicate indicator, concise help and the name-token range. Honor the client's preferred
+  supported format (`markdown` or `plaintext`), defaulting to plaintext.
+- **REQ-LSP-HOV-2:** Resolve only statically identifiable calls by module and arity. Source-defined,
+  imported, dynamic and multifile predicates must not be mislabeled as builtins. Unknown modules,
+  unresolved imports, data terms, variables, comments and whitespace return null.
+- **REQ-LSP-HOV-3:** Use source name spans and zero-based UTF-16 positions, including quoted names,
+  operators and CR/LF line endings. Negative/malformed positions are invalid parameters; positions
+  beyond a line clamp to its end, and positions beyond the document return null.
+- **REQ-LSP-HOV-4:** Read current analysis snapshots with unsaved buffers and physical include
+  ownership. Pending requests remain cancellable and do not block protocol input. Hover requests
+  invalidated by accepted text/workspace changes return ContentModified; clients can retry.
+- **REQ-LSP-HOV-5:** Include ordinary goals in rules, initialization goals, statically known
+  metapredicate arguments/closures and ordinary goals inside DCG braces. DCG nonterminal calls and
+  arithmetic expression terms are not ordinary builtin calls.
+- **REQ-LSP-HOV-6:** Derive signatures from actual registrations/bundled libraries plus explicit
+  compiler control forms. Hide internal `$` predicates. State when a predefined predicate is a
+  Modern extension unavailable in StrictIso; never execute user source to obtain hover information.
+
+`BuiltinHoverTests` verifies arity, module/import resolution, shadowing, meta closures, DCG escapes,
+recovery and mode notes (REQ-LSP-HOV-2/5/6). `HoverTests` verifies format negotiation, URI/position
+validation, UTF-16 ranges, include contexts and project changes (REQ-LSP-HOV-1/3/4).
+`AnalysisSchedulerTests` verifies pending hover cancellation, ContentModified responses, retry and
+shutdown during blocked reevaluation (REQ-LSP-HOV-4). The managed/native hover smoke test checks
+the combined wire contract. These requirements have no remaining product decisions for this slice.
+
+Help covers statically identified calls in recovered complete clauses. Signatures come from the
+existing runtime/library catalog; compiler control forms have explicit entries. A separate static
+help catalog supplies summaries; entries without a specific summary receive a generic predefined
+predicate description. No user-predicate documentation or dynamic call inference is claimed.
+Builtin signatures are shown as `name/arity`, not argument modes or determinism guarantees.
+Conflicting builtin/user resolutions for a shared include suppress hover rather than choosing one.
+
+Position mapping supports CR, LF and CRLF. Parsing retains the reader's existing behavior: a `%`
+comment terminated only by bare CR currently continues until LF or EOF, so following text has no
+hover targets. The new line-position tests use valid parsed source independently of that limitation.
+Actual editor hover rendering remains unverified.
+
+Remaining navigation work: local variables and predicate completion, then locations/references
+across imports, exports, reexports and multifile declarations.
 
 ## Stage 4: editor and distribution — planned
 
@@ -213,9 +252,9 @@ dotnet src/DotProlog.LanguageServer/bin/Debug/net10.0/dotprolog-lsp.dll --projec
 
 The process expects LSP frames on stdin; it is not an interactive command prompt. It advertises
 full-text synchronization only. Background analysis supports includes for file documents; completion
-and editor extensions remain planned. Document symbols support predicate outlines for compatible
-clients. Project mode analyzes all evaluated sources; loose-file mode
-analyzes include closures. No performance or
+and editor extensions remain planned. Document symbols provide predicate outlines, and builtin hover
+provides signatures, short help and language-mode notes. Project mode analyzes all evaluated sources;
+loose-file mode analyzes include closures. No performance or
 cross-platform NativeAOT claim is made from the initial host check.
 
 ## Verification
@@ -233,6 +272,8 @@ python3 tests/Integration/verify-language-server-cancellation.py dotnet src/DotP
 python3 tests/Integration/verify-language-server-cancellation.py /tmp/dotprolog-lsp-native/dotprolog-lsp
 python3 tests/Integration/verify-language-server-symbols.py dotnet src/DotProlog.LanguageServer/bin/Debug/net10.0/dotprolog-lsp.dll
 python3 tests/Integration/verify-language-server-symbols.py /tmp/dotprolog-lsp-native/dotprolog-lsp
+python3 tests/Integration/verify-language-server-hover.py dotnet src/DotProlog.LanguageServer/bin/Debug/net10.0/dotprolog-lsp.dll
+python3 tests/Integration/verify-language-server-hover.py /tmp/dotprolog-lsp-native/dotprolog-lsp
 ```
 
 Replace the RID and executable suffix for the host. The smoke test is repeatable and has a
@@ -246,15 +287,21 @@ process-tree cleanup. It verifies wire output and exit status for either managed
 
 Verified on macOS arm64 on 2026-11-02:
 
-- `dotnet test --project tests/DotProlog.LanguageServer.Tests --verbosity quiet`: 54 passed,
-  zero failed or skipped.
-- `dotnet test --project tests/DotProlog.Compiler.Tests --verbosity quiet`: 2,838 passed,
-  zero failed or skipped, including cancellation before loading and during include reads.
-- `dotnet test --project tests/DotProlog.Syntax.Tests --verbosity quiet`: 453 passed,
-  zero failed or skipped, including quoted, prefix, postfix and infix name-token spans.
+- `dotnet test --project tests/DotProlog.LanguageServer.Tests --no-build --no-restore --verbosity quiet`:
+  66 passed, zero failed or skipped, after a warning-free single-worker build. Two preceding builds
+  were interrupted by MSBuild worker exits; `dotnet build tests/DotProlog.LanguageServer.Tests
+  --no-restore -m:1 -nr:false` succeeded.
+- `dotnet test --project tests/DotProlog.Compiler.Tests --verbosity quiet`: 2,849 passed,
+  zero failed or skipped, including the builtin hover resolution tests.
+- The previous syntax baseline had 453 passing tests, including name-token spans. Syntax code was
+  unchanged and that suite was not rerun for hover.
 - The earlier CLI baseline had 53 passing tests; the CLI suite was not rerun for this increment.
 
-Current document-symbol and background-analysis checks:
+Current hover, document-symbol and background-analysis checks:
+
+- The hover smoke test passed against managed and native executables: negotiated Markdown/plaintext,
+  UTF-16 positions after supplementary Unicode characters, quoted names, source shadowing, exclusion
+  of ordinary data terms, current unsaved edits, close cleanup and StrictIso availability notes.
 
 - The symbol smoke test passed against managed and native executables: hierarchical and flat
   responses, Unicode selections, multi-clause predicates, DCGs, recovery from incomplete syntax,
@@ -277,15 +324,16 @@ Current document-symbol and background-analysis checks:
 - A repeated lifecycle regression test verifies responses are flushed before server exit returns;
   direct stream-backed pipes avoid the earlier background-writer completion race.
 - The NativeAOT publish command above completed with no warnings or AOT suppressions.
-- CSharpier checked the new projects and solution; `git diff --check` passed.
+- CSharpier checked the changed feature files; `git diff --check` passed.
 
 Windows/Linux native runs and editor-client verification remain unmeasured. The full repository
-integration/conformance suite was not rerun for this document-symbol increment.
+integration/conformance suite was not rerun for this builtin-hover increment.
 
 ## Design references
 
 - [MSBuild evaluation-only queries](https://learn.microsoft.com/en-us/visualstudio/msbuild/evaluate-items-and-properties)
 - [LSP specification](https://microsoft.github.io/language-server-protocol/)
+- [LSP 3.17 hover contract](https://raw.githubusercontent.com/microsoft/language-server-protocol/gh-pages/_specifications/lsp/3.17/language/hover.md)
 - [StreamJsonRpc transport extensibility](https://microsoft.github.io/vs-streamjsonrpc/docs/extensibility.html)
 - [StreamJsonRpc NativeAOT restrictions](https://microsoft.github.io/vs-streamjsonrpc/docs/nativeAOT.html)
 - [VS Code language server guide](https://code.visualstudio.com/api/language-extensions/language-server-extension-guide)

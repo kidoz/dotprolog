@@ -27,6 +27,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - The language server now provides predicate outlines through document-symbol requests, with
   module and arity identities, individual clause entries, DCG source arities and precise name ranges.
   Outlines honor unsaved buffers, includes and project settings, and pending requests can be cancelled.
+- The language server now shows builtin hover signatures, short descriptions and StrictIso
+  availability notes. Hover respects module and arity resolution, excludes ordinary data terms,
+  and supports unsaved buffers, cancellation and retries after text changes.
 
 - Source linting now validates literal format calls, predicate options and arithmetic expressions;
   reports possible built-in arity mismatches and predetermined goals; checks all-solutions variable
