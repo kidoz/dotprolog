@@ -248,3 +248,19 @@ fi
 test "$lint_exit" -eq 1
 printf '%s\n' "$lint_output" | grep -F 'warning DPL3045'
 printf '%s\n' "$lint_output" | grep -F 'p/5'
+
+# Direct-subgoal counts and their positive threshold override require explicit opt-in.
+printf '%s\n' 'p :- a,b,c,d,e,f,g,h,i.' >HelloProlog/lint-subgoals.pl
+dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint --max-clause-subgoals 1 HelloProlog/lint-subgoals.pl
+dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --enable-rule DPL3046 --max-clause-subgoals 9 HelloProlog/lint-subgoals.pl
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --enable-rule DPL3046 --max-clause-subgoals 8 --warnings-as-errors HelloProlog/lint-subgoals.pl 2>&1); then
+    echo "lint unexpectedly accepted an enabled excessive-subgoal-count rule" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3046'
+printf '%s\n' "$lint_output" | grep -F 'p/0'
