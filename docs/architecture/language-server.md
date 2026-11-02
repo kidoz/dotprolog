@@ -141,7 +141,7 @@ cancellation terminates real MSBuild evaluation and its descendant. Establish pe
 measurements on a pinned corpus before accepting a latency target; 250 ms after debounce on a
 2,000-line file is a proposed initial target, not a measured claim.
 
-## Stage 3: symbols and navigation — document symbols and builtin hover implemented
+## Stage 3: symbols and navigation — outlines, builtin hover and word completion implemented
 
 The first navigation increment provides a predicate outline through LSP 3.17
 `textDocument/documentSymbol`. Its requirements and acceptance checks are:
@@ -177,7 +177,7 @@ ranges. The server caches these records and source text with each analysis; LSP 
 outside the compiler. Symbols are labeled `module:name/arity` (omitting `user:`) or `name//arity`
 for DCGs. Hierarchical results group clauses; flat results navigate to the first clause.
 
-No additional language semantics, completion, definitions/references, rename, formatting,
+No additional language semantics, definitions/references, rename, formatting,
 `.dpli` services or editor extension are part of this increment.
 
 ### Builtin hover — implemented
@@ -220,8 +220,48 @@ comment terminated only by bare CR currently continues until LF or EOF, so follo
 hover targets. The new line-position tests use valid parsed source independently of that limitation.
 Actual editor hover rendering remains unverified.
 
-Remaining navigation work: local variables and predicate completion, then locations/references
-across imports, exports, reexports and multifile declarations.
+Remaining navigation work: definition locations and references across imports, exports, reexports
+and multifile declarations.
+
+### Completion contract — implemented
+
+This increment targets LSP 3.17 word completion in both language modes; it changes no
+execution semantics, build targets or package distribution.
+
+- **REQ-LSP-CMP-1:** Advertise `completionProvider` and accept `textDocument/completion`,
+  returning function/variable items with plain name insertion and explicit UTF-16 text edits.
+  Labels distinguish predicate arities. Invalid positions return InvalidParams; unknown documents
+  and unsupported lexical positions return an empty list.
+- **REQ-LSP-CMP-2:** Offer visible source predicates and actual registered/library builtins,
+  resolving local definitions, imports and user-module fallback with the compiler model.
+  Hide internal names and unavailable StrictIso builtins. Explicit atom module qualification
+  uses that module's resolution context; unknown or variable modules yield no suggestions.
+- **REQ-LSP-CMP-3:** Complete unquoted identifier prefixes, including the unfinished final clause,
+  and replace the full identifier containing the cursor. Offer named variables only from the
+  current lexical clause, excluding the anonymous variable. Suppress comments, quoted literals,
+  numbers and symbolic-name completion. Word suggestions are lexical, including term arguments;
+  this increment does not infer whether an argument expects a goal or data.
+- **REQ-LSP-CMP-4:** Use current unsaved analysis snapshots, project sources and include contexts.
+  Shared include contexts expose only candidates agreed by every context. Pending completion
+  requests support RequestCancelled and return ContentModified when superseded by an edit.
+- **REQ-LSP-CMP-5:** Build lexical and predicate indexes in the background worker without executing
+  source or parsing on the protocol input loop. Verify completion through managed and NativeAOT
+  stdio, including incomplete edits, variable scope, module visibility and Unicode ranges.
+
+`CompletionTests` covers protocol edits, overlays, project mode and include contexts (REQ-LSP-CMP-1/4).
+`CompletionIndexTests` covers imports, declarations, mode filtering and physical module scopes
+(REQ-LSP-CMP-2). `CompletionTextTests` covers incomplete clauses, comments, literals, variables and
+Unicode identifiers (REQ-LSP-CMP-3). `AnalysisSchedulerTests` checks pending completion cancellation,
+ContentModified and shutdown during blocked reevaluation (REQ-LSP-CMP-4/5). The completion smoke
+script checks the managed/native wire contract (REQ-LSP-CMP-1/3/5). Snippets, automatic imports,
+quoted/operator-name completion, DCG-specific filtering and editor UI verification are deferred.
+
+Completion tokenizes the raw buffer with default Unicode lexical rules; it does not replay
+`char_conversion/2` or reader flag changes while scanning partial words. Parsed definitions and
+module visibility still come from the configured project/include analysis. Predicate arities are
+callable arities (DCGs include their two generated arguments), and only recovered definitions are
+candidates. A missing import conservatively suppresses uncertain builtin candidates. Comment and
+quoted-token suppression uses the existing lexer, including its bare-CR line-comment behavior.
 
 ## Stage 4: editor and distribution — planned
 
@@ -251,9 +291,10 @@ dotnet src/DotProlog.LanguageServer/bin/Debug/net10.0/dotprolog-lsp.dll --projec
 ```
 
 The process expects LSP frames on stdin; it is not an interactive command prompt. It advertises
-full-text synchronization only. Background analysis supports includes for file documents; completion
-and editor extensions remain planned. Document symbols provide predicate outlines, and builtin hover
-provides signatures, short help and language-mode notes. Project mode analyzes all evaluated sources;
+full-text synchronization only. Background analysis supports includes for file documents.
+Document symbols provide predicate outlines; builtin hover provides signatures, short help and
+language-mode notes; completion suggests predicate names and current-clause variables. Editor
+extensions remain planned. Project mode analyzes all evaluated sources;
 loose-file mode analyzes include closures. No performance or
 cross-platform NativeAOT claim is made from the initial host check.
 
@@ -274,6 +315,8 @@ python3 tests/Integration/verify-language-server-symbols.py dotnet src/DotProlog
 python3 tests/Integration/verify-language-server-symbols.py /tmp/dotprolog-lsp-native/dotprolog-lsp
 python3 tests/Integration/verify-language-server-hover.py dotnet src/DotProlog.LanguageServer/bin/Debug/net10.0/dotprolog-lsp.dll
 python3 tests/Integration/verify-language-server-hover.py /tmp/dotprolog-lsp-native/dotprolog-lsp
+python3 tests/Integration/verify-language-server-completion.py dotnet src/DotProlog.LanguageServer/bin/Debug/net10.0/dotprolog-lsp.dll
+python3 tests/Integration/verify-language-server-completion.py /tmp/dotprolog-lsp-native/dotprolog-lsp
 ```
 
 Replace the RID and executable suffix for the host. The smoke test is repeatable and has a
@@ -287,17 +330,23 @@ process-tree cleanup. It verifies wire output and exit status for either managed
 
 Verified on macOS arm64 on 2026-11-02:
 
-- `dotnet test --project tests/DotProlog.LanguageServer.Tests --no-build --no-restore --verbosity quiet`:
-  66 passed, zero failed or skipped, after a warning-free single-worker build. Two preceding builds
-  were interrupted by MSBuild worker exits; `dotnet build tests/DotProlog.LanguageServer.Tests
-  --no-restore -m:1 -nr:false` succeeded.
-- `dotnet test --project tests/DotProlog.Compiler.Tests --verbosity quiet`: 2,849 passed,
-  zero failed or skipped, including the builtin hover resolution tests.
-- The previous syntax baseline had 453 passing tests, including name-token spans. Syntax code was
-  unchanged and that suite was not rerun for hover.
+- `DotProlog.LanguageServer.Tests`: 81 passed, zero failed or skipped, after a warning-free
+  single-worker build (`dotnet build tests/DotProlog.LanguageServer.Tests --no-restore -m:1 -nr:false`).
+- `DotProlog.Syntax.Tests`: 464 passed, zero failed or skipped, including lexical completion,
+  supplementary Unicode variable names and combining marks.
+- The four `CompletionIndexTests` passed. A full compiler run passed 2,929 of 2,930 tests;
+  the remaining failure was the concurrently developed excessive-arity linter's
+  `MixedDefinitionsSharingLoweredIdentityProduceOneFinding` DCG-first case. Completion tests
+  and existing hover/source analysis tests passed. This is not a clean full-suite result.
 - The earlier CLI baseline had 53 passing tests; the CLI suite was not rerun for this increment.
 
-Current hover, document-symbol and background-analysis checks:
+Current completion, hover, document-symbol and background-analysis checks:
+
+- The completion smoke test passed against managed and native executables: capability negotiation,
+  UTF-16 replacement of a whole identifier, incomplete unsaved buffers, clause-local variables,
+  module visibility and explicit qualification, source shadowing, comment exclusion, close cleanup
+  and StrictIso filtering. Unit tests additionally cover repeated/shared include contexts, an
+  unfinished include with no parsed clauses, project membership changes and request cancellation.
 
 - The hover smoke test passed against managed and native executables: negotiated Markdown/plaintext,
   UTF-16 positions after supplementary Unicode characters, quoted names, source shadowing, exclusion
@@ -327,12 +376,13 @@ Current hover, document-symbol and background-analysis checks:
 - CSharpier checked the changed feature files; `git diff --check` passed.
 
 Windows/Linux native runs and editor-client verification remain unmeasured. The full repository
-integration/conformance suite was not rerun for this builtin-hover increment.
+integration/conformance suite was not rerun for this completion increment.
 
 ## Design references
 
 - [MSBuild evaluation-only queries](https://learn.microsoft.com/en-us/visualstudio/msbuild/evaluate-items-and-properties)
 - [LSP specification](https://microsoft.github.io/language-server-protocol/)
+- [LSP 3.17 completion contract](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion)
 - [LSP 3.17 hover contract](https://raw.githubusercontent.com/microsoft/language-server-protocol/gh-pages/_specifications/lsp/3.17/language/hover.md)
 - [StreamJsonRpc transport extensibility](https://microsoft.github.io/vs-streamjsonrpc/docs/extensibility.html)
 - [StreamJsonRpc NativeAOT restrictions](https://microsoft.github.io/vs-streamjsonrpc/docs/nativeAOT.html)

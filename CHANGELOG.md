@@ -8,6 +8,10 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Added
 
+- The language server now completes visible predicate names and clause-local variables in unsaved,
+  unfinished code, with arity labels, builtin help, module-aware candidates and UTF-16 replacement
+  edits. Completion honors project mode, includes, cancellation and superseded document versions.
+
 - A development language server prototype provides file-local parser and lint diagnostics for
   unsaved documents over LSP stdio, with UTF-16 ranges and Modern or StrictIso mode selection.
   Editor extensions and release packaging remain planned.
