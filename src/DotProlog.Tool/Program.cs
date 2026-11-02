@@ -11,7 +11,11 @@ internal static class Program
     private const string LanguageModeNames = PrologLanguageModes.Names;
     private const string LintProfileNames = "semantic|covington";
     private const string LintOptInRuleNames =
-        LintDiagnosticIds.PossibleNonSteadfastClause + "|" + LintDiagnosticIds.PossibleNonTailRecursion;
+        LintDiagnosticIds.PossibleNonSteadfastClause
+        + "|"
+        + LintDiagnosticIds.PossibleNonTailRecursion
+        + "|"
+        + LintDiagnosticIds.PossibleMultifileCut;
     private const int ExitLintWarnings = 1;
     private const int ExitSuccess = 0;
     private const int ExitUsage = 64;
@@ -238,21 +242,21 @@ internal static class Program
                 }
 
                 var selected = args[++index];
-                var nonSteadfast = selected.Equals(
-                    LintDiagnosticIds.PossibleNonSteadfastClause,
-                    StringComparison.OrdinalIgnoreCase
-                );
-                var nonTail = selected.Equals(LintDiagnosticIds.PossibleNonTailRecursion, StringComparison.OrdinalIgnoreCase);
-                if (!nonSteadfast && !nonTail)
+                string? rule = selected.ToUpperInvariant() switch
+                {
+                    LintDiagnosticIds.PossibleNonSteadfastClause => LintDiagnosticIds.PossibleNonSteadfastClause,
+                    LintDiagnosticIds.PossibleNonTailRecursion => LintDiagnosticIds.PossibleNonTailRecursion,
+                    LintDiagnosticIds.PossibleMultifileCut => LintDiagnosticIds.PossibleMultifileCut,
+                    _ => null,
+                };
+                if (rule is null)
                 {
                     error.WriteLine($"error: unsupported lint rule: {selected}");
                     error.WriteLine($"       expected one of: {LintOptInRuleNames}");
                     return ExitUsage;
                 }
 
-                enabledRules.Add(
-                    nonTail ? LintDiagnosticIds.PossibleNonTailRecursion : LintDiagnosticIds.PossibleNonSteadfastClause
-                );
+                enabledRules.Add(rule);
                 continue;
             }
 

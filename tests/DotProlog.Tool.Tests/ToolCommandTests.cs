@@ -256,9 +256,27 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void MultifileCutRuleIsDisabledUnlessExplicitlyEnabled()
+    {
+        var path = Source("multifile.pl", ":- multifile(p/0).\np :- !.\n");
+
+        (var defaultExit, _, var defaultError) = Execute("lint", path);
+        (var enabledExit, _, var enabledError) = Execute("lint", "--enable-rule", "dpl3039", "--warnings-as-errors", path);
+
+        Assert.Equal(0, defaultExit);
+        Assert.Empty(defaultError);
+        Assert.Equal(1, enabledExit);
+        Assert.Contains("DPL3039", enabledError, StringComparison.Ordinal);
+        Assert.Contains("p/0", enabledError, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MultipleOptInRulesCanBeEnabledTogether()
     {
-        var path = Source("heuristics.pl", "max(X, Y, X) :- X >= Y, !.\np(N) :- N > 0, p(N), writeln(N).\n");
+        var path = Source(
+            "heuristics.pl",
+            ":- multifile(p/0).\nmax(X, Y, X) :- X >= Y, !.\np :- !.\np(N) :- N > 0, p(N), writeln(N).\n"
+        );
 
         (var exitCode, _, var error) = Execute(
             "lint",
@@ -266,6 +284,8 @@ public sealed class ToolCommandTests : IDisposable
             "DPL3037",
             "--enable-rule",
             "DPL3038",
+            "--enable-rule",
+            "DPL3039",
             "--warnings-as-errors",
             path
         );
@@ -273,6 +293,7 @@ public sealed class ToolCommandTests : IDisposable
         Assert.Equal(1, exitCode);
         Assert.Contains("DPL3037", error, StringComparison.Ordinal);
         Assert.Contains("DPL3038", error, StringComparison.Ordinal);
+        Assert.Contains("DPL3039", error, StringComparison.Ordinal);
     }
 
     [Theory]
