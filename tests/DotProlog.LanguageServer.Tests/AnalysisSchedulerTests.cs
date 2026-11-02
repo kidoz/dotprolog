@@ -78,8 +78,10 @@ public sealed class AnalysisSchedulerTests
         Assert.Equal("current/0", Assert.Single(result)!["name"]!.GetValue<string>());
     }
 
-    [Fact]
-    public async Task PendingHoverIsInvalidatedByAnEditInsteadOfUsingShiftedPosition()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PendingPositionRequestIsInvalidatedByAnEditInsteadOfUsingShiftedPosition(bool completion)
     {
         await using var scheduler = new AnalysisScheduler(
             PrologLanguageMode.Modern,
@@ -93,7 +95,8 @@ public sealed class AnalysisSchedulerTests
         await scheduler.RequestAsync(
             new PendingAnalysisRequest(
                 "hover",
-                workspace => workspace.Hover("untitled:hover", 0, 7, false),
+                workspace =>
+                    completion ? workspace.Completion("untitled:hover", 0, 9) : workspace.Hover("untitled:hover", 0, 7, false),
                 (result, error) =>
                 {
                     Assert.Null(result);
@@ -110,7 +113,8 @@ public sealed class AnalysisSchedulerTests
         await scheduler.RequestAsync(
             new PendingAnalysisRequest(
                 "retry",
-                workspace => workspace.Hover("untitled:hover", 0, 7, false),
+                workspace =>
+                    completion ? workspace.Completion("untitled:hover", 0, 9) : workspace.Hover("untitled:hover", 0, 7, false),
                 (result, error) =>
                 {
                     Assert.Null(error);
@@ -121,7 +125,10 @@ public sealed class AnalysisSchedulerTests
             )
         );
         var current = await retry.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        Assert.StartsWith("var/1", current!["contents"]!["value"]!.GetValue<string>(), StringComparison.Ordinal);
+        if (completion)
+            Assert.Contains((JsonArray)current!, item => item!["label"]!.GetValue<string>() == "var/1");
+        else
+            Assert.StartsWith("var/1", current!["contents"]!["value"]!.GetValue<string>(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -207,9 +214,10 @@ public sealed class AnalysisSchedulerTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task RequestsAndShutdownRemainResponsiveDuringReevaluation(bool hover)
+    [InlineData("documentSymbol")]
+    [InlineData("hover")]
+    [InlineData("completion")]
+    public async Task RequestsAndShutdownRemainResponsiveDuringReevaluation(string requestMethod)
     {
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -279,11 +287,13 @@ public sealed class AnalysisSchedulerTests
             };
             await SendAsync(clientWrite, changed.ToJsonString(), timeout.Token);
             await entered.Task.WaitAsync(TimeSpan.FromSeconds(2), timeout.Token);
-            string outline = hover
+            bool positional = requestMethod != "documentSymbol";
+            string outline = positional
                 ? """{"jsonrpc":"2.0","id":40,"method":"textDocument/hover","params":{"textDocument":{"uri":"untitled:pending"},"position":{"line":0,"character":0}}}"""
                 : """{"jsonrpc":"2.0","id":40,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":"untitled:pending"}}}""";
+            outline = outline.Replace("textDocument/hover", "textDocument/" + requestMethod, StringComparison.Ordinal);
             await SendAsync(clientWrite, outline, timeout.Token);
-            if (hover)
+            if (positional)
             {
                 await SendAsync(
                     clientWrite,

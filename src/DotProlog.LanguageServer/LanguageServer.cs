@@ -148,6 +148,11 @@ internal sealed class LanguageServer(
                                             ["positionEncoding"] = "utf-16",
                                             ["documentSymbolProvider"] = true,
                                             ["hoverProvider"] = true,
+                                            ["completionProvider"] = new JsonObject
+                                            {
+                                                ["resolveProvider"] = false,
+                                                ["triggerCharacters"] = new JsonArray(":"),
+                                            },
                                             ["textDocumentSync"] = new JsonObject { ["openClose"] = true, ["change"] = 1 },
                                         },
                                         ["serverInfo"] = new JsonObject { ["name"] = "DotProlog" },
@@ -191,11 +196,12 @@ internal sealed class LanguageServer(
                             )
                             .ConfigureAwait(false);
                         break;
+                    case "textDocument/completion" when request:
                     case "textDocument/hover" when request:
-                        JsonObject hoverParameters = RequireObject(body["params"]);
-                        string hoverUri = RequireString(RequireObject(hoverParameters["textDocument"])["uri"]);
-                        DocumentSnapshot.Key(hoverUri);
-                        JsonObject position = RequireObject(hoverParameters["position"]);
+                        JsonObject positionParameters = RequireObject(body["params"]);
+                        string positionUri = RequireString(RequireObject(positionParameters["textDocument"])["uri"]);
+                        DocumentSnapshot.Key(positionUri);
+                        JsonObject position = RequireObject(positionParameters["position"]);
                         int line = RequireInteger(position["line"]);
                         int character = RequireInteger(position["character"]);
                         if (line < 0 || character < 0)
@@ -204,8 +210,11 @@ internal sealed class LanguageServer(
                             .RequestAsync(
                                 new PendingAnalysisRequest(
                                     id!.ToJsonString(),
-                                    workspace => workspace.Hover(hoverUri, line, character, _markdownHover),
-                                    (hover, error) => ReplyAnalysisAsync(id, hover, error),
+                                    workspace =>
+                                        method == "textDocument/completion"
+                                            ? workspace.Completion(positionUri, line, character)
+                                            : workspace.Hover(positionUri, line, character, _markdownHover),
+                                    (result, error) => ReplyAnalysisAsync(id, result, error),
                                     InvalidateOnChange: true
                                 )
                             )

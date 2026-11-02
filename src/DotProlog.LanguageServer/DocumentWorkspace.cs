@@ -18,6 +18,14 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
     internal JsonArray Symbols(string uri, bool hierarchical) =>
         DocumentSymbols.Convert(uri, _outlines.GetValueOrDefault(DocumentSnapshot.Key(uri)), hierarchical);
 
+    internal JsonArray Completion(string uri, int line, int character) =>
+        DocumentCompletion.Convert(
+            _outlines.GetValueOrDefault(DocumentSnapshot.Key(uri)),
+            DocumentSnapshot.Key(uri),
+            line,
+            character
+        );
+
     internal JsonObject? Hover(string uri, int line, int character, bool markdown) =>
         DocumentHover.Convert(_outlines.GetValueOrDefault(DocumentSnapshot.Key(uri)), line, character, markdown);
 
@@ -283,12 +291,15 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
     {
         var symbols = PrologSourceSymbols.Analyze(units, _analysisCancellation);
         var hovers = PrologBuiltinHovers.Analyze(units, languageMode, _analysisCancellation);
+        var completions = PrologCompletionIndex.Create(units, languageMode, _analysisCancellation);
         return sources.ToDictionary(
             item => item.Key,
             item => new SourceOutline(
                 item.Value,
                 symbols.Where(symbol => DocumentSnapshot.KeyComparer.Equals(symbol.FileName, item.Key)).ToArray(),
-                hovers.Where(hover => DocumentSnapshot.KeyComparer.Equals(hover.FileName, item.Key)).ToArray()
+                hovers.Where(hover => DocumentSnapshot.KeyComparer.Equals(hover.FileName, item.Key)).ToArray(),
+                PrologCompletionText.Create(item.Value, _analysisCancellation),
+                [completions]
             ),
             DocumentSnapshot.KeyComparer
         );
@@ -348,7 +359,9 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
                     ? new SourceOutline(
                         outline.Text,
                         previous.Symbols.Concat(outline.Symbols).Distinct().ToArray(),
-                        previous.Hovers.Concat(outline.Hovers).Distinct().ToArray()
+                        previous.Hovers.Concat(outline.Hovers).Distinct().ToArray(),
+                        outline.CompletionText,
+                        previous.Completions.Concat(outline.Completions).Distinct().ToArray()
                     )
                     : outline;
             }

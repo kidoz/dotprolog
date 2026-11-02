@@ -50,7 +50,9 @@ internal static class DocumentDiagnostics
             new SourceOutline(
                 text,
                 PrologSourceSymbols.Analyze([source], cancellationToken),
-                PrologBuiltinHovers.Analyze([source], mode, cancellationToken)
+                PrologBuiltinHovers.Analyze([source], mode, cancellationToken),
+                PrologCompletionText.Create(text, cancellationToken),
+                [PrologCompletionIndex.Create([source], mode, cancellationToken)]
             )
         );
     }
