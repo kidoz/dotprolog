@@ -19,6 +19,7 @@ internal sealed class LanguageServer(
 
     private readonly FileWatchRegistration _fileWatchRegistration = new();
     private bool _hierarchicalSymbols;
+    private bool _markdownHover;
     private bool _initialized;
     private bool _shutdown;
 
@@ -121,6 +122,21 @@ internal sealed class LanguageServer(
                             && symbolCapabilities["hierarchicalDocumentSymbolSupport"] is JsonValue support
                             && support.TryGetValue<bool>(out var supported)
                             && supported;
+                        if (
+                            capabilities["textDocument"] is JsonObject hoverText
+                            && hoverText["hover"] is JsonObject hoverCapabilities
+                            && hoverCapabilities["contentFormat"] is JsonArray formats
+                        )
+                        {
+                            foreach (var format in formats)
+                            {
+                                if (TryString(format, out string kind) && kind is "markdown" or "plaintext")
+                                {
+                                    _markdownHover = kind == "markdown";
+                                    break;
+                                }
+                            }
+                        }
                         _initialized = true;
                         await SendAsync(
                                 Result(
@@ -131,6 +147,7 @@ internal sealed class LanguageServer(
                                         {
                                             ["positionEncoding"] = "utf-16",
                                             ["documentSymbolProvider"] = true,
+                                            ["hoverProvider"] = true,
                                             ["textDocumentSync"] = new JsonObject { ["openClose"] = true, ["change"] = 1 },
                                         },
                                         ["serverInfo"] = new JsonObject { ["name"] = "DotProlog" },
@@ -165,12 +182,31 @@ internal sealed class LanguageServer(
                         string symbolUri = RequireString(RequireObject(RequireObject(body["params"])["textDocument"])["uri"]);
                         DocumentSnapshot.Key(symbolUri);
                         await analysis
-                            .RequestSymbolsAsync(
-                                new PendingSymbolRequest(
+                            .RequestAsync(
+                                new PendingAnalysisRequest(
                                     id!.ToJsonString(),
-                                    symbolUri,
-                                    _hierarchicalSymbols,
-                                    (symbols, error) => ReplySymbolsAsync(id, symbols, error)
+                                    workspace => workspace.Symbols(symbolUri, _hierarchicalSymbols),
+                                    (symbols, error) => ReplyAnalysisAsync(id, symbols, error)
+                                )
+                            )
+                            .ConfigureAwait(false);
+                        break;
+                    case "textDocument/hover" when request:
+                        JsonObject hoverParameters = RequireObject(body["params"]);
+                        string hoverUri = RequireString(RequireObject(hoverParameters["textDocument"])["uri"]);
+                        DocumentSnapshot.Key(hoverUri);
+                        JsonObject position = RequireObject(hoverParameters["position"]);
+                        int line = RequireInteger(position["line"]);
+                        int character = RequireInteger(position["character"]);
+                        if (line < 0 || character < 0)
+                            throw new InvalidParametersException();
+                        await analysis
+                            .RequestAsync(
+                                new PendingAnalysisRequest(
+                                    id!.ToJsonString(),
+                                    workspace => workspace.Hover(hoverUri, line, character, _markdownHover),
+                                    (hover, error) => ReplyAnalysisAsync(id, hover, error),
+                                    InvalidateOnChange: true
                                 )
                             )
                             .ConfigureAwait(false);
@@ -179,7 +215,7 @@ internal sealed class LanguageServer(
                         JsonNode? cancelledId = RequireObject(body["params"])["id"];
                         if (!ValidId(cancelledId))
                             throw new InvalidParametersException();
-                        await analysis.CancelSymbolRequestAsync(cancelledId!.ToJsonString()).ConfigureAwait(false);
+                        await analysis.CancelRequestAsync(cancelledId!.ToJsonString()).ConfigureAwait(false);
                         break;
                     case "shutdown" when request:
                         _shutdown = true;
@@ -229,14 +265,15 @@ internal sealed class LanguageServer(
             }
         }
 
-        async Task ReplySymbolsAsync(JsonNode? id, JsonArray? symbols, int? error)
+        async Task ReplyAnalysisAsync(JsonNode? id, JsonNode? symbols, int? error)
         {
             await SendAsync(
                     error is { } code
                         ? Error(
                             id,
                             code,
-                            code == -32800 ? "Request cancelled."
+                            code == -32801 ? "Content modified; retry the request."
+                                : code == -32800 ? "Request cancelled."
                                 : code == -32600 ? "Duplicate request id."
                                 : "Analysis failed."
                         )

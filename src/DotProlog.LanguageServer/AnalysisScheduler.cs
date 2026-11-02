@@ -12,7 +12,7 @@ internal sealed class AnalysisScheduler : IAsyncDisposable
     private readonly HashSet<string> _diskChanges = new(StringComparer.Ordinal);
     private readonly Func<CancellationToken, Task<ProjectConfiguration>>? _reload;
     private readonly Func<IReadOnlyList<DiagnosticPublication>, string?, int, Task> _publish;
-    private readonly Dictionary<string, PendingSymbolRequest> _symbolRequests = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, PendingAnalysisRequest> _requests = new(StringComparer.Ordinal);
     private bool _analysisFailed;
     private readonly TimeSpan _debounce;
     private readonly Task _worker;
@@ -63,24 +63,21 @@ internal sealed class AnalysisScheduler : IAsyncDisposable
             return _diskChanges.Count > 0;
         });
 
-    internal async Task RequestSymbolsAsync(PendingSymbolRequest request)
+    internal async Task RequestAsync(PendingAnalysisRequest request)
     {
         await _gate.WaitAsync().ConfigureAwait(false);
         try
         {
             if (_stopping)
                 await request.Reply(null, -32800).ConfigureAwait(false);
-            else if (_symbolRequests.ContainsKey(request.Id))
+            else if (_requests.ContainsKey(request.Id))
                 await request.Reply(null, -32600).ConfigureAwait(false);
             else if (_idle.Task.IsCompleted)
                 await request
-                    .Reply(
-                        _analysisFailed ? null : _workspace.Symbols(request.Uri, request.Hierarchical),
-                        _analysisFailed ? -32803 : null
-                    )
+                    .Reply(_analysisFailed ? null : request.Read(_workspace), _analysisFailed ? -32803 : null)
                     .ConfigureAwait(false);
             else
-                _symbolRequests.TryAdd(request.Id, request);
+                _requests.TryAdd(request.Id, request);
         }
         finally
         {
@@ -88,12 +85,12 @@ internal sealed class AnalysisScheduler : IAsyncDisposable
         }
     }
 
-    internal async Task CancelSymbolRequestAsync(string id)
+    internal async Task CancelRequestAsync(string id)
     {
         await _gate.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (_symbolRequests.Remove(id, out var request))
+            if (_requests.Remove(id, out var request))
                 await request.Reply(null, -32800).ConfigureAwait(false);
         }
         finally
@@ -102,14 +99,12 @@ internal sealed class AnalysisScheduler : IAsyncDisposable
         }
     }
 
-    private async Task CompleteSymbolRequestsAsync(int? error)
+    private async Task CompleteRequestsAsync(int? error)
     {
-        PendingSymbolRequest[] requests = [.. _symbolRequests.Values];
-        _symbolRequests.Clear();
+        PendingAnalysisRequest[] requests = [.. _requests.Values];
+        _requests.Clear();
         foreach (var request in requests)
-            await request
-                .Reply(error is null ? _workspace.Symbols(request.Uri, request.Hierarchical) : null, error)
-                .ConfigureAwait(false);
+            await request.Reply(error is null ? request.Read(_workspace) : null, error).ConfigureAwait(false);
     }
 
     private async Task ChangeAsync(Func<bool> change)
@@ -120,6 +115,11 @@ internal sealed class AnalysisScheduler : IAsyncDisposable
             if (_stopping || !change())
                 return;
             _generation++;
+            foreach (var request in _requests.Values.Where(item => item.InvalidateOnChange).ToArray())
+            {
+                _requests.Remove(request.Id);
+                await request.Reply(null, -32801).ConfigureAwait(false);
+            }
             if (_active is not null)
                 await _active.CancelAsync().ConfigureAwait(false);
             if (_idle.Task.IsCompleted)
@@ -158,7 +158,7 @@ internal sealed class AnalysisScheduler : IAsyncDisposable
             if (_active is not null)
                 await _active.CancelAsync().ConfigureAwait(false);
             await _lifetime.CancelAsync().ConfigureAwait(false);
-            await CompleteSymbolRequestsAsync(-32800).ConfigureAwait(false);
+            await CompleteRequestsAsync(-32800).ConfigureAwait(false);
             _idle.TrySetResult();
         }
         finally
@@ -246,7 +246,7 @@ internal sealed class AnalysisScheduler : IAsyncDisposable
                         _reloadError = error;
                         _diskChanges.Clear();
                         _analysisFailed = false;
-                        await CompleteSymbolRequestsAsync(null).ConfigureAwait(false);
+                        await CompleteRequestsAsync(null).ConfigureAwait(false);
                         _idle.TrySetResult();
                     }
                     finally
@@ -273,7 +273,7 @@ internal sealed class AnalysisScheduler : IAsyncDisposable
                             await _publish([], $"Analysis failed; retaining previous results. {exception.Message}", 1)
                                 .ConfigureAwait(false);
                             _analysisFailed = true;
-                            await CompleteSymbolRequestsAsync(-32803).ConfigureAwait(false);
+                            await CompleteRequestsAsync(-32803).ConfigureAwait(false);
                             _idle.TrySetResult();
                         }
                     }

@@ -27,6 +27,17 @@ internal sealed class SourcePositions
     internal JsonObject Range(SourceSpan span) =>
         new() { ["start"] = Position(span.Start), ["end"] = Position(span.Start + span.Length) };
 
+    internal int? Offset(int line, int character)
+    {
+        if (line < 0 || character < 0 || line >= _lines.Count)
+            return null;
+        int start = _lines[line];
+        int end = line + 1 < _lines.Count ? _lines[line + 1] : _text.Length;
+        while (end > start && _text[end - 1] is '\r' or '\n')
+            end--;
+        return start + Math.Min(character, end - start);
+    }
+
     private JsonObject Position(int offset)
     {
         offset = Math.Clamp(offset, 0, _text.Length);

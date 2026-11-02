@@ -18,6 +18,9 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
     internal JsonArray Symbols(string uri, bool hierarchical) =>
         DocumentSymbols.Convert(uri, _outlines.GetValueOrDefault(DocumentSnapshot.Key(uri)), hierarchical);
 
+    internal JsonObject? Hover(string uri, int line, int character, bool markdown) =>
+        DocumentHover.Convert(_outlines.GetValueOrDefault(DocumentSnapshot.Key(uri)), line, character, markdown);
+
     internal DocumentWorkspace Fork()
     {
         var copy = new DocumentWorkspace(mode, project);
@@ -190,7 +193,7 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
                 findings.Where(item => DocumentSnapshot.KeyComparer.Equals(item.FileName, path))
             );
         }
-        return new WorkspaceAnalysis(dependencies, diagnostics, Outlines([loaded.Source], sources));
+        return new WorkspaceAnalysis(dependencies, diagnostics, Outlines([loaded.Source], sources, mode));
 
         string ReadSource(string path)
         {
@@ -253,7 +256,7 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
                 text,
                 findings.Where(item => DocumentSnapshot.KeyComparer.Equals(item.FileName, path))
             );
-        return new WorkspaceAnalysis(dependencies, diagnostics, Outlines(units, sources));
+        return new WorkspaceAnalysis(dependencies, diagnostics, Outlines(units, sources, configuration.Mode));
 
         string ReadSource(string path)
         {
@@ -272,14 +275,20 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
         }
     }
 
-    private Dictionary<string, SourceOutline> Outlines(IReadOnlyList<PrologLintSource> units, Dictionary<string, string> sources)
+    private Dictionary<string, SourceOutline> Outlines(
+        IReadOnlyList<PrologLintSource> units,
+        Dictionary<string, string> sources,
+        PrologLanguageMode languageMode
+    )
     {
         var symbols = PrologSourceSymbols.Analyze(units, _analysisCancellation);
+        var hovers = PrologBuiltinHovers.Analyze(units, languageMode, _analysisCancellation);
         return sources.ToDictionary(
             item => item.Key,
             item => new SourceOutline(
                 item.Value,
-                symbols.Where(symbol => DocumentSnapshot.KeyComparer.Equals(symbol.FileName, item.Key)).ToArray()
+                symbols.Where(symbol => DocumentSnapshot.KeyComparer.Equals(symbol.FileName, item.Key)).ToArray(),
+                hovers.Where(hover => DocumentSnapshot.KeyComparer.Equals(hover.FileName, item.Key)).ToArray()
             ),
             DocumentSnapshot.KeyComparer
         );
@@ -336,7 +345,11 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
             foreach (var (path, outline) in analysis.Outlines)
             {
                 _outlines[path] = _outlines.TryGetValue(path, out var previous)
-                    ? new SourceOutline(outline.Text, previous.Symbols.Concat(outline.Symbols).Distinct().ToArray())
+                    ? new SourceOutline(
+                        outline.Text,
+                        previous.Symbols.Concat(outline.Symbols).Distinct().ToArray(),
+                        previous.Hovers.Concat(outline.Hovers).Distinct().ToArray()
+                    )
                     : outline;
             }
             foreach ((string path, JsonArray diagnostics) in analysis.Diagnostics)

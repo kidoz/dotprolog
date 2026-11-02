@@ -48,24 +48,22 @@ public sealed class AnalysisSchedulerTests
         var current = new TaskCompletionSource<JsonArray>(TaskCreationOptions.RunContinuationsAsynchronously);
         var cancelled = new TaskCompletionSource<int?>(TaskCreationOptions.RunContinuationsAsynchronously);
         await scheduler.UpdateAsync(new DocumentSnapshot("untitled:outline", "old.", 1), false);
-        await scheduler.RequestSymbolsAsync(
-            new PendingSymbolRequest(
+        await scheduler.RequestAsync(
+            new PendingAnalysisRequest(
                 "current",
-                "untitled:outline",
-                true,
+                workspace => workspace.Symbols("untitled:outline", true),
                 (symbols, error) =>
                 {
                     Assert.Null(error);
-                    current.SetResult(symbols!);
+                    current.SetResult(symbols!.AsArray());
                     return Task.CompletedTask;
                 }
             )
         );
-        await scheduler.RequestSymbolsAsync(
-            new PendingSymbolRequest(
+        await scheduler.RequestAsync(
+            new PendingAnalysisRequest(
                 "cancelled",
-                "untitled:outline",
-                true,
+                workspace => workspace.Symbols("untitled:outline", true),
                 (_, error) =>
                 {
                     cancelled.SetResult(error);
@@ -73,11 +71,57 @@ public sealed class AnalysisSchedulerTests
                 }
             )
         );
-        await scheduler.CancelSymbolRequestAsync("cancelled");
+        await scheduler.CancelRequestAsync("cancelled");
         Assert.Equal(-32800, await cancelled.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         await scheduler.UpdateAsync(new DocumentSnapshot("untitled:outline", "current.", 2), true);
         var result = await current.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Equal("current/0", Assert.Single(result)!["name"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task PendingHoverIsInvalidatedByAnEditInsteadOfUsingShiftedPosition()
+    {
+        await using var scheduler = new AnalysisScheduler(
+            PrologLanguageMode.Modern,
+            null,
+            null,
+            (_, _, _) => Task.CompletedTask,
+            TimeSpan.FromMilliseconds(150)
+        );
+        var response = new TaskCompletionSource<int?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await scheduler.UpdateAsync(new DocumentSnapshot("untitled:hover", "run :- write(ok).", 1), false);
+        await scheduler.RequestAsync(
+            new PendingAnalysisRequest(
+                "hover",
+                workspace => workspace.Hover("untitled:hover", 0, 7, false),
+                (result, error) =>
+                {
+                    Assert.Null(result);
+                    response.SetResult(error);
+                    return Task.CompletedTask;
+                },
+                InvalidateOnChange: true
+            )
+        );
+        await scheduler.UpdateAsync(new DocumentSnapshot("untitled:hover", "run :- var(X).", 2), true);
+        Assert.Equal(-32801, await response.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        await scheduler.WaitForIdleAsync().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var retry = new TaskCompletionSource<JsonNode?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await scheduler.RequestAsync(
+            new PendingAnalysisRequest(
+                "retry",
+                workspace => workspace.Hover("untitled:hover", 0, 7, false),
+                (result, error) =>
+                {
+                    Assert.Null(error);
+                    retry.SetResult(result);
+                    return Task.CompletedTask;
+                },
+                InvalidateOnChange: true
+            )
+        );
+        var current = await retry.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.StartsWith("var/1", current!["contents"]!["value"]!.GetValue<string>(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -162,8 +206,10 @@ public sealed class AnalysisSchedulerTests
         Assert.Empty(Assert.Single(publications).Diagnostics);
     }
 
-    [Fact]
-    public async Task RequestsAndShutdownRemainResponsiveDuringReevaluation()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RequestsAndShutdownRemainResponsiveDuringReevaluation(bool hover)
     {
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -179,14 +225,14 @@ public sealed class AnalysisSchedulerTests
             project,
             async token =>
             {
-                entered.SetResult();
+                entered.TrySetResult();
                 try
                 {
                     await Task.Delay(Timeout.Infinite, token);
                 }
                 catch (OperationCanceledException)
                 {
-                    cancelled.SetResult();
+                    cancelled.TrySetResult();
                     throw;
                 }
                 return project;
@@ -233,9 +279,22 @@ public sealed class AnalysisSchedulerTests
             };
             await SendAsync(clientWrite, changed.ToJsonString(), timeout.Token);
             await entered.Task.WaitAsync(TimeSpan.FromSeconds(2), timeout.Token);
-            const string outline =
-                """{"jsonrpc":"2.0","id":40,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":"untitled:pending"}}}""";
+            string outline = hover
+                ? """{"jsonrpc":"2.0","id":40,"method":"textDocument/hover","params":{"textDocument":{"uri":"untitled:pending"},"position":{"line":0,"character":0}}}"""
+                : """{"jsonrpc":"2.0","id":40,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":"untitled:pending"}}}""";
             await SendAsync(clientWrite, outline, timeout.Token);
+            if (hover)
+            {
+                await SendAsync(
+                    clientWrite,
+                    """{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"untitled:pending","version":1,"text":"run :- write(ok)."}}}""",
+                    timeout.Token
+                );
+                var modified = await ReadAsync(clientRead, timeout.Token);
+                Assert.Equal(40, modified["id"]!.GetValue<int>());
+                Assert.Equal(-32801, modified["error"]!["code"]!.GetValue<int>());
+                await SendAsync(clientWrite, outline, timeout.Token);
+            }
             await SendAsync(clientWrite, """{"jsonrpc":"2.0","id":2,"method":"unknown"}""", timeout.Token);
             Assert.Equal(
                 2,

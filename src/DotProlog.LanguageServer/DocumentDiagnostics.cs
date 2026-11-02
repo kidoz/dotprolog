@@ -47,7 +47,11 @@ internal static class DocumentDiagnostics
         );
         return (
             Convert(text, parsed.Diagnostics.Concat(warnings)),
-            new SourceOutline(text, PrologSourceSymbols.Analyze([source], cancellationToken))
+            new SourceOutline(
+                text,
+                PrologSourceSymbols.Analyze([source], cancellationToken),
+                PrologBuiltinHovers.Analyze([source], mode, cancellationToken)
+            )
         );
     }
 
