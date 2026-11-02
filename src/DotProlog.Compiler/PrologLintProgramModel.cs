@@ -6,6 +6,7 @@ namespace DotProlog.Compiler;
 internal sealed class PrologLintProgramModel
 {
     private readonly Dictionary<string, string> _moduleByPath;
+    private readonly Dictionary<SyntaxTerm, int> _sourceContexts = new(ReferenceEqualityComparer.Instance);
     private readonly HashSet<string> _unresolvedImportModules = new(StringComparer.Ordinal);
     private readonly HashSet<(string Module, PredicateIndicator Predicate)> _unresolvedImportPredicates = [];
     private readonly HashSet<(string Module, PredicateIndicator Predicate)> _ordinary = [];
@@ -22,6 +23,9 @@ internal sealed class PrologLintProgramModel
     }
 
     internal IReadOnlyList<PrologLintSource> Sources { get; }
+
+    internal int ContextOf(SyntaxTerm clause) => _sourceContexts.GetValueOrDefault(clause);
+
     internal bool HasUnresolvedImports => _unresolvedImportModules.Count > 0 || _unresolvedImportPredicates.Count > 0;
     internal ModuleTable Modules { get; }
     internal List<ClauseContext> Clauses { get; } = [];
@@ -39,10 +43,7 @@ internal sealed class PrologLintProgramModel
             model.CollectDefinitions(source, imports);
         }
 
-        foreach (ImportRequest import in imports)
-        {
-            model.ResolveImport(import);
-        }
+        model.ResolveImports(imports);
 
         var propagated = true;
         while (propagated)
@@ -186,6 +187,7 @@ internal sealed class PrologLintProgramModel
             }
             if (clause is null)
                 continue;
+            _sourceContexts[clause] = context;
             ModuleScopes.Add((file, clause.Span.Start, module, context));
             if (clause is CompoundTerm { Name: ":-", Arity: 1, Arguments: [CompoundTerm directive] })
             {
@@ -361,6 +363,37 @@ internal sealed class PrologLintProgramModel
 
             Modules.DeclareMeta(module, indicator.Name, indicator.Arity, arguments, new string(template));
             Declarations.Add(new DeclarationSite(module, indicator, false, "meta_predicate", item.Span, source.FileName));
+        }
+    }
+
+    private void ResolveImports(List<ImportRequest> imports)
+    {
+        // Resolve dependency modules before their clients so reexport visibility is independent of file order.
+        // Keep source order within a module, including competing imports of the same indicator.
+        var pending = imports
+            .GroupBy(import => import.Importer)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+        while (pending.Count > 0)
+        {
+            var ready = pending
+                .Where(group =>
+                    group.Value.All(import =>
+                    {
+                        string? dependency = import.FileDirective ? ResolveModulePath(import) : import.SourceModule;
+                        return dependency is null || dependency == group.Key || !pending.ContainsKey(dependency);
+                    })
+                )
+                .Select(group => group.Key)
+                .ToArray();
+            // Cyclic imports retain conservative, source-ordered resolution and cannot stall analysis.
+            if (ready.Length == 0)
+                ready = [pending.Keys.First()];
+            foreach (string module in ready)
+            {
+                foreach (var import in pending[module])
+                    ResolveImport(import);
+                pending.Remove(module);
+            }
         }
     }
 
