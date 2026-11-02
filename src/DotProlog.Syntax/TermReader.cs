@@ -469,7 +469,7 @@ public sealed class TermReader
 
             if (op.IsPostfix)
             {
-                left = new CompoundTerm(name, [left], left.Span.To(operatorSpan));
+                left = new CompoundTerm(name, [left], left.Span.To(operatorSpan)) { NameSpan = operatorSpan };
                 priority = op.Priority;
                 continue;
             }
@@ -482,7 +482,7 @@ public sealed class TermReader
 
             // '|' used as an infix operator at priority 1100 denotes disjunction.
             var functor = name == "|" && op.Priority == 1100 ? ";" : name;
-            left = new CompoundTerm(functor, [left, right], left.Span.To(right.Span));
+            left = new CompoundTerm(functor, [left, right], left.Span.To(right.Span)) { NameSpan = operatorSpan };
             priority = op.Priority;
         }
     }
@@ -555,7 +555,7 @@ public sealed class TermReader
                 }
 
                 SourceSpan span = token.Span.To(_current.Span);
-                return Expect("}") ? new CompoundTerm("{}", [inner], span) : null;
+                return Expect("}") ? new CompoundTerm("{}", [inner], span) { NameSpan = token.Span } : null;
             }
 
             default:
@@ -603,7 +603,7 @@ public sealed class TermReader
             }
 
             priority = prefix.Priority;
-            return new CompoundTerm(name, [operand], token.Span.To(operand.Span));
+            return new CompoundTerm(name, [operand], token.Span.To(operand.Span)) { NameSpan = token.Span };
         }
 
         Advance();
@@ -741,7 +741,7 @@ public sealed class TermReader
                 2 => new[] { first!, second! },
                 _ => arguments!,
             };
-            return new CompoundTerm(name, parsedArguments, span);
+            return new CompoundTerm(name, parsedArguments, span) { NameSpan = nameSpan };
         }
     }
 

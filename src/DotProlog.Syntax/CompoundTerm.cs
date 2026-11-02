@@ -6,6 +6,9 @@ namespace DotProlog.Syntax;
 /// <param name="Span">Source range the term was read from.</param>
 public sealed record CompoundTerm(string Name, IReadOnlyList<SyntaxTerm> Arguments, SourceSpan Span) : SyntaxTerm(Span)
 {
+    /// <summary>The original functor or operator token, when retained by the reader; null for constructed terms.</summary>
+    public SourceSpan? NameSpan { get; init; }
+
     /// <summary>The functor's arity.</summary>
     public int Arity => Arguments.Count;
 }
