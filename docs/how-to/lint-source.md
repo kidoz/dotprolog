@@ -73,6 +73,29 @@ The warning is not a proof of non-steadfastness or a recommendation to remove ev
 if-then-else conditions, negation, all-solutions goals, and meta-calls have different scopes and are
 not treated as clause cuts by this rule.
 
+## Check direct non-tail recursion
+
+Enable the recursion heuristic explicitly:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint --enable-rule DPL3038 program.pl
+```
+
+`DPL3038` is off in every default profile. It reports each direct self-call with remaining control
+flow that prevents the compiler's last-call optimization. A call in the last conjunction position is
+tail-recursive; disjunction and then/else branches have independent tail positions. Conditions are
+never tail positions, and a following goal or cut makes a call non-tail even when that goal looks
+redundant.
+
+The rule covers ordinary predicates and direct DCG nonterminal recursion, including explicit
+qualification by the current module. Indirect and mutual recursion, other modules, negation,
+all-solutions goals, cleanup goals, and meta-calls are excluded. Dynamic and multifile source clauses
+are eligible.
+
+This is an optimization hint, not a correctness warning or a termination proof. Review whether an
+accumulator or another formulation would help before rewriting working code. Both opt-in rules can be
+enabled together by repeating `--enable-rule` with `DPL3037` and `DPL3038`.
+
 ## Fail CI on warnings
 
 ```console

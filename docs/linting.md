@@ -16,6 +16,7 @@ dotnet prolog lint [options] <file.pl> [more.pl ...]
 | `--profile semantic` | Default profile: source-local and whole-program semantic checks |
 | `--profile covington` | Add automatically checkable Covington layout guidelines 2.1–2.7 |
 | `--enable-rule DPL3037` | Enable the opt-in non-steadfast clause heuristic; repeatable |
+| `--enable-rule DPL3038` | Enable the opt-in non-tail-recursion heuristic; repeatable |
 | `--mode modern` or `--mode strict-iso` | Seed the reader's language mode; default `modern` |
 | `--flag name=value` | Override a curated initial flag; repeatable |
 | `--indent-size N` | Positive indentation unit; Covington default `4` |
@@ -70,6 +71,7 @@ These rules run in every profile:
 | `DPL3035` | An imported predicate or nonterminal has no static reference in its importing module |
 | `DPL3036` | No recognized entry point reaches a grammar nonterminal through static calls |
 | `DPL3037` | Opt-in: distinct head arguments share variables and the clause contains a same-scope cut |
+| `DPL3038` | Opt-in: a direct self-call is outside a compiler tail position |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -208,6 +210,28 @@ compiler. Unrelated unresolved calls do not suppress this file-local rule, and n
 This is a heuristic, not a proof of non-steadfastness or general mode/determinism analysis. Review
 whether committing to the head unification is intentional before changing the clause.
 
+### Opt-in non-tail recursion
+
+`DPL3038` is disabled by default in every profile. Enable it with `--enable-rule DPL3038`, alone or
+alongside other opt-in rules. It reports each direct self-call that is outside a tail position
+understood by the clause compiler, located at the recursive call. The message identifies the ordinary
+predicate or DCG nonterminal and states that remaining control flow prevents last-call optimization.
+
+The last conjunction position is a tail position. Disjunction branches and then/else branches have
+independent tail positions; if-then-else and soft-cut conditions are never tail positions. A bare
+soft-cut conditional follows the compiler's conjunction behavior. Any later goal or cut makes a
+self-call non-tail, even when that later operation looks redundant.
+
+Self identity uses the current module, name, and arity, or the source `Name//Arity` plus two for a
+nonterminal. Qualification by the same current module counts; another module, indirect or mutual
+recursion, and runtime-constructed goals do not. Negation, all-solutions goals, cleanup goals,
+`call/1` and `call/N`, and other meta-calls are not traversed. DCG `{}` goals are inspected as
+ordinary goals, while DCG `call//1` is excluded. Static, dynamic, and multifile clauses are eligible,
+and unrelated unresolved calls do not suppress this file-local rule.
+
+This is an optimization hint, not a correctness fault, termination analysis, or proof that rewriting
+recursion will improve a workload.
+
 ### Double-quoted text
 
 `DPL3011` and `DPL3012` judge each double-quoted literal by the `double_quotes` value in force where
@@ -269,5 +293,5 @@ Name every module file whose definitions should participate in cross-file analys
 are read only through `include/1` expansion.
 
 The layout profile reports warnings only. It does not rewrite source. Naming conventions, comment
-quality rules, general mode or determinism inference, and automatic fixes are not implemented.
-DotProlog does not yet retain the comments and exact whitespace needed for a lossless formatter.
+quality rules, general mode, determinism, or termination inference, and automatic fixes are not
+implemented. DotProlog does not yet retain the comments and exact whitespace needed for a lossless formatter.
