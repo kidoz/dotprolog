@@ -8,6 +8,15 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Added
 
+- The language server now finds references to source predicates across analyzed project files,
+  includes and unsaved buffers, with optional definition locations. Results respect module and
+  arity resolution, DCGs and meta-calls, and exclude ambiguous include locations and unrelated
+  loose programs with the same predicate names.
+
+- The language server now navigates predicate calls and heads to their source clauses, including
+  imports, reexports, DCGs and multifile definitions. Navigation preserves unsaved target buffers,
+  physical include locations and UTF-16 ranges, with definition links for supporting clients.
+
 - The language server now completes visible predicate names and clause-local variables in unsaved,
   unfinished code, with arity labels, builtin help, module-aware candidates and UTF-16 replacement
   edits. Completion honors project mode, includes, cancellation and superseded document versions.

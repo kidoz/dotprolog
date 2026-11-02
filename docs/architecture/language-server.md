@@ -141,34 +141,30 @@ cancellation terminates real MSBuild evaluation and its descendant. Establish pe
 measurements on a pinned corpus before accepting a latency target; 250 ms after debounce on a
 2,000-line file is a proposed initial target, not a measured claim.
 
-## Stage 3: symbols and navigation — outlines, builtin hover and word completion implemented
+## Stage 3: symbols and navigation — outlines, hover, completion, definitions and references implemented
 
 The first navigation increment provides a predicate outline through LSP 3.17
-`textDocument/documentSymbol`. Its requirements and acceptance checks are:
+`textDocument/documentSymbol`, with the following behavior:
 
-- **REQ-LSP-SYM-1:** Advertise `documentSymbolProvider` and return hierarchical `DocumentSymbol`
+- Advertise `documentSymbolProvider` and return hierarchical `DocumentSymbol`
   results when the client advertises support, otherwise flat `SymbolInformation` results.
-- **REQ-LSP-SYM-2:** Identify definitions by module, source name, arity and ordinary/DCG identity.
+- Identify definitions by module, source name, arity and ordinary/DCG identity.
   Group clauses of the same predicate in each physical file; hierarchical results expose individual
   clause children for predicates with multiple clauses. Directives and declarations are not definitions.
-- **REQ-LSP-SYM-3:** Use zero-based UTF-16 ranges from the analyzed text, with selection ranges on
+- Use zero-based UTF-16 ranges from the analyzed text, with selection ranges on
   the original name/operator token, including quoting. Definition ranges cover parsed terms, excluding
   their terminating full stops. Synthetic heads without a name token use the head range.
-- **REQ-LSP-SYM-4:** Use unsaved buffers and the same project/include reader context as diagnostics.
+- Use unsaved buffers and the same project/include reader context as diagnostics.
   Return only definitions physically owned by the requested URI. Untracked documents return an empty
   list; unopened evaluated project sources and retained includes can have outlines.
-- **REQ-LSP-SYM-5:** Requests arriving during analysis wait for a current committed snapshot without
+- Requests arriving during analysis wait for a current committed snapshot without
   blocking protocol input. Edits supersede pending analysis; cancellation and shutdown complete pending
   requests with RequestCancelled. An analysis failure completes them with RequestFailed.
-- **REQ-LSP-SYM-6:** Preserve definitions recovered around incomplete clauses without inventing
+- Preserve definitions recovered around incomplete clauses without inventing
   definitions for malformed heads. Never execute source. Managed and NativeAOT wire behavior must agree.
 
 Parser name-span tests, source-symbol tests, workspace ownership tests and framed protocol tests
 verify these requirements; real-process managed/native smoke tests verify the combined contract.
-`NameSpanTests` covers token spans (REQ-LSP-SYM-3); `SourceSymbolTests` covers module context,
-DCG identity and recovery (REQ-LSP-SYM-2/6); `DocumentSymbolTests` covers response shapes, physical
-ownership, configured modes and membership (REQ-LSP-SYM-1/4); `AnalysisSchedulerTests` covers
-fresh snapshots, explicit cancellation and shutdown during blocked work (REQ-LSP-SYM-5).
 The generic internal analysis-failure response is implemented but has no fault-injection check.
 
 The compiler exposes `PrologSourceSymbol` records through `PrologSourceSymbols.Analyze` using the
@@ -177,36 +173,29 @@ ranges. The server caches these records and source text with each analysis; LSP 
 outside the compiler. Symbols are labeled `module:name/arity` (omitting `user:`) or `name//arity`
 for DCGs. Hierarchical results group clauses; flat results navigate to the first clause.
 
-No additional language semantics, definitions/references, rename, formatting,
+No additional language semantics, rename, formatting,
 `.dpli` services or editor extension are part of this increment.
 
 ### Builtin hover — implemented
 
-- **REQ-LSP-HOV-1:** Advertise `hoverProvider` and implement LSP 3.17 `textDocument/hover` with
+- Advertise `hoverProvider` and implement LSP 3.17 `textDocument/hover` with
   a predicate indicator, concise help and the name-token range. Honor the client's preferred
   supported format (`markdown` or `plaintext`), defaulting to plaintext.
-- **REQ-LSP-HOV-2:** Resolve only statically identifiable calls by module and arity. Source-defined,
+- Resolve only statically identifiable calls by module and arity. Source-defined,
   imported, dynamic and multifile predicates must not be mislabeled as builtins. Unknown modules,
   unresolved imports, data terms, variables, comments and whitespace return null.
-- **REQ-LSP-HOV-3:** Use source name spans and zero-based UTF-16 positions, including quoted names,
+- Use source name spans and zero-based UTF-16 positions, including quoted names,
   operators and CR/LF line endings. Negative/malformed positions are invalid parameters; positions
   beyond a line clamp to its end, and positions beyond the document return null.
-- **REQ-LSP-HOV-4:** Read current analysis snapshots with unsaved buffers and physical include
+- Read current analysis snapshots with unsaved buffers and physical include
   ownership. Pending requests remain cancellable and do not block protocol input. Hover requests
   invalidated by accepted text/workspace changes return ContentModified; clients can retry.
-- **REQ-LSP-HOV-5:** Include ordinary goals in rules, initialization goals, statically known
+- Include ordinary goals in rules, initialization goals, statically known
   metapredicate arguments/closures and ordinary goals inside DCG braces. DCG nonterminal calls and
   arithmetic expression terms are not ordinary builtin calls.
-- **REQ-LSP-HOV-6:** Derive signatures from actual registrations/bundled libraries plus explicit
+- Derive signatures from actual registrations/bundled libraries plus explicit
   compiler control forms. Hide internal `$` predicates. State when a predefined predicate is a
   Modern extension unavailable in StrictIso; never execute user source to obtain hover information.
-
-`BuiltinHoverTests` verifies arity, module/import resolution, shadowing, meta closures, DCG escapes,
-recovery and mode notes (REQ-LSP-HOV-2/5/6). `HoverTests` verifies format negotiation, URI/position
-validation, UTF-16 ranges, include contexts and project changes (REQ-LSP-HOV-1/3/4).
-`AnalysisSchedulerTests` verifies pending hover cancellation, ContentModified responses, retry and
-shutdown during blocked reevaluation (REQ-LSP-HOV-4). The managed/native hover smoke test checks
-the combined wire contract. These requirements have no remaining product decisions for this slice.
 
 Help covers statically identified calls in recovered complete clauses. Signatures come from the
 existing runtime/library catalog; compiler control forms have explicit entries. A separate static
@@ -220,41 +209,36 @@ comment terminated only by bare CR currently continues until LF or EOF, so follo
 hover targets. The new line-position tests use valid parsed source independently of that limitation.
 Actual editor hover rendering remains unverified.
 
-Remaining navigation work: definition locations and references across imports, exports, reexports
-and multifile declarations.
+Remaining navigation work: predicate rename, refusing edits when static analysis cannot establish
+a complete, unambiguous set of affected source locations.
 
 ### Completion contract — implemented
 
 This increment targets LSP 3.17 word completion in both language modes; it changes no
 execution semantics, build targets or package distribution.
 
-- **REQ-LSP-CMP-1:** Advertise `completionProvider` and accept `textDocument/completion`,
+- Advertise `completionProvider` and accept `textDocument/completion`,
   returning function/variable items with plain name insertion and explicit UTF-16 text edits.
   Labels distinguish predicate arities. Invalid positions return InvalidParams; unknown documents
   and unsupported lexical positions return an empty list.
-- **REQ-LSP-CMP-2:** Offer visible source predicates and actual registered/library builtins,
+- Offer visible source predicates and actual registered/library builtins,
   resolving local definitions, imports and user-module fallback with the compiler model.
   Hide internal names and unavailable StrictIso builtins. Explicit atom module qualification
   uses that module's resolution context; unknown or variable modules yield no suggestions.
-- **REQ-LSP-CMP-3:** Complete unquoted identifier prefixes, including the unfinished final clause,
+- Complete unquoted identifier prefixes, including the unfinished final clause,
   and replace the full identifier containing the cursor. Offer named variables only from the
   current lexical clause, excluding the anonymous variable. Suppress comments, quoted literals,
   numbers and symbolic-name completion. Word suggestions are lexical, including term arguments;
   this increment does not infer whether an argument expects a goal or data.
-- **REQ-LSP-CMP-4:** Use current unsaved analysis snapshots, project sources and include contexts.
+- Use current unsaved analysis snapshots, project sources and include contexts.
   Shared include contexts expose only candidates agreed by every context. Pending completion
   requests support RequestCancelled and return ContentModified when superseded by an edit.
-- **REQ-LSP-CMP-5:** Build lexical and predicate indexes in the background worker without executing
+- Build lexical and predicate indexes in the background worker without executing
   source or parsing on the protocol input loop. Verify completion through managed and NativeAOT
   stdio, including incomplete edits, variable scope, module visibility and Unicode ranges.
 
-`CompletionTests` covers protocol edits, overlays, project mode and include contexts (REQ-LSP-CMP-1/4).
-`CompletionIndexTests` covers imports, declarations, mode filtering and physical module scopes
-(REQ-LSP-CMP-2). `CompletionTextTests` covers incomplete clauses, comments, literals, variables and
-Unicode identifiers (REQ-LSP-CMP-3). `AnalysisSchedulerTests` checks pending completion cancellation,
-ContentModified and shutdown during blocked reevaluation (REQ-LSP-CMP-4/5). The completion smoke
-script checks the managed/native wire contract (REQ-LSP-CMP-1/3/5). Snippets, automatic imports,
-quoted/operator-name completion, DCG-specific filtering and editor UI verification are deferred.
+Snippets, automatic imports, quoted/operator-name completion, DCG-specific filtering and editor UI
+verification are deferred.
 
 Completion tokenizes the raw buffer with default Unicode lexical rules; it does not replay
 `char_conversion/2` or reader flag changes while scanning partial words. Parsed definitions and
@@ -262,6 +246,70 @@ module visibility still come from the configured project/include analysis. Predi
 callable arities (DCGs include their two generated arguments), and only recovered definitions are
 candidates. A missing import conservatively suppresses uncertain builtin candidates. Comment and
 quoted-token suppression uses the existing lexer, including its bare-CR line-comment behavior.
+
+### Definition navigation contract — implemented
+
+This increment adds LSP 3.17 source navigation in both language modes without executing source.
+
+- Advertise `definitionProvider` and serve `textDocument/definition`.
+  Return `LocationLink[]` when `textDocument.definition.linkSupport` is true, otherwise
+  `Location[]`. Use UTF-16 origin/name/clause ranges and preserve physical include ownership.
+- Resolve statically known calls by module and callable arity, following
+  imports, reexports and user-module fallback. Return every matching source clause, including
+  multifile definitions. Predicate heads navigate to the same definition set.
+- Traverse ordinary rule/initialization goals, DCG nonterminals and escaped
+  goals, and statically identifiable meta-goals/closures. Exclude ordinary data, comments,
+  literals, builtins, variable call targets, intrinsic controls and unresolved targets.
+  Dynamic declarations alone are not source implementations; available source clauses can be targets.
+- Read committed analysis snapshots containing current unsaved buffers,
+  project files and include expansions. Conflicting shared/repeated include resolutions return
+  no destination. Unknown documents or unsupported positions return an empty array.
+- Reject malformed positions with InvalidParams. Pending requests support
+  RequestCancelled and ContentModified using the positional-request scheduler contract.
+  No request-time parsing, source execution or arbitrary disk loading is permitted.
+
+`SourceDefinitionTests` verifies source identity, arities, reexports in both source orders,
+DCG/meta-goals, multifile clauses, quoted/operator names and unresolved calls.
+`DefinitionTests` verifies link negotiation, URI/range conversion, edits, target overlays, project
+membership and conflicting shared/repeated includes.
+`AnalysisSchedulerTests` verifies invalidation, retry, cancellation and shutdown for definition
+requests. `verify-language-server-definition.py` exercises the wire contract,
+Unicode, DCGs, reexports and target-buffer/disk changes through managed and native executables.
+Import dependencies are analyzed before clients, preserving declaration order inside each module.
+Cyclic import graphs use a bounded conservative fallback; no fixed-point completeness is claimed.
+Navigation covers recovered complete clauses. Import loading remains limited to evaluated project
+sources and include closures; variable binding inference, declaration-indicator navigation,
+rename and actual editor UI validation are outside this increment.
+
+### Find references contract — implemented
+
+This increment adds LSP 3.17 `textDocument/references` for source predicates in both language modes.
+
+- Advertise `referencesProvider`; require a boolean `context.includeDeclaration` and return
+  deterministic, deduplicated `Location[]` with UTF-16 name-token ranges.
+- Resolve the selected head or call by module, callable arity and shared physical source
+  definitions. Search the analyzed project/include/buffer workspace. Separate unrelated loose
+  programs that happen to define the same module/name/arity.
+- Report ordinary calls, DCG calls and statically known meta-goals/closures using the same model
+  as definition navigation. Include parsed clause heads only when `includeDeclaration` is true.
+  Predicate indicators in directives, variables, data, builtin calls and unresolved targets are excluded.
+- Require agreement across shared/repeated include contexts both at the selected occurrence and
+  at each returned location. Unsupported/ambiguous selections return an empty array; uncertain
+  candidate locations are omitted rather than guessed. Results are static findings, not a claim
+  that every runtime reference is known.
+- Update the background reference index with unsaved edits, disk changes, project membership
+  and document close. Validate malformed parameters with InvalidParams. Pending positional
+  requests support RequestCancelled and ContentModified; no request-time parsing, source
+  execution or arbitrary file loading is allowed.
+
+`SourceDefinitionTests` verifies the explicit head/call metadata. `ReferenceTests` covers
+protocol validation, optional heads, UTF-16 locations, module/arity resolution, DCGs/meta-goals,
+multifile clauses, loose-program isolation, includes, overlays, disk changes and membership.
+`AnalysisSchedulerTests` covers reference cancellation, invalidation/retry and shutdown during
+blocked reevaluation. `verify-language-server-references.py` checks the combined managed/native
+wire behavior with a real evaluated project and client-first reexports. Dynamic binding inference,
+references to declarations without source bodies, rename and editor UI validation remain outside
+this increment. Definition navigation shares the strengthened include/program identity check.
 
 ## Stage 4: editor and distribution — planned
 
@@ -293,7 +341,9 @@ dotnet src/DotProlog.LanguageServer/bin/Debug/net10.0/dotprolog-lsp.dll --projec
 The process expects LSP frames on stdin; it is not an interactive command prompt. It advertises
 full-text synchronization only. Background analysis supports includes for file documents.
 Document symbols provide predicate outlines; builtin hover provides signatures, short help and
-language-mode notes; completion suggests predicate names and current-clause variables. Editor
+language-mode notes; completion suggests predicate names and current-clause variables; definitions
+navigate to source clauses across the analyzed workspace; references list known calls and
+optionally clause heads. Editor
 extensions remain planned. Project mode analyzes all evaluated sources;
 loose-file mode analyzes include closures. No performance or
 cross-platform NativeAOT claim is made from the initial host check.
@@ -317,6 +367,10 @@ python3 tests/Integration/verify-language-server-hover.py dotnet src/DotProlog.L
 python3 tests/Integration/verify-language-server-hover.py /tmp/dotprolog-lsp-native/dotprolog-lsp
 python3 tests/Integration/verify-language-server-completion.py dotnet src/DotProlog.LanguageServer/bin/Debug/net10.0/dotprolog-lsp.dll
 python3 tests/Integration/verify-language-server-completion.py /tmp/dotprolog-lsp-native/dotprolog-lsp
+python3 tests/Integration/verify-language-server-definition.py dotnet src/DotProlog.LanguageServer/bin/Debug/net10.0/dotprolog-lsp.dll
+python3 tests/Integration/verify-language-server-definition.py /tmp/dotprolog-lsp-native/dotprolog-lsp
+python3 tests/Integration/verify-language-server-references.py dotnet src/DotProlog.LanguageServer/bin/Debug/net10.0/dotprolog-lsp.dll
+python3 tests/Integration/verify-language-server-references.py /tmp/dotprolog-lsp-native/dotprolog-lsp
 ```
 
 Replace the RID and executable suffix for the host. The smoke test is repeatable and has a
@@ -330,17 +384,29 @@ process-tree cleanup. It verifies wire output and exit status for either managed
 
 Verified on macOS arm64 on 2026-11-02:
 
-- `DotProlog.LanguageServer.Tests`: 81 passed, zero failed or skipped, after a warning-free
+- `DotProlog.LanguageServer.Tests`: 109 passed, zero failed or skipped, after a warning-free
   single-worker build (`dotnet build tests/DotProlog.LanguageServer.Tests --no-restore -m:1 -nr:false`).
-- `DotProlog.Syntax.Tests`: 464 passed, zero failed or skipped, including lexical completion,
-  supplementary Unicode variable names and combining marks.
-- The four `CompletionIndexTests` passed. A full compiler run passed 2,929 of 2,930 tests;
-  the remaining failure was the concurrently developed excessive-arity linter's
-  `MixedDefinitionsSharingLoweredIdentityProduceOneFinding` DCG-first case. Completion tests
-  and existing hover/source analysis tests passed. This is not a clean full-suite result.
+- `DotProlog.Compiler.Tests`: 2,981 passed, zero failed or skipped, including source-definition,
+  builtin hover, import-resolution and reference head/call metadata regressions.
+- The previous syntax baseline had 464 passing tests, including lexical completion and Unicode
+  identifiers. Syntax code was unchanged and that suite was not rerun for reference navigation.
 - The earlier CLI baseline had 53 passing tests; the CLI suite was not rerun for this increment.
 
-Current completion, hover, document-symbol and background-analysis checks:
+Current reference, definition, completion, hover, document-symbol and background-analysis checks:
+
+- The reference smoke test passed against managed and native executables: optional heads,
+  exact UTF-16 call locations, DCG/meta-calls,
+  unrelated loose-program isolation, real-project reexports, unsaved overlays, disk updates,
+  project source removal and close cleanup. Unit tests additionally verify that ambiguous
+  shared/repeated include positions are omitted both as origins and candidate results.
+  Actual editor reference UI remains unverified.
+
+- The definition smoke test passed against managed and native executables: links and plain
+  locations, UTF-16 origin/target ranges,
+  multiple clauses, DCGs, reexports with clients first in evaluated project order, unsaved target
+  overlays, disk changes and close cleanup. Unit tests additionally check multifile predicates,
+  custom meta-goals, shared/repeated include conflicts, and a token interpreted as data in one
+  include context and a goal in another. Actual editor navigation UI remains unverified.
 
 - The completion smoke test passed against managed and native executables: capability negotiation,
   UTF-16 replacement of a whole identifier, incomplete unsaved buffers, clause-local variables,
@@ -376,12 +442,14 @@ Current completion, hover, document-symbol and background-analysis checks:
 - CSharpier checked the changed feature files; `git diff --check` passed.
 
 Windows/Linux native runs and editor-client verification remain unmeasured. The full repository
-integration/conformance suite was not rerun for this completion increment.
+integration/conformance suite was not rerun for this reference-navigation increment.
 
 ## Design references
 
 - [MSBuild evaluation-only queries](https://learn.microsoft.com/en-us/visualstudio/msbuild/evaluate-items-and-properties)
 - [LSP specification](https://microsoft.github.io/language-server-protocol/)
+- [LSP 3.17 references contract](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references)
+- [LSP 3.17 definition contract](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_definition)
 - [LSP 3.17 completion contract](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion)
 - [LSP 3.17 hover contract](https://raw.githubusercontent.com/microsoft/language-server-protocol/gh-pages/_specifications/lsp/3.17/language/hover.md)
 - [StreamJsonRpc transport extensibility](https://microsoft.github.io/vs-streamjsonrpc/docs/extensibility.html)
