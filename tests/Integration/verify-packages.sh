@@ -218,3 +218,17 @@ fi
 test "$lint_exit" -eq 1
 printf '%s\n' "$lint_output" | grep -F 'warning DPL3043'
 printf '%s\n' "$lint_output" | grep -F 'p/0'
+
+# Non-snake-case procedure names are advisory convention findings only after opt-in.
+printf '%s\n' 'badName.' >HelloProlog/lint-naming.pl
+dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint HelloProlog/lint-naming.pl
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --enable-rule DPL3044 --warnings-as-errors HelloProlog/lint-naming.pl 2>&1); then
+    echo "lint unexpectedly accepted an enabled non-snake-case predicate name" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3044'
+printf '%s\n' "$lint_output" | grep -F 'badName/0'
