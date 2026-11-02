@@ -141,4 +141,7 @@ public static class LintDiagnosticIds
 
     /// <summary>A user-defined predicate or nonterminal name does not follow lower snake_case.</summary>
     public const string NonSnakeCasePredicate = "DPL3044";
+
+    /// <summary>A user-defined predicate or nonterminal exceeds the configured source-arity limit.</summary>
+    public const string ExcessivePredicateArity = "DPL3045";
 }

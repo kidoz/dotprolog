@@ -47,6 +47,9 @@ public sealed record PrologLintOptions
     /// <summary>Whether spaces or tabs immediately before a line ending are rejected.</summary>
     public bool CheckTrailingWhitespace { get; init; }
 
+    /// <summary>Maximum source arity allowed by the opt-in excessive-arity rule.</summary>
+    public int MaxPredicateArity { get; init; } = 4;
+
     /// <summary>Diagnostic identifiers of additional opt-in semantic rules.</summary>
     public IReadOnlyCollection<string> EnabledRules { get; init; } = [];
 
