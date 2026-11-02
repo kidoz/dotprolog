@@ -12,7 +12,11 @@ public static class PrologSourceSymbols
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var model = PrologLintProgramModel.Build(sources);
+        return Analyze(PrologLintProgramModel.Build(sources), cancellationToken);
+    }
+
+    internal static IReadOnlyList<PrologSourceSymbol> Analyze(PrologLintProgramModel model, CancellationToken cancellationToken)
+    {
         List<PrologSourceSymbol> result = [];
         foreach (var context in model.Clauses)
         {
