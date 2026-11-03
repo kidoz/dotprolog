@@ -87,6 +87,14 @@ The extension, tests and build tooling are written in TypeScript. Tooling source
 for ECMAScript modules and compile to `bin/scripts/` through `npm run compile:scripts`.
 The npm commands compile the tooling automatically; the language server remains C#.
 
+Format the extension's TypeScript, JSON and README with `npm run format`; use
+`npm run format:check` to check formatting without modifying files. CI runs the check.
+The repository's `.prettierrc.json` defines the style, and `.prettierignore` excludes
+generated build outputs, dependencies and lockfiles. In VS Code, install **Prettier - Code
+formatter** (`esbenp.prettier-vscode`) and select it as the TypeScript default formatter
+to use **Format Document** or format on save. Run `npm ci` first to make the pinned local
+Prettier version available to the editor.
+
 For example, in a POSIX shell, test a locally packaged managed extension at the minimum version:
 
 ```sh
