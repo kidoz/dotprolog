@@ -168,6 +168,25 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void LintReportsInconsistentMetaPredicateDeclarationsByDefault()
+    {
+        var path = Source(
+            "meta-declarations.pl",
+            ":- initialization(halt(9)). :- meta_predicate(p(0)). :- meta_predicate(p(1)). p(_).\n"
+        );
+
+        (var defaultExit, _, var defaultError) = Execute("lint", path);
+        (var enabledExit, _, var enabledError) = Execute("lint", "--warnings-as-errors", path);
+
+        Assert.Equal(0, defaultExit);
+        Assert.Contains("DPL3050", defaultError, StringComparison.Ordinal);
+        Assert.Equal(1, enabledExit);
+        Assert.Contains("DPL3050", enabledError, StringComparison.Ordinal);
+        Assert.Contains("declaration p(1) for user:p/1", enabledError, StringComparison.Ordinal);
+        Assert.Contains("earlier template p(0)", enabledError, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LintReportsAGroundCallWithNoMatchingClauseHead()
     {
         var path = Source("trivial.pl", "p(a). go :- p(b).\n");

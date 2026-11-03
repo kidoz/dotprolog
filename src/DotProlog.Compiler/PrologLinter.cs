@@ -37,6 +37,7 @@ public static class PrologLinter
         PrologLiteralLinter.Analyze(clauses, fileName, diagnostics);
         PrologAllSolutionsLinter.Analyze(clauses, fileName, diagnostics);
         PrologStructureLinter.Analyze(clauses, fileName, diagnostics);
+        PrologMetaPredicateDeclarationLinter.Analyze(clauses, fileName, diagnostics);
         PrologSemanticSingletonLinter.Analyze(clauses, fileName, diagnostics);
 
         return [.. diagnostics.OrderBy(diagnostic => diagnostic.Span.Start).ThenBy(diagnostic => diagnostic.Id)];
@@ -124,7 +125,11 @@ public static class PrologLinter
                 diagnostics.AddRange(
                     local.Where(diagnostic =>
                         diagnostic.Id
-                            is not (LintDiagnosticIds.PossibleBuiltinArityMismatch or LintDiagnosticIds.DeclaredButUndefined)
+                            is not (
+                                LintDiagnosticIds.PossibleBuiltinArityMismatch
+                                or LintDiagnosticIds.DeclaredButUndefined
+                                or LintDiagnosticIds.InconsistentMetaPredicate
+                            )
                     )
                 );
             }
@@ -142,6 +147,7 @@ public static class PrologLinter
         PrologExcessiveSubgoalCountLinter.Analyze(model, options, diagnostics);
         PrologLocalImportShadowLinter.Analyze(model, options, diagnostics);
         PrologBuiltinShadowLinter.Analyze(model, options, diagnostics);
+        PrologMetaPredicateDeclarationLinter.Analyze(model, diagnostics);
         PrologConflictingImportLinter.Analyze(model, diagnostics);
         PrologCallGraphLinter.Analyze(model, diagnostics);
         PrologReachabilityLinter.Analyze(model, diagnostics);

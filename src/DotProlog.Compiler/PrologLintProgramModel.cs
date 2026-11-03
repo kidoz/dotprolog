@@ -32,6 +32,7 @@ internal sealed class PrologLintProgramModel
     internal List<ClauseContext> Clauses { get; } = [];
     internal List<DeclarationSite> Declarations { get; } = [];
     internal List<DeclarationSite> LocalProcedureDeclarations { get; } = [];
+    internal List<MetaPredicateDeclaration> MetaPredicateDeclarations { get; } = [];
     internal List<ImportSite> Imports { get; } = [];
     internal List<ImportConflict> ImportConflicts { get; } = [];
     internal List<LocalImportShadow> LocalImportShadows { get; } = [];
@@ -257,6 +258,10 @@ internal sealed class PrologLintProgramModel
             case ("meta_predicate", 1):
                 DeclareMetaPredicates(module, directive.Arguments[0], source);
                 return module;
+            case ("metapredicate", 1):
+                RecordMetaPredicates("metapredicate", module, directive.Arguments[0], source);
+                _effectfulModules.Add(module);
+                return module;
             case ("op", 3):
             case ("set_prolog_flag", 2):
             case ("char_conversion", 2):
@@ -347,6 +352,7 @@ internal sealed class PrologLintProgramModel
     {
         foreach (SyntaxTerm item in LintSyntax.SequenceItems(declarations))
         {
+            RecordMetaPredicate("meta_predicate", module, item, source);
             if (!LintSyntax.TryPredicate(item, grammar: false, out PredicateIndicator indicator))
             {
                 continue;
@@ -377,6 +383,32 @@ internal sealed class PrologLintProgramModel
 
             Modules.DeclareMeta(module, indicator.Name, indicator.Arity, arguments, new string(template));
             Declarations.Add(new DeclarationSite(module, indicator, false, "meta_predicate", item.Span, source.FileName));
+        }
+    }
+
+    private void RecordMetaPredicates(string directiveName, string module, SyntaxTerm declarations, PrologLintSource source)
+    {
+        foreach (SyntaxTerm item in LintSyntax.SequenceItems(declarations))
+        {
+            RecordMetaPredicate(directiveName, module, item, source);
+        }
+    }
+
+    private void RecordMetaPredicate(string directiveName, string module, SyntaxTerm item, PrologLintSource source)
+    {
+        if (
+            PrologMetaPredicateDeclarationSyntax.TryNormalize(
+                directiveName,
+                item,
+                out PredicateIndicator indicator,
+                out string template,
+                out string signature
+            )
+        )
+        {
+            MetaPredicateDeclarations.Add(
+                new MetaPredicateDeclaration(module, indicator, template, signature, item.Span, source.FileName)
+            );
         }
     }
 
@@ -556,6 +588,15 @@ internal sealed class PrologLintProgramModel
         string Kind,
         SourceSpan Span,
         string FileName
+    );
+
+    internal sealed record MetaPredicateDeclaration(
+        string Module,
+        PredicateIndicator Indicator,
+        string Template,
+        string Signature,
+        SourceSpan Span,
+        string? FileName
     );
 
     internal readonly record struct LintResolution

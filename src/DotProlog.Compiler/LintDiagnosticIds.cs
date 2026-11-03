@@ -156,4 +156,7 @@ public static class LintDiagnosticIds
 
     /// <summary>A local procedure shares the identity of a predefined predicate.</summary>
     public const string BuiltinShadow = "DPL3049";
+
+    /// <summary>Declarations for one module and predicate have conflicting meta-argument modes.</summary>
+    public const string InconsistentMetaPredicate = "DPL3050";
 }
