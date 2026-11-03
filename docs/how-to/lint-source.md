@@ -86,6 +86,25 @@ exports produce no shadow finding, and local rejection does not also produce `DP
 review hint, not a recommendation to remove an import or rename a working local procedure. No source
 is executed or rewritten.
 
+## Review predefined identity collisions
+
+`DPL3049` is disabled by default because intentionally replacing a bundled library predicate can be
+valid. Enable it explicitly:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint --enable-rule DPL3049 program.pl
+```
+
+The rule reports a local static, dynamic, or multifile procedure whose lowered identity matches a
+native built-in or bundled Prolog library predicate. It covers ordinary predicates, DCG nonterminals,
+modules, `user`, and included source. One finding per module and identity is located at the first
+local clause name, or at the first eligible declaration when no clause exists.
+
+The warning identifies a collision; it does not claim that the local definition always wins. Some
+native redefinitions are ignored, and some module or grammar redefinitions are rejected. Imports and
+reexports do not repeat the finding at each importing module. Review actual call resolution before
+renaming or deleting either definition. No source is executed or rewritten.
+
 ## Check for possible non-steadfast clauses
 
 Enable the non-steadfast heuristic explicitly:

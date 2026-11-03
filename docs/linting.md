@@ -26,6 +26,7 @@ dotnet prolog lint [options] <file.pl> [more.pl ...]
 | `--enable-rule DPL3045` | Enable the opt-in excessive-arity heuristic; repeatable |
 | `--enable-rule DPL3046` | Enable the opt-in excessive-subgoal-count heuristic; repeatable |
 | `--enable-rule DPL3048` | Enable the opt-in local-import shadowing heuristic; repeatable |
+| `--enable-rule DPL3049` | Enable the opt-in predefined-identity collision heuristic; repeatable |
 | `--mode modern` or `--mode strict-iso` | Seed the reader's language mode; default `modern` |
 | `--flag name=value` | Override a curated initial flag; repeatable |
 | `--indent-size N` | Positive indentation unit; Covington default `4` |
@@ -93,6 +94,7 @@ These rules run in every profile:
 | `DPL3046` | Opt-in: a rule exceeds the configured direct-subgoal limit |
 | `DPL3047` | A later import conflicts with an earlier import from a different module |
 | `DPL3048` | Opt-in: a local procedure shadows an import of the same lowered identity |
+| `DPL3049` | Opt-in: a local procedure shares a native or bundled-library predicate identity |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -257,6 +259,33 @@ reexports. Unknown modules, unresolved file imports, unknown exports, and unexpo
 bindings produce no `DPL3048` and do not suppress independent findings. `user` fallback, built-ins,
 and explicitly qualified calls are outside the rule. Local rejection does not also produce `DPL3047`.
 No source is executed, and imports and local definitions are never removed, renamed, or reordered.
+
+### Opt-in predefined identity collisions
+
+`DPL3049` is disabled by default in every profile because intentional replacement of a bundled
+library predicate can be valid. Enable it with `--enable-rule DPL3049`; duplicate options do not
+duplicate findings. Compiler API callers can select the same rule through
+`PrologLintOptions.EnabledRules` in either the single-file or whole-program entry point.
+
+The rule reports a locally supplied static, dynamic, or multifile procedure whose lowered identity
+matches an entry in the predefined catalog derived from native registrations and bundled Prolog
+library source. It emits one finding per module and identity, regardless of clause or call count.
+Different arities do not collide. Ordinary predicates and DCG nonterminals use the two-argument DCG
+adjustment, and the message includes both the local source-form indicator and predefined lowered
+predicate identity.
+
+Findings occur at the first local clause name, or at the first eligible declaration indicator when no
+clause exists. Included definitions retain physical source ownership, and ordinary and grammar
+definitions sharing a lowered identity produce one finding. Named modules and `user` are covered.
+Imports and reexports do not repeat a source definition's finding in each importing module. Export,
+discontiguous, and meta-predicate declarations without definitions are excluded, and unresolved calls
+or imports do not suppress the rule.
+
+The warning reports an identity collision, not a guarantee that the local definition takes priority.
+Native redefinitions can be ignored, and module or grammar redefinitions can be rejected under
+existing language rules. Both language modes use the same implementation-defined catalog; the warning
+does not classify a name as an ISO built-in or change compiler validation, execution, or the recorded
+compatibility gaps. No source is executed, resolved differently, renamed, or removed.
 
 ### Opt-in non-steadfast clauses
 

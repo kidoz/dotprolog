@@ -109,6 +109,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - Opt-in local-import shadowing linting reports resolved imports hidden by local static, dynamic, or
   multifile procedures using `DPL3048`. Enable it with `--enable-rule DPL3048`; findings use the
   first local clause or declaration and cover DCG identities, reexports, and includes without execution.
+- Opt-in predefined-identity linting reports local procedures sharing native or bundled-library
+  identities using `DPL3049`. Enable it with `--enable-rule DPL3049`; source-owned findings cover
+  declarations, DCGs, modules, and includes without claiming that local definitions always win.
 
 ### Changed
 
