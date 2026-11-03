@@ -96,6 +96,7 @@ These rules run in every profile:
 | `DPL3048` | Opt-in: a local procedure shadows an import of the same lowered identity |
 | `DPL3049` | Opt-in: a local procedure shares a native or bundled-library predicate identity |
 | `DPL3050` | Meta-predicate declarations for one module and predicate have conflicting argument modes |
+| `DPL3051` | A selective import requests an identity its statically known source module does not export |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -235,6 +236,33 @@ Unknown modules, unresolved file imports, unknown exports, and selective binding
 their source remain unknown and produce no `DPL3047`; they do not suppress independently resolved
 conflicts. Existing first-accepted-binding behavior and unused-import suppression remain unchanged.
 No source is executed, and imports are never reordered or rewritten.
+
+### Missing exports
+
+`DPL3051` runs in the default semantic profile. It reports a selective `use_module/2`, `import/2`, or
+`reexport/2` binding whose lowered `name/arity` identity is absent from the exports of its resolved,
+statically known source module. The message identifies the importer, source module, and requested
+identity, and states that the binding is not exported and is not resolved. No call is required.
+
+Each finding is located at the first missing selective indicator and deduplicated by importing module,
+source module, and lowered identity. Different identities and source modules remain separate. DCG
+requests preserve `Name//Arity` notation while their comparison identity includes the two added
+arguments. An ordinary export with the same lowered identity is not missing; predicate/nonterminal
+confusion remains `DPL3031`. Whole `use_module/1`, `import/1`, and `reexport/1` forms enumerate known
+exports and therefore produce no missing-selective-binding findings.
+
+Unknown modules, unresolved file imports, malformed selective items, and malformed or incomplete
+export surfaces do not prove absence and produce no corresponding `DPL3051`. They do not suppress
+independently resolved missing bindings. Dynamic or multifile definitions alone do not imply export,
+while explicitly exported dynamic and multifile declarations are eligible normally. A definitively
+missing reexport is reported and not exported; a downstream selective import can independently report
+the same absent identity. Unresolved or malformed reexports instead make the affected downstream
+surface incomplete.
+
+Missing bindings do not also produce `DPL3047` or `DPL3048`, because no import was accepted to
+conflict with another import or local definition. Existing import resolution and unknown-call handling
+remain unchanged. The rule runs only in whole-program analysis; the reusable single-file entry point
+does not invent source-module export knowledge. No source is executed, consulted, or rewritten.
 
 ### Opt-in local import shadowing
 

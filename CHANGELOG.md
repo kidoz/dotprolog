@@ -115,6 +115,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - Default meta-predicate consistency linting reports conflicting Modern and ISO argument-mode
   declarations using `DPL3050`. Findings cover named files and includes while preserving goal,
   closure, and module-sensitive distinctions without executing source or changing template selection.
+- Default missing-export linting reports selective import and reexport bindings absent from a known
+  source module's exports using `DPL3051`. Findings retain DCG source notation and precise indicator
+  spans, deduplicate repeated requests, and remain conservative for unknown or incomplete surfaces.
 
 ### Changed
 

@@ -66,6 +66,27 @@ execution:
 dotnet run --project src/DotProlog.Tool -- lint main.pl module-a.pl module-b.pl
 ```
 
+## Review missing exports
+
+`DPL3051` runs in the default semantic profile. List the importing file and its source modules in one
+command so selective imports can be checked without execution:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint --warnings-as-errors main.pl library.pl
+```
+
+The rule reports a `use_module/2`, `import/2`, or `reexport/2` binding whose lowered `name/arity`
+identity is absent from the resolved source module's known exports. The warning is located at the
+requested indicator and identifies both modules. Repeated requests from one source are deduplicated;
+whole-module imports are excluded.
+
+DCG requests retain `Name//Arity` notation while comparison uses the two-argument-lowered identity.
+An ordinary export with that identity is not missing; source-kind confusion remains `DPL3031`.
+Unknown modules, unresolved files, malformed requests, and malformed or incomplete export surfaces
+produce no absence claim and do not hide independent findings. Failed reexports and their downstream
+selective imports can each be reported. Missing bindings do not also produce `DPL3047` or `DPL3048`.
+No source is executed, consulted, or rewritten.
+
 ## Review local import shadowing
 
 `DPL3048` is disabled by default because deliberately replacing an imported binding with a local
