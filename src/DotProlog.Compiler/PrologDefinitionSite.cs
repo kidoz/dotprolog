@@ -22,4 +22,7 @@ public sealed record PrologDefinitionSite(
 {
     /// <summary>Whether this occurrence is a parsed clause head rather than a call.</summary>
     public bool IsDefinition { get; init; }
+
+    /// <summary>Whether this occurrence is a declaration or import/export indicator.</summary>
+    public bool IsDeclaration { get; init; }
 }

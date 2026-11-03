@@ -13,7 +13,11 @@ public static class PrologSourceDefinitions
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var model = PrologLintProgramModel.Build(sources);
+        return Analyze(PrologLintProgramModel.Build(sources), cancellationToken);
+    }
+
+    internal static IReadOnlyList<PrologDefinitionSite> Analyze(PrologLintProgramModel model, CancellationToken cancellationToken)
+    {
         var symbols = PrologSourceSymbols.Analyze(model, cancellationToken);
         var definitions = symbols
             .GroupBy(symbol => (symbol.Module, symbol.Name, Arity: symbol.Arity + (symbol.IsNonterminal ? 2 : 0)))

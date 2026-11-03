@@ -9,7 +9,8 @@ internal static class PrologCallSites
     internal static IReadOnlyList<PrologCallSite> Analyze(
         PrologLintProgramModel model,
         PrologLanguageMode mode,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        Action<string>? incomplete = null
     )
     {
         List<PrologCallSite> result = [];
@@ -37,6 +38,11 @@ internal static class PrologCallSites
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var term = site.Term;
+                if (term is VariableTerm)
+                {
+                    incomplete?.Invoke("Indirect goals cannot be renamed safely.");
+                    continue;
+                }
                 if (term is CompoundTerm { Name: ":", Arity: 2 } qualified)
                 {
                     pending.Push(
@@ -69,6 +75,8 @@ internal static class PrologCallSites
                 }
                 if (site.Grammar)
                 {
+                    if (term is StringTerm)
+                        continue;
                     if (term is CompoundTerm { Name: "{}", Arity: 1 } ordinary)
                         pending.Push(site with { Term = ordinary.Arguments[0], Grammar = false });
                     else if (term is AtomTerm { Name: "!" })
@@ -87,11 +95,23 @@ internal static class PrologCallSites
                             );
                     }
                     else if (term is not AtomTerm { Name: "[]" or "{}" } && term is not CompoundTerm { Name: ".", Arity: 2 })
-                        Add(term, site.Module, 2, grammar: true);
+                    {
+                        if (Add(term, site.Module, 2, grammar: true) is not null)
+                            incomplete?.Invoke("This builtin DCG call requires additional rename analysis.");
+                    }
                     // DCG sites are retained for navigation but excluded from ordinary builtin hover.
                     continue;
                 }
                 var resolution = Add(term, site.Module, site.Extra, grammar: site.HideHover);
+                if (
+                    site.Extra != 0
+                    && term is CompoundTerm closure
+                    && site.Module is not null
+                    && model.MetaArgumentsOf(site.Module, new PredicateIndicator(closure.Name, closure.Arity + site.Extra))
+                        is { } closureMeta
+                    && closureMeta.Any(argument => argument >= 0)
+                )
+                    incomplete?.Invoke("Nested meta closures require additional rename analysis.");
                 if (site.Extra != 0 || term is not CompoundTerm goal || site.Module is null)
                     continue;
                 var indicator = new PredicateIndicator(goal.Name, goal.Arity);
@@ -149,8 +169,11 @@ internal static class PrologCallSites
                         range = nameSpan;
                         break;
                     default:
+                        incomplete?.Invoke("A goal has no editable predicate name.");
                         return null;
                 }
+                if (module is null)
+                    incomplete?.Invoke("Variable module qualifiers cannot be renamed safely.");
                 var predicate = new PredicateIndicator(name, arity);
                 PrologBuiltinDocumentation? help = null;
                 string? owner = null;
