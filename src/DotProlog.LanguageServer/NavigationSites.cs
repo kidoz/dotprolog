@@ -60,6 +60,7 @@ internal static class NavigationSites
                 || site.Arity != first.Arity
                 || site.Range != first.Range
                 || site.IsDefinition != first.IsDefinition
+                || site.IsDeclaration != first.IsDeclaration
             )
         )
             return null;

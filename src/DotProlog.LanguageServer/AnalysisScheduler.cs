@@ -73,9 +73,7 @@ internal sealed class AnalysisScheduler : IAsyncDisposable
             else if (_requests.ContainsKey(request.Id))
                 await request.Reply(null, -32600).ConfigureAwait(false);
             else if (_idle.Task.IsCompleted)
-                await request
-                    .Reply(_analysisFailed ? null : request.Read(_workspace), _analysisFailed ? -32803 : null)
-                    .ConfigureAwait(false);
+                await request.CompleteAsync(_workspace, _analysisFailed ? -32803 : null).ConfigureAwait(false);
             else
                 _requests.TryAdd(request.Id, request);
         }
@@ -104,7 +102,7 @@ internal sealed class AnalysisScheduler : IAsyncDisposable
         PendingAnalysisRequest[] requests = [.. _requests.Values];
         _requests.Clear();
         foreach (var request in requests)
-            await request.Reply(error is null ? request.Read(_workspace) : null, error).ConfigureAwait(false);
+            await request.CompleteAsync(_workspace, error).ConfigureAwait(false);
     }
 
     private async Task ChangeAsync(Func<bool> change)
@@ -233,6 +231,7 @@ internal sealed class AnalysisScheduler : IAsyncDisposable
                         }
                     }
                     var publications = candidate.AnalyzeSnapshot(documents, disk, project, active.Token);
+                    candidate.RenameConfigurationCurrent = error is null;
                     active.Token.ThrowIfCancellationRequested();
                     await _gate.WaitAsync(active.Token).ConfigureAwait(false);
                     try

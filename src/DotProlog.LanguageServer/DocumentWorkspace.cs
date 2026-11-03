@@ -16,6 +16,18 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
     private CancellationToken _analysisCancellation;
     private ReferenceIndex _references = new();
 
+    internal bool RenameConfigurationCurrent { get; set; } = true;
+
+    internal JsonObject? PrepareRename(string uri, int line, int character) =>
+        RenameConfigurationCurrent ? DocumentRename.Prepare(_outlines, uri, line, character) : null;
+
+    internal JsonObject Rename(string uri, int line, int character, string newName)
+    {
+        if (!RenameConfigurationCurrent)
+            throw new AnalysisRequestException(-32803, "Project reevaluation failed; repair the project before rename.");
+        return DocumentRename.Rename(_outlines, _documents, uri, line, character, newName);
+    }
+
     internal JsonArray Symbols(string uri, bool hierarchical) =>
         DocumentSymbols.Convert(uri, _outlines.GetValueOrDefault(DocumentSnapshot.Key(uri)), hierarchical);
 
@@ -46,6 +58,7 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
         copy._published = new Dictionary<string, DiagnosticPublication>(_published, DocumentSnapshot.KeyComparer);
         copy._outlines = new Dictionary<string, SourceOutline>(_outlines, DocumentSnapshot.KeyComparer);
         copy._references = _references;
+        copy.RenameConfigurationCurrent = RenameConfigurationCurrent;
         return copy;
     }
 
@@ -272,7 +285,16 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
                 text,
                 findings.Where(item => DocumentSnapshot.KeyComparer.Equals(item.FileName, path))
             );
-        return new WorkspaceAnalysis(dependencies, diagnostics, Outlines(units, sources, configuration.Mode));
+        return new WorkspaceAnalysis(
+            dependencies,
+            diagnostics,
+            Outlines(
+                units,
+                sources,
+                configuration.Mode,
+                findings.Any(finding => finding.Id == LintDiagnosticIds.UnresolvedLintSource)
+            )
+        );
 
         string ReadSource(string path)
         {
@@ -294,13 +316,15 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
     private Dictionary<string, SourceOutline> Outlines(
         IReadOnlyList<PrologLintSource> units,
         Dictionary<string, string> sources,
-        PrologLanguageMode languageMode
+        PrologLanguageMode languageMode,
+        bool hasAnalysisGaps = false
     )
     {
         var symbols = PrologSourceSymbols.Analyze(units, _analysisCancellation);
         var hovers = PrologBuiltinHovers.Analyze(units, languageMode, _analysisCancellation);
         var completions = PrologCompletionIndex.Create(units, languageMode, _analysisCancellation);
         var definitions = PrologSourceDefinitions.Analyze(units, _analysisCancellation);
+        var rename = PrologRenameAnalysis.Create(units, hasAnalysisGaps, _analysisCancellation);
         return sources.ToDictionary(
             item => item.Key,
             item => new SourceOutline(
@@ -309,7 +333,8 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
                 hovers.Where(hover => DocumentSnapshot.KeyComparer.Equals(hover.FileName, item.Key)).ToArray(),
                 PrologCompletionText.Create(item.Value, _analysisCancellation),
                 [completions],
-                [definitions.Where(site => DocumentSnapshot.KeyComparer.Equals(site.FileName, item.Key)).ToArray()]
+                [definitions.Where(site => DocumentSnapshot.KeyComparer.Equals(site.FileName, item.Key)).ToArray()],
+                [rename]
             ),
             DocumentSnapshot.KeyComparer
         );
@@ -373,7 +398,8 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
                         previous.Hovers.Concat(outline.Hovers).Distinct().ToArray(),
                         outline.CompletionText,
                         previous.Completions.Concat(outline.Completions).Distinct().ToArray(),
-                        previous.Definitions.Concat(outline.Definitions).ToArray()
+                        previous.Definitions.Concat(outline.Definitions).ToArray(),
+                        previous.Renames.Concat(outline.Renames).Distinct().ToArray()
                     )
                     : outline;
             }

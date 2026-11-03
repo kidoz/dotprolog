@@ -21,6 +21,7 @@ internal sealed class LanguageServer(
     private bool _hierarchicalSymbols;
     private bool _markdownHover;
     private bool _definitionLinks;
+    private bool _versionedEdits;
     private bool _initialized;
     private bool _shutdown;
 
@@ -117,6 +118,18 @@ internal sealed class LanguageServer(
                         }
                         var capabilities = RequireObject(RequireObject(body["params"])["capabilities"]);
                         _fileWatchRegistration.Configure(capabilities);
+                        _versionedEdits =
+                            capabilities["workspace"] is JsonObject editWorkspace
+                            && editWorkspace["workspaceEdit"] is JsonObject editCapabilities
+                            && editCapabilities["documentChanges"] is JsonValue documentChanges
+                            && documentChanges.TryGetValue<bool>(out var supportsChanges)
+                            && supportsChanges;
+                        bool prepareRename =
+                            capabilities["textDocument"] is JsonObject renameText
+                            && renameText["rename"] is JsonObject renameCapabilities
+                            && renameCapabilities["prepareSupport"] is JsonValue prepareSupport
+                            && prepareSupport.TryGetValue<bool>(out var supportsPrepare)
+                            && supportsPrepare;
                         _definitionLinks =
                             capabilities["textDocument"] is JsonObject definitionText
                             && definitionText["definition"] is JsonObject definitionCapabilities
@@ -157,6 +170,10 @@ internal sealed class LanguageServer(
                                             ["hoverProvider"] = true,
                                             ["definitionProvider"] = true,
                                             ["referencesProvider"] = true,
+                                            ["renameProvider"] =
+                                                _versionedEdits && prepareRename
+                                                    ? new JsonObject { ["prepareProvider"] = true }
+                                                    : JsonValue.Create(_versionedEdits),
                                             ["completionProvider"] = new JsonObject
                                             {
                                                 ["resolveProvider"] = false,
@@ -205,6 +222,8 @@ internal sealed class LanguageServer(
                             )
                             .ConfigureAwait(false);
                         break;
+                    case "textDocument/prepareRename" when request:
+                    case "textDocument/rename" when request:
                     case "textDocument/references" when request:
                     case "textDocument/definition" when request:
                     case "textDocument/completion" when request:
@@ -217,6 +236,13 @@ internal sealed class LanguageServer(
                         int character = RequireInteger(position["character"]);
                         if (line < 0 || character < 0)
                             throw new InvalidParametersException();
+                        string? newName = method == "textDocument/rename" ? RequireString(positionParameters["newName"]) : null;
+                        if (method is "textDocument/rename" or "textDocument/prepareRename" && !_versionedEdits)
+                        {
+                            await SendAsync(Error(id, -32803, "Rename requires workspace.workspaceEdit.documentChanges support."))
+                                .ConfigureAwait(false);
+                            break;
+                        }
                         bool includeDeclaration = false;
                         if (method == "textDocument/references")
                         {
@@ -231,6 +257,8 @@ internal sealed class LanguageServer(
                                     workspace =>
                                         method switch
                                         {
+                                            "textDocument/prepareRename" => workspace.PrepareRename(positionUri, line, character),
+                                            "textDocument/rename" => workspace.Rename(positionUri, line, character, newName!),
                                             "textDocument/references" => workspace.References(
                                                 positionUri,
                                                 line,
@@ -247,7 +275,8 @@ internal sealed class LanguageServer(
                                             _ => workspace.Hover(positionUri, line, character, _markdownHover),
                                         },
                                     (result, error) => ReplyAnalysisAsync(id, result, error),
-                                    InvalidateOnChange: true
+                                    InvalidateOnChange: true,
+                                    ReplyError: (code, message) => SendAsync(Error(id, code, message)).AsTask()
                                 )
                             )
                             .ConfigureAwait(false);

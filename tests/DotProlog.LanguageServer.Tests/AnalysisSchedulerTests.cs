@@ -83,6 +83,8 @@ public sealed class AnalysisSchedulerTests
     [InlineData("completion")]
     [InlineData("definition")]
     [InlineData("references")]
+    [InlineData("prepareRename")]
+    [InlineData("rename")]
     public async Task PendingPositionRequestIsInvalidatedByAnEditInsteadOfUsingShiftedPosition(string requestKind)
     {
         await using var scheduler = new AnalysisScheduler(
@@ -96,7 +98,9 @@ public sealed class AnalysisSchedulerTests
         await scheduler.UpdateAsync(
             new DocumentSnapshot(
                 "untitled:hover",
-                requestKind is "definition" or "references" ? "run :- first. first." : "run :- write(ok).",
+                requestKind is "definition" or "references" or "prepareRename" or "rename"
+                    ? "run :- first. first."
+                    : "run :- write(ok).",
                 1
             ),
             false
@@ -107,6 +111,8 @@ public sealed class AnalysisSchedulerTests
                 workspace =>
                     requestKind switch
                     {
+                        "prepareRename" => workspace.PrepareRename("untitled:hover", 0, 7),
+                        "rename" => workspace.Rename("untitled:hover", 0, 7, "renamed"),
                         "references" => workspace.References("untitled:hover", 0, 7, false),
                         "definition" => workspace.Definition("untitled:hover", 0, 7, false),
                         "completion" => workspace.Completion("untitled:hover", 0, 9),
@@ -124,7 +130,9 @@ public sealed class AnalysisSchedulerTests
         await scheduler.UpdateAsync(
             new DocumentSnapshot(
                 "untitled:hover",
-                requestKind is "definition" or "references" ? "run :- second. second." : "run :- var(X).",
+                requestKind is "definition" or "references" or "prepareRename" or "rename"
+                    ? "run :- second. second."
+                    : "run :- var(X).",
                 2
             ),
             true
@@ -138,6 +146,8 @@ public sealed class AnalysisSchedulerTests
                 workspace =>
                     requestKind switch
                     {
+                        "prepareRename" => workspace.PrepareRename("untitled:hover", 0, 7),
+                        "rename" => workspace.Rename("untitled:hover", 0, 7, "renamed"),
                         "references" => workspace.References("untitled:hover", 0, 7, false),
                         "definition" => workspace.Definition("untitled:hover", 0, 7, false),
                         "completion" => workspace.Completion("untitled:hover", 0, 9),
@@ -153,7 +163,11 @@ public sealed class AnalysisSchedulerTests
             )
         );
         var current = await retry.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        if (requestKind == "references")
+        if (requestKind == "prepareRename")
+            Assert.Equal("second", current!["placeholder"]!.GetValue<string>());
+        else if (requestKind == "rename")
+            Assert.Equal(2, Assert.Single(current!["documentChanges"]!.AsArray())!["textDocument"]!["version"]!.GetValue<int>());
+        else if (requestKind == "references")
             Assert.Equal(7, Assert.Single((JsonArray)current!)!["range"]!["start"]!["character"]!.GetValue<int>());
         else if (requestKind == "definition")
             Assert.Equal(15, Assert.Single((JsonArray)current!)!["range"]!["start"]!["character"]!.GetValue<int>());
@@ -251,6 +265,8 @@ public sealed class AnalysisSchedulerTests
     [InlineData("completion")]
     [InlineData("definition")]
     [InlineData("references")]
+    [InlineData("prepareRename")]
+    [InlineData("rename")]
     public async Task RequestsAndShutdownRemainResponsiveDuringReevaluation(string requestMethod)
     {
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -304,7 +320,7 @@ public sealed class AnalysisSchedulerTests
         {
             await SendAsync(
                 clientWrite,
-                """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}""",
+                """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{"workspace":{"workspaceEdit":{"documentChanges":true}},"textDocument":{"rename":{"prepareSupport":true}}}}}""",
                 timeout.Token
             );
             Assert.Equal(1, (await ReadAsync(clientRead, timeout.Token))["id"]!.GetValue<int>());
@@ -331,6 +347,12 @@ public sealed class AnalysisSchedulerTests
                 var referenceRequest = JsonNode.Parse(outline)!;
                 referenceRequest["params"]!["context"] = new JsonObject { ["includeDeclaration"] = false };
                 outline = referenceRequest.ToJsonString();
+            }
+            if (requestMethod == "rename")
+            {
+                var renameRequest = JsonNode.Parse(outline)!;
+                renameRequest["params"]!["newName"] = "renamed";
+                outline = renameRequest.ToJsonString();
             }
             await SendAsync(clientWrite, outline, timeout.Token);
             if (positional)

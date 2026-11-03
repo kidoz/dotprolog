@@ -9,5 +9,6 @@ internal sealed record SourceOutline(
     IReadOnlyList<PrologBuiltinHover> Hovers,
     PrologCompletionText CompletionText,
     IReadOnlyList<PrologCompletionIndex> Completions,
-    IReadOnlyList<IReadOnlyList<PrologDefinitionSite>> Definitions
+    IReadOnlyList<IReadOnlyList<PrologDefinitionSite>> Definitions,
+    IReadOnlyList<PrologRenameAnalysis> Renames
 );
