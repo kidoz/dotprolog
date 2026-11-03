@@ -149,6 +149,7 @@ public static class PrologLinter
         PrologBuiltinShadowLinter.Analyze(model, options, diagnostics);
         PrologMetaPredicateDeclarationLinter.Analyze(model, diagnostics);
         PrologConflictingImportLinter.Analyze(model, diagnostics);
+        PrologMissingExportLinter.Analyze(model, diagnostics);
         PrologCallGraphLinter.Analyze(model, diagnostics);
         PrologReachabilityLinter.Analyze(model, diagnostics);
         PrologUnusedImportLinter.Analyze(model, diagnostics);

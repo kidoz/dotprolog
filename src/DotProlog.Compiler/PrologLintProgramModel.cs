@@ -14,6 +14,9 @@ internal sealed class PrologLintProgramModel
     private readonly HashSet<(string Module, PredicateIndicator Predicate)> _dynamicOrMultifile = [];
     private readonly HashSet<string> _effectfulModules = new(StringComparer.Ordinal);
     private readonly HashSet<(string Importer, string SourceModule, PredicateIndicator Indicator)> _localImportShadows = [];
+    private readonly HashSet<(string Importer, string SourceModule, PredicateIndicator Indicator)> _missingExports = [];
+    private readonly HashSet<string> _incompleteExportModules = new(StringComparer.Ordinal);
+    private readonly HashSet<(string Module, PredicateIndicator Predicate)> _incompleteExportPredicates = [];
 
     private PrologLintProgramModel(IReadOnlyList<PrologLintSource> sources)
     {
@@ -36,6 +39,7 @@ internal sealed class PrologLintProgramModel
     internal List<ImportSite> Imports { get; } = [];
     internal List<ImportConflict> ImportConflicts { get; } = [];
     internal List<LocalImportShadow> LocalImportShadows { get; } = [];
+    internal List<MissingExport> MissingExports { get; } = [];
     internal List<(string File, int Offset, string Module, int Context)> ModuleScopes { get; } = [];
 
     internal static PrologLintProgramModel Build(IReadOnlyList<PrologLintSource> sources)
@@ -49,6 +53,11 @@ internal sealed class PrologLintProgramModel
         }
 
         model.ResolveImports(imports);
+        model.PropagateIncompleteExports(imports);
+        model.MissingExports.RemoveAll(missing =>
+            model.Modules.ExportsOf(missing.SourceModule).Contains(missing.Indicator)
+            || model.HasIncompleteExport(missing.SourceModule, missing.Indicator)
+        );
 
         var propagated = true;
         while (propagated)
@@ -286,6 +295,7 @@ internal sealed class PrologLintProgramModel
         {
             if (!LintSyntax.TryIndicator(item, out PredicateIndicator indicator, out var nonterminal))
             {
+                _incompleteExportModules.Add(module);
                 continue;
             }
 
@@ -452,6 +462,7 @@ internal sealed class PrologLintProgramModel
             if (sourceModule is null)
             {
                 MarkUnresolved(request, predicate: null);
+                MarkIncompleteReexport(request);
                 Imports.Add(request.ToSite(sourceModule));
                 return;
             }
@@ -459,8 +470,14 @@ internal sealed class PrologLintProgramModel
         else if (sourceModule is null || !Modules.Catalog.Contains(sourceModule))
         {
             MarkUnresolved(request, predicate: null);
+            MarkIncompleteReexport(request);
             Imports.Add(request.ToSite(sourceModule));
             return;
+        }
+
+        if (request.Reexport && !request.BindingsComplete)
+        {
+            _incompleteExportModules.Add(request.Importer);
         }
 
         IEnumerable<PredicateIndicator> selected = request.Selective
@@ -472,6 +489,11 @@ internal sealed class PrologLintProgramModel
         {
             if (!exports.Contains(predicate))
             {
+                if (request.Selective)
+                {
+                    RecordMissingExport(request, predicate, sourceModule);
+                }
+
                 MarkUnresolved(request, predicate);
                 continue;
             }
@@ -498,6 +520,77 @@ internal sealed class PrologLintProgramModel
         }
 
         Imports.Add(request.ToSite(sourceModule));
+    }
+
+    private void RecordMissingExport(ImportRequest request, PredicateIndicator predicate, string sourceModule)
+    {
+        if (!_missingExports.Add((request.Importer, sourceModule, predicate)))
+        {
+            return;
+        }
+
+        ImportBinding binding = request.Bindings.First(binding => binding.Indicator == predicate);
+        MissingExports.Add(
+            new MissingExport(request.Importer, sourceModule, predicate, binding.Nonterminal, binding.Span, request.Source)
+        );
+    }
+
+    private bool HasIncompleteExport(string module, PredicateIndicator predicate) =>
+        _incompleteExportModules.Contains(module) || _incompleteExportPredicates.Contains((module, predicate));
+
+    private void MarkIncompleteReexport(ImportRequest request)
+    {
+        if (request.Reexport)
+        {
+            _incompleteExportModules.Add(request.Importer);
+        }
+    }
+
+    private void PropagateIncompleteExports(List<ImportRequest> imports)
+    {
+        var propagated = true;
+        while (propagated)
+        {
+            propagated = false;
+            foreach (ImportRequest request in imports.Where(import => import.Reexport))
+            {
+                string? sourceModule = request.FileDirective ? ResolveModulePath(request) : request.SourceModule;
+                if (sourceModule is null || !Modules.Catalog.Contains(sourceModule))
+                {
+                    propagated |= _incompleteExportModules.Add(request.Importer);
+                    continue;
+                }
+
+                if (!request.BindingsComplete)
+                {
+                    propagated |= _incompleteExportModules.Add(request.Importer);
+                }
+
+                HashSet<PredicateIndicator> exports = [.. Modules.ExportsOf(sourceModule)];
+                if (request.Selective)
+                {
+                    foreach (ImportBinding binding in request.Bindings)
+                    {
+                        if (!exports.Contains(binding.Indicator) && HasIncompleteExport(sourceModule, binding.Indicator))
+                        {
+                            propagated |= _incompleteExportPredicates.Add((request.Importer, binding.Indicator));
+                        }
+                    }
+
+                    continue;
+                }
+
+                if (_incompleteExportModules.Contains(sourceModule))
+                {
+                    propagated |= _incompleteExportModules.Add(request.Importer);
+                }
+
+                foreach (var incomplete in _incompleteExportPredicates.Where(entry => entry.Module == sourceModule).ToArray())
+                {
+                    propagated |= _incompleteExportPredicates.Add((request.Importer, incomplete.Predicate));
+                }
+            }
+        }
     }
 
     private void RecordLocalImportShadow(ImportRequest request, PredicateIndicator predicate, string sourceModule)
@@ -649,6 +742,15 @@ internal sealed class PrologLintProgramModel
         bool Nonterminal
     );
 
+    internal sealed record MissingExport(
+        string Importer,
+        string SourceModule,
+        PredicateIndicator Indicator,
+        bool Nonterminal,
+        SourceSpan Span,
+        PrologLintSource Source
+    );
+
     private sealed record ImportRequest(
         PrologLintSource Source,
         string Importer,
@@ -658,14 +760,28 @@ internal sealed class PrologLintProgramModel
         bool Selective,
         bool Reexport,
         CompoundTerm Directive,
+        bool BindingsComplete,
         IReadOnlyList<ImportBinding> Bindings
     )
     {
         internal static ImportRequest ForFile(PrologLintSource source, string importer, CompoundTerm directive)
         {
             var path = directive.Arguments[0] is AtomTerm atom ? atom.Name : null;
-            IReadOnlyList<ImportBinding> bindings = directive.Arity == 2 ? Indicators(directive.Arguments[1]) : [];
-            return new ImportRequest(source, importer, null, path, true, directive.Arity == 2, false, directive, bindings);
+            var bindingsComplete = true;
+            IReadOnlyList<ImportBinding> bindings =
+                directive.Arity == 2 ? Indicators(directive.Arguments[1], out bindingsComplete) : [];
+            return new ImportRequest(
+                source,
+                importer,
+                null,
+                path,
+                true,
+                directive.Arity == 2,
+                false,
+                directive,
+                bindingsComplete,
+                bindings
+            );
         }
 
         internal static ImportRequest ForModule(
@@ -676,21 +792,39 @@ internal sealed class PrologLintProgramModel
         )
         {
             var module = directive.Arguments[0] is AtomTerm atom ? atom.Name : null;
-            IReadOnlyList<ImportBinding> bindings = directive.Arity == 2 ? Indicators(directive.Arguments[1]) : [];
-            return new ImportRequest(source, importer, module, null, false, directive.Arity == 2, reexport, directive, bindings);
+            var bindingsComplete = true;
+            IReadOnlyList<ImportBinding> bindings =
+                directive.Arity == 2 ? Indicators(directive.Arguments[1], out bindingsComplete) : [];
+            return new ImportRequest(
+                source,
+                importer,
+                module,
+                null,
+                false,
+                directive.Arity == 2,
+                reexport,
+                directive,
+                bindingsComplete,
+                bindings
+            );
         }
 
         internal ImportSite ToSite(string? sourceModule) =>
             new(Importer, sourceModule, Selective, Reexport, Bindings, Directive.Arguments[0], Source);
 
-        private static List<ImportBinding> Indicators(SyntaxTerm term)
+        private static List<ImportBinding> Indicators(SyntaxTerm term, out bool complete)
         {
+            complete = true;
             List<ImportBinding> result = [];
             foreach (SyntaxTerm item in LintSyntax.SequenceItems(term))
             {
                 if (LintSyntax.TryIndicator(item, out PredicateIndicator indicator, out var nonterminal))
                 {
                     result.Add(new ImportBinding(indicator, nonterminal, item.Span));
+                }
+                else
+                {
+                    complete = false;
                 }
             }
 

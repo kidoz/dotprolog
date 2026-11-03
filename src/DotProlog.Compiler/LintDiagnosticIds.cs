@@ -159,4 +159,7 @@ public static class LintDiagnosticIds
 
     /// <summary>Declarations for one module and predicate have conflicting meta-argument modes.</summary>
     public const string InconsistentMetaPredicate = "DPL3050";
+
+    /// <summary>A selective import requests an identity its source module does not export.</summary>
+    public const string MissingExport = "DPL3051";
 }

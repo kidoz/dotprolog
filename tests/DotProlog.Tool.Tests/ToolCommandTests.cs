@@ -187,6 +187,26 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void LintReportsMissingExportsByDefaultWithoutExecutingSource()
+    {
+        var a = Source("missing-export-source.pl", ":- module(a, [q/0]). q.\n");
+        var main = Source(
+            "missing-export-main.pl",
+            ":- module(m, []). :- initialization(halt(9)). :- use_module('missing-export-source.pl', [p/0]).\n"
+        );
+
+        (var defaultExit, _, var defaultError) = Execute("lint", main, a);
+        (var enabledExit, _, var enabledError) = Execute("lint", "--warnings-as-errors", main, a);
+
+        Assert.Equal(0, defaultExit);
+        Assert.Contains("DPL3051", defaultError, StringComparison.Ordinal);
+        Assert.Equal(1, enabledExit);
+        Assert.Contains("DPL3051", enabledError, StringComparison.Ordinal);
+        Assert.Contains("Import of p/0 into module m from module a", enabledError, StringComparison.Ordinal);
+        Assert.Contains("binding is not resolved", enabledError, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LintReportsAGroundCallWithNoMatchingClauseHead()
     {
         var path = Source("trivial.pl", "p(a). go :- p(b).\n");
