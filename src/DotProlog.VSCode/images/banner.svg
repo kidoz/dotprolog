@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="title">
+  <title id="title">DotProlog — Prolog on .NET</title>
+  <rect width="1200" height="300" rx="24" fill="#f5f7ff"/>
+  <image x="24" y="22" width="256" height="256" href="icon.svg"/>
+  <text x="326" y="157" font-family="Inter,DejaVu Sans,sans-serif" font-size="94" font-weight="700" fill="#101c68">DotProlog</text>
+  <text x="332" y="214" font-family="Inter,DejaVu Sans,sans-serif" font-size="32" fill="#485778">Prolog on .NET</text>
+</svg>

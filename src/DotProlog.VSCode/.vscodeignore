@@ -5,6 +5,8 @@
 !language-configuration.json
 !syntaxes/**
 !snippets/**
+!images/*.png
+!CHANGELOG.md
 !bin/extension.js
 !bin/THIRD_PARTY_NOTICES.txt
 !bin/server/**/*.dll

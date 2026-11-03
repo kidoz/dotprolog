@@ -1,7 +1,7 @@
 {
   "name": "dotprolog",
   "displayName": "DotProlog",
-  "description": "DotProlog language services for Prolog on .NET.",
+  "description": "Prolog on .NET: diagnostics, completion, hover, navigation and predicate rename.",
   "version": "0.1.0",
   "publisher": "kidoz",
   "license": "MIT",
@@ -177,5 +177,16 @@
   "overrides": {
     "minimatch": "11.0.1",
     "glob": "14.0.3"
+  },
+  "icon": "images/icon.png",
+  "preview": true,
+  "homepage": "https://github.com/kidoz/dotprolog/tree/main/src/DotProlog.VSCode",
+  "bugs": {
+    "url": "https://github.com/kidoz/dotprolog/issues"
+  },
+  "qna": "https://github.com/kidoz/dotprolog/issues",
+  "galleryBanner": {
+    "color": "#101c68",
+    "theme": "dark"
   }
 }

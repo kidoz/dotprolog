@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 256 256" role="img" aria-labelledby="title description">
+  <title id="title">DotProlog</title>
+  <desc id="description">The DotProlog D and three connected logic nodes on a light rounded tile.</desc>
+  <rect x="2" y="2" width="252" height="252" rx="48" fill="#f5f7ff" stroke="#dbe2fa" stroke-width="2"/>
+  <path d="M62 43H107C171 43 205 80 205 128S171 213 107 213H62" fill="none" stroke="#101c68" stroke-width="20" stroke-linecap="round"/>
+  <path d="M66 86V170" fill="none" stroke="#101c68" stroke-width="11"/>
+  <path d="M66 86L165 128" fill="none" stroke="#8c36ef" stroke-width="11"/>
+  <path d="M66 170L165 128" fill="none" stroke="#04a8e8" stroke-width="11"/>
+  <circle cx="66" cy="86" r="17" fill="#f5f7ff" stroke="#8c36ef" stroke-width="11"/>
+  <circle cx="66" cy="170" r="17" fill="#f5f7ff" stroke="#04a8e8" stroke-width="11"/>
+  <circle cx="165" cy="128" r="17" fill="#f5f7ff" stroke="#04a8e8" stroke-width="11"/>
+</svg>
