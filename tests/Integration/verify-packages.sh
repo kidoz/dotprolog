@@ -282,3 +282,25 @@ fi
 test "$lint_exit" -eq 1
 printf '%s\n' "$lint_output" | grep -F 'warning DPL3047'
 printf '%s\n' "$lint_output" | grep -F 'earlier import from module a'
+
+# Local import shadowing is opt-in and never executes an initialization directive.
+printf '%s\n' ':- module(shadow_source, [p/0]).' 'p.' >HelloProlog/lint-shadow-source.pl
+printf '%s\n' ':- module(shadow_main, [p/0]).' ':- initialization(halt(9)).' \
+    ':- import(shadow_source, [p/0]).' 'p.' >HelloProlog/lint-shadow-main.pl
+lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    HelloProlog/lint-shadow-main.pl HelloProlog/lint-shadow-source.pl 2>&1)
+if printf '%s\n' "$lint_output" | grep -F 'warning DPL3048'; then
+    echo "lint enabled local import shadowing by default" >&2
+    exit 1
+fi
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --enable-rule DPL3048 --warnings-as-errors \
+    HelloProlog/lint-shadow-main.pl HelloProlog/lint-shadow-source.pl 2>&1); then
+    echo "lint unexpectedly accepted an enabled local import shadow" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3048'
+printf '%s\n' "$lint_output" | grep -F 'from module shadow_source'
