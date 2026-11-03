@@ -1,6 +1,9 @@
 # DotProlog for Visual Studio Code
 
-Language services for DotProlog, the Prolog implementation for .NET 10.
+![DotProlog — Prolog on .NET](images/banner.png)
+
+Write Prolog with diagnostics, completion, hover documentation and navigation powered by
+DotProlog's bundled language server. DotProlog is the Prolog implementation for .NET 10.
 
 ## Features
 
@@ -11,6 +14,12 @@ Language services for DotProlog, the Prolog implementation for .NET 10.
 - One explicitly selected `.dplproj` per window, with evaluated mode, flags and source items.
 - Server restart, output and bounded automatic recovery after server crashes.
 - Highlighting for `.dpli` contracts and XML editing for `.dplproj` files.
+
+![Prolog syntax highlighting and predicate outline in VS Code](images/editor.png)
+
+Diagnostics update as you type, including changes in unsaved included files.
+
+![Parser diagnostics in the editor and Problems panel](images/diagnostics.png)
 
 Analysis does not execute Prolog goals. Rename only covers the analyzed snapshot and can refuse
 operations when the server cannot prove an unambiguous static edit. Contract diagnostics, formatting,
@@ -137,3 +146,6 @@ CI retains platform VSIX files and native symbols. Other target architectures re
 ## License
 
 MIT. Bundled dependency notices accompany the extension.
+
+Report bugs and request features in [GitHub Issues](https://github.com/kidoz/dotprolog/issues).
+Maintainers can follow the [Marketplace publishing guide](../../docs/how-to/publish-vscode-extension.md).
