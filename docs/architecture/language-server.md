@@ -457,6 +457,28 @@ process-tree cleanup. It verifies wire output and exit status for either managed
 
 ## Verification evidence
 
+Installed-package validation at `8d8f3d4` on 2026-11-03 is tracked by
+[the managed/native CI run](https://github.com/kidoz/dotprolog/actions/runs/41681224293).
+All six managed jobs passed. Native results are:
+
+| Native target | VS Code 1.91.0 | VS Code 1.144.1 |
+| --- | --- | --- |
+| Windows x64 (`win-x64`) | Passed | Passed |
+| Linux x64 (`linux-x64`) | Passed | Passed |
+| macOS arm64 (`osx-arm64`) | Passed | Queued for a hosted runner |
+
+Each completed job passed six launch/grammar tests, installation through the selected editor's CLI,
+eight editor integration tests and one Restricted Mode test. Native publish produced no trimming or
+AOT warnings. Native jobs also exercised initialization, Unicode diagnostics, debounced edits,
+include overlays, disk changes, shutdown and early exit with an empty `PATH` and isolated
+`DOTNET_ROOT`, using the installed executable with its original permissions and no managed-server
+DLL fallback. Project editor checks retained SDK access. Completed jobs uploaded their VSIX files;
+native jobs also uploaded debug symbols. The macOS native stable job remains unverified in CI while
+queued; the same installation, protocol and editor checks passed locally on macOS arm64 for both
+versions. Its first runner request stayed unassigned for over fifteen minutes; only that job was
+retried on the same commit, retaining the other eleven successful results. Other native architectures
+and older Linux distribution baselines were not tested.
+
 Cross-platform managed-package validation passed all six jobs on 2026-11-03 at `c23c5a6` in
 [the VS Code CI run](https://github.com/kidoz/dotprolog/actions/runs/41678580961):
 
