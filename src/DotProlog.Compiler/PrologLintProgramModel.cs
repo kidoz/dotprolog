@@ -31,6 +31,7 @@ internal sealed class PrologLintProgramModel
     internal List<ClauseContext> Clauses { get; } = [];
     internal List<DeclarationSite> Declarations { get; } = [];
     internal List<ImportSite> Imports { get; } = [];
+    internal List<ImportConflict> ImportConflicts { get; } = [];
     internal List<(string File, int Offset, string Module, int Context)> ModuleScopes { get; } = [];
 
     internal static PrologLintProgramModel Build(IReadOnlyList<PrologLintSource> sources)
@@ -430,7 +431,7 @@ internal sealed class PrologLintProgramModel
                 continue;
             }
 
-            if (Modules.TryImport(request.Importer, predicate, sourceModule, out _))
+            if (Modules.TryImport(request.Importer, predicate, sourceModule, out string? conflictingModule))
             {
                 if (request.Reexport)
                 {
@@ -440,10 +441,39 @@ internal sealed class PrologLintProgramModel
             else
             {
                 MarkUnresolved(request, predicate);
+                if (conflictingModule is not null && conflictingModule != request.Importer)
+                {
+                    RecordImportConflict(request, predicate, conflictingModule, sourceModule);
+                }
             }
         }
 
         Imports.Add(request.ToSite(sourceModule));
+    }
+
+    private void RecordImportConflict(
+        ImportRequest request,
+        PredicateIndicator predicate,
+        string earlierModule,
+        string laterModule
+    )
+    {
+        SourceSpan span = request.Directive.Arguments[0].Span;
+        bool nonterminal;
+        if (request.Selective)
+        {
+            ImportBinding binding = request.Bindings.First(binding => binding.Indicator == predicate);
+            span = binding.Span;
+            nonterminal = binding.Nonterminal;
+        }
+        else
+        {
+            nonterminal = _nonterminals.Contains((laterModule, predicate)) && !_ordinary.Contains((laterModule, predicate));
+        }
+
+        ImportConflicts.Add(
+            new ImportConflict(request.Importer, earlierModule, laterModule, predicate, nonterminal, span, request.Source)
+        );
     }
 
     private string? ResolveModulePath(ImportRequest request)
@@ -530,6 +560,16 @@ internal sealed class PrologLintProgramModel
     );
 
     internal sealed record ImportBinding(PredicateIndicator Indicator, bool Nonterminal, SourceSpan Span);
+
+    internal sealed record ImportConflict(
+        string Importer,
+        string EarlierModule,
+        string LaterModule,
+        PredicateIndicator Indicator,
+        bool Nonterminal,
+        SourceSpan Span,
+        PrologLintSource Source
+    );
 
     private sealed record ImportRequest(
         PrologLintSource Source,

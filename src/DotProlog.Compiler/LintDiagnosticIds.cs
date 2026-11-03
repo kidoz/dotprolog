@@ -147,4 +147,7 @@ public static class LintDiagnosticIds
 
     /// <summary>A rule exceeds the configured direct-subgoal limit.</summary>
     public const string ExcessiveSubgoalCount = "DPL3046";
+
+    /// <summary>A later import conflicts with an earlier import from a different module.</summary>
+    public const string ConflictingImport = "DPL3047";
 }

@@ -100,6 +100,24 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void LintReportsConflictingImportsByDefault()
+    {
+        var a = Source("a.pl", ":- module(a, [p/0]). p.\n");
+        var b = Source("b.pl", ":- module(b, [p/0]). p.\n");
+        var main = Source("conflict.pl", ":- module(m, []). :- import(a, [p/0]). :- import(b, [p/0]).\n");
+
+        (var defaultExit, _, var defaultError) = Execute("lint", main, a, b);
+        (var enabledExit, _, var enabledError) = Execute("lint", "--warnings-as-errors", main, a, b);
+
+        Assert.Equal(0, defaultExit);
+        Assert.Contains("DPL3047", defaultError, StringComparison.Ordinal);
+        Assert.Equal(1, enabledExit);
+        Assert.Contains("DPL3047", enabledError, StringComparison.Ordinal);
+        Assert.Contains("earlier import from module a", enabledError, StringComparison.Ordinal);
+        Assert.Contains("from module b", enabledError, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LintReportsAGroundCallWithNoMatchingClauseHead()
     {
         var path = Source("trivial.pl", "p(a). go :- p(b).\n");
