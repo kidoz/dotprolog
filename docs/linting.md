@@ -27,6 +27,8 @@ dotnet prolog lint [options] <file.pl> [more.pl ...]
 | `--enable-rule DPL3046` | Enable the opt-in excessive-subgoal-count heuristic; repeatable |
 | `--enable-rule DPL3048` | Enable the opt-in local-import shadowing heuristic; repeatable |
 | `--enable-rule DPL3049` | Enable the opt-in predefined-identity collision heuristic; repeatable |
+| `--enable-rule DPL3052` | Enable opt-in leading-fact contract output checking; repeatable |
+| `--contract FILE` | Pair a `.dpli` contract with exactly one named `.pl` base name; repeatable |
 | `--mode modern` or `--mode strict-iso` | Seed the reader's language mode; default `modern` |
 | `--flag name=value` | Override a curated initial flag; repeatable |
 | `--indent-size N` | Positive indentation unit; Covington default `4` |
@@ -97,6 +99,7 @@ These rules run in every profile:
 | `DPL3049` | Opt-in: a local procedure shares a native or bundled-library predicate identity |
 | `DPL3050` | Meta-predicate declarations for one module and predicate have conflicting argument modes |
 | `DPL3051` | A selective import requests an identity its statically known source module does not export |
+| `DPL3052` | Opt-in: a leading static fact has a ground output incompatible with its `.dpli` declaration |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -335,6 +338,34 @@ histories, and a single local declaration differing from an imported or predefin
 this rule. Exact duplicates remain `DPL3025`. Dynamic or multifile procedures and unrelated unresolved
 calls do not suppress explicit conflicts. Whole-program analysis suppresses duplicate file-local
 copies, retains physical source ownership, and never executes or rewrites declarations.
+
+### Opt-in contract output compatibility
+
+`DPL3052` is disabled by default in every profile and is not run during SDK façade generation. Enable
+it with `--enable-rule DPL3052` and supply each `.dpli` explicitly using repeatable `--contract FILE`.
+A contract must have the same base name as exactly one named `.pl` source; missing or ambiguous
+pairing returns `64`, while contract reader diagnostics retain their `DPL2xxx` identities and return
+`65`. There is no ambient sibling discovery.
+
+The rule examines only the first supplied static clause for a contract export. It must be an ordinary
+fact with no earlier ordinary or grammar clause of the same identity. Every declared input must be a
+ground term compatible with the value constructed by its typed façade input. A finding is emitted for
+each fully ground output that the runtime marshaller definitely cannot convert to its declared type.
+The warning is located at that output and names the module-qualified predicate, output name, expected
+type, actual runtime shape, and contract file.
+
+Output compatibility follows the actual marshaller: `atom` accepts only atoms, `integer` accepts only
+the fixnum representation, `float` accepts every numeric representation, `term` accepts every ground
+term, and `list(T)` requires a proper list with recursively compatible elements. Input compatibility
+follows façade construction instead, so input `float` requires a float and does not inherit the output
+numeric coercions. Source integers are classified after fixnum widening.
+
+Later facts, leading rules, variable or partially ground inputs and outputs, open lists,
+reader-dependent quoted text, incompatible inputs, mixed predicate/nonterminal definitions,
+imported-only definitions, dynamic or multifile targets, ambiguous export modules, and effectful
+modules are not established and remain silent. A consistent leading output says nothing about later
+clauses, determinism, or whole-predicate correctness. Both language modes use the same rules, included
+facts retain physical spans, and no source is consulted, executed, or rewritten.
 
 ### Opt-in non-steadfast clauses
 

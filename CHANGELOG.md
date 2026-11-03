@@ -118,6 +118,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - Default missing-export linting reports selective import and reexport bindings absent from a known
   source module's exports using `DPL3051`. Findings retain DCG source notation and precise indicator
   spans, deduplicate repeated requests, and remain conservative for unknown or incomplete surfaces.
+- Opt-in contract output linting reports provably incompatible ground outputs in leading static facts
+  using `DPL3052`. Repeatable `--contract FILE` pairs `.dpli` files with named sources; compatibility
+  covers numeric coercions, nested lists, both language modes, and conservative unknown handling.
 
 ### Changed
 

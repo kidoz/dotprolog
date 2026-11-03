@@ -145,6 +145,30 @@ and reexports do not merge declaration histories. Exact duplicates remain `DPL30
 calls and dynamic or multifile procedures do not hide explicit conflicts. No source is executed or
 rewritten.
 
+## Check leading fact outputs against a .NET contract
+
+`DPL3052` is opt-in. Pair each `.dpli` file explicitly with a named `.pl` file having the same base
+name, and enable the rule:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint \
+    --enable-rule DPL3052 --contract rules.dpli rules.pl
+```
+
+The rule reports a ground output in the first static fact that cannot be converted by the generated
+façade's marshaller. Every declared input must also be ground and compatible with the typed input.
+Findings are located at the incompatible output term and name the predicate, output, expected type,
+actual runtime shape, and contract file.
+
+Later facts, leading rules, variable or open outputs, reader-dependent text, incompatible or variable
+inputs, mixed grammar definitions, imported-only definitions, dynamic or multifile targets, and
+effectful modules are not established and remain silent. Output `float` accepts every numeric runtime
+representation; input `float` requires a float. Output `integer` excludes big-integer representations.
+Proper lists are checked recursively. No finding is not a proof of whole-predicate contract consistency.
+
+A missing or ambiguous source pairing returns `64`; contract reader errors return `65`. The rule is
+not enabled during SDK builds. No source is consulted, executed, or rewritten.
+
 ## Check for possible non-steadfast clauses
 
 Enable the non-steadfast heuristic explicitly:
