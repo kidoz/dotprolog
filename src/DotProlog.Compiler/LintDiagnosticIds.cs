@@ -162,4 +162,7 @@ public static class LintDiagnosticIds
 
     /// <summary>A selective import requests an identity its source module does not export.</summary>
     public const string MissingExport = "DPL3051";
+
+    /// <summary>A leading static fact has an output incompatible with its contract declaration.</summary>
+    public const string ContractOutputTypeMismatch = "DPL3052";
 }

@@ -46,6 +46,25 @@ public sealed record ContractType(ContractTypeKind Kind, ContractType? Element =
             _ => $"global::DotProlog.Runtime.PrologMarshal.ToList({value}, __item => {Element!.ToOutputExpression("__item")})",
         };
 
+    internal bool CanMarshalOutput(global::DotProlog.Runtime.PrologValue value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return Kind switch
+        {
+            ContractTypeKind.Atom => value is global::DotProlog.Runtime.PrologAtom,
+            ContractTypeKind.Integer => value is global::DotProlog.Runtime.PrologInteger,
+            ContractTypeKind.Float => value
+                is global::DotProlog.Runtime.PrologFloat
+                    or global::DotProlog.Runtime.PrologInteger
+                    or global::DotProlog.Runtime.PrologBigInteger
+                    or global::DotProlog.Runtime.PrologRational,
+            ContractTypeKind.Term => true,
+            _ => value.TryGetList(out var items) && items.All(CanMarshalOutputElement),
+        };
+    }
+
+    private bool CanMarshalOutputElement(global::DotProlog.Runtime.PrologValue value) => Element!.CanMarshalOutput(value);
+
     /// <inheritdoc />
     public override string ToString() => Kind == ContractTypeKind.List ? $"list({Element})" : Kind.ToString().ToLowerInvariant();
 }
