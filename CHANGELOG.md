@@ -93,6 +93,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - Opt-in subgoal-count linting reports rules above a direct-subgoal limit using `DPL3046`. Enable it
   with `--enable-rule DPL3046`; the default maximum is 8 and `--max-clause-subgoals N` supplies a
   positive override while transparent control flow and opaque goals are counted without execution.
+- Default conflicting-import linting reports later import bindings rejected because a different
+  module already supplied the same lowered identity using `DPL3047`. Selective and whole imports,
+  reexports, DCG identities, includes, and unknown-source handling are covered without execution.
 
 ### Changed
 

@@ -48,6 +48,24 @@ Reexports are excluded. Imports whose sources contain reader or initialization s
 excluded, including transitive effects through other imports. Incomplete static analysis suppresses
 the rule. A finding is an advisory hint, not a certificate that removing the import is safe.
 
+## Review conflicting imports
+
+`DPL3047` runs in the default semantic profile. It reports each later import binding rejected because
+a different module already supplied the same lowered predicate or nonterminal identity. The warning
+identifies the importer, earlier and later source modules, and rejected identity.
+
+Selective findings occur at the rejected indicator; whole-import findings occur at the module or file
+argument. Repeated same-source imports, local-definition overrides, and `user` fallback do not
+conflict. Reexports follow the same first-accepted-binding rule. Unknown modules and exports remain
+unknown without hiding independently resolved conflicts.
+
+List all relevant source files in one command so the linter can resolve these bindings without
+execution:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint main.pl module-a.pl module-b.pl
+```
+
 ## Check for possible non-steadfast clauses
 
 Enable the non-steadfast heuristic explicitly:

@@ -90,6 +90,7 @@ These rules run in every profile:
 | `DPL3044` | Opt-in: a user-defined predicate or nonterminal name is outside lower `snake_case` |
 | `DPL3045` | Opt-in: a user-defined predicate or nonterminal exceeds the configured source-arity limit |
 | `DPL3046` | Opt-in: a rule exceeds the configured direct-subgoal limit |
+| `DPL3047` | A later import conflicts with an earlier import from a different module |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -207,6 +208,28 @@ executable effects is excluded, including effects propagated through nested impo
 whole-unit incomplete-analysis conditions as reachability suppress `DPL3035` without suppressing
 other diagnostics. A finding is an advisory hint, not proof that removing the import preserves
 behavior.
+
+### Conflicting imports
+
+`DPL3047` runs in the default semantic profile. It reports each later import binding rejected because
+a different module already supplied the same lowered predicate or nonterminal identity. The message
+identifies the importer, earlier and later source modules, and rejected identity, and states that the
+later binding is not resolved. No call to the rejected binding is required.
+
+Selective `use_module/2`, `import/2`, and `reexport/2` findings occur at the rejected indicator.
+Whole-module findings occur at the module or file argument, one per conflicting export. Source order
+within a module determines the earlier accepted binding. Successful reexports participate in the same
+model; rejected reexport bindings produce findings and are not exported.
+
+Repeated imports from the same source module are idempotent. Local definitions override imports and
+`user` fallback is not another import source, so neither produces this conflict. Dynamic and multifile
+declarations do not merge identities supplied by different modules. Ordinary predicates and DCG
+nonterminals sharing a lowered identity conflict.
+
+Unknown modules, unresolved file imports, unknown exports, and selective bindings not exported by
+their source remain unknown and produce no `DPL3047`; they do not suppress independently resolved
+conflicts. Existing first-accepted-binding behavior and unused-import suppression remain unchanged.
+No source is executed, and imports are never reordered or rewritten.
 
 ### Opt-in non-steadfast clauses
 
