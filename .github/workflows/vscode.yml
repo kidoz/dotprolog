@@ -2,10 +2,10 @@ name: VS Code extension
 
 on:
   pull_request:
-    paths: ['src/**', 'tests/DotProlog.VSCode.Tests/**', 'Directory.Build.props', 'global.json', '.gitattributes', '.editorconfig', '.github/workflows/vscode.yml']
+    paths: ['src/**', 'tests/DotProlog.VSCode.Tests/**', 'Directory.Build.props', 'global.json', '.gitattributes', '.editorconfig', '.prettierrc.json', '.prettierignore', '.github/workflows/vscode.yml']
   push:
     branches: [main]
-    paths: ['src/**', 'tests/DotProlog.VSCode.Tests/**', 'Directory.Build.props', 'global.json', '.gitattributes', '.editorconfig', '.github/workflows/vscode.yml']
+    paths: ['src/**', 'tests/DotProlog.VSCode.Tests/**', 'Directory.Build.props', 'global.json', '.gitattributes', '.editorconfig', '.prettierrc.json', '.prettierignore', '.github/workflows/vscode.yml']
   workflow_dispatch:
 
 permissions:
