@@ -107,7 +107,8 @@ npm run test:restricted
 ```
 
 Set `VSCODE_VERSION=stable` to repeat the same checks on current stable. CI tests both selections
-on Windows, Linux and macOS using the extracted managed VSIX. The Mocha harness is bundled as
+on Windows, Linux and macOS for both managed and native packages installed through VS Code's CLI.
+The native targets are Windows x64, Linux x64 and macOS arm64. The Mocha harness is bundled as
 CommonJS and runs serially, so tests also load in the older Node runtime embedded in VS Code 1.91.
 The test harness is excluded from the VSIX.
 
@@ -116,11 +117,22 @@ platform package on a matching OS and native toolchain:
 
 ```sh
 npm run package -- darwin-arm64
+VSCODE_VERSION=minimum npm run test:install -- darwin-arm64
+DOTPROLOG_EXTENSION_PATH="$PWD/bin/installed/extension" VSCODE_VERSION=minimum npm run test:integration
+DOTPROLOG_EXTENSION_PATH="$PWD/bin/installed/extension" VSCODE_VERSION=minimum npm run test:restricted
 ```
 
 Targets are `darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`, `win32-x64` and `win32-arm64`.
 Targets map to .NET RIDs; cross-OS native compilation is unsupported. These commands create local
 artifacts and never publish to the Marketplace. Test each generated platform package on its target.
+
+`test:install` requires Python 3 for the native protocol smoke test. It uses an isolated VS Code
+profile and extensions directory under `bin/installed`, checks the installed executable permissions
+without repairing them, and runs the native server with an empty executable search path and isolated
+`DOTNET_ROOT`. The smoke test covers diagnostics, include overlays, file changes and shutdown without
+launching `dotnet`. Editor integration also covers project evaluation with the SDK available.
+Omit the target to install the managed VSIX. Native publish treats trimming and AOT warnings as errors;
+CI retains platform VSIX files and native symbols. Other target architectures remain unverified.
 
 ## License
 

@@ -151,6 +151,7 @@
     "build:server": "npm run compile:scripts && node bin/scripts/server.mjs",
     "test": "npm run compile && node --test bin/unit/*.test.js",
     "test:integration": "npm run compile && node bin/scripts/test.mjs",
+    "test:install": "npm run compile:scripts && node bin/scripts/install-test-package.mjs",
     "package": "npm run compile:scripts && node bin/scripts/package.mjs",
     "vscode:prepublish": "npm run compile",
     "test:restricted": "npm run compile && node bin/scripts/test.mjs --restricted",

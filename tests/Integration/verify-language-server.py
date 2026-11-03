@@ -107,8 +107,10 @@ class Session:
 
 def workspace_smoke(command):
     with tempfile.TemporaryDirectory(prefix="DotProlog LSP # ") as directory:
-        root = Path(directory) / "main.pl"
-        child = Path(directory) / "operators.inc"
+        # Match .NET's expansion of Windows TEMP aliases such as RUNNER~1.
+        workspace = Path(directory).resolve()
+        root = workspace / "main.pl"
+        child = workspace / "operators.inc"
         operator_text = ":- op(500, xfy, likes)."
         child.write_text(operator_text, encoding="utf-8")
         session = Session(command)

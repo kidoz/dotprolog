@@ -2,24 +2,32 @@ name: VS Code extension
 
 on:
   pull_request:
-    paths: ['src/**', 'tests/DotProlog.VSCode.Tests/**', 'Directory.Build.props', 'global.json', '.gitattributes', '.editorconfig', '.prettierrc.json', '.prettierignore', '.github/workflows/vscode.yml']
+    paths: ['src/**', 'tests/DotProlog.VSCode.Tests/**', 'tests/Integration/verify-language-server.py', 'Directory.Build.props', 'global.json', '.gitattributes', '.editorconfig', '.prettierrc.json', '.prettierignore', '.github/workflows/vscode.yml']
   push:
     branches: [main]
-    paths: ['src/**', 'tests/DotProlog.VSCode.Tests/**', 'Directory.Build.props', 'global.json', '.gitattributes', '.editorconfig', '.prettierrc.json', '.prettierignore', '.github/workflows/vscode.yml']
+    paths: ['src/**', 'tests/DotProlog.VSCode.Tests/**', 'tests/Integration/verify-language-server.py', 'Directory.Build.props', 'global.json', '.gitattributes', '.editorconfig', '.prettierrc.json', '.prettierignore', '.github/workflows/vscode.yml']
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  managed-preview:
+  package-preview:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         vscode: [minimum, stable]
+        package: [managed, native]
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+          - os: windows-latest
+            target: win32-x64
+          - os: macos-latest
+            target: darwin-arm64
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: src/DotProlog.VSCode
@@ -39,11 +47,14 @@ jobs:
           cache: npm
           cache-dependency-path: src/DotProlog.VSCode/package-lock.json
       - run: npm ci
+      - name: NativeAOT prerequisites (Linux)
+        if: runner.os == 'Linux' && matrix.package == 'native'
+        run: sudo apt-get update && sudo apt-get install --yes clang zlib1g-dev
       - run: npm run format:check
       - run: npm test
-      - run: npm run package
-      - name: Extract the VSIX for consumer tests
-        run: python -m zipfile -e bin/dotprolog-0.1.0.vsix bin/installed
+      - run: npm run package -- ${{ matrix.package == 'native' && matrix.target || '' }}
+      - name: Install and verify the VSIX
+        run: npm run test:install -- ${{ matrix.package == 'native' && matrix.target || '' }}
       - name: Editor integration (Linux)
         if: runner.os == 'Linux'
         run: xvfb-run -a npm run test:integration
@@ -58,10 +69,20 @@ jobs:
         run: npm run test:restricted
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: dotprolog-vscode-${{ runner.os }}-${{ matrix.vscode }}
+          name: dotprolog-vscode-${{ matrix.package }}-${{ runner.os }}-${{ matrix.vscode }}
           path: src/DotProlog.VSCode/bin/*.vsix
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: matrix.package == 'native'
+        with:
+          name: dotprolog-vscode-symbols-${{ runner.os }}-${{ matrix.vscode }}
+          path: |
+            src/DotProlog.VSCode/bin/server/*.dbg
+            src/DotProlog.VSCode/bin/server/*.pdb
+            src/DotProlog.VSCode/bin/server/*.dSYM/**
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: failure()
         with:
-          name: dotprolog-vscode-logs-${{ runner.os }}-${{ matrix.vscode }}
-          path: src/DotProlog.VSCode/bin/last-editor-run/profile/logs
+          name: dotprolog-vscode-logs-${{ matrix.package }}-${{ runner.os }}-${{ matrix.vscode }}
+          path: |
+            src/DotProlog.VSCode/bin/last-editor-run/profile/logs
+            src/DotProlog.VSCode/bin/installed/profile/logs

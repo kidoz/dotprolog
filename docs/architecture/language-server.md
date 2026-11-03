@@ -379,13 +379,15 @@ releases. See the [extension guide](https://github.com/kidoz/dotprolog/blob/main
 for installation and settings.
 
 `tests/DotProlog.VSCode.Tests` exercises real Extension Hosts and server processes with isolated
-profiles and temporary workspaces. The managed-package CI matrix runs integration and Restricted
+profiles and temporary workspaces. The managed and native package CI matrix runs integration and Restricted
 Mode checks on both the manifest's minimum VS Code version and current stable for each OS.
 `VSCODE_VERSION=minimum` derives the exact lower bound from the tested extension's manifest;
 an exact version or `stable` can also be selected. The host reports its actual version and fails
 if it differs from an exact/minimum selection, even with an executable override.
-Cross-platform native checks, a second independent editor
-client and Rider integration remain future work.
+Native jobs build on matching Windows x64, Linux x64 and macOS arm64 hosts, install the VSIX
+through VS Code's CLI, preserve installed executable permissions and run protocol smoke checks with
+an empty executable search path and isolated `DOTNET_ROOT`. Project editor tests retain SDK access.
+A second independent editor client, other native architectures and Rider integration remain future work.
 
 Acceptance: clean installation, editor diagnostics from an unsaved file, server restart/recovery,
 configuration, and native executable operation without a separately installed .NET runtime.
@@ -455,19 +457,19 @@ process-tree cleanup. It verifies wire output and exit status for either managed
 
 ## Verification evidence
 
-Cross-platform managed-package validation on 2026-11-03 at `c23c5a6` is tracked by
+Cross-platform managed-package validation passed all six jobs on 2026-11-03 at `c23c5a6` in
 [the VS Code CI run](https://github.com/kidoz/dotprolog/actions/runs/41678580961):
 
 | Host | VS Code 1.91.0 | VS Code 1.144.1 |
 | --- | --- | --- |
 | Windows x64 | Passed | Passed |
 | Linux x64 | Passed | Passed |
-| macOS arm64 | Queued for a hosted runner | Passed |
+| macOS arm64 | Passed | Passed |
 
-Each completed job passed formatting, TypeScript compilation, six launch/grammar tests,
+Each job passed formatting, TypeScript compilation, six launch/grammar tests,
 managed VSIX packaging, eight editor integration tests against the extracted package and one
 Restricted Mode test. Each uploaded its VSIX artifact. The minimum editor used Node 20.9.0;
-stable used Node 24.22.1. The macOS minimum job is not counted as a CI pass while queued.
+stable used Node 24.22.1.
 
 The preceding run exposed a Windows URI conversion defect: the `%3A` drive separator sent by
 VS Code left an extra leading slash in the server's local path. Includes acquired duplicated
