@@ -8,6 +8,11 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Added
 
+- The language server now prepares and returns versioned predicate rename edits for source heads,
+  resolved calls and declaration/import/export indicators, including DCGs. Rename requires a
+  complete, unambiguous static snapshot and rejects collisions, indirect or reflective calls,
+  unsupported directives and stale project settings; the editor applies the returned edits.
+
 - The language server now finds references to source predicates across analyzed project files,
   includes and unsaved buffers, with optional definition locations. Results respect module and
   arity resolution, DCGs and meta-calls, and exclude ambiguous include locations and unrelated

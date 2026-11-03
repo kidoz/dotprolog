@@ -141,7 +141,7 @@ cancellation terminates real MSBuild evaluation and its descendant. Establish pe
 measurements on a pinned corpus before accepting a latency target; 250 ms after debounce on a
 2,000-line file is a proposed initial target, not a measured claim.
 
-## Stage 3: symbols and navigation — outlines, hover, completion, definitions and references implemented
+## Stage 3: symbols and navigation — implemented with conservative predicate rename
 
 The first navigation increment provides a predicate outline through LSP 3.17
 `textDocument/documentSymbol`, with the following behavior:
@@ -209,8 +209,8 @@ comment terminated only by bare CR currently continues until LF or EOF, so follo
 hover targets. The new line-position tests use valid parsed source independently of that limitation.
 Actual editor hover rendering remains unverified.
 
-Remaining navigation work: predicate rename, refusing edits when static analysis cannot establish
-a complete, unambiguous set of affected source locations.
+Predicate rename now follows the conservative contract below, refusing edits when static analysis
+cannot establish a complete, unambiguous set of affected source locations in the analyzed workspace.
 
 ### Completion contract — implemented
 
@@ -311,6 +311,51 @@ wire behavior with a real evaluated project and client-first reexports. Dynamic 
 references to declarations without source bodies, rename and editor UI validation remain outside
 this increment. Definition navigation shares the strengthened include/program identity check.
 
+### Predicate rename contract — implemented
+
+This increment implements LSP 3.17 `textDocument/prepareRename` and `textDocument/rename` in
+Modern and StrictIso modes. It changes editor analysis only, with no new language semantics.
+
+- Enable rename only for clients advertising `workspace.workspaceEdit.documentChanges`.
+  Advertise `{ prepareProvider: true }` when the client also advertises `rename.prepareSupport`;
+  otherwise advertise boolean rename support. Preparation returns the name-token range and
+  semantic name, or null when the snapshot cannot support rename.
+- Return a `WorkspaceEdit.documentChanges` array with deterministic, deduplicated UTF-16 edits.
+  Open buffers carry their accepted version; unopened files carry `version: null` as specified by
+  LSP. The server never applies edits. Disk content is the last analyzed snapshot: clients must
+  deliver file-change notifications and handle external changes when applying edits.
+- Rename all clauses and statically resolved calls of the selected module/callable-arity identity,
+  including DCG and known meta-call targets. Also edit explicit module exports, `export`, selective
+  imports/reexports, `multifile`, `discontiguous` and `meta_predicate` names. Preserve module names,
+  arities, data terms and unrelated loose programs. Whole-module imports need no textual change.
+- Accept plain ASCII names matching `[a-z][a-zA-Z0-9_]*`, excluding builtin names, default operators
+  and expansion hooks. Quoted source tokens with an eligible semantic name can be replaced by a
+  plain identifier. Reject invalid/reserved new names with InvalidParams. Reject an existing new
+  name of the same callable arity anywhere in an affected analysis, conservatively including
+  other modules, with RequestFailed. A valid unchanged name returns an empty edit.
+- Require every retained interpretation of each edited physical token to agree on its identity,
+  role and source definition. Refuse ambiguous includes, missing/invalid source content, unresolved
+  or cyclic imports, declarations without source bodies, variable goals or module qualifiers,
+  dynamic declarations, reader-changing and unsupported directives, and reflective/database calls.
+  Builtin calls must belong to an audited allowlist. These checks apply to the whole affected
+  project/include analysis; an unrelated unsupported construct in that analysis can disable rename.
+  Custom meta-predicates whose bodies invoke variables and nested closures needing additional
+  argument propagation are deliberately unsupported in this first implementation.
+- Recheck eligibility and collisions on every rename, even after successful preparation. Failed
+  project reevaluation disables rename until recovery. Pending requests support RequestCancelled
+  and ContentModified; an expected rename refusal does not invalidate the workspace or other requests.
+  No request performs parsing, source execution or filesystem reads.
+
+Scope is the evaluated project, retained include closures and open buffers. Consumers outside that
+snapshot, external APIs and runtime-created references are not inferred. General atom/operator
+rename, variable rename, formatting and editor UI integration remain out of scope.
+
+`RenameAnalysisTests` covers compiler eligibility and declaration tokens. `RenameTests` verifies
+edit application, solution preservation in both modes, imports/reexports, DCGs, includes, overlays,
+collisions and failure recovery. `AnalysisSchedulerTests` exercises cancellation, superseded edits
+and shutdown during blocked reevaluation. `verify-language-server-rename.py` checks the combined
+contract over managed and native stdio, including project reload failure and recovery.
+
 ## Stage 4: editor and distribution — planned
 
 Ship a thin VS Code extension for language registration, highlighting, settings and server launch.
@@ -343,7 +388,8 @@ full-text synchronization only. Background analysis supports includes for file d
 Document symbols provide predicate outlines; builtin hover provides signatures, short help and
 language-mode notes; completion suggests predicate names and current-clause variables; definitions
 navigate to source clauses across the analyzed workspace; references list known calls and
-optionally clause heads. Editor
+optionally clause heads; rename returns versioned edits when its conservative eligibility checks
+pass and the client supports versioned workspace edits. Editor
 extensions remain planned. Project mode analyzes all evaluated sources;
 loose-file mode analyzes include closures. No performance or
 cross-platform NativeAOT claim is made from the initial host check.
@@ -371,6 +417,8 @@ python3 tests/Integration/verify-language-server-definition.py dotnet src/DotPro
 python3 tests/Integration/verify-language-server-definition.py /tmp/dotprolog-lsp-native/dotprolog-lsp
 python3 tests/Integration/verify-language-server-references.py dotnet src/DotProlog.LanguageServer/bin/Debug/net10.0/dotprolog-lsp.dll
 python3 tests/Integration/verify-language-server-references.py /tmp/dotprolog-lsp-native/dotprolog-lsp
+python3 tests/Integration/verify-language-server-rename.py dotnet src/DotProlog.LanguageServer/bin/Debug/net10.0/dotprolog-lsp.dll
+python3 tests/Integration/verify-language-server-rename.py /tmp/dotprolog-lsp-native/dotprolog-lsp
 ```
 
 Replace the RID and executable suffix for the host. The smoke test is repeatable and has a
@@ -384,15 +432,23 @@ process-tree cleanup. It verifies wire output and exit status for either managed
 
 Verified on macOS arm64 on 2026-11-02:
 
-- `DotProlog.LanguageServer.Tests`: 109 passed, zero failed or skipped, after a warning-free
+- `DotProlog.LanguageServer.Tests`: 132 passed, zero failed or skipped, after a warning-free
   single-worker build (`dotnet build tests/DotProlog.LanguageServer.Tests --no-restore -m:1 -nr:false`).
-- `DotProlog.Compiler.Tests`: 2,981 passed, zero failed or skipped, including source-definition,
-  builtin hover, import-resolution and reference head/call metadata regressions.
+- `DotProlog.Compiler.Tests`: 3,028 passed, zero failed or skipped, including rename analysis,
+  source definitions, builtin hover and import-resolution regressions. After adding two further
+  cases, the focused rename suite passed all 27 tests (cycles and nested static meta-goals included).
 - The previous syntax baseline had 464 passing tests, including lexical completion and Unicode
-  identifiers. Syntax code was unchanged and that suite was not rerun for reference navigation.
+  identifiers. Syntax code was unchanged and that suite was not rerun for predicate rename.
 - The earlier CLI baseline had 53 passing tests; the CLI suite was not rerun for this increment.
 
-Current reference, definition, completion, hover, document-symbol and background-analysis checks:
+Current rename, reference, definition, completion, hover, document-symbol and background-analysis checks:
+
+- All ten smoke scripts passed against both managed and macOS arm64 native executables.
+  The new rename script verifies versioned UTF-16 edits, unchanged source files before client
+  application, DCGs, selective imports/reexports, current overlays, invalid names, collisions,
+  unsupported/indirect calls, and failed project reevaluation followed by recovery. Unit tests
+  also apply returned edits and preserve query solutions in Modern and StrictIso modes, check
+  ambiguous/repeated includes, and isolate expected failures from other queued requests.
 
 - The reference smoke test passed against managed and native executables: optional heads,
   exact UTF-16 call locations, DCG/meta-calls,
@@ -442,12 +498,14 @@ Current reference, definition, completion, hover, document-symbol and background
 - CSharpier checked the changed feature files; `git diff --check` passed.
 
 Windows/Linux native runs and editor-client verification remain unmeasured. The full repository
-integration/conformance suite was not rerun for this reference-navigation increment.
+integration/conformance suite was not rerun for this predicate-rename increment.
 
 ## Design references
 
 - [MSBuild evaluation-only queries](https://learn.microsoft.com/en-us/visualstudio/msbuild/evaluate-items-and-properties)
 - [LSP specification](https://microsoft.github.io/language-server-protocol/)
+- [LSP 3.17 rename contract](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rename)
+- [LSP 3.17 workspace edits](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspaceEdit)
 - [LSP 3.17 references contract](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references)
 - [LSP 3.17 definition contract](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_definition)
 - [LSP 3.17 completion contract](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion)
