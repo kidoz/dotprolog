@@ -304,3 +304,22 @@ fi
 test "$lint_exit" -eq 1
 printf '%s\n' "$lint_output" | grep -F 'warning DPL3048'
 printf '%s\n' "$lint_output" | grep -F 'from module shadow_source'
+
+# Predefined identity collisions are opt-in and do not execute source.
+printf '%s\n' ':- initialization(halt(9)).' 'member(_, _).' >HelloProlog/lint-builtin-shadow.pl
+lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    HelloProlog/lint-builtin-shadow.pl 2>&1)
+if printf '%s\n' "$lint_output" | grep -F 'warning DPL3049'; then
+    echo "lint enabled predefined identity shadowing by default" >&2
+    exit 1
+fi
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --enable-rule DPL3049 --warnings-as-errors HelloProlog/lint-builtin-shadow.pl 2>&1); then
+    echo "lint unexpectedly accepted an enabled predefined identity collision" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3049'
+printf '%s\n' "$lint_output" | grep -F 'predefined predicate member/2'
