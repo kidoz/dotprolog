@@ -2,6 +2,7 @@
 # a Windows checkout from failing that check, and keeps Prolog sources byte-identical everywhere.
 *.cs        text eol=lf
 *.ts        text eol=lf
+*.mts       text eol=lf
 *.mjs       text eol=lf
 *.cjs       text eol=lf
 *.pl        text eol=lf

@@ -1,6 +1,14 @@
 import { runTests, downloadAndUnzipVSCode } from "@vscode/test-electron";
 import { spawn } from "node:child_process";
-import { mkdtemp, mkdir, readFile, writeFile, rm, cp } from "node:fs/promises";
+import {
+    mkdtemp,
+    mkdir,
+    readFile,
+    realpath,
+    writeFile,
+    rm,
+    cp,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { root } from "./server.mjs";
@@ -29,7 +37,11 @@ console.log(
     `Testing VS Code ${version} (${requestedVersion}) with ${extensionPath}`,
 );
 
-const temp = await mkdtemp(path.join(os.tmpdir(), "dotprolog-vscode-"));
+// Windows TEMP can use an 8.3 alias (RUNNER~1). .NET expands that alias when
+// publishing unopened-file diagnostics, so give both processes the same physical path.
+const temp = await realpath(
+    await mkdtemp(path.join(os.tmpdir(), "dotprolog-vscode-")),
+);
 const workspace = path.join(temp, "workspace with spaces");
 const restricted = process.argv.includes("--restricted");
 await mkdir(workspace);
@@ -96,7 +108,7 @@ try {
                 shell: false,
             },
         );
-        await new Promise((resolve, reject) => {
+        await new Promise<void>((resolve, reject) => {
             child.on("error", reject);
             child.on("exit", (code) =>
                 code === 0

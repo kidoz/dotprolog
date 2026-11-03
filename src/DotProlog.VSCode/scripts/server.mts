@@ -1,13 +1,17 @@
-import { spawnSync } from "node:child_process";
+import { spawnSync, type SpawnSyncOptions } from "node:child_process";
 import { rm, mkdir, readFile, writeFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const root = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
-    "..",
+    "../..",
 );
-export function run(command, args, options = {}) {
+export function run(
+    command: string,
+    args: string[],
+    options: SpawnSyncOptions = {},
+): void {
     const result = spawnSync(command, args, {
         cwd: root,
         stdio: "inherit",
@@ -22,8 +26,13 @@ export function run(command, args, options = {}) {
     }
 }
 
-export async function publishServer(target) {
-    const rids = {
+interface PackageAssets {
+    libraries: Record<string, { type: string; path: string }>;
+    packageFolders: Record<string, unknown>;
+}
+
+export async function publishServer(target?: string): Promise<void> {
+    const rids: Record<string, string> = {
         "darwin-arm64": "osx-arm64",
         "darwin-x64": "osx-x64",
         "linux-x64": "linux-x64",
@@ -56,7 +65,7 @@ export async function publishServer(target) {
               ]
             : ["--no-self-contained", "-p:UseAppHost=false"]),
     ]);
-    const assets = JSON.parse(
+    const assets: PackageAssets = JSON.parse(
         await readFile(
             path.resolve(
                 root,
@@ -87,14 +96,12 @@ export async function publishServer(target) {
             throw new Error(`Missing package license metadata for ${identity}`);
         }
         const files = await readdir(directory);
-        const metadata = await readFile(
-            path.join(
-                directory,
-                files.find((file) => file.endsWith(".nuspec")),
-            ),
-            "utf8",
-        );
-        const field = (name) =>
+        const nuspec = files.find((file) => file.endsWith(".nuspec"));
+        if (!nuspec) {
+            throw new Error(`Missing package license metadata for ${identity}`);
+        }
+        const metadata = await readFile(path.join(directory, nuspec), "utf8");
+        const field = (name: string): string =>
             new RegExp(`<${name}(?: [^>]*)?>([\\s\\S]*?)</${name}>`).exec(
                 metadata,
             )?.[1] ?? "";

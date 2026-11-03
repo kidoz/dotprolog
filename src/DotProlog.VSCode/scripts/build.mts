@@ -1,10 +1,13 @@
-import { build } from "esbuild";
+import { build, type BuildOptions } from "esbuild";
 import { mkdir, readFile, writeFile, copyFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const root = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../..",
+);
 const tests = path.resolve(root, "../../tests/DotProlog.VSCode.Tests");
 const common = {
     bundle: true,
@@ -14,7 +17,7 @@ const common = {
     nodePaths: [path.join(root, "node_modules")],
     external: ["vscode", "vscode-oniguruma/release/onig.wasm"],
     legalComments: "inline",
-};
+} satisfies BuildOptions;
 await mkdir(path.join(root, "bin"), { recursive: true });
 await build({
     ...common,
@@ -41,7 +44,7 @@ await build({
 // so its module format does not depend on the Node version embedded by the editor.
 await build({
     ...common,
-    entryPoints: [path.join(root, "scripts/test-runner.cjs")],
+    entryPoints: [path.join(root, "scripts/test-runner.mts")],
     outfile: path.join(root, "bin/test-runner.cjs"),
     // Extension Host cases share editor state and run serially. Do not bundle Mocha's
     // optional parallel runner and its filesystem-relative worker entrypoints.
@@ -49,14 +52,20 @@ await build({
 });
 await copyFile(path.resolve(root, "../../LICENSE"), path.join(root, "LICENSE"));
 // Retain the full license texts for the npm runtime dependencies included by the bundle.
-const visited = new Set();
+interface PackageManifest {
+    name: string;
+    version: string;
+    dependencies?: Record<string, string>;
+}
+
+const visited = new Set<string>();
 let notices = "";
-async function license(name, parent = root) {
+async function license(name: string, parent = root): Promise<void> {
     const require = createRequire(path.join(parent, "package.json"));
     let directory = path.dirname(require.resolve(name));
     while (true) {
         try {
-            const candidate = JSON.parse(
+            const candidate: PackageManifest = JSON.parse(
                 await readFile(path.join(directory, "package.json"), "utf8"),
             );
             if (candidate.name === name) {
@@ -69,7 +78,7 @@ async function license(name, parent = root) {
         }
         directory = next;
     }
-    const manifest = JSON.parse(
+    const manifest: PackageManifest = JSON.parse(
         await readFile(path.join(directory, "package.json"), "utf8"),
     );
     const identity = `${name}@${manifest.version}`;

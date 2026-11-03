@@ -1,9 +1,9 @@
-const path = require("node:path");
-const { default: Mocha } = require("mocha");
-const assert = require("node:assert/strict");
-const vscode = require("vscode");
+import path from "node:path";
+import Mocha from "mocha";
+import assert from "node:assert/strict";
+import * as vscode from "vscode";
 
-exports.run = async () => {
+export async function run(): Promise<void> {
     const expected = process.env.DOTPROLOG_TEST_VSCODE_VERSION;
     console.log(
         `Extension Host: VS Code ${vscode.version}, Node ${process.versions.node}, ${process.platform}/${process.arch}`,
@@ -23,11 +23,11 @@ exports.run = async () => {
             `integration/${process.env.DOTPROLOG_TEST_RESTRICTED ? "restricted" : "editor"}.test.js`,
         ),
     );
-    await new Promise((resolve, reject) =>
+    await new Promise<void>((resolve, reject) =>
         mocha.run((failed) =>
             failed
                 ? reject(new Error(`${failed} editor tests failed`))
                 : resolve(),
         ),
     );
-};
+}

@@ -5,7 +5,7 @@ import { publishServer, root } from "./server.mjs";
 
 const target = process.argv[2];
 await publishServer(target);
-const manifest = JSON.parse(
+const manifest: { name: string; version: string } = JSON.parse(
     await readFile(path.join(root, "package.json"), "utf8"),
 );
 const packagePath = path.join(

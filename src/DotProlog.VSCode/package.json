@@ -146,13 +146,14 @@
     }
   },
   "scripts": {
-    "compile": "tsc --noEmit && node scripts/build.mjs",
-    "build:server": "node scripts/server.mjs",
+    "compile": "tsc --noEmit && npm run compile:scripts && node bin/scripts/build.mjs",
+    "compile:scripts": "tsc --project tsconfig.scripts.json",
+    "build:server": "npm run compile:scripts && node bin/scripts/server.mjs",
     "test": "npm run compile && node --test bin/unit/*.test.js",
-    "test:integration": "npm run compile && node scripts/test.mjs",
-    "package": "node scripts/package.mjs",
+    "test:integration": "npm run compile && node bin/scripts/test.mjs",
+    "package": "npm run compile:scripts && node bin/scripts/package.mjs",
     "vscode:prepublish": "npm run compile",
-    "test:restricted": "npm run compile && node scripts/test.mjs --restricted",
+    "test:restricted": "npm run compile && node bin/scripts/test.mjs --restricted",
     "format": "prettier --write src scripts ../../tests/DotProlog.VSCode.Tests *.json syntaxes/*.json snippets/*.json README.md",
     "format:check": "prettier --check src scripts ../../tests/DotProlog.VSCode.Tests *.json syntaxes/*.json snippets/*.json README.md"
   },
