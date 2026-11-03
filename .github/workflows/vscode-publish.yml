@@ -1,0 +1,120 @@
+name: VS Code Marketplace preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact extension version from package.json (for example 0.1.0)
+        required: true
+        type: string
+      publish:
+        description: Publish the validated packages to the Marketplace pre-release channel
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vscode-marketplace-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - id: check
+        name: Verify the requested version and publisher
+        env:
+          EXPECTED_VERSION: ${{ inputs.version }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const manifest = JSON.parse(fs.readFileSync('src/DotProlog.VSCode/package.json', 'utf8'));
+          if (!/^\d+\.\d+\.\d+$/.test(process.env.EXPECTED_VERSION) || manifest.version !== process.env.EXPECTED_VERSION)
+            throw new Error('The requested version must equal package.json.');
+          if (manifest.publisher !== 'kidoz' || manifest.name !== 'dotprolog' || manifest.preview !== true)
+            throw new Error('Expected the kidoz.dotprolog preview identity.');
+          if (process.env.PUBLISH === 'true' && process.env.GITHUB_REF !== 'refs/heads/main')
+            throw new Error('Marketplace publication must run from main.');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${manifest.version}\n`);
+          NODE
+
+  validate:
+    needs: metadata
+    uses: ./.github/workflows/vscode.yml
+
+  collect:
+    needs: [metadata, validate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dotprolog-vscode-managed-Linux-stable
+          path: bundles/managed
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dotprolog-vscode-native-Linux-stable
+          path: bundles/linux
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dotprolog-vscode-native-Windows-stable
+          path: bundles/windows
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dotprolog-vscode-native-macOS-stable
+          path: bundles/macos
+      - name: Verify Marketplace payloads and compute checksums
+        env:
+          EXTENSION_VERSION: ${{ needs.metadata.outputs.version }}
+        run: python3 tests/Integration/verify-vscode-release.py bundles "$EXTENSION_VERSION"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dotprolog-marketplace-${{ needs.metadata.outputs.version }}
+          path: bundles
+      - name: Record the reviewable result
+        env:
+          EXTENSION_VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          echo "Prepared DotProlog $EXTENSION_VERSION: managed fallback and three native VSIX packages." >> "$GITHUB_STEP_SUMMARY"
+          echo 'All 12 managed/native editor combinations passed before collection.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'SHA256SUMS is included in the Marketplace artifact.' >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    if: ${{ inputs.publish }}
+    needs: [metadata, collect]
+    runs-on: ubuntu-latest
+    environment:
+      name: vscode-marketplace
+      url: https://marketplace.visualstudio.com/items?itemName=kidoz.dotprolog
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dotprolog-marketplace-${{ needs.metadata.outputs.version }}
+          path: bundles
+      - run: npm ci
+        working-directory: src/DotProlog.VSCode
+      - name: Verify the approved package checksums
+        run: cd bundles && sha256sum --check SHA256SUMS
+      - name: Publish the tested packages using Trusted Publishing
+        shell: bash
+        run: |
+          mapfile -t packages < <(find "$GITHUB_WORKSPACE/bundles" -name '*.vsix' -type f | sort)
+          test "${#packages[@]}" -eq 4
+          cd src/DotProlog.VSCode
+          npx --no-install vsce publish --packagePath "${packages[@]}" --pre-release --oidc
