@@ -264,3 +264,21 @@ fi
 test "$lint_exit" -eq 1
 printf '%s\n' "$lint_output" | grep -F 'warning DPL3046'
 printf '%s\n' "$lint_output" | grep -F 'p/0'
+
+# Conflicting imports are reported by the packed tool's default semantic profile.
+printf '%s\n' ':- module(a, [p/0]).' 'p.' >HelloProlog/lint-import-a.pl
+printf '%s\n' ':- module(b, [p/0]).' 'p.' >HelloProlog/lint-import-b.pl
+printf '%s\n' ':- module(m, []).' ':- import(a, [p/0]).' ':- import(b, [p/0]).' >HelloProlog/lint-import-main.pl
+lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    HelloProlog/lint-import-main.pl HelloProlog/lint-import-a.pl HelloProlog/lint-import-b.pl 2>&1)
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3047'
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint --warnings-as-errors \
+    HelloProlog/lint-import-main.pl HelloProlog/lint-import-a.pl HelloProlog/lint-import-b.pl 2>&1); then
+    echo "lint unexpectedly accepted conflicting imports" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3047'
+printf '%s\n' "$lint_output" | grep -F 'earlier import from module a'
