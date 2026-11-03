@@ -105,6 +105,25 @@ native redefinitions are ignored, and some module or grammar redefinitions are r
 reexports do not repeat the finding at each importing module. Review actual call resolution before
 renaming or deleting either definition. No source is executed or rewritten.
 
+## Review inconsistent meta-predicate declarations
+
+`DPL3050` runs in the default semantic profile. It reports the first later declaration whose argument
+modes disagree with the first declaration for the same module and `name/arity`:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint --warnings-as-errors program.pl
+```
+
+Modern `meta_predicate/1` and ISO `metapredicate/1` are supported across named files and includes.
+The comparison preserves goal-zero, positive closure counts, and module-sensitive arguments. Modern
+`:` is not treated as `0`, and ISO `:` and `*` remain distinct. Different ordinary Modern markers are
+equivalent and do not produce a consistency warning.
+
+The finding identifies the earlier and later templates without claiming either is selected. Imports
+and reexports do not merge declaration histories. Exact duplicates remain `DPL3025`, while unresolved
+calls and dynamic or multifile procedures do not hide explicit conflicts. No source is executed or
+rewritten.
+
 ## Check for possible non-steadfast clauses
 
 Enable the non-steadfast heuristic explicitly:

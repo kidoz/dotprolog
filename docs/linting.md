@@ -95,6 +95,7 @@ These rules run in every profile:
 | `DPL3047` | A later import conflicts with an earlier import from a different module |
 | `DPL3048` | Opt-in: a local procedure shadows an import of the same lowered identity |
 | `DPL3049` | Opt-in: a local procedure shares a native or bundled-library predicate identity |
+| `DPL3050` | Meta-predicate declarations for one module and predicate have conflicting argument modes |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -286,6 +287,26 @@ Native redefinitions can be ignored, and module or grammar redefinitions can be 
 existing language rules. Both language modes use the same implementation-defined catalog; the warning
 does not classify a name as an ISO built-in or change compiler validation, execution, or the recorded
 compatibility gaps. No source is executed, resolved differently, renamed, or removed.
+
+### Inconsistent meta-predicate declarations
+
+`DPL3050` runs in every profile in both language modes. It compares supplied declarations for one
+module and `name/arity` and reports the first later declaration whose normalized argument modes differ
+from the first. Distinct modules and arities have independent declaration histories. One finding per
+identity is located at the first differing later template, and the message identifies the earlier and
+later templates without claiming that either is selected.
+
+Modern `meta_predicate/1` and ISO `metapredicate/1` are covered across named files and includes.
+Comparison uses argument meaning rather than source spelling. Ordinary Modern argument markers are
+equivalent to one another. Goal-zero, positive closure counts, and module-sensitive arguments remain
+distinct; Modern `:` is not folded into `0`, and ISO `:` and `*` remain distinct. Malformed templates
+remain reader or compiler concerns rather than consistency findings.
+
+Declarations are compared only within their owning module. Imports and reexports do not merge
+histories, and a single local declaration differing from an imported or predefined template is outside
+this rule. Exact duplicates remain `DPL3025`. Dynamic or multifile procedures and unrelated unresolved
+calls do not suppress explicit conflicts. Whole-program analysis suppresses duplicate file-local
+copies, retains physical source ownership, and never executes or rewrites declarations.
 
 ### Opt-in non-steadfast clauses
 

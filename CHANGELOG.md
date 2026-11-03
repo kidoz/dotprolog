@@ -112,6 +112,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - Opt-in predefined-identity linting reports local procedures sharing native or bundled-library
   identities using `DPL3049`. Enable it with `--enable-rule DPL3049`; source-owned findings cover
   declarations, DCGs, modules, and includes without claiming that local definitions always win.
+- Default meta-predicate consistency linting reports conflicting Modern and ISO argument-mode
+  declarations using `DPL3050`. Findings cover named files and includes while preserving goal,
+  closure, and module-sensitive distinctions without executing source or changing template selection.
 
 ### Changed
 
