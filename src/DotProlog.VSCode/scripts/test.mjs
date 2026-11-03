@@ -1,9 +1,33 @@
 import { runTests, downloadAndUnzipVSCode } from "@vscode/test-electron";
 import { spawn } from "node:child_process";
-import { mkdtemp, mkdir, writeFile, rm, cp } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile, rm, cp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { root } from "./server.mjs";
+
+const extensionPath = process.env.DOTPROLOG_EXTENSION_PATH || root;
+const requestedVersion = process.env.VSCODE_VERSION || "stable";
+let version = requestedVersion;
+if (requestedVersion === "minimum") {
+    const manifest = JSON.parse(
+        await readFile(path.join(extensionPath, "package.json"), "utf8"),
+    );
+    const minimum = /^\^(\d+\.\d+\.\d+)$/.exec(manifest.engines.vscode);
+    if (!minimum) {
+        throw new Error(
+            "Minimum-version tests require an explicit ^major.minor.patch VS Code engine range.",
+        );
+    }
+    version = minimum[1];
+}
+if (version !== "stable" && !/^\d+\.\d+\.\d+$/.test(version)) {
+    throw new Error(
+        "VSCODE_VERSION must be minimum, stable or an exact major.minor.patch version.",
+    );
+}
+console.log(
+    `Testing VS Code ${version} (${requestedVersion}) with ${extensionPath}`,
+);
 
 const temp = await mkdtemp(path.join(os.tmpdir(), "dotprolog-vscode-"));
 const workspace = path.join(temp, "workspace with spaces");
@@ -25,9 +49,10 @@ await writeFile(
 // Use a real Extension Host with a fresh profile, not the developer's settings or extensions.
 try {
     const options = {
-        extensionDevelopmentPath: process.env.DOTPROLOG_EXTENSION_PATH || root,
-        extensionTestsPath: path.join(root, "scripts/test-runner.cjs"),
+        extensionDevelopmentPath: extensionPath,
+        extensionTestsPath: path.join(root, "bin/test-runner.cjs"),
         vscodeExecutablePath: process.env.VSCODE_EXECUTABLE_PATH,
+        version,
         cachePath: path.join(root, "bin/vscode-test"),
         launchArgs: [
             workspace,
@@ -43,6 +68,7 @@ try {
         extensionTestsEnv: {
             DOTPROLOG_TEST_WORKSPACE: workspace,
             DOTPROLOG_TEST_RESTRICTED: restricted ? "1" : "",
+            DOTPROLOG_TEST_VSCODE_VERSION: version,
         },
     };
     if (restricted) {
@@ -50,7 +76,10 @@ try {
         // directly for this check so Restricted Mode is actually exercised.
         const executable =
             options.vscodeExecutablePath ||
-            (await downloadAndUnzipVSCode({ cachePath: options.cachePath }));
+            (await downloadAndUnzipVSCode({
+                cachePath: options.cachePath,
+                version,
+            }));
         const child = spawn(
             executable,
             [

@@ -37,6 +37,16 @@ await build({
     ],
     outdir: path.join(root, "bin/integration"),
 });
+// Older supported Extension Hosts cannot require ESM dependencies. Bundle the harness too,
+// so its module format does not depend on the Node version embedded by the editor.
+await build({
+    ...common,
+    entryPoints: [path.join(root, "scripts/test-runner.cjs")],
+    outfile: path.join(root, "bin/test-runner.cjs"),
+    // Extension Host cases share editor state and run serially. Do not bundle Mocha's
+    // optional parallel runner and its filesystem-relative worker entrypoints.
+    external: [...common.external, "./nodejs/parallel-buffered-runner.cjs"],
+});
 await copyFile(path.resolve(root, "../../LICENSE"), path.join(root, "LICENSE"));
 // Retain the full license texts for the npm runtime dependencies included by the bundle.
 const visited = new Set();
