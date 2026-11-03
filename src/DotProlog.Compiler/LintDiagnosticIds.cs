@@ -153,4 +153,7 @@ public static class LintDiagnosticIds
 
     /// <summary>A local procedure shadows an import of the same lowered identity.</summary>
     public const string LocalImportShadow = "DPL3048";
+
+    /// <summary>A local procedure shares the identity of a predefined predicate.</summary>
+    public const string BuiltinShadow = "DPL3049";
 }
