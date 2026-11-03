@@ -15,7 +15,20 @@ internal sealed record DocumentSnapshot(string Uri, string Text, int Version)
             throw new InvalidParametersException();
         try
         {
-            return Path.GetFullPath(parsed.LocalPath);
+            string path = parsed.LocalPath;
+            // VS Code escapes the drive colon as %3A. Uri then treats the path as
+            // Unix-style and retains its leading slash, even on Windows.
+            if (
+                OperatingSystem.IsWindows()
+                && parsed.Host.Length == 0
+                && path.Length >= 4
+                && path[0] == '/'
+                && char.IsAsciiLetter(path[1])
+                && path[2] == ':'
+                && path[3] == '/'
+            )
+                path = path[1..];
+            return Path.GetFullPath(path);
         }
         catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
         {

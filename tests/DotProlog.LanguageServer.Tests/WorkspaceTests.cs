@@ -97,6 +97,38 @@ public sealed class WorkspaceTests : IDisposable
     }
 
     [Fact]
+    public void EscapedDriveUrisResolveIncludesAndDiskChanges()
+    {
+        const string child = "child %3A space #.source";
+        Write(child, "included(ok).");
+        string EditorUri(string file) =>
+            "file://" + UriFor(file)["file://".Length..].Replace(":/", "%3A/", StringComparison.Ordinal);
+        string parent = EditorUri("main.pl");
+        var initial = _workspace.Update(new DocumentSnapshot(parent, $":- include('{child}').", 1));
+        AssertNoErrors(Assert.Single(initial, publication => publication.Uri == parent));
+        Assert.True(_workspace.IsNewer(UriFor("main.pl"), 2));
+
+        Write(child, "included(.");
+        AssertHasErrors(For(_workspace.DiskChanged([EditorUri(child)]), child));
+        Write(child, "included(ok).");
+        AssertNoErrors(For(_workspace.DiskChanged([EditorUri(child)]), child));
+    }
+
+    [Theory]
+    [InlineData("file:///c%3A/Users/test/source%20%233A%253A.pl")]
+    [InlineData("file:///C%3a/Users/test/source%20%233A%253A.pl")]
+    public void EscapedWindowsDriveHasTheSameDocumentIdentity(string documentAddress)
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Windows drive identity requires Windows.");
+        Assert.True(
+            DocumentSnapshot.KeyComparer.Equals(
+                DocumentSnapshot.Key("file:///C:/Users/test/source%20%233A%253A.pl"),
+                DocumentSnapshot.Key(documentAddress)
+            )
+        );
+    }
+
+    [Fact]
     public void OverlayIdentityNormalizesEscapingAndDotSegments()
     {
         Open("child #.pl", "value(X).");
