@@ -379,7 +379,12 @@ releases. See the [extension guide](https://github.com/kidoz/dotprolog/blob/main
 for installation and settings.
 
 `tests/DotProlog.VSCode.Tests` exercises real Extension Hosts and server processes with isolated
-profiles and temporary workspaces. Cross-platform native checks, a second independent editor
+profiles and temporary workspaces. The managed-package CI matrix runs integration and Restricted
+Mode checks on both the manifest's minimum VS Code version and current stable for each OS.
+`VSCODE_VERSION=minimum` derives the exact lower bound from the tested extension's manifest;
+an exact version or `stable` can also be selected. The host reports its actual version and fails
+if it differs from an exact/minimum selection, even with an executable override.
+Cross-platform native checks, a second independent editor
 client and Rider integration remain future work.
 
 Acceptance: clean installation, editor diagnostics from an unsaved file, server restart/recovery,
@@ -450,6 +455,22 @@ process-tree cleanup. It verifies wire output and exit status for either managed
 
 ## Verification evidence
 
+Minimum/current-stable compatibility verified on macOS arm64 on 2026-11-03 using a freshly
+packaged and extracted managed VSIX:
+
+| VS Code | Embedded Node | Editor integration | Restricted Mode |
+| --- | --- | --- | --- |
+| 1.91.0 (declared minimum) | 20.9.0 | 8 passed | 1 passed |
+| 1.144.1 (stable resolved for this run) | 24.22.1 | 8 passed | 1 passed |
+
+The first minimum-version attempt failed before test execution because Node 20.9 could not
+`require()` Mocha 12's ESM entrypoint. Bundling the serial test harness as CommonJS fixed the
+failure; the extension's engine range and runtime dependencies did not need changes. The harness
+remains outside the VSIX. A deliberate mismatch (requesting 1.91.1 with a 1.91.0 executable)
+was rejected by the in-host version assertion. Six launch/grammar tests, TypeScript compilation
+and Prettier also passed. The GitHub Actions matrix now covers minimum/stable on Windows, Linux
+and macOS; remote CI execution and native packages were not rerun for this compatibility increment.
+
 VS Code preview verified on macOS arm64 on 2026-11-03 with VS Code 1.130.0 and .NET SDK 10.0.403:
 
 - Six launch/grammar checks passed, and the language server suite passed all 132 tests.
@@ -464,7 +485,7 @@ VS Code preview verified on macOS arm64 on 2026-11-03 with VS Code 1.130.0 and .
 - TypeScript compilation, Prettier, the strict documentation build and `git diff --check` passed.
 
 The Windows/Linux managed-package CI matrix is configured but was not executed locally. Native
-packages for other targets, minimum-supported VS Code validation and Marketplace publication remain
+packages for other targets and Marketplace publication remain
 unverified or outside this local preview.
 
 Verified on macOS arm64 on 2026-11-02:

@@ -75,9 +75,29 @@ npm run package
 
 Editor tests use isolated Extension Hosts, profiles and temporary workspaces with spaces in their
 paths. VS Code stable is downloaded by default; set `VSCODE_EXECUTABLE_PATH` to use an installed
-VS Code executable. On headless Linux, run editor tests under `xvfb-run -a`. Set
+VS Code executable. Set `VSCODE_VERSION=minimum` to test the exact lower bound declared by the
+tested extension's `engines.vscode` (currently 1.91.0), or set an exact version such as `1.91.0`.
+Both integration and Restricted Mode tests honor this setting. The Extension Host logs its actual
+VS Code and Node versions and rejects a mismatch for an exact/minimum selection, including when
+an executable override is supplied. On headless Linux, run editor tests under `xvfb-run -a`. Set
 `DOTPROLOG_EXTENSION_PATH` to an extracted VSIX's `extension` directory to test the packaged payload.
 Build outputs and VSIX files live under `bin/`; npm dependencies live in `node_modules/`.
+
+For example, in a POSIX shell, test a locally packaged managed extension at the minimum version:
+
+```sh
+npm run package
+python3 -m zipfile -e bin/dotprolog-0.1.0.vsix bin/compatibility/managed
+export DOTPROLOG_EXTENSION_PATH="$PWD/bin/compatibility/managed/extension"
+export VSCODE_VERSION=minimum
+npm run test:integration
+npm run test:restricted
+```
+
+Set `VSCODE_VERSION=stable` to repeat the same checks on current stable. CI tests both selections
+on Windows, Linux and macOS using the extracted managed VSIX. The Mocha harness is bundled as
+CommonJS and runs serially, so tests also load in the older Node runtime embedded in VS Code 1.91.
+The test harness is excluded from the VSIX.
 
 `npm run package` creates `bin/dotprolog-0.1.0.vsix` with the managed server. To build a NativeAOT
 platform package on a matching OS and native toolchain:
