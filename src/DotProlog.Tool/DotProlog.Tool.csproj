@@ -38,6 +38,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\DotProlog.Compiler\DotProlog.Compiler.csproj" />
+        <ProjectReference Include="..\DotProlog.CodeGen.CSharp\DotProlog.CodeGen.CSharp.csproj" />
         <ProjectReference Include="../DotProlog.Packages/DotProlog.Packages.csproj" />
     </ItemGroup>
 

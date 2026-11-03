@@ -207,6 +207,84 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void ContractOutputRuleIsOptInAndHonorsWarningsAsErrorsWithoutExecution()
+    {
+        var source = Source("contract-rules.pl", ":- module(m, [p/1]). p(wrong).\n");
+        var contract = Source("contract-rules.dpli", ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)]).\n");
+        var canary = Source("contract-canary.pl", ":- module(canary, []). :- initialization(halt(9)).\n");
+
+        (var defaultExit, _, var defaultError) = Execute("lint", "--contract", contract, source, canary);
+        (var enabledExit, _, var enabledError) = Execute(
+            "lint",
+            "--enable-rule",
+            "dpl3052",
+            "--contract",
+            contract,
+            source,
+            canary
+        );
+        (var strictExit, _, var strictError) = Execute(
+            "lint",
+            "--enable-rule",
+            "DPL3052",
+            "--contract",
+            contract,
+            "--warnings-as-errors",
+            source,
+            canary
+        );
+
+        Assert.Equal(0, defaultExit);
+        Assert.DoesNotContain("DPL3052", defaultError, StringComparison.Ordinal);
+        Assert.Equal(0, enabledExit);
+        Assert.Contains("DPL3052", enabledError, StringComparison.Ordinal);
+        Assert.Equal(1, strictExit);
+        Assert.Contains("DPL3052", strictError, StringComparison.Ordinal);
+        Assert.Contains("Output value of m:p/1", strictError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ContractOptionRequiresExactlyOneMatchingSourceBaseName()
+    {
+        var source = Source("pairing-rules.pl", ":- module(m, []). \n");
+        var contract = Source("other.dpli", ":- clr_module('M').\n");
+
+        (var exitCode, _, var error) = Execute("lint", "--contract", contract, source);
+        (var missingExit, _, var missingError) = Execute("lint", "--contract");
+
+        Assert.Equal(64, exitCode);
+        Assert.Contains("same base name as exactly one", error, StringComparison.Ordinal);
+        Assert.Equal(64, missingExit);
+        Assert.Contains("missing contract file", missingError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ContractReaderErrorsReturnCompileError()
+    {
+        var source = Source("invalid-contract.pl", ":- module(m, [p/1]). p(wrong).\n");
+        var contract = Source(
+            "invalid-contract.dpli",
+            ":- clr_module('M'). :- clr_export(p/1, unknown, [out(value, integer)]).\n"
+        );
+
+        (var exitCode, _, var error) = Execute("lint", "--enable-rule", "DPL3052", "--contract", contract, source);
+
+        Assert.Equal(65, exitCode);
+        Assert.Contains("error DPL2", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EnabledContractRuleWithoutContractHasNothingToReport()
+    {
+        var source = Source("no-contract.pl", ":- module(m, [p/1]). p(wrong).\n");
+
+        (var exitCode, _, var error) = Execute("lint", "--enable-rule", "DPL3052", source);
+
+        Assert.Equal(0, exitCode);
+        Assert.DoesNotContain("DPL3052", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LintReportsAGroundCallWithNoMatchingClauseHead()
     {
         var path = Source("trivial.pl", "p(a). go :- p(b).\n");

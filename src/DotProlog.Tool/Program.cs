@@ -1,3 +1,4 @@
+using DotProlog.CodeGen.CSharp;
 using DotProlog.Compiler;
 using DotProlog.Packages;
 using DotProlog.Runtime;
@@ -33,7 +34,9 @@ internal static class Program
         + "|"
         + LintDiagnosticIds.LocalImportShadow
         + "|"
-        + LintDiagnosticIds.BuiltinShadow;
+        + LintDiagnosticIds.BuiltinShadow
+        + "|"
+        + LintDiagnosticIds.ContractOutputTypeMismatch;
     private const int ExitLintWarnings = 1;
     private const int ExitSuccess = 0;
     private const int ExitUsage = 64;
@@ -211,6 +214,7 @@ internal static class Program
         int? maxClauseSubgoals = null;
         List<string> flagEntries = [];
         List<string> enabledRules = [];
+        List<string> contractPaths = [];
         List<string> paths = [];
 
         for (var index = 0; index < args.Length; index++)
@@ -219,6 +223,18 @@ internal static class Program
             if (argument == "--warnings-as-errors")
             {
                 warningsAsErrors = true;
+                continue;
+            }
+
+            if (argument == "--contract")
+            {
+                if (index + 1 >= args.Length)
+                {
+                    error.WriteLine("error: missing contract file after --contract");
+                    return ExitUsage;
+                }
+
+                contractPaths.Add(args[++index]);
                 continue;
             }
 
@@ -276,6 +292,7 @@ internal static class Program
                     LintDiagnosticIds.ExcessiveSubgoalCount => LintDiagnosticIds.ExcessiveSubgoalCount,
                     LintDiagnosticIds.LocalImportShadow => LintDiagnosticIds.LocalImportShadow,
                     LintDiagnosticIds.BuiltinShadow => LintDiagnosticIds.BuiltinShadow,
+                    LintDiagnosticIds.ContractOutputTypeMismatch => LintDiagnosticIds.ContractOutputTypeMismatch,
                     _ => null,
                 };
                 if (rule is null)
@@ -405,6 +422,50 @@ internal static class Program
 
         var foundErrors = false;
         var foundWarnings = false;
+        List<(ModuleContract Contract, string FileName)> contracts = [];
+        foreach (var path in contractPaths)
+        {
+            string[] matchingSources = [.. paths.Where(source => SameBaseName(path, source))];
+            if (matchingSources.Length != 1)
+            {
+                error.WriteLine($"error: contract {path} must have the same base name as exactly one named .pl source");
+                return ExitUsage;
+            }
+
+            if (!File.Exists(path))
+            {
+                error.WriteLine($"error: file not found: {path}");
+                foundErrors = true;
+                continue;
+            }
+
+            var absolute = Path.GetFullPath(path);
+            string text;
+            try
+            {
+                text = File.ReadAllText(absolute);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                error.WriteLine($"error: cannot read {path}: {exception.Message}");
+                foundErrors = true;
+                continue;
+            }
+
+            ContractReadResult result = ContractReader.Read(text, "DotProlog", absolute);
+            foreach (Diagnostic diagnostic in result.Diagnostics)
+            {
+                error.WriteLine(diagnostic.ToString());
+                foundErrors |= diagnostic.Severity == DiagnosticSeverity.Error;
+                foundWarnings |= diagnostic.Severity == DiagnosticSeverity.Warning;
+            }
+
+            if (result.Success)
+            {
+                contracts.Add((result.Contract!, absolute));
+            }
+        }
+
         List<PrologLintSource> sources = [];
         foreach (var path in paths)
         {
@@ -446,6 +507,16 @@ internal static class Program
             foundWarnings |= diagnostic.Severity == DiagnosticSeverity.Warning;
         }
 
+        foreach ((ModuleContract contract, string fileName) in contracts)
+        {
+            foreach (Diagnostic diagnostic in PrologContractLinter.Analyze(sources, contract, fileName, lintOptions))
+            {
+                error.WriteLine(diagnostic.ToString());
+                foundErrors |= diagnostic.Severity == DiagnosticSeverity.Error;
+                foundWarnings |= diagnostic.Severity == DiagnosticSeverity.Warning;
+            }
+        }
+
         if (foundErrors)
         {
             return ExitCompileError;
@@ -453,6 +524,13 @@ internal static class Program
 
         return warningsAsErrors && foundWarnings ? ExitLintWarnings : ExitSuccess;
     }
+
+    private static bool SameBaseName(string left, string right) =>
+        string.Equals(
+            Path.GetFileNameWithoutExtension(left),
+            Path.GetFileNameWithoutExtension(right),
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal
+        );
 
     private static int UnknownCommand(string command, TextWriter error)
     {
@@ -521,7 +599,7 @@ internal static class Program
         output.WriteLine("  dotnet prolog restore [--locked] [--project DIR]");
         output.WriteLine("  dotnet prolog package <command> (init, add, remove, restore, update, check, tree, run)");
         output.WriteLine($"  dotnet prolog lint [--mode {LanguageModeNames}] [--flag name=value] [--profile {LintProfileNames}]");
-        output.WriteLine($"      [--enable-rule {LintOptInRuleNames}] [--warnings-as-errors] <file.pl>...");
+        output.WriteLine($"      [--enable-rule {LintOptInRuleNames}] [--contract FILE] [--warnings-as-errors] <file.pl>...");
         output.WriteLine("      analyze source without consulting it or executing directives");
         output.WriteLine();
         output.WriteLine("Language modes:");
@@ -546,6 +624,6 @@ internal static class Program
         );
         output.WriteLine("       [--indent-size N] [--max-line-length N] [--max-clause-lines N]");
         output.WriteLine("       [--max-predicate-arity N] [--max-clause-subgoals N]");
-        output.WriteLine($"       [--enable-rule {LintOptInRuleNames}] [--warnings-as-errors] <file.pl>...");
+        output.WriteLine($"       [--enable-rule {LintOptInRuleNames}] [--contract FILE] [--warnings-as-errors] <file.pl>...");
     }
 }
