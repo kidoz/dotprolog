@@ -25,6 +25,7 @@ dotnet prolog lint [options] <file.pl> [more.pl ...]
 | `--enable-rule DPL3044` | Enable the opt-in predicate naming heuristic; repeatable |
 | `--enable-rule DPL3045` | Enable the opt-in excessive-arity heuristic; repeatable |
 | `--enable-rule DPL3046` | Enable the opt-in excessive-subgoal-count heuristic; repeatable |
+| `--enable-rule DPL3048` | Enable the opt-in local-import shadowing heuristic; repeatable |
 | `--mode modern` or `--mode strict-iso` | Seed the reader's language mode; default `modern` |
 | `--flag name=value` | Override a curated initial flag; repeatable |
 | `--indent-size N` | Positive indentation unit; Covington default `4` |
@@ -91,6 +92,7 @@ These rules run in every profile:
 | `DPL3045` | Opt-in: a user-defined predicate or nonterminal exceeds the configured source-arity limit |
 | `DPL3046` | Opt-in: a rule exceeds the configured direct-subgoal limit |
 | `DPL3047` | A later import conflicts with an earlier import from a different module |
+| `DPL3048` | Opt-in: a local procedure shadows an import of the same lowered identity |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -230,6 +232,31 @@ Unknown modules, unresolved file imports, unknown exports, and selective binding
 their source remain unknown and produce no `DPL3047`; they do not suppress independently resolved
 conflicts. Existing first-accepted-binding behavior and unused-import suppression remain unchanged.
 No source is executed, and imports are never reordered or rewritten.
+
+### Opt-in local import shadowing
+
+`DPL3048` is disabled by default in every profile because local specialization of an imported binding
+is often intentional. Enable it with `--enable-rule DPL3048`; duplicate options do not duplicate
+findings. Compiler API callers can select the same rule through `PrologLintOptions.EnabledRules`.
+
+The rule reports a resolved import that attempts to introduce an identity already defined or declared
+in the importing module. The message names the local procedure, importing and imported source modules,
+and states that the imported binding is not resolved. Static, dynamic, and multifile local procedures
+are eligible regardless of whether they occur before or after the import. No call is required.
+
+Each finding is located at the first supplied local clause's predicate or nonterminal name token. If
+there is no clause, the first eligible dynamic or multifile declaration indicator is used. Included
+clauses and declarations retain their physical source ownership. One finding is emitted per imported
+source module and lowered identity; repeated directives from that source do not duplicate it, while
+different sources remain separate. Ordinary predicates and DCG nonterminals sharing a lowered
+identity shadow one another. Selective `//` imports retain their source nonterminal form, and whole
+imports use the hidden export's known kind.
+
+Selective and whole `use_module`, `import`, and `reexport` directives are covered, including rejected
+reexports. Unknown modules, unresolved file imports, unknown exports, and unexported selective
+bindings produce no `DPL3048` and do not suppress independent findings. `user` fallback, built-ins,
+and explicitly qualified calls are outside the rule. Local rejection does not also produce `DPL3047`.
+No source is executed, and imports and local definitions are never removed, renamed, or reordered.
 
 ### Opt-in non-steadfast clauses
 

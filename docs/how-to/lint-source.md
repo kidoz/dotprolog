@@ -66,6 +66,26 @@ execution:
 dotnet run --project src/DotProlog.Tool -- lint main.pl module-a.pl module-b.pl
 ```
 
+## Review local import shadowing
+
+`DPL3048` is disabled by default because deliberately replacing an imported binding with a local
+procedure is common. Enable it explicitly and list the importing and imported source files:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint --enable-rule DPL3048 main.pl library.pl
+```
+
+The rule reports a resolved import whose predicate or DCG nonterminal identity is hidden by a local
+clause, `dynamic` declaration, or `multifile` declaration. It locates the finding at the first local
+clause name, or at the first eligible declaration when no clause exists. Local definitions take
+priority regardless of whether they occur before or after the import.
+
+Repeated imports from one source produce one finding per lowered identity; different hidden sources
+remain separate. Selective and whole imports and reexports are covered. Unresolved modules and
+exports produce no shadow finding, and local rejection does not also produce `DPL3047`. This is a
+review hint, not a recommendation to remove an import or rename a working local procedure. No source
+is executed or rewritten.
+
 ## Check for possible non-steadfast clauses
 
 Enable the non-steadfast heuristic explicitly:

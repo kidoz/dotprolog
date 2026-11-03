@@ -106,6 +106,9 @@ All notable changes to DotProlog are recorded here. The format follows
 - Default conflicting-import linting reports later import bindings rejected because a different
   module already supplied the same lowered identity using `DPL3047`. Selective and whole imports,
   reexports, DCG identities, includes, and unknown-source handling are covered without execution.
+- Opt-in local-import shadowing linting reports resolved imports hidden by local static, dynamic, or
+  multifile procedures using `DPL3048`. Enable it with `--enable-rule DPL3048`; findings use the
+  first local clause or declaration and cover DCG identities, reexports, and includes without execution.
 
 ### Changed
 
