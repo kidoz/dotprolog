@@ -83,6 +83,10 @@ an executable override is supplied. On headless Linux, run editor tests under `x
 `DOTPROLOG_EXTENSION_PATH` to an extracted VSIX's `extension` directory to test the packaged payload.
 Build outputs and VSIX files live under `bin/`; npm dependencies live in `node_modules/`.
 
+The extension, tests and build tooling are written in TypeScript. Tooling sources use `.mts`
+for ECMAScript modules and compile to `bin/scripts/` through `npm run compile:scripts`.
+The npm commands compile the tooling automatically; the language server remains C#.
+
 For example, in a POSIX shell, test a locally packaged managed extension at the minimum version:
 
 ```sh
