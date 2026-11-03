@@ -323,3 +323,20 @@ fi
 test "$lint_exit" -eq 1
 printf '%s\n' "$lint_output" | grep -F 'warning DPL3049'
 printf '%s\n' "$lint_output" | grep -F 'predefined predicate member/2'
+
+# Conflicting meta-predicate modes are reported by default without executing source.
+printf '%s\n' ':- initialization(halt(9)).' ':- meta_predicate(p(0)).' ':- meta_predicate(p(1)).' \
+    'p(_).' >HelloProlog/lint-meta-declarations.pl
+lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    HelloProlog/lint-meta-declarations.pl 2>&1)
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3050'
+printf '%s\n' "$lint_output" | grep -F 'earlier template p(0)'
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --warnings-as-errors HelloProlog/lint-meta-declarations.pl 2>&1); then
+    echo "lint unexpectedly accepted conflicting meta-predicate declarations" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3050'
