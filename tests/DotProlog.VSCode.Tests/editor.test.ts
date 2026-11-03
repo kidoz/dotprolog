@@ -19,7 +19,19 @@ async function eventually<T>(
         }
         await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    throw new Error("Timed out waiting for editor state.");
+    const diagnostics = vscode.languages
+        .getDiagnostics()
+        .map(([uri, items]) => ({
+            uri: uri.toString(),
+            diagnostics: items.map((item) => ({
+                code: item.code,
+                severity: item.severity,
+                message: item.message,
+            })),
+        }));
+    throw new Error(
+        `Timed out waiting for editor state. Published diagnostics: ${JSON.stringify(diagnostics)}`,
+    );
 }
 
 async function document(name: string, text: string) {
