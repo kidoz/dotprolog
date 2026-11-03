@@ -69,5 +69,6 @@ rsvg-convert -w 512 -h 512 icon.svg -o icon-512.png
 rsvg-convert banner.svg -o banner.png
 ```
 
-The VSIX includes PNG assets only. Refresh `editor.png` and `diagnostics.png` from the actual
-extension UI when features change. Keep sample workspaces free of account details and private code.
+The VSIX includes PNG branding and JPEG screenshots; SVG masters stay in the source tree.
+Refresh `editor.jpg` and `diagnostics.jpg` from the actual extension UI when features change.
+Keep sample workspaces free of account details and private code.
