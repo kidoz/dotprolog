@@ -31,7 +31,9 @@ internal static class Program
         + "|"
         + LintDiagnosticIds.ExcessiveSubgoalCount
         + "|"
-        + LintDiagnosticIds.LocalImportShadow;
+        + LintDiagnosticIds.LocalImportShadow
+        + "|"
+        + LintDiagnosticIds.BuiltinShadow;
     private const int ExitLintWarnings = 1;
     private const int ExitSuccess = 0;
     private const int ExitUsage = 64;
@@ -273,6 +275,7 @@ internal static class Program
                     LintDiagnosticIds.ExcessivePredicateArity => LintDiagnosticIds.ExcessivePredicateArity,
                     LintDiagnosticIds.ExcessiveSubgoalCount => LintDiagnosticIds.ExcessiveSubgoalCount,
                     LintDiagnosticIds.LocalImportShadow => LintDiagnosticIds.LocalImportShadow,
+                    LintDiagnosticIds.BuiltinShadow => LintDiagnosticIds.BuiltinShadow,
                     _ => null,
                 };
                 if (rule is null)

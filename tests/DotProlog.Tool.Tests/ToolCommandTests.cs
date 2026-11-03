@@ -144,6 +144,30 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void BuiltinShadowRuleIsDisabledUnlessExplicitlyEnabled()
+    {
+        var path = Source("builtin-shadow.pl", ":- initialization(halt(9)). member(_, _).\n");
+
+        (var defaultExit, _, var defaultError) = Execute("lint", path);
+        (var enabledExit, _, var enabledError) = Execute(
+            "lint",
+            "--enable-rule",
+            "DPL3049",
+            "--enable-rule",
+            "dpl3049",
+            "--warnings-as-errors",
+            path
+        );
+
+        Assert.Equal(0, defaultExit);
+        Assert.DoesNotContain("DPL3049", defaultError, StringComparison.Ordinal);
+        Assert.Equal(1, enabledExit);
+        Assert.Equal(1, enabledError.Split(["DPL3049"], StringSplitOptions.None).Length - 1);
+        Assert.Contains("Local procedure member/2 in module user", enabledError, StringComparison.Ordinal);
+        Assert.Contains("predefined predicate member/2", enabledError, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LintReportsAGroundCallWithNoMatchingClauseHead()
     {
         var path = Source("trivial.pl", "p(a). go :- p(b).\n");
@@ -493,7 +517,7 @@ public sealed class ToolCommandTests : IDisposable
         var imported = Source("heuristics-import.pl", ":- module(shadow_source, [shadowed/0]). shadowed.\n");
         var path = Source(
             "heuristics.pl",
-            ":- module(heuristics, []). :- import(shadow_source, [shadowed/0]).\nshadowed.\n:- multifile(p/0).\nmax(X, Y, X) :- X >= Y, !.\np :- !.\np(N) :- N > 0, p(N), writeln(N).\nq :- repeat.\nr :- true, !.\ns :- catch(true, _, true).\nt :- (true -> true).\nbadName.\nu(A, B, C, D, E).\nv :- a,b,c,d,e,f,g,h,i.\n"
+            ":- module(heuristics, []). :- import(shadow_source, [shadowed/0]).\nshadowed.\nmember(_, _).\n:- multifile(p/0).\nmax(X, Y, X) :- X >= Y, !.\np :- !.\np(N) :- N > 0, p(N), writeln(N).\nq :- repeat.\nr :- true, !.\ns :- catch(true, _, true).\nt :- (true -> true).\nbadName.\nu(A, B, C, D, E).\nv :- a,b,c,d,e,f,g,h,i.\n"
         );
 
         (var exitCode, _, var error) = Execute(
@@ -520,6 +544,8 @@ public sealed class ToolCommandTests : IDisposable
             "DPL3046",
             "--enable-rule",
             "DPL3048",
+            "--enable-rule",
+            "DPL3049",
             "--warnings-as-errors",
             path,
             imported
@@ -537,6 +563,7 @@ public sealed class ToolCommandTests : IDisposable
         Assert.Contains("DPL3045", error, StringComparison.Ordinal);
         Assert.Contains("DPL3046", error, StringComparison.Ordinal);
         Assert.Contains("DPL3048", error, StringComparison.Ordinal);
+        Assert.Contains("DPL3049", error, StringComparison.Ordinal);
     }
 
     [Theory]
