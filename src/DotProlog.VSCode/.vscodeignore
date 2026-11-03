@@ -6,6 +6,7 @@
 !syntaxes/**
 !snippets/**
 !images/*.png
+!images/*.jpg
 !CHANGELOG.md
 !bin/extension.js
 !bin/THIRD_PARTY_NOTICES.txt

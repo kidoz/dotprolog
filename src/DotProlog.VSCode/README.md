@@ -15,11 +15,11 @@ DotProlog's bundled language server. DotProlog is the Prolog implementation for 
 - Server restart, output and bounded automatic recovery after server crashes.
 - Highlighting for `.dpli` contracts and XML editing for `.dplproj` files.
 
-![Prolog syntax highlighting and predicate outline in VS Code](images/editor.png)
+![Prolog syntax highlighting and predicate outline in VS Code](images/editor.jpg)
 
 Diagnostics update as you type, including changes in unsaved included files.
 
-![Parser diagnostics in the editor and Problems panel](images/diagnostics.png)
+![Parser diagnostics in the editor and Problems panel](images/diagnostics.jpg)
 
 Analysis does not execute Prolog goals. Rename only covers the analyzed snapshot and can refuse
 operations when the server cannot prove an unambiguous static edit. Contract diagnostics, formatting,
