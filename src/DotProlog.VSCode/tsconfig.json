@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "vscode": ["node_modules/@types/vscode"],
+      "vscode-textmate": ["node_modules/vscode-textmate"],
+      "vscode-oniguruma": ["node_modules/vscode-oniguruma"]
+    },
+    "types": ["node", "mocha"]
+  },
+  "include": ["src/**/*.ts", "../../tests/DotProlog.VSCode.Tests/**/*.ts"]
+}

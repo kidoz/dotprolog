@@ -1,0 +1,5 @@
+{
+  "scopeName": "source.dotprolog.contract",
+  "name": "DotProlog Contract",
+  "patterns": [{ "include": "source.dotprolog" }]
+}

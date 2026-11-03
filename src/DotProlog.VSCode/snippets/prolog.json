@@ -1,0 +1,22 @@
+{
+  "Rule": {
+    "prefix": "rule",
+    "body": ["${1:predicate}(${2:Arguments}) :-", "    ${0:Goal}."],
+    "description": "Predicate rule"
+  },
+  "Module": {
+    "prefix": "module",
+    "body": [":- module(${1:name}, [${2:predicate/1}]).", "", "$0"],
+    "description": "Module declaration"
+  },
+  "DCG rule": {
+    "prefix": "dcg",
+    "body": ["${1:nonterminal} -->", "    ${0:Body}."],
+    "description": "Grammar rule"
+  },
+  "Use module": {
+    "prefix": "use_module",
+    "body": ":- use_module(${1:module}, [${2:predicate/1}]).",
+    "description": "Import predicates"
+  }
+}

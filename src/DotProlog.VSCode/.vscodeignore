@@ -1,0 +1,16 @@
+**/*
+!package.json
+!README.md
+!LICENSE
+!language-configuration.json
+!syntaxes/**
+!snippets/**
+!bin/extension.js
+!bin/THIRD_PARTY_NOTICES.txt
+!bin/server/**/*.dll
+!bin/server/*.json
+!bin/server/THIRD_PARTY_NOTICES.txt
+!bin/server/dotprolog-lsp
+!bin/server/dotprolog-lsp.exe
+!bin/server/**/*.so
+!bin/server/**/*.dylib

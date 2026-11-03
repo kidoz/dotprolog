@@ -1,0 +1,86 @@
+{
+  "scopeName": "source.dotprolog",
+  "name": "DotProlog",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "name": "constant.character.escape.dotprolog",
+      "match": "\\b0'(?:\\\\.|.)"
+    },
+    {
+      "name": "string.quoted.single.dotprolog",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "match": "\\\\.|''",
+          "name": "constant.character.escape.dotprolog"
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.double.dotprolog",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "match": "\\\\.|\"\"",
+          "name": "constant.character.escape.dotprolog"
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.other.dotprolog",
+      "begin": "`",
+      "end": "`",
+      "patterns": [
+        {
+          "match": "\\\\.|``",
+          "name": "constant.character.escape.dotprolog"
+        }
+      ]
+    },
+    {
+      "name": "constant.numeric.dotprolog",
+      "match": "\\b(?:0[xX][0-9A-Fa-f_]+|0[oO][0-7_]+|0[bB][01_]+|[0-9][0-9_]*(?:\\.[0-9][0-9_]*)?(?:[eE][+-]?[0-9][0-9_]*)?)\\b"
+    },
+    {
+      "name": "variable.other.dotprolog",
+      "match": "(?<![\\p{L}\\p{N}_])[\\p{Lu}_][\\p{L}\\p{N}_]*"
+    },
+    {
+      "name": "keyword.operator.dotprolog",
+      "match": "-->|:-|\\?-|[!#$&*+./:<=>?@\\\\^~;-]+"
+    },
+    {
+      "name": "entity.name.function.dotprolog",
+      "match": "(?<![\\p{L}\\p{N}_])[\\p{Ll}][\\p{L}\\p{N}_]*(?=\\s*\\()"
+    },
+    {
+      "name": "constant.other.atom.dotprolog",
+      "match": "(?<![\\p{L}\\p{N}_])[\\p{Ll}][\\p{L}\\p{N}_]*"
+    },
+    {
+      "name": "punctuation.section.dotprolog",
+      "match": "[()\\[\\]{},|]"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.percentage.dotprolog",
+          "begin": "%",
+          "end": "$"
+        },
+        {
+          "name": "comment.block.dotprolog",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    }
+  }
+}
