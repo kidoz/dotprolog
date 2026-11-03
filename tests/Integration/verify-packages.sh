@@ -340,3 +340,21 @@ else
 fi
 test "$lint_exit" -eq 1
 printf '%s\n' "$lint_output" | grep -F 'warning DPL3050'
+
+# Missing selective exports are reported by default without running initialization directives.
+printf '%s\n' ':- module(export_source, [q/0]).' 'q.' >HelloProlog/lint-export-source.pl
+printf '%s\n' ':- module(export_main, []).' ':- initialization(halt(9)).' \
+    ':- use_module('\''lint-export-source.pl'\'', [p/0]).' >HelloProlog/lint-export-main.pl
+lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    HelloProlog/lint-export-main.pl HelloProlog/lint-export-source.pl 2>&1)
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3051'
+printf '%s\n' "$lint_output" | grep -F 'Import of p/0 into module export_main from module export_source'
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --warnings-as-errors HelloProlog/lint-export-main.pl HelloProlog/lint-export-source.pl 2>&1); then
+    echo "lint unexpectedly accepted a missing selective export" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3051'
