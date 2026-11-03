@@ -13,6 +13,7 @@ internal sealed class PrologLintProgramModel
     private readonly HashSet<(string Module, PredicateIndicator Predicate)> _nonterminals = [];
     private readonly HashSet<(string Module, PredicateIndicator Predicate)> _dynamicOrMultifile = [];
     private readonly HashSet<string> _effectfulModules = new(StringComparer.Ordinal);
+    private readonly HashSet<(string Importer, string SourceModule, PredicateIndicator Indicator)> _localImportShadows = [];
 
     private PrologLintProgramModel(IReadOnlyList<PrologLintSource> sources)
     {
@@ -30,8 +31,10 @@ internal sealed class PrologLintProgramModel
     internal ModuleTable Modules { get; }
     internal List<ClauseContext> Clauses { get; } = [];
     internal List<DeclarationSite> Declarations { get; } = [];
+    internal List<DeclarationSite> LocalProcedureDeclarations { get; } = [];
     internal List<ImportSite> Imports { get; } = [];
     internal List<ImportConflict> ImportConflicts { get; } = [];
+    internal List<LocalImportShadow> LocalImportShadows { get; } = [];
     internal List<(string File, int Offset, string Module, int Context)> ModuleScopes { get; } = [];
 
     internal static PrologLintProgramModel Build(IReadOnlyList<PrologLintSource> sources)
@@ -309,6 +312,16 @@ internal sealed class PrologLintProgramModel
                 Modules.Define(module, indicator);
                 _ordinary.Add((module, indicator));
                 _dynamicOrMultifile.Add((module, indicator));
+                LocalProcedureDeclarations.Add(
+                    new DeclarationSite(
+                        module,
+                        indicator,
+                        nonterminal,
+                        dynamic ? "dynamic" : "multifile",
+                        item.Span,
+                        source.FileName
+                    )
+                );
             }
 
             if (dynamic)
@@ -445,10 +458,27 @@ internal sealed class PrologLintProgramModel
                 {
                     RecordImportConflict(request, predicate, conflictingModule, sourceModule);
                 }
+                else if (conflictingModule == request.Importer)
+                {
+                    RecordLocalImportShadow(request, predicate, sourceModule);
+                }
             }
         }
 
         Imports.Add(request.ToSite(sourceModule));
+    }
+
+    private void RecordLocalImportShadow(ImportRequest request, PredicateIndicator predicate, string sourceModule)
+    {
+        if (!_localImportShadows.Add((request.Importer, sourceModule, predicate)))
+        {
+            return;
+        }
+
+        bool nonterminal = request.Selective
+            ? request.Bindings.First(binding => binding.Indicator == predicate).Nonterminal
+            : _nonterminals.Contains((sourceModule, predicate)) && !_ordinary.Contains((sourceModule, predicate));
+        LocalImportShadows.Add(new LocalImportShadow(request.Importer, sourceModule, predicate, nonterminal));
     }
 
     private void RecordImportConflict(
@@ -569,6 +599,13 @@ internal sealed class PrologLintProgramModel
         bool Nonterminal,
         SourceSpan Span,
         PrologLintSource Source
+    );
+
+    internal sealed record LocalImportShadow(
+        string Importer,
+        string SourceModule,
+        PredicateIndicator Indicator,
+        bool Nonterminal
     );
 
     private sealed record ImportRequest(

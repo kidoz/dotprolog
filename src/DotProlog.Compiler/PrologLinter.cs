@@ -139,6 +139,7 @@ public static class PrologLinter
         PrologNamingLinter.Analyze(model, options, diagnostics);
         PrologExcessiveArityLinter.Analyze(model, options, diagnostics);
         PrologExcessiveSubgoalCountLinter.Analyze(model, options, diagnostics);
+        PrologLocalImportShadowLinter.Analyze(model, options, diagnostics);
         PrologConflictingImportLinter.Analyze(model, diagnostics);
         PrologCallGraphLinter.Analyze(model, diagnostics);
         PrologReachabilityLinter.Analyze(model, diagnostics);

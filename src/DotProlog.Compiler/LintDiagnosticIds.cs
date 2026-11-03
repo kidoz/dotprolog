@@ -150,4 +150,7 @@ public static class LintDiagnosticIds
 
     /// <summary>A later import conflicts with an earlier import from a different module.</summary>
     public const string ConflictingImport = "DPL3047";
+
+    /// <summary>A local procedure shadows an import of the same lowered identity.</summary>
+    public const string LocalImportShadow = "DPL3048";
 }
