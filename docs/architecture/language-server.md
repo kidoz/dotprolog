@@ -356,11 +356,31 @@ collisions and failure recovery. `AnalysisSchedulerTests` exercises cancellation
 and shutdown during blocked reevaluation. `verify-language-server-rename.py` checks the combined
 contract over managed and native stdio, including project reload failure and recovery.
 
-## Stage 4: editor and distribution — planned
+## Stage 4: editor and distribution — VS Code preview implemented
 
-Ship a thin VS Code extension for language registration, highlighting, settings and server launch.
-Verify a second independent LSP client; add Rider integration separately. Establish tool packaging,
-RID artifacts, licensing checks and Windows/Linux/macOS native tests before enabling releases.
+`src/DotProlog.VSCode` supplies a TypeScript client using `vscode-languageclient`, source/contract
+language registration, TextMate highlighting, snippets and server launch. Project files retain XML
+editing. The negotiated server capabilities provide diagnostics, hover, Outline, completion,
+definitions, references and versioned predicate rename through VS Code.
+
+One client owns the window's Prolog buffers with one explicitly selected project or loose-file
+session. Setting changes restart the server and synchronize unsaved buffers again. The client
+launches a DLL using `dotnet`, or an executable directly, without a shell, `dotnet run` or a
+`--stdio` argument. Dynamic client watchers deliver disk notifications, including arbitrary include
+extensions. Workspace watch coverage and exclusions still apply.
+
+Language services require Workspace Trust; syntax contributions remain available in Restricted Mode.
+The workspace Node host keeps server and source locations together for remote development.
+Browser-only and virtual workspaces are unsupported. Opening source triggers no builds or restores.
+
+Local packaging bundles a managed server requiring the .NET 10 runtime, or a NativeAOT server for
+an explicit platform target. Project mode still requires the .NET SDK. Packaging does not publish
+releases. See the [extension guide](https://github.com/kidoz/dotprolog/blob/main/src/DotProlog.VSCode/README.md)
+for installation and settings.
+
+`tests/DotProlog.VSCode.Tests` exercises real Extension Hosts and server processes with isolated
+profiles and temporary workspaces. Cross-platform native checks, a second independent editor
+client and Rider integration remain future work.
 
 Acceptance: clean installation, editor diagnostics from an unsaved file, server restart/recovery,
 configuration, and native executable operation without a separately installed .NET runtime.
@@ -389,8 +409,8 @@ Document symbols provide predicate outlines; builtin hover provides signatures, 
 language-mode notes; completion suggests predicate names and current-clause variables; definitions
 navigate to source clauses across the analyzed workspace; references list known calls and
 optionally clause heads; rename returns versioned edits when its conservative eligibility checks
-pass and the client supports versioned workspace edits. Editor
-extensions remain planned. Project mode analyzes all evaluated sources;
+pass and the client supports versioned workspace edits. The VS Code preview exposes these services.
+Project mode analyzes all evaluated sources;
 loose-file mode analyzes include closures. No performance or
 cross-platform NativeAOT claim is made from the initial host check.
 
@@ -429,6 +449,23 @@ to stall evaluation and spawn a child, then checks request/shutdown responses wi
 process-tree cleanup. It verifies wire output and exit status for either managed or native executables.
 
 ## Verification evidence
+
+VS Code preview verified on macOS arm64 on 2026-11-03 with VS Code 1.130.0 and .NET SDK 10.0.403:
+
+- Six launch/grammar checks passed, and the language server suite passed all 132 tests.
+- The managed and native VSIX payloads passed eight real Extension Host tests each: unsaved
+  diagnostic updates and cleanup, hover/Outline/completion/navigation/references/rename, arbitrary
+  include-extension disk watching, restart and crash recovery with unsaved buffers, saved project
+  import reloads, language identities and recovery after an invalid server override.
+- A separate Restricted Mode Extension Host retained language registration and started no server.
+  That runner deliberately avoids the test helper's default trust-disabling argument.
+- Native publication for `osx-arm64` completed without warnings. Both VSIX packages include
+  dependency notices and exclude source, tests, npm dependencies and debug symbols.
+- TypeScript compilation, Prettier, the strict documentation build and `git diff --check` passed.
+
+The Windows/Linux managed-package CI matrix is configured but was not executed locally. Native
+packages for other targets, minimum-supported VS Code validation and Marketplace publication remain
+unverified or outside this local preview.
 
 Verified on macOS arm64 on 2026-11-02:
 

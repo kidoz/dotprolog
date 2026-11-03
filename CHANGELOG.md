@@ -8,6 +8,11 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Added
 
+- A VS Code extension preview provides DotProlog highlighting, snippets and language server
+  integration for diagnostics, hover, Outline, completion, definitions, references and predicate
+  rename. It supports explicit project selection, server restart and local VSIX packaging, with
+  language services enabled in trusted workspaces.
+
 - The language server now prepares and returns versioned predicate rename edits for source heads,
   resolved calls and declaration/import/export indicators, including DCGs. Rename requires a
   complete, unambiguous static snapshot and rejects collisions, indirect or reflective calls,
@@ -28,7 +33,7 @@ All notable changes to DotProlog are recorded here. The format follows
 
 - A development language server prototype provides file-local parser and lint diagnostics for
   unsaved documents over LSP stdio, with UTF-16 ranges and Modern or StrictIso mode selection.
-  Editor extensions and release packaging remain planned.
+  Standalone server release packaging remains planned.
 - Language server file diagnostics now expand includes using unsaved buffers before disk,
   reanalyze dependent files when buffers change or close, and clear findings when their last
   including document closes. Included files retain their own diagnostic ranges and reader context.
