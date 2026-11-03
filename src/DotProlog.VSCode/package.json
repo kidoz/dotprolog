@@ -154,8 +154,8 @@
     "package": "npm run compile:scripts && node bin/scripts/package.mjs",
     "vscode:prepublish": "npm run compile",
     "test:restricted": "npm run compile && node bin/scripts/test.mjs --restricted",
-    "format": "prettier --write src scripts ../../tests/DotProlog.VSCode.Tests *.json syntaxes/*.json snippets/*.json README.md",
-    "format:check": "prettier --check src scripts ../../tests/DotProlog.VSCode.Tests *.json syntaxes/*.json snippets/*.json README.md"
+    "format": "prettier --ignore-path ../../.prettierignore --write ../../.prettierrc.json src scripts ../../tests/DotProlog.VSCode.Tests *.json syntaxes/*.json snippets/*.json README.md",
+    "format:check": "prettier --ignore-path ../../.prettierignore --check ../../.prettierrc.json src scripts ../../tests/DotProlog.VSCode.Tests *.json syntaxes/*.json snippets/*.json README.md"
   },
   "dependencies": {
     "vscode-languageclient": "11.0.0"
