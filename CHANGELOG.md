@@ -157,6 +157,9 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Fixed
 
+- The language server resolves Windows file URIs with an escaped drive colon, as sent by VS Code.
+  Includes and project file-change notifications now use the same paths as disk analysis, avoiding
+  invalid duplicated drive prefixes and stale diagnostics.
 - HTTPS package archives require an explicit SHA-256 digest and reject redirects. The download
   timeout covers the response body as well as headers. Local ZIP checksums remain optional.
 - Package input reads reject FIFOs, devices and symbolic-link replacements before reading from

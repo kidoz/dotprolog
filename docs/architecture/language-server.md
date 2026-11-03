@@ -455,6 +455,28 @@ process-tree cleanup. It verifies wire output and exit status for either managed
 
 ## Verification evidence
 
+Cross-platform managed-package validation on 2026-11-03 at `c23c5a6` is tracked by
+[the VS Code CI run](https://github.com/kidoz/dotprolog/actions/runs/41678580961):
+
+| Host | VS Code 1.91.0 | VS Code 1.144.1 |
+| --- | --- | --- |
+| Windows x64 | Passed | Passed |
+| Linux x64 | Passed | Passed |
+| macOS arm64 | Queued for a hosted runner | Passed |
+
+Each completed job passed formatting, TypeScript compilation, six launch/grammar tests,
+managed VSIX packaging, eight editor integration tests against the extracted package and one
+Restricted Mode test. Each uploaded its VSIX artifact. The minimum editor used Node 20.9.0;
+stable used Node 24.22.1. The macOS minimum job is not counted as a CI pass while queued.
+
+The preceding run exposed a Windows URI conversion defect: the `%3A` drive separator sent by
+VS Code left an extra leading slash in the server's local path. Includes acquired duplicated
+drive prefixes, and disk notifications did not match project source paths. Normalizing that
+drive prefix fixed both failing editor cases. Regression coverage checks document identity,
+include loading and disk updates, including filenames with spaces, `#` and literal `%3A`.
+A clean-source local language-server run passed 133 tests and skipped two Windows-only cases.
+Native packages were not exercised by this matrix.
+
 Minimum/current-stable compatibility verified on macOS arm64 on 2026-11-03 using a freshly
 packaged and extracted managed VSIX:
 
