@@ -358,3 +358,27 @@ else
 fi
 test "$lint_exit" -eq 1
 printf '%s\n' "$lint_output" | grep -F 'warning DPL3051'
+
+# Contract output analysis is opt-in and never executes another module's initialization directive.
+printf '%s\n' ':- module(contract_rules, [p/1]).' 'p(wrong).' >HelloProlog/lint-contract-rules.pl
+printf '%s\n' ':- clr_module('\''ContractRules'\'').' \
+    ':- clr_export(p/1, det, [out(value, integer)]).' >HelloProlog/lint-contract-rules.dpli
+printf '%s\n' ':- module(contract_canary, []).' ':- initialization(halt(9)).' >HelloProlog/lint-contract-canary.pl
+lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --contract HelloProlog/lint-contract-rules.dpli \
+    HelloProlog/lint-contract-rules.pl HelloProlog/lint-contract-canary.pl 2>&1)
+if printf '%s\n' "$lint_output" | grep -F 'warning DPL3052'; then
+    echo "lint enabled contract output analysis by default" >&2
+    exit 1
+fi
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --enable-rule DPL3052 --contract HelloProlog/lint-contract-rules.dpli --warnings-as-errors \
+    HelloProlog/lint-contract-rules.pl HelloProlog/lint-contract-canary.pl 2>&1); then
+    echo "lint unexpectedly accepted an incompatible contract output" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3052'
+printf '%s\n' "$lint_output" | grep -F 'Output value of contract_rules:p/1'
