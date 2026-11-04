@@ -11,7 +11,7 @@ public static class PrologContractLinter
     /// <param name="sources">Physical Prolog sources forming one analysis unit.</param>
     /// <param name="contract">The parsed .NET contract paired with one source unit.</param>
     /// <param name="contractFileName">Physical contract path used in findings.</param>
-    /// <param name="options">Lint options for the default leading-fact and opt-in later-fact rules.</param>
+    /// <param name="options">Lint options for the default leading-fact and later-fact rules.</param>
     public static IReadOnlyList<Diagnostic> Analyze(
         IReadOnlyList<PrologLintSource> sources,
         ModuleContract contract,
@@ -22,7 +22,7 @@ public static class PrologContractLinter
         ArgumentNullException.ThrowIfNull(sources);
         ArgumentNullException.ThrowIfNull(contract);
         ArgumentNullException.ThrowIfNull(contractFileName);
-        var analyzeLater = options?.Enables(LintDiagnosticIds.LaterContractOutputTypeMismatch) == true;
+        var analyzeLater = options?.Enables(LintDiagnosticIds.LaterContractOutputTypeMismatch) != false;
         if (options is not null && !options.Enables(LintDiagnosticIds.ContractOutputTypeMismatch) && !analyzeLater)
         {
             return [];
@@ -85,6 +85,10 @@ public static class PrologContractLinter
         }
 
         List<Diagnostic> diagnostics = [];
+        using Machine? unificationMachine =
+            analyzeLater && contract.Exports.Any(export => export.Determinism is Determinism.Det or Determinism.Semidet)
+                ? new Machine(new BytecodeProgram())
+                : null;
         foreach (ContractExport export in contract.Exports)
         {
             var indicator = new PredicateIndicator(export.PredicateName, export.Arity);
@@ -102,7 +106,7 @@ public static class PrologContractLinter
                 && factTables.TryGetValue((laterModule, indicator), out List<PrologLintProgramModel.ClauseContext>? table)
             )
             {
-                AnalyzeLaterExport(laterModule, indicator, export, table, contractFileName, diagnostics);
+                AnalyzeLaterExport(laterModule, indicator, export, table, contractFileName, unificationMachine, diagnostics);
             }
         }
 
@@ -181,6 +185,7 @@ public static class PrologContractLinter
         ContractExport export,
         List<PrologLintProgramModel.ClauseContext> clauses,
         string contractFileName,
+        Machine? unificationMachine,
         List<Diagnostic> diagnostics
     )
     {
@@ -189,12 +194,11 @@ public static class PrologContractLinter
             return;
         }
 
-        using var machine = new Machine(new BytecodeProgram());
         for (var candidate = 1; candidate < rows.Length; candidate++)
         {
             if (
                 export.Determinism is Determinism.Det or Determinism.Semidet
-                && EarlierInputUnifies(export, rows, candidate, machine)
+                && EarlierInputUnifies(export, rows, candidate, unificationMachine!)
             )
             {
                 continue;
