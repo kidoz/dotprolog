@@ -27,11 +27,61 @@ public static class PrologContractLinter
             return [];
         }
 
-        PrologLintProgramModel model = PrologLintProgramModel.Build(sources);
+        HashSet<PredicateIndicator> contracted = [];
+        foreach (ContractExport export in contract.Exports)
+        {
+            contracted.Add(new PredicateIndicator(export.PredicateName, export.Arity));
+        }
+
+        PrologLintProgramModel model = PrologLintProgramModel.BuildForPredicates(sources, contracted);
+        Dictionary<PredicateIndicator, string> exportingModules = [];
+        HashSet<PredicateIndicator> ambiguous = [];
+        foreach (ModuleDefinition definition in model.Modules.Catalog.Definitions)
+        {
+            foreach (PredicateIndicator indicator in model.Modules.ExportsOf(definition.Name))
+            {
+                if (contracted.Contains(indicator) && !exportingModules.TryAdd(indicator, definition.Name))
+                {
+                    ambiguous.Add(indicator);
+                }
+            }
+        }
+
+        Dictionary<PredicateIndicator, string> eligibleModules = [];
+        foreach (PredicateIndicator indicator in contracted)
+        {
+            if (
+                !ambiguous.Contains(indicator)
+                && exportingModules.TryGetValue(indicator, out string? module)
+                && !model.HasNonPredicateEffects(module)
+                && !model.IsDynamicOrMultifile(module, indicator)
+                && !model.IsNonterminal(module, indicator)
+            )
+            {
+                eligibleModules.Add(indicator, module);
+            }
+        }
+
+        Dictionary<(string Module, PredicateIndicator Indicator), PrologLintProgramModel.ClauseContext> firstClauses = [];
+        foreach (PrologLintProgramModel.ClauseContext clause in model.Clauses)
+        {
+            if (eligibleModules.TryGetValue(clause.Indicator, out string? module) && clause.Module == module)
+            {
+                firstClauses.TryAdd((module, clause.Indicator), clause);
+            }
+        }
+
         List<Diagnostic> diagnostics = [];
         foreach (ContractExport export in contract.Exports)
         {
-            AnalyzeExport(model, export, contractFileName, diagnostics);
+            var indicator = new PredicateIndicator(export.PredicateName, export.Arity);
+            if (
+                eligibleModules.TryGetValue(indicator, out string? module)
+                && firstClauses.TryGetValue((module, indicator), out PrologLintProgramModel.ClauseContext? first)
+            )
+            {
+                AnalyzeExport(module, indicator, export, first, contractFileName, diagnostics);
+            }
         }
 
         return
@@ -44,34 +94,15 @@ public static class PrologContractLinter
     }
 
     private static void AnalyzeExport(
-        PrologLintProgramModel model,
+        string module,
+        PredicateIndicator indicator,
         ContractExport export,
+        PrologLintProgramModel.ClauseContext first,
         string contractFileName,
         List<Diagnostic> diagnostics
     )
     {
-        var indicator = new PredicateIndicator(export.PredicateName, export.Arity);
-        string[] modules =
-        [
-            .. model
-                .Modules.Catalog.Definitions.Select(definition => definition.Name)
-                .Where(module => model.Modules.ExportsOf(module).Contains(indicator)),
-        ];
-        if (modules is not [string module] || model.HasNonPredicateEffects(module))
-        {
-            return;
-        }
-
-        if (model.IsDynamicOrMultifile(module, indicator) || model.IsNonterminal(module, indicator))
-        {
-            return;
-        }
-
-        PrologLintProgramModel.ClauseContext[] clauses =
-        [
-            .. model.Clauses.Where(clause => clause.Module == module && clause.Indicator == indicator),
-        ];
-        if (clauses is not [PrologLintProgramModel.ClauseContext first, ..] || first.Grammar || !IsFact(first.Clause))
+        if (first.Grammar || !IsFact(first.Clause))
         {
             return;
         }

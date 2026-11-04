@@ -42,14 +42,31 @@ internal sealed class PrologLintProgramModel
     internal List<MissingExport> MissingExports { get; } = [];
     internal List<(string File, int Offset, string Module, int Context)> ModuleScopes { get; } = [];
 
-    internal static PrologLintProgramModel Build(IReadOnlyList<PrologLintSource> sources)
+    internal static PrologLintProgramModel Build(IReadOnlyList<PrologLintSource> sources) => BuildCore(sources, null);
+
+    /// <summary>Builds directives and leading clauses for selected predicates without source-navigation scopes.</summary>
+    internal static PrologLintProgramModel BuildForPredicates(
+        IReadOnlyList<PrologLintSource> sources,
+        IReadOnlySet<PredicateIndicator> predicates
+    )
+    {
+        ArgumentNullException.ThrowIfNull(sources);
+        ArgumentNullException.ThrowIfNull(predicates);
+        return BuildCore(sources, predicates);
+    }
+
+    private static PrologLintProgramModel BuildCore(
+        IReadOnlyList<PrologLintSource> sources,
+        IReadOnlySet<PredicateIndicator>? predicates
+    )
     {
         ArgumentNullException.ThrowIfNull(sources);
         var model = new PrologLintProgramModel(sources);
         List<ImportRequest> imports = [];
+        HashSet<(string Module, PredicateIndicator Indicator)>? leadingClauses = predicates is null ? null : [];
         foreach (PrologLintSource source in sources)
         {
-            model.CollectDefinitions(source, imports);
+            model.CollectDefinitions(source, imports, predicates, leadingClauses);
         }
 
         model.ResolveImports(imports);
@@ -136,10 +153,19 @@ internal sealed class PrologLintProgramModel
         return clauses.Count > 0 && !_dynamicOrMultifile.Contains((module, predicate));
     }
 
-    private void CollectDefinitions(PrologLintSource source, List<ImportRequest> imports)
+    private void CollectDefinitions(
+        PrologLintSource source,
+        List<ImportRequest> imports,
+        IReadOnlySet<PredicateIndicator>? predicates,
+        HashSet<(string Module, PredicateIndicator Indicator)>? leadingClauses
+    )
     {
         var module = ModuleTable.UserModule;
-        CollectModuleScopes(source);
+        if (predicates is null)
+        {
+            CollectModuleScopes(source);
+        }
+
         for (var index = 0; index < source.Clauses.Count; index++)
         {
             SyntaxTerm clause = source.Clauses[index];
@@ -165,12 +191,20 @@ internal sealed class PrologLintProgramModel
 
             var grammar = clause is CompoundTerm { Name: "-->", Arity: 2 };
             SyntaxTerm head = LintSyntax.ClauseHead(clause);
-            if (!LintSyntax.TryPredicate(head, grammar, out PredicateIndicator indicator))
+            if (
+                !LintSyntax.TryPredicate(head, grammar, out PredicateIndicator indicator)
+                || (predicates is not null && !predicates.Contains(indicator))
+            )
             {
                 continue;
             }
 
-            Modules.Define(module, indicator);
+            var leading = leadingClauses?.Add((module, indicator)) != false;
+            if (leading)
+            {
+                Modules.Define(module, indicator);
+            }
+
             if (grammar)
             {
                 _nonterminals.Add((module, indicator));
@@ -180,7 +214,10 @@ internal sealed class PrologLintProgramModel
                 _ordinary.Add((module, indicator));
             }
 
-            Clauses.Add(new ClauseContext(owner, clause, module, indicator, grammar));
+            if (leading)
+            {
+                Clauses.Add(new ClauseContext(owner, clause, module, indicator, grammar));
+            }
         }
     }
 
