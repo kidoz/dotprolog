@@ -56,5 +56,7 @@ public sealed record PrologLintOptions
     /// <summary>Diagnostic identifiers of additional opt-in semantic rules.</summary>
     public IReadOnlyCollection<string> EnabledRules { get; init; } = [];
 
-    internal bool Enables(string diagnosticId) => EnabledRules.Contains(diagnosticId, StringComparer.OrdinalIgnoreCase);
+    internal bool Enables(string diagnosticId) =>
+        string.Equals(diagnosticId, LintDiagnosticIds.ContractOutputTypeMismatch, StringComparison.OrdinalIgnoreCase)
+        || EnabledRules.Contains(diagnosticId, StringComparer.OrdinalIgnoreCase);
 }

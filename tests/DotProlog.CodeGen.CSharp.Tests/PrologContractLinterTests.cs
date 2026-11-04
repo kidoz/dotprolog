@@ -6,11 +6,6 @@ namespace DotProlog.CodeGen.CSharp.Tests;
 
 public sealed class PrologContractLinterTests : IDisposable
 {
-    private static readonly PrologLintOptions Enabled = PrologLintOptions.SemanticOnly with
-    {
-        EnabledRules = [LintDiagnosticIds.ContractOutputTypeMismatch],
-    };
-
     private readonly string _directory = Path.Combine(
         Path.GetTempPath(),
         "dotprolog-contract-lint-" + Guid.NewGuid().ToString("N")
@@ -19,13 +14,19 @@ public sealed class PrologContractLinterTests : IDisposable
     public PrologContractLinterTests() => Directory.CreateDirectory(_directory);
 
     [Fact]
-    public void RuleIsDisabledUnlessExplicitlyEnabled()
+    public void RuleRunsInEveryProfileWithoutExplicitEnablement()
     {
         const string source = ":- module(m, [p/1]). p(wrong).";
         const string contract = ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)]).";
 
-        Assert.Empty(Lint(source, contract, options: PrologLintOptions.SemanticOnly));
-        Assert.Empty(Lint(source, contract, options: PrologLintOptions.Covington));
+        Assert.Single(
+            Lint(source, contract, options: PrologLintOptions.SemanticOnly),
+            Id(LintDiagnosticIds.ContractOutputTypeMismatch)
+        );
+        Assert.Single(
+            Lint(source, contract, options: PrologLintOptions.Covington),
+            Id(LintDiagnosticIds.ContractOutputTypeMismatch)
+        );
         Assert.Single(Lint(source, contract), Id(LintDiagnosticIds.ContractOutputTypeMismatch));
     }
 
@@ -404,7 +405,7 @@ public sealed class PrologContractLinterTests : IDisposable
         var path = Path.Combine(Path.GetTempPath(), "rules.dpli");
         ContractReadResult result = ContractReader.Read(contract, "Tests", path);
         Assert.True(result.Success, string.Join("; ", result.Diagnostics));
-        return PrologContractLinter.Analyze(sources, result.Contract!, path, options ?? Enabled);
+        return PrologContractLinter.Analyze(sources, result.Contract!, path, options);
     }
 
     private static PrologLintSource Source(string name, string text, PrologLanguageMode mode) =>

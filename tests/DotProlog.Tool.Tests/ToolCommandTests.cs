@@ -207,7 +207,7 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
-    public void ContractOutputRuleIsOptInAndHonorsWarningsAsErrorsWithoutExecution()
+    public void ContractOutputRuleIsDefaultAndHonorsWarningsAsErrorsWithoutExecution()
     {
         var source = Source("contract-rules.pl", ":- module(m, [p/1]). p(wrong).\n");
         var contract = Source("contract-rules.dpli", ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)]).\n");
@@ -235,9 +235,10 @@ public sealed class ToolCommandTests : IDisposable
         );
 
         Assert.Equal(0, defaultExit);
-        Assert.DoesNotContain("DPL3052", defaultError, StringComparison.Ordinal);
+        Assert.Contains("DPL3052", defaultError, StringComparison.Ordinal);
         Assert.Equal(0, enabledExit);
         Assert.Contains("DPL3052", enabledError, StringComparison.Ordinal);
+        Assert.Equal(defaultError, enabledError);
         Assert.Equal(1, strictExit);
         Assert.Contains("DPL3052", strictError, StringComparison.Ordinal);
         Assert.Contains("Output value of m:p/1", strictError, StringComparison.Ordinal);
