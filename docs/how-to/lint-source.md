@@ -168,6 +168,27 @@ Proper lists are checked recursively. No finding is not a proof of whole-predica
 A missing or ambiguous source pairing returns `64`; contract reader errors return `65`. SDK façade
 generation reports the same warning through MSBuild. No source is consulted, executed, or rewritten.
 
+## Check reachable later fact outputs
+
+`DPL3053` is opt-in and does not run during SDK façade generation. Enable it with the same explicit
+contract pairing:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint \
+    --enable-rule DPL3053 --contract rules.dpli rules.pl
+```
+
+The rule analyzes only later facts in fully ground, reader-independent static fact tables. Every
+declared input must be compatible with façade construction, and every argument in the table must be
+ground. Deterministic and semi-deterministic exports require that no earlier input head unifies with
+the candidate invocation. Streaming exports reach later facts during complete enumeration. Ground
+unification uses ordinary Prolog term semantics, not arithmetic equality.
+
+Rules, cuts, grammar definitions, variables, open or reader-dependent terms, incompatible inputs,
+dynamic or multifile targets, imported or ambiguous definitions, and effectful modules remain silent.
+`DPL3052` continues to analyze the first fact, so enabling both rules does not duplicate first-fact
+findings. Silence is not a proof of whole-predicate correctness.
+
 ## Check for possible non-steadfast clauses
 
 Enable the non-steadfast heuristic explicitly:

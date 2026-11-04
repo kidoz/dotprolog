@@ -122,6 +122,9 @@ All notable changes to DotProlog are recorded here. The format follows
   using `DPL3052`. Repeatable `--contract FILE` pairs `.dpli` files with named CLI sources, and SDK
   façade generation reports the same positioned warning through MSBuild. Compatibility covers numeric
   coercions, nested lists, both language modes, and conservative unknown handling.
+- Opt-in later-fact contract output linting reports reachable incompatibilities in fully ground static
+  fact tables using `DPL3053`. Enable it with `--enable-rule DPL3053`; ground input unification and
+  declared determinism control reachability without executing source or changing SDK generation.
 
 ### Changed
 

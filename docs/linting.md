@@ -28,6 +28,7 @@ dotnet prolog lint [options] <file.pl> [more.pl ...]
 | `--enable-rule DPL3048` | Enable the opt-in local-import shadowing heuristic; repeatable |
 | `--enable-rule DPL3049` | Enable the opt-in predefined-identity collision heuristic; repeatable |
 | `--enable-rule DPL3052` | Accepted for compatibility; leading-fact contract output checking already runs by default |
+| `--enable-rule DPL3053` | Enable opt-in reachable later-fact contract output checking; repeatable |
 | `--contract FILE` | Pair a `.dpli` contract with exactly one named `.pl` base name; repeatable |
 | `--mode modern` or `--mode strict-iso` | Seed the reader's language mode; default `modern` |
 | `--flag name=value` | Override a curated initial flag; repeatable |
@@ -100,6 +101,7 @@ These rules run in every profile:
 | `DPL3050` | Meta-predicate declarations for one module and predicate have conflicting argument modes |
 | `DPL3051` | A selective import requests an identity its statically known source module does not export |
 | `DPL3052` | A leading static fact has a ground output incompatible with its `.dpli` declaration |
+| `DPL3053` | Opt-in: a reachable later static fact has a ground output incompatible with its `.dpli` declaration |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -367,6 +369,24 @@ imported-only definitions, dynamic or multifile targets, ambiguous export module
 modules are not established and remain silent. A consistent leading output says nothing about later
 clauses, determinism, or whole-predicate correctness. Both language modes use the same rules, included
 facts retain physical spans, and no source is consulted, executed, or rewritten.
+
+### Opt-in later-fact contract output compatibility
+
+`DPL3053` is disabled by default in every profile and is not run during SDK façade generation. Enable
+it with `--enable-rule DPL3053` and the same explicit `--contract FILE` pairing used by `DPL3052`.
+It analyzes only the second and subsequent clauses of a fully ground, reader-independent static fact
+table, leaving first-fact analysis to `DPL3052` without duplicating findings.
+
+Every argument in the table must be ground and every declared input must be compatible with façade
+construction. For `det` and `semidet`, a later candidate is reachable only when no earlier input head
+unifies with its invocation. For `multi` and `nondet`, complete enumeration reaches every unifiable
+later fact. Ground input comparison uses ordinary Prolog term unification, not arithmetic equality.
+Findings use the same marshaller compatibility and exact output spans as `DPL3052`.
+
+Rules, cuts, mixed grammar definitions, variables, open or reader-dependent terms, incompatible inputs,
+dynamic or multifile targets, imported-only or ambiguous definitions, and effectful modules reject the
+whole table and remain silent. Included facts retain physical locations, both language modes use the
+same rules, and no source is executed. Silence does not prove whole-predicate correctness.
 
 ### Opt-in non-steadfast clauses
 
