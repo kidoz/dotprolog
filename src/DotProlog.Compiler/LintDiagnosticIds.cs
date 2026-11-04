@@ -165,4 +165,7 @@ public static class LintDiagnosticIds
 
     /// <summary>A leading static fact has an output incompatible with its contract declaration.</summary>
     public const string ContractOutputTypeMismatch = "DPL3052";
+
+    /// <summary>A reachable later static fact has an output incompatible with its contract declaration.</summary>
+    public const string LaterContractOutputTypeMismatch = "DPL3053";
 }

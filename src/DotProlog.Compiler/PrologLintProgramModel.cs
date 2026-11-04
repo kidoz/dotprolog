@@ -42,28 +42,31 @@ internal sealed class PrologLintProgramModel
     internal List<MissingExport> MissingExports { get; } = [];
     internal List<(string File, int Offset, string Module, int Context)> ModuleScopes { get; } = [];
 
-    internal static PrologLintProgramModel Build(IReadOnlyList<PrologLintSource> sources) => BuildCore(sources, null);
+    internal static PrologLintProgramModel Build(IReadOnlyList<PrologLintSource> sources) =>
+        BuildCore(sources, null, leadingOnly: true);
 
-    /// <summary>Builds directives and leading clauses for selected predicates without source-navigation scopes.</summary>
+    /// <summary>Builds directives and selected predicate clauses without source-navigation scopes.</summary>
     internal static PrologLintProgramModel BuildForPredicates(
         IReadOnlyList<PrologLintSource> sources,
-        IReadOnlySet<PredicateIndicator> predicates
+        IReadOnlySet<PredicateIndicator> predicates,
+        bool leadingOnly = true
     )
     {
         ArgumentNullException.ThrowIfNull(sources);
         ArgumentNullException.ThrowIfNull(predicates);
-        return BuildCore(sources, predicates);
+        return BuildCore(sources, predicates, leadingOnly);
     }
 
     private static PrologLintProgramModel BuildCore(
         IReadOnlyList<PrologLintSource> sources,
-        IReadOnlySet<PredicateIndicator>? predicates
+        IReadOnlySet<PredicateIndicator>? predicates,
+        bool leadingOnly
     )
     {
         ArgumentNullException.ThrowIfNull(sources);
         var model = new PrologLintProgramModel(sources);
         List<ImportRequest> imports = [];
-        HashSet<(string Module, PredicateIndicator Indicator)>? leadingClauses = predicates is null ? null : [];
+        HashSet<(string Module, PredicateIndicator Indicator)>? leadingClauses = predicates is null || !leadingOnly ? null : [];
         foreach (PrologLintSource source in sources)
         {
             model.CollectDefinitions(source, imports, predicates, leadingClauses);
