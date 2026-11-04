@@ -359,7 +359,7 @@ fi
 test "$lint_exit" -eq 1
 printf '%s\n' "$lint_output" | grep -F 'warning DPL3051'
 
-# Contract output analysis is opt-in and never executes another module's initialization directive.
+# Contract output analysis is default-enabled and never executes another module's initialization directive.
 printf '%s\n' ':- module(contract_rules, [p/1]).' 'p(wrong).' >HelloProlog/lint-contract-rules.pl
 printf '%s\n' ':- clr_module('\''ContractRules'\'').' \
     ':- clr_export(p/1, det, [out(value, integer)]).' >HelloProlog/lint-contract-rules.dpli
@@ -367,10 +367,8 @@ printf '%s\n' ':- module(contract_canary, []).' ':- initialization(halt(9)).' >H
 lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
     --contract HelloProlog/lint-contract-rules.dpli \
     HelloProlog/lint-contract-rules.pl HelloProlog/lint-contract-canary.pl 2>&1)
-if printf '%s\n' "$lint_output" | grep -F 'warning DPL3052'; then
-    echo "lint enabled contract output analysis by default" >&2
-    exit 1
-fi
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3052'
+printf '%s\n' "$lint_output" | grep -F 'Output value of contract_rules:p/1'
 if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
     --enable-rule DPL3052 --contract HelloProlog/lint-contract-rules.dpli --warnings-as-errors \
     HelloProlog/lint-contract-rules.pl HelloProlog/lint-contract-canary.pl 2>&1); then
@@ -382,3 +380,17 @@ fi
 test "$lint_exit" -eq 1
 printf '%s\n' "$lint_output" | grep -F 'warning DPL3052'
 printf '%s\n' "$lint_output" | grep -F 'Output value of contract_rules:p/1'
+
+# The packed SDK reports the same warning through MSBuild without executing an unrelated source unit.
+dotnet new prolog-lib -n ContractLibrary --DotPrologVersion "$version"
+printf '%s\n' ':- module(rules, [p/1]).' 'p(wrong).' >ContractLibrary/rules.pl
+printf '%s\n' ':- clr_module('\''Rules'\'').' \
+    ':- clr_export(p/1, det, [out(value, integer)]).' >ContractLibrary/rules.dpli
+printf '%s\n' ':- module(contract_canary, []).' ':- initialization(halt(9)).' >ContractLibrary/canary.pl
+sdk_log="$audit_root/sdk-contract.log"
+if ! dotnet build ContractLibrary/ContractLibrary.dplproj -c Release >"$sdk_log" 2>&1; then
+    cat "$sdk_log" >&2
+    exit 1
+fi
+grep -F 'rules.pl(2,3): warning DPL3052' "$sdk_log"
+grep -F 'Output value of rules:p/1' "$sdk_log"
