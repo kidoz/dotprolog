@@ -36,7 +36,9 @@ internal static class Program
         + "|"
         + LintDiagnosticIds.BuiltinShadow
         + "|"
-        + LintDiagnosticIds.ContractOutputTypeMismatch;
+        + LintDiagnosticIds.ContractOutputTypeMismatch
+        + "|"
+        + LintDiagnosticIds.LaterContractOutputTypeMismatch;
     private const int ExitLintWarnings = 1;
     private const int ExitSuccess = 0;
     private const int ExitUsage = 64;
@@ -293,6 +295,7 @@ internal static class Program
                     LintDiagnosticIds.LocalImportShadow => LintDiagnosticIds.LocalImportShadow,
                     LintDiagnosticIds.BuiltinShadow => LintDiagnosticIds.BuiltinShadow,
                     LintDiagnosticIds.ContractOutputTypeMismatch => LintDiagnosticIds.ContractOutputTypeMismatch,
+                    LintDiagnosticIds.LaterContractOutputTypeMismatch => LintDiagnosticIds.LaterContractOutputTypeMismatch,
                     _ => null,
                 };
                 if (rule is null)

@@ -245,6 +245,59 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void LaterContractOutputRuleIsOptInAndHonorsWarningsAsErrorsWithoutExecution()
+    {
+        var source = Source("later-contract-rules.pl", ":- module(m, [p/2]). p(1, 1). p(2, wrong).\n");
+        var contract = Source(
+            "later-contract-rules.dpli",
+            ":- clr_module('M'). :- clr_export(p/2, det, [in(item, integer), out(value, integer)]).\n"
+        );
+        var canary = Source("later-contract-canary.pl", ":- module(canary, []). :- initialization(halt(9)).\n");
+
+        (var defaultExit, _, var defaultError) = Execute("lint", "--contract", contract, source, canary);
+        (var enabledExit, _, var enabledError) = Execute(
+            "lint",
+            "--enable-rule",
+            "dpl3053",
+            "--contract",
+            contract,
+            source,
+            canary
+        );
+        (var repeatedExit, _, var repeatedError) = Execute(
+            "lint",
+            "--enable-rule",
+            "DPL3053",
+            "--enable-rule",
+            "DPL3053",
+            "--contract",
+            contract,
+            source,
+            canary
+        );
+        (var strictExit, _, var strictError) = Execute(
+            "lint",
+            "--enable-rule",
+            "DPL3053",
+            "--contract",
+            contract,
+            "--warnings-as-errors",
+            source,
+            canary
+        );
+
+        Assert.Equal(0, defaultExit);
+        Assert.DoesNotContain("DPL3053", defaultError, StringComparison.Ordinal);
+        Assert.Equal(0, enabledExit);
+        Assert.Contains("DPL3053", enabledError, StringComparison.Ordinal);
+        Assert.Contains("later fact output", enabledError, StringComparison.Ordinal);
+        Assert.Equal(0, repeatedExit);
+        Assert.Equal(enabledError, repeatedError);
+        Assert.Equal(1, strictExit);
+        Assert.Contains("DPL3053", strictError, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ContractOptionRequiresExactlyOneMatchingSourceBaseName()
     {
         var source = Source("pairing-rules.pl", ":- module(m, []). \n");
