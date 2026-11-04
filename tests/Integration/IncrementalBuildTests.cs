@@ -241,6 +241,21 @@ public sealed class IncrementalBuildTests : IDisposable
         (var effectExit, var effectLog) = await Build();
         Assert.True(effectExit == 0, $"The effectful-module build failed:\n{effectLog}");
         Assert.DoesNotContain("DPL3052", effectLog, StringComparison.Ordinal);
+
+        await File.WriteAllTextAsync(
+            Path.Combine(_project, "rules.dpli"),
+            ":- clr_module('Rules').\n:- clr_export(value/2, det, [in(item, integer), out(value, integer)]).\n",
+            TestContext.Current.CancellationToken
+        );
+        await File.WriteAllTextAsync(
+            Path.Combine(_project, "rules.pl"),
+            ":- module(m, [value/2]).\nvalue(1, 1).\nvalue(2, wrong).\n",
+            TestContext.Current.CancellationToken
+        );
+        (var laterDefaultExit, var laterDefaultLog) = await Build();
+        Assert.True(laterDefaultExit == 0, $"The later-fact default build failed:\n{laterDefaultLog}");
+        Assert.Contains("rules.pl(3,10): warning DPL3053", laterDefaultLog, StringComparison.Ordinal);
+        Assert.Contains("Output value of m:value/2", laterDefaultLog, StringComparison.Ordinal);
     }
 
     private void WriteProjectFile()
