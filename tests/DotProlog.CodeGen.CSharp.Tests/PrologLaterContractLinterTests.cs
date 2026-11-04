@@ -19,12 +19,13 @@ public sealed class PrologLaterContractLinterTests : IDisposable
     public PrologLaterContractLinterTests() => Directory.CreateDirectory(_directory);
 
     [Fact]
-    public void LaterRuleIsOptIn()
+    public void LaterRuleRunsWithoutExplicitEnablement()
     {
         const string source = ":- module(m, [p/1]). p(1). p(wrong).";
         const string contract = ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, integer)]).";
 
-        Assert.DoesNotContain(Lint(source, contract), Id(LintDiagnosticIds.LaterContractOutputTypeMismatch));
+        Assert.Single(Lint(source, contract), Id(LintDiagnosticIds.LaterContractOutputTypeMismatch));
+        Assert.Single(Lint(source, contract, PrologLintOptions.Covington), Id(LintDiagnosticIds.LaterContractOutputTypeMismatch));
         Assert.Single(Lint(source, contract, Later), Id(LintDiagnosticIds.LaterContractOutputTypeMismatch));
     }
 

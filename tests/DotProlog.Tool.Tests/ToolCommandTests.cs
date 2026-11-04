@@ -245,7 +245,7 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
-    public void LaterContractOutputRuleIsOptInAndHonorsWarningsAsErrorsWithoutExecution()
+    public void LaterContractOutputRuleIsDefaultAndHonorsWarningsAsErrorsWithoutExecution()
     {
         var source = Source("later-contract-rules.pl", ":- module(m, [p/2]). p(1, 1). p(2, wrong).\n");
         var contract = Source(
@@ -287,9 +287,10 @@ public sealed class ToolCommandTests : IDisposable
         );
 
         Assert.Equal(0, defaultExit);
-        Assert.DoesNotContain("DPL3053", defaultError, StringComparison.Ordinal);
+        Assert.Contains("DPL3053", defaultError, StringComparison.Ordinal);
         Assert.Equal(0, enabledExit);
         Assert.Contains("DPL3053", enabledError, StringComparison.Ordinal);
+        Assert.Equal(defaultError, enabledError);
         Assert.Contains("later fact output", enabledError, StringComparison.Ordinal);
         Assert.Equal(0, repeatedExit);
         Assert.Equal(enabledError, repeatedError);
