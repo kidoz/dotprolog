@@ -200,7 +200,7 @@ public sealed class PrologContractLinterTests : IDisposable
     public void MixedOrdinaryAndGrammarDefinitionsAreNotEstablished()
     {
         IReadOnlyList<Diagnostic> diagnostics = Lint(
-            ":- module(m, [p/2]). p(ok, 1). p(_, _) --> [].",
+            ":- module(m, [p/2]). p(ok, 1). p --> [].",
             ":- clr_module('M'). :- clr_export(p/2, det, [in(item, atom), out(value, integer)])."
         );
 
