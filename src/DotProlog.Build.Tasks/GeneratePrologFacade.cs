@@ -1,4 +1,5 @@
 using DotProlog.CodeGen.CSharp;
+using DotProlog.Compiler;
 using DotProlog.Packages;
 using DotProlog.Runtime;
 using DotProlog.Syntax;
@@ -113,6 +114,7 @@ public sealed class GeneratePrologFacade : Task
         }
         Directory.CreateDirectory(OutputPath);
         List<ITaskItem> generated = [];
+        List<PrologLintSource>? analysisSources = null;
 
         if (GenerateEntryPoint)
         {
@@ -196,6 +198,12 @@ public sealed class GeneratePrologFacade : Task
                 continue;
             }
 
+            analysisSources ??= LoadAnalysisSources(languageMode, flagOverrides, libraryFiles);
+            ReportDiagnostics(
+                PrologContractLinter.Analyze(analysisSources, result.Contract!, contractPath, PrologLintOptions.SemanticOnly),
+                sourcePath
+            );
+
             var target = Path.Combine(OutputPath, $"{result.Contract!.ClrTypeName}Module.g.cs");
             WriteIfChanged(target, facade);
             generated.Add(new TaskItem(target));
@@ -207,6 +215,46 @@ public sealed class GeneratePrologFacade : Task
 
         GeneratedFiles = [.. generated];
         return !Log.HasLoggedErrors;
+    }
+
+    private List<PrologLintSource> LoadAnalysisSources(
+        PrologLanguageMode languageMode,
+        PrologFlagOverrides flagOverrides,
+        IReadOnlyDictionary<string, string>? libraryFiles
+    )
+    {
+        List<PrologLintSource> sources = [];
+        HashSet<string> paths = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        foreach (ITaskItem source in Sources)
+        {
+            Add(source.GetMetadata("FullPath"));
+        }
+
+        if (libraryFiles is not null)
+        {
+            foreach (string path in libraryFiles.Values)
+            {
+                Add(path);
+            }
+        }
+
+        return sources;
+
+        void Add(string path)
+        {
+            var fullPath = Path.GetFullPath(path);
+            if (!paths.Add(fullPath))
+            {
+                return;
+            }
+
+            PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+                fullPath,
+                File.ReadAllText(fullPath),
+                new BytecodeProgram(languageMode, flagOverrides)
+            );
+            sources.Add(loaded.Source);
+        }
     }
 
     /// <summary>

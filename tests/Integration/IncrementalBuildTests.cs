@@ -187,6 +187,62 @@ public sealed class IncrementalBuildTests : IDisposable
         Assert.Empty(Directory.GetFiles(Path.Combine(_project, "obj", "prolog"), "*.g.cs"));
     }
 
+    [Fact]
+    public async Task ContractOutputWarningsUsePositionedMsBuildDiagnosticsWithoutExecution()
+    {
+        Assert.SkipUnless(
+            Environment.GetEnvironmentVariable(OptInVariable) == "1",
+            $"Set {OptInVariable}=1 to run the toolchain integration tests."
+        );
+        (var taskExit, var taskLog) = await Run(
+            "dotnet",
+            ["build", "-nodereuse:false", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
+        );
+        Assert.True(taskExit == 0, taskLog);
+        WriteProjectFile();
+        WriteModule("rules", "Rules");
+        await File.WriteAllTextAsync(
+            Path.Combine(_project, "rules.dpli"),
+            ":- clr_module('Rules').\n:- clr_export(value/1, det, [out(value, integer)]).\n",
+            TestContext.Current.CancellationToken
+        );
+        await File.WriteAllTextAsync(
+            Path.Combine(_project, "canary.pl"),
+            ":- module(canary, []).\n:- initialization(halt(9)).\n",
+            TestContext.Current.CancellationToken
+        );
+        const string incompatible = ":- module(m, [value/1]).\nvalue(wrong).\n";
+        await File.WriteAllTextAsync(Path.Combine(_project, "rules.pl"), incompatible, TestContext.Current.CancellationToken);
+
+        (var exit, var log) = await Build();
+        Assert.True(exit == 0, $"The default build failed:\n{log}");
+        Assert.Contains("rules.pl(2,7): warning DPL3052", log, StringComparison.Ordinal);
+        Assert.Contains("Output value of m:value/1", log, StringComparison.Ordinal);
+
+        await File.WriteAllTextAsync(Path.Combine(_project, "rules.pl"), incompatible, TestContext.Current.CancellationToken);
+        (var strictExit, var strictLog) = await Build("-p:MSBuildTreatWarningsAsErrors=true");
+        Assert.NotEqual(0, strictExit);
+        Assert.Contains("error DPL3052", strictLog, StringComparison.Ordinal);
+
+        await File.WriteAllTextAsync(
+            Path.Combine(_project, "rules.pl"),
+            ":- module(m, [value/1]).\nvalue(1). value(wrong).\n",
+            TestContext.Current.CancellationToken
+        );
+        (var laterExit, var laterLog) = await Build();
+        Assert.True(laterExit == 0, $"The later-fact build failed:\n{laterLog}");
+        Assert.DoesNotContain("DPL3052", laterLog, StringComparison.Ordinal);
+
+        await File.WriteAllTextAsync(
+            Path.Combine(_project, "rules.pl"),
+            ":- module(m, [value/1]).\n:- initialization(halt(9)).\nvalue(wrong).\n",
+            TestContext.Current.CancellationToken
+        );
+        (var effectExit, var effectLog) = await Build();
+        Assert.True(effectExit == 0, $"The effectful-module build failed:\n{effectLog}");
+        Assert.DoesNotContain("DPL3052", effectLog, StringComparison.Ordinal);
+    }
+
     private void WriteProjectFile()
     {
         var source = Path.Combine(RepositoryLayout.Root, "src");
