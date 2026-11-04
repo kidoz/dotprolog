@@ -147,12 +147,11 @@ rewritten.
 
 ## Check leading fact outputs against a .NET contract
 
-`DPL3052` is opt-in. Pair each `.dpli` file explicitly with a named `.pl` file having the same base
-name, and enable the rule:
+`DPL3052` runs by default. Pair each `.dpli` file explicitly with a named `.pl` file having the same
+base name:
 
 ```console
-dotnet run --project src/DotProlog.Tool -- lint \
-    --enable-rule DPL3052 --contract rules.dpli rules.pl
+dotnet run --project src/DotProlog.Tool -- lint --contract rules.dpli rules.pl
 ```
 
 The rule reports a ground output in the first static fact that cannot be converted by the generated
@@ -166,8 +165,8 @@ effectful modules are not established and remain silent. Output `float` accepts 
 representation; input `float` requires a float. Output `integer` excludes big-integer representations.
 Proper lists are checked recursively. No finding is not a proof of whole-predicate contract consistency.
 
-A missing or ambiguous source pairing returns `64`; contract reader errors return `65`. The rule is
-not enabled during SDK builds. No source is consulted, executed, or rewritten.
+A missing or ambiguous source pairing returns `64`; contract reader errors return `65`. SDK façade
+generation reports the same warning through MSBuild. No source is consulted, executed, or rewritten.
 
 ## Check for possible non-steadfast clauses
 
