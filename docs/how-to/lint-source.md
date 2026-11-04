@@ -170,12 +170,11 @@ generation reports the same warning through MSBuild. No source is consulted, exe
 
 ## Check reachable later fact outputs
 
-`DPL3053` is opt-in and does not run during SDK façade generation. Enable it with the same explicit
-contract pairing:
+`DPL3053` runs by default, including during SDK façade generation. Use the same explicit contract
+pairing for CLI analysis:
 
 ```console
-dotnet run --project src/DotProlog.Tool -- lint \
-    --enable-rule DPL3053 --contract rules.dpli rules.pl
+dotnet run --project src/DotProlog.Tool -- lint --contract rules.dpli rules.pl
 ```
 
 The rule analyzes only later facts in fully ground, reader-independent static fact tables. Every
@@ -186,8 +185,8 @@ unification uses ordinary Prolog term semantics, not arithmetic equality.
 
 Rules, cuts, grammar definitions, variables, open or reader-dependent terms, incompatible inputs,
 dynamic or multifile targets, imported or ambiguous definitions, and effectful modules remain silent.
-`DPL3052` continues to analyze the first fact, so enabling both rules does not duplicate first-fact
-findings. Silence is not a proof of whole-predicate correctness.
+`DPL3052` analyzes the first fact and `DPL3053` analyzes later facts, so their findings do not overlap.
+Silence is not a proof of whole-predicate correctness.
 
 ## Check for possible non-steadfast clauses
 

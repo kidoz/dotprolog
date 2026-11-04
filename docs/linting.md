@@ -28,7 +28,7 @@ dotnet prolog lint [options] <file.pl> [more.pl ...]
 | `--enable-rule DPL3048` | Enable the opt-in local-import shadowing heuristic; repeatable |
 | `--enable-rule DPL3049` | Enable the opt-in predefined-identity collision heuristic; repeatable |
 | `--enable-rule DPL3052` | Accepted for compatibility; leading-fact contract output checking already runs by default |
-| `--enable-rule DPL3053` | Enable opt-in reachable later-fact contract output checking; repeatable |
+| `--enable-rule DPL3053` | Accepted for compatibility; reachable later-fact contract output checking already runs by default |
 | `--contract FILE` | Pair a `.dpli` contract with exactly one named `.pl` base name; repeatable |
 | `--mode modern` or `--mode strict-iso` | Seed the reader's language mode; default `modern` |
 | `--flag name=value` | Override a curated initial flag; repeatable |
@@ -101,7 +101,7 @@ These rules run in every profile:
 | `DPL3050` | Meta-predicate declarations for one module and predicate have conflicting argument modes |
 | `DPL3051` | A selective import requests an identity its statically known source module does not export |
 | `DPL3052` | A leading static fact has a ground output incompatible with its `.dpli` declaration |
-| `DPL3053` | Opt-in: a reachable later static fact has a ground output incompatible with its `.dpli` declaration |
+| `DPL3053` | A reachable later static fact has a ground output incompatible with its `.dpli` declaration |
 
 An underscore-prefixed name marks an intentionally unused variable:
 
@@ -370,12 +370,13 @@ modules are not established and remain silent. A consistent leading output says 
 clauses, determinism, or whole-predicate correctness. Both language modes use the same rules, included
 facts retain physical spans, and no source is consulted, executed, or rewritten.
 
-### Opt-in later-fact contract output compatibility
+### Later-fact contract output compatibility
 
-`DPL3053` is disabled by default in every profile and is not run during SDK façade generation. Enable
-it with `--enable-rule DPL3053` and the same explicit `--contract FILE` pairing used by `DPL3052`.
-It analyzes only the second and subsequent clauses of a fully ground, reader-independent static fact
-table, leaving first-fact analysis to `DPL3052` without duplicating findings.
+`DPL3053` runs in every profile and during SDK façade generation. The `--enable-rule DPL3053` option
+remains accepted for compatibility and does not duplicate findings. CLI analysis uses the same explicit
+`--contract FILE` pairing as `DPL3052`. The rule analyzes only the second and subsequent clauses of a
+fully ground, reader-independent static fact table, leaving first-fact analysis to `DPL3052` without
+duplicating findings.
 
 Every argument in the table must be ground and every declared input must be compatible with façade
 construction. For `det` and `semidet`, a later candidate is reachable only when no earlier input head
