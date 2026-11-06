@@ -38,6 +38,9 @@ public sealed class PrologGroundRuleContractLinterTests : IDisposable
     [InlineData("foo(a) = foo(a)")]
     [InlineData("[a,b] = [a,b]")]
     [InlineData("1 = 1r1")]
+    [InlineData("1.0 = 1.0")]
+    [InlineData("-0.0 = 0.0")]
+    [InlineData("1r2 = 1r2")]
     [InlineData("true, a = a")]
     [InlineData("(a = a, true)")]
     public void SuccessfulGroundBodiesExposeRuleOutputs(string body)
@@ -64,6 +67,9 @@ public sealed class PrologGroundRuleContractLinterTests : IDisposable
     [InlineData("foo(a) = foo(b)")]
     [InlineData("[a,b] = [a,c]")]
     [InlineData("1 = 1.0")]
+    [InlineData("1.0 = 2.0")]
+    [InlineData("1r2 = 1r3")]
+    [InlineData("9223372036854775808 = 9223372036854775809")]
     [InlineData("true, a = b")]
     [InlineData("a = b, true")]
     public void FailingGroundBodiesSuppressRuleOutputs(string body)

@@ -480,6 +480,22 @@ public static class PrologContractLinter
     private static bool RuntimeUnifiable(PrologValue left, PrologValue right, Machine machine)
     {
         machine.BeginCall();
+        switch (left)
+        {
+            case PrologAtom leftAtom when right is PrologAtom rightAtom:
+                return leftAtom.Name == rightAtom.Name;
+            case PrologString leftString when right is PrologString rightString:
+                return leftString.Value == rightString.Value;
+            case PrologInteger leftInteger when right is PrologInteger rightInteger:
+                return leftInteger.Value == rightInteger.Value;
+            case PrologBigInteger leftBig when right is PrologBigInteger rightBig:
+                return leftBig.Value == rightBig.Value;
+            case PrologRational leftRational when right is PrologRational rightRational:
+                return leftRational.Numerator == rightRational.Numerator && leftRational.Denominator == rightRational.Denominator;
+            case PrologFloat leftFloat when right is PrologFloat rightFloat:
+                return leftFloat.Value.Equals(rightFloat.Value);
+        }
+
         Cell leftCell = PrologInput.FromValue(left).Build(machine);
         Cell rightCell = PrologInput.FromValue(right).Build(machine);
         return machine.CanUnify(leftCell, rightCell);
