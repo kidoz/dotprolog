@@ -9,7 +9,11 @@ internal static class PrologLintCompleteness
         model.HasUnresolvedImports
         || model.Sources.Any(source => source.HasAnalysisGaps)
         || model.Clauses.Any(DefinesSourceExpansion)
-        || model.Sources.SelectMany(source => source.Clauses).Any(HasUnrecognizedDirective);
+        || model.Sources.SelectMany(source => source.Clauses).Any(HasUnrecognizedDirective)
+        || model.Sources.SelectMany(source => source.Clauses).Any(HasQualifiedClauseHead);
+
+    private static bool HasQualifiedClauseHead(SyntaxTerm clause) =>
+        LintSyntax.ClauseHead(clause) is CompoundTerm { Name: ":", Arity: 2 };
 
     private static bool DefinesSourceExpansion(PrologLintProgramModel.ClauseContext clause) =>
         clause.Indicator is { Arity: 2, Name: "term_expansion" or "goal_expansion" };
