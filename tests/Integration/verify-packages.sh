@@ -401,12 +401,36 @@ fi
 test "$lint_exit" -eq 1
 printf '%s\n' "$lint_output" | grep -F 'warning DPL3053'
 
-# The packed SDK reports both warnings through MSBuild without executing an unrelated source unit.
+# Ground-rule contract analysis is default-enabled in the packed tool without executing source.
+printf '%s\n' ':- module(ground_rule_contract_rules, [p/2]).' 'p(1, 1) :- a = b.' 'p(1, wrong) :- true.' \
+    >HelloProlog/lint-ground-rule-contract-rules.pl
+printf '%s\n' ':- clr_module('\''GroundRuleContractRules'\'').' \
+    ':- clr_export(p/2, det, [in(item, integer), out(value, integer)]).' \
+    >HelloProlog/lint-ground-rule-contract-rules.dpli
+lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --contract HelloProlog/lint-ground-rule-contract-rules.dpli \
+    HelloProlog/lint-ground-rule-contract-rules.pl HelloProlog/lint-contract-canary.pl 2>&1)
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3054'
+printf '%s\n' "$lint_output" | grep -F 'Output value of ground_rule_contract_rules:p/2'
+if lint_output=$(dotnet tool exec --source "$package_feed" "DotProlog.Tool@$version" lint \
+    --contract HelloProlog/lint-ground-rule-contract-rules.dpli --warnings-as-errors \
+    HelloProlog/lint-ground-rule-contract-rules.pl HelloProlog/lint-contract-canary.pl 2>&1); then
+    echo "lint unexpectedly accepted a reachable ground-rule contract output" >&2
+    exit 1
+else
+    lint_exit=$?
+fi
+test "$lint_exit" -eq 1
+printf '%s\n' "$lint_output" | grep -F 'warning DPL3054'
+
+# The packed SDK reports all three warnings through MSBuild without executing an unrelated source unit.
 dotnet new prolog-lib -n ContractLibrary --DotPrologVersion "$version"
-printf '%s\n' ':- module(rules, [p/1, q/1]).' 'p(wrong).' 'q(1).' 'q(wrong).' >ContractLibrary/rules.pl
+printf '%s\n' ':- module(rules, [p/1, q/1, r/2]).' 'p(wrong).' 'q(1).' 'q(wrong).' \
+    'r(1, 1) :- a = b.' 'r(1, wrong) :- true.' >ContractLibrary/rules.pl
 printf '%s\n' ':- clr_module('\''Rules'\'').' \
     ':- clr_export(p/1, det, [out(value, integer)]).' \
-    ':- clr_export(q/1, nondet, [out(value, integer)]).' >ContractLibrary/rules.dpli
+    ':- clr_export(q/1, nondet, [out(value, integer)]).' \
+    ':- clr_export(r/2, det, [in(item, integer), out(value, integer)]).' >ContractLibrary/rules.dpli
 printf '%s\n' ':- module(contract_canary, []).' ':- initialization(halt(9)).' >ContractLibrary/canary.pl
 sdk_log="$audit_root/sdk-contract.log"
 if ! dotnet build ContractLibrary/ContractLibrary.dplproj -c Release >"$sdk_log" 2>&1; then
@@ -415,5 +439,7 @@ if ! dotnet build ContractLibrary/ContractLibrary.dplproj -c Release >"$sdk_log"
 fi
 grep -F 'rules.pl(2,3): warning DPL3052' "$sdk_log"
 grep -F 'rules.pl(4,3): warning DPL3053' "$sdk_log"
+grep -F 'rules.pl(6,6): warning DPL3054' "$sdk_log"
 grep -F 'Output value of rules:p/1' "$sdk_log"
 grep -F 'Output value of rules:q/1' "$sdk_log"
+grep -F 'Output value of rules:r/2' "$sdk_log"

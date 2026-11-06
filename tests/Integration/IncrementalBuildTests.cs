@@ -264,7 +264,8 @@ public sealed class IncrementalBuildTests : IDisposable
         );
         (var groundRuleExit, var groundRuleLog) = await Build();
         Assert.True(groundRuleExit == 0, $"The ground-rule default build failed:\n{groundRuleLog}");
-        Assert.DoesNotContain("DPL3054", groundRuleLog, StringComparison.Ordinal);
+        Assert.Contains("rules.pl(3,10): warning DPL3054", groundRuleLog, StringComparison.Ordinal);
+        Assert.Contains("Output value of m:value/2", groundRuleLog, StringComparison.Ordinal);
     }
 
     private void WriteProjectFile()
