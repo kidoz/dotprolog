@@ -168,4 +168,7 @@ public static class LintDiagnosticIds
 
     /// <summary>A reachable later static fact has an output incompatible with its contract declaration.</summary>
     public const string LaterContractOutputTypeMismatch = "DPL3053";
+
+    /// <summary>A reachable ground-guarded rule has an output incompatible with its contract declaration.</summary>
+    public const string GroundRuleContractOutputTypeMismatch = "DPL3054";
 }
