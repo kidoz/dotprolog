@@ -256,6 +256,15 @@ public sealed class IncrementalBuildTests : IDisposable
         Assert.True(laterDefaultExit == 0, $"The later-fact default build failed:\n{laterDefaultLog}");
         Assert.Contains("rules.pl(3,10): warning DPL3053", laterDefaultLog, StringComparison.Ordinal);
         Assert.Contains("Output value of m:value/2", laterDefaultLog, StringComparison.Ordinal);
+
+        await File.WriteAllTextAsync(
+            Path.Combine(_project, "rules.pl"),
+            ":- module(m, [value/2]).\nvalue(1, 1) :- a = b.\nvalue(1, wrong) :- true.\n",
+            TestContext.Current.CancellationToken
+        );
+        (var groundRuleExit, var groundRuleLog) = await Build();
+        Assert.True(groundRuleExit == 0, $"The ground-rule default build failed:\n{groundRuleLog}");
+        Assert.DoesNotContain("DPL3054", groundRuleLog, StringComparison.Ordinal);
     }
 
     private void WriteProjectFile()
