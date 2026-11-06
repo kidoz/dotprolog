@@ -11,6 +11,7 @@ internal static class Program
 {
     private const string LanguageModeNames = PrologLanguageModes.Names;
     private const string LintProfileNames = "semantic|covington";
+
     private const string LintOptInRuleNames =
         LintDiagnosticIds.PossibleNonSteadfastClause
         + "|"
@@ -38,7 +39,10 @@ internal static class Program
         + "|"
         + LintDiagnosticIds.ContractOutputTypeMismatch
         + "|"
-        + LintDiagnosticIds.LaterContractOutputTypeMismatch;
+        + LintDiagnosticIds.LaterContractOutputTypeMismatch
+        + "|"
+        + LintDiagnosticIds.GroundRuleContractOutputTypeMismatch;
+
     private const int ExitLintWarnings = 1;
     private const int ExitSuccess = 0;
     private const int ExitUsage = 64;
@@ -88,6 +92,7 @@ internal static class Program
                     error.WriteLine("error: missing directory after --packages");
                     return ExitUsage;
                 }
+
                 packageDirectory = args[index];
                 continue;
             }
@@ -164,6 +169,7 @@ internal static class Program
                     $"{version.Major}.{version.Minor}.{version.Build}"
                 );
             }
+
             LoadResult loaded = engine.ConsultFile(path);
             foreach (Diagnostic diagnostic in loaded.Diagnostics)
             {
@@ -296,6 +302,8 @@ internal static class Program
                     LintDiagnosticIds.BuiltinShadow => LintDiagnosticIds.BuiltinShadow,
                     LintDiagnosticIds.ContractOutputTypeMismatch => LintDiagnosticIds.ContractOutputTypeMismatch,
                     LintDiagnosticIds.LaterContractOutputTypeMismatch => LintDiagnosticIds.LaterContractOutputTypeMismatch,
+                    LintDiagnosticIds.GroundRuleContractOutputTypeMismatch =>
+                        LintDiagnosticIds.GroundRuleContractOutputTypeMismatch,
                     _ => null,
                 };
                 if (rule is null)
