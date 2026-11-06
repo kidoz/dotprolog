@@ -299,7 +299,7 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
-    public void GroundRuleContractOutputRuleIsOptInAndHonorsWarningsAsErrorsWithoutExecution()
+    public void GroundRuleContractOutputRuleIsDefaultAndHonorsWarningsAsErrorsWithoutExecution()
     {
         var source = Source("ground-rule-contract-rules.pl", ":- module(m, [p/2]). p(1, 1) :- a = b. p(1, wrong) :- true.\n");
         var contract = Source(
@@ -341,9 +341,10 @@ public sealed class ToolCommandTests : IDisposable
         );
 
         Assert.Equal(0, defaultExit);
-        Assert.DoesNotContain("DPL3054", defaultError, StringComparison.Ordinal);
+        Assert.Contains("DPL3054", defaultError, StringComparison.Ordinal);
         Assert.Equal(0, enabledExit);
         Assert.Contains("DPL3054", enabledError, StringComparison.Ordinal);
+        Assert.Equal(defaultError, enabledError);
         Assert.Contains("ground rule output", enabledError, StringComparison.Ordinal);
         Assert.Equal(0, repeatedExit);
         Assert.Equal(enabledError, repeatedError);

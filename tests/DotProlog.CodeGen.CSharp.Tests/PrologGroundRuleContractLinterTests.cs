@@ -19,13 +19,13 @@ public sealed class PrologGroundRuleContractLinterTests : IDisposable
     public PrologGroundRuleContractLinterTests() => Directory.CreateDirectory(_directory);
 
     [Fact]
-    public void GroundRuleAnalysisRequiresExplicitEnablement()
+    public void GroundRuleAnalysisRunsWithoutExplicitEnablement()
     {
         const string source = ":- module(m, [p/1]). p(wrong) :- true.";
         const string contract = ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, integer)]).";
 
-        Assert.DoesNotContain(Lint(source, contract), Id(LintDiagnosticIds.GroundRuleContractOutputTypeMismatch));
-        Assert.DoesNotContain(
+        Assert.Single(Lint(source, contract), Id(LintDiagnosticIds.GroundRuleContractOutputTypeMismatch));
+        Assert.Single(
             Lint(source, contract, PrologLintOptions.Covington),
             Id(LintDiagnosticIds.GroundRuleContractOutputTypeMismatch)
         );
