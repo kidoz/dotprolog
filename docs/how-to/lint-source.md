@@ -188,6 +188,26 @@ dynamic or multifile targets, imported or ambiguous definitions, and effectful m
 `DPL3052` analyzes the first fact and `DPL3053` analyzes later facts, so their findings do not overlap.
 Silence is not a proof of whole-predicate correctness.
 
+## Check ground-guarded rule outputs
+
+`DPL3054` is opt-in and does not run during SDK façade generation. Enable it explicitly with the same
+contract pairing used for fact analysis:
+
+```console
+dotnet run --project src/DotProlog.Tool -- lint --enable-rule DPL3054 --contract rules.dpli rules.pl
+```
+
+The rule analyzes ordinary rule heads in complete static tables whose heads are ground and
+reader-independent. Every body must be `true/0` or a conjunction of ground `=/2` goals. A ground
+unification succeeds or fails using ordinary Prolog runtime unification; no source goal is executed.
+For `det` and `semidet`, an earlier clause hides a candidate only when its input head unifies and its
+body succeeds. Streaming exports reach every successful candidate during complete enumeration.
+
+Variables, arbitrary calls, cuts, disjunction, negation, conditionals, arithmetic, reader-dependent
+terms, incompatible inputs, grammar definitions, dynamic or multifile targets, imported or ambiguous
+definitions, and effectful modules reject the whole table. Facts remain covered by `DPL3052` and
+`DPL3053`; `DPL3054` reports only rule heads. Silence is not a proof of whole-predicate correctness.
+
 ## Check for possible non-steadfast clauses
 
 Enable the non-steadfast heuristic explicitly:
