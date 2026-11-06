@@ -144,6 +144,11 @@ All notable changes to DotProlog are recorded here. The format follows
   counts expose retained text and numeric values for hosts managing engine lifetimes, and
   `BytecodeProgram.ConstantCount` exposes the constant-pool append position.
 
+### Fixed
+
+- Reachability and unused-import linting conservatively suppress analysis for module-qualified clause
+  heads instead of reporting their local helpers as unreferenced.
+
 ## [0.17.0] — 2026-11-01
 
 ### Added

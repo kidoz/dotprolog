@@ -196,9 +196,9 @@ source-kind confusion. When ordinary clauses and grammar rules share one lowered
 nonterminal finding is suppressed and only the ordinary definitions remain eligible for `DPL3034`.
 
 Reachability requires a complete static call graph. Unresolved includes or imports, unknown calls or
-modules, variable goals, unsupported meta-closures, runtime database mutation or source loading,
-conditional compilation, source expansion, and unavailable source suppress `DPL3034` and `DPL3036`
-for the entire analysis unit. Other diagnostics still run. As with every lint rule, no clause,
+modules, variable goals, unsupported meta-closures, module-qualified clause heads, runtime database
+mutation or source loading, conditional compilation, source expansion, and unavailable source suppress
+`DPL3034` and `DPL3036` for the entire analysis unit. Other diagnostics still run. As with every lint rule, no clause,
 directive, initialization goal, or expansion is executed.
 
 ### Possibly unused imports
