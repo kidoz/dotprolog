@@ -321,6 +321,27 @@ public sealed class PrologReachabilityLinterTests : IDisposable
     }
 
     [Fact]
+    public void QualifiedClauseHeadsSuppressReachabilityFindings()
+    {
+        IReadOnlyList<Diagnostic> diagnostics = Lint(
+            ":- module(m, []). :- multifile(host:hook/0). host:hook :- helper. helper. dead."
+        );
+
+        Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleUnreferencedPredicate));
+    }
+
+    [Fact]
+    public void QualifiedGrammarHeadsSuppressReachabilityFindings()
+    {
+        IReadOnlyList<Diagnostic> diagnostics = Lint(
+            ":- module(m, []). :- multifile(host:grammar//0). host:grammar --> [a]. dead. dead_grammar --> [b]."
+        );
+
+        Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleUnreferencedPredicate));
+        Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleUnreferencedNonterminal));
+    }
+
+    [Fact]
     public void UnsupportedMetaClosuresSuppressReachabilityFindings()
     {
         IReadOnlyList<Diagnostic> diagnostics = Lint(":- module(m, []). go(X) :- maplist(42, X). dead.");
