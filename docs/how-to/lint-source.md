@@ -190,12 +190,14 @@ Silence is not a proof of whole-predicate correctness.
 
 ## Check ground-guarded rule outputs
 
-`DPL3054` is opt-in and does not run during SDK façade generation. Enable it explicitly with the same
-contract pairing used for fact analysis:
+`DPL3054` runs by default, including during SDK façade generation. Use the same explicit contract
+pairing as for fact analysis:
 
 ```console
-dotnet run --project src/DotProlog.Tool -- lint --enable-rule DPL3054 --contract rules.dpli rules.pl
+dotnet run --project src/DotProlog.Tool -- lint --contract rules.dpli rules.pl
 ```
+
+`--enable-rule DPL3054` remains accepted for compatibility and does not duplicate findings.
 
 The rule analyzes ordinary rule heads in complete static tables whose heads are ground and
 reader-independent. Every body must be `true/0` or a conjunction of ground `=/2` goals. A ground

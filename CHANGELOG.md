@@ -125,10 +125,10 @@ All notable changes to DotProlog are recorded here. The format follows
 - Default later-fact contract output linting reports reachable incompatibilities in fully ground static
   fact tables using `DPL3053`. Ground input unification and declared determinism control reachability
   without executing source, and SDK façade generation reports the same positioned warning through MSBuild.
-- Opt-in ground-rule contract output linting reports incompatible rule-head outputs using `DPL3054`
+- Default ground-rule contract output linting reports incompatible rule-head outputs using `DPL3054`
   when complete static tables contain only ground heads, `true/0`, and conjunctions of ground `=/2`
-  goals. Determinism-aware reachability accounts for failing earlier guards without executing source;
-  default profiles and SDK façade generation remain unchanged.
+  goals. Determinism-aware reachability accounts for failing earlier guards without executing source,
+  and SDK façade generation reports the same positioned warning through MSBuild.
 
 ### Changed
 
