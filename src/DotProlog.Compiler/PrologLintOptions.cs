@@ -59,5 +59,6 @@ public sealed record PrologLintOptions
     internal bool Enables(string diagnosticId) =>
         string.Equals(diagnosticId, LintDiagnosticIds.ContractOutputTypeMismatch, StringComparison.OrdinalIgnoreCase)
         || string.Equals(diagnosticId, LintDiagnosticIds.LaterContractOutputTypeMismatch, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(diagnosticId, LintDiagnosticIds.GroundRuleContractOutputTypeMismatch, StringComparison.OrdinalIgnoreCase)
         || EnabledRules.Contains(diagnosticId, StringComparer.OrdinalIgnoreCase);
 }

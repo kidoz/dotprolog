@@ -11,7 +11,7 @@ public static class PrologContractLinter
     /// <param name="sources">Physical Prolog sources forming one analysis unit.</param>
     /// <param name="contract">The parsed .NET contract paired with one source unit.</param>
     /// <param name="contractFileName">Physical contract path used in findings.</param>
-    /// <param name="options">Lint options for default fact rules and opt-in ground-guarded rules.</param>
+    /// <param name="options">Lint options for the default fact and ground-guarded rule checks.</param>
     public static IReadOnlyList<Diagnostic> Analyze(
         IReadOnlyList<PrologLintSource> sources,
         ModuleContract contract,
@@ -23,7 +23,7 @@ public static class PrologContractLinter
         ArgumentNullException.ThrowIfNull(contract);
         ArgumentNullException.ThrowIfNull(contractFileName);
         var analyzeLater = options?.Enables(LintDiagnosticIds.LaterContractOutputTypeMismatch) != false;
-        var analyzeGroundRules = options?.Enables(LintDiagnosticIds.GroundRuleContractOutputTypeMismatch) == true;
+        var analyzeGroundRules = options?.Enables(LintDiagnosticIds.GroundRuleContractOutputTypeMismatch) != false;
         if (
             options is not null
             && !options.Enables(LintDiagnosticIds.ContractOutputTypeMismatch)
