@@ -312,8 +312,11 @@ samples and exercise NativeAOT.
 
 ## Platforms
 
-Built and tested on .NET 10. NativeAOT publishing is exercised on the host platform of whatever
-machine runs the acceptance test; the packages themselves are platform-neutral.
+Packages target .NET 10 and can be consumed by .NET 10 and .NET 11 projects. CI covers
+building with SDK 10 and SDK 11, and packed .NET 11 templates including NativeAOT. Managed tools
+and standalone `plc` output retain their .NET 10 runtime requirement. NativeAOT publishing is
+exercised on the host platform of whatever machine runs the acceptance test; the packages
+themselves are platform-neutral.
 
 Portable source packages can supply explicit `use_module(library(Name))` aliases in Modern mode.
 See [the package guide](docs/how-to/manage-packages.md) for restoration and engine compatibility limits.

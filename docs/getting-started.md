@@ -5,7 +5,9 @@ greets three people. You will see Prolog find several answers to the same questi
 
 ## Prerequisites
 
-Install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) and Git. You also need
+Install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) or
+[.NET 11 SDK](https://dotnet.microsoft.com/download/dotnet/11.0), plus Git. When using SDK 11,
+keep the .NET 10 runtime installed to run the repository tools and test hosts. You also need
 a text editor and a terminal. Run all commands below from the repository root after cloning it.
 
 This tutorial uses the repository tool so the examples match the checked-out source. Packaged
@@ -21,8 +23,8 @@ cd dotprolog
 dotnet --version
 ```
 
-The last command should print a `10.0` SDK version. The repository's `global.json` selects the SDK;
-if .NET reports that it cannot find a compatible version, install the version requested there.
+The last command should print a `10.0` or `11.0` SDK version. The repository's `global.json`
+prefers SDK 10 and accepts SDK 11 when SDK 10 is unavailable.
 
 The next command builds the tool automatically. Running the whole test suite is covered in
 [build and test the repository](how-to/build-and-test.md).

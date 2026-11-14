@@ -1,6 +1,6 @@
 <img src="docs/assets/dotprolog-logo.png" alt="DotProlog logo" width="720">
 
-A Prolog language implementation for .NET 10, written in C# 14.
+A Prolog language implementation for .NET 10 and .NET 11, written in C# 14.
 
 [VS Code extension preview](src/DotProlog.VSCode/README.md): highlighting, diagnostics, completion,
 navigation and predicate rename, with local VSIX installation.
@@ -20,6 +20,24 @@ can publish a native executable with NativeAOT. It is published as the `DotProlo
 .NET tool.
 The packages have been on NuGet.org since 0.2.0 and the current release is 0.17.0: see
 [CHANGELOG.md](CHANGELOG.md) and [COMPATIBILITY.md](COMPATIBILITY.md).
+
+## .NET versions
+
+DotProlog supports .NET 10 and .NET 11 projects. Packages and managed tools retain their
+.NET 10 baseline; keep the .NET 10 runtime installed for `plc`, `propack` and portable tool
+fallbacks. Repository builds accept SDK 10 or 11 and retain C# 14.
+
+Templates default to .NET 10. With SDK 11 installed, select .NET 11 explicitly:
+
+```bash
+dotnet new prolog-console -n HelloProlog --Framework net11.0
+dotnet new prolog-lib -n Rules --Framework net11.0
+dotnet new prolog-test -n Tests --Framework net11.0
+```
+
+Existing `.dplproj` applications can set `<TargetFramework>net11.0</TargetFramework>`.
+The standalone `plc` compiler continues to emit .NET 10 applications.
+These template options are available from the current source; they are not in release 0.17.0.
 
 ## Portable packages
 

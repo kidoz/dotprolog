@@ -8,6 +8,10 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Added
 
+- .NET 11 projects can use the SDK and all three templates with `--Framework net11.0`.
+  .NET 10 remains the default target and package baseline; repository SDK selection also accepts
+  a later stable SDK when .NET 10 SDK is unavailable. CI covers SDK 11 and packed .NET 11 consumers.
+
 - A VS Code extension preview provides DotProlog highlighting, snippets and language server
   integration for diagnostics, hover, Outline, completion, definitions, references and predicate
   rename. It supports explicit project selection, server restart and local VSIX packaging, with
