@@ -156,3 +156,52 @@ jobs:
           name: packages
           path: artifacts/*
           if-no-files-found: error
+
+  dotnet11:
+    name: .NET 11 SDK and consumers
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # Baseline test hosts and managed tools still require the .NET 10 runtime.
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: |
+            10.0.x
+            11.0.x
+
+      - name: Select .NET 11 SDK
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path('global.json')
+          data = json.loads(path.read_text())
+          data['sdk']['version'] = '11.0.100'
+          data['sdk']['rollForward'] = 'latestFeature'
+          path.write_text(json.dumps(data, indent=2) + '\n')
+          PY
+          dotnet --version
+
+      - name: Install NativeAOT prerequisites
+        run: sudo apt-get update && sudo apt-get install --yes clang zlib1g-dev
+
+      - name: Build facade generator and solution
+        run: |
+          dotnet build src/DotProlog.Build.Tasks -c Release -p:ContinuousIntegrationBuild=true
+          dotnet build DotProlog.slnx -c Release -p:ContinuousIntegrationBuild=true
+
+      - name: Test on .NET 11 runtime
+        run: dotnet test --solution DotProlog.slnx -c Release --no-build --no-ansi
+        env:
+          DOTNET_ROLL_FORWARD: LatestMajor
+
+      - name: Pack baseline packages with .NET 11 SDK
+        run: |
+          dotnet pack src/DotProlog.Tool -c Release -r linux-x64 -o artifacts -p:ContinuousIntegrationBuild=true
+          dotnet pack src/DotProlog.Tool -c Release -r any -o artifacts -p:ContinuousIntegrationBuild=true
+          dotnet pack DotProlog.slnx -c Release --no-build -o artifacts -p:ContinuousIntegrationBuild=true
+
+      - name: Verify .NET 11 templates, tests, SDK and NativeAOT
+        run: tests/Integration/verify-packages.sh artifacts linux-x64 net11.0

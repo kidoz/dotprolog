@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-if [[ $# -lt 1 || $# -gt 2 ]]; then
-    echo "usage: $0 <package-feed> [expected-tool-rid]" >&2
+if [[ $# -lt 1 || $# -gt 3 ]]; then
+    echo "usage: $0 <package-feed> [expected-tool-rid] [target-framework]" >&2
     exit 64
 fi
 
@@ -11,7 +11,14 @@ repository_root=$(cd "$(dirname "$0")/../.." && pwd)
 package_feed=$(cd "$1" && pwd)
 version=$(grep -oE '<VersionPrefix>[^<]+' "$repository_root/Directory.Build.props" | cut -d'>' -f2)
 expected_tool_rid=${2:-}
+target_framework=${3:-net10.0}
+case "$target_framework" in
+    net10.0|net11.0) ;;
+    *) echo "unsupported target framework: $target_framework" >&2; exit 64 ;;
+esac
 audit_root=$(mktemp -d "${TMPDIR:-/tmp}/dotprolog-package-consumer.XXXXXX")
+# NuGet identifies projects by path; macOS temporary-directory aliases must resolve consistently.
+audit_root=$(cd "$audit_root" && pwd -P)
 
 cleanup() {
     rm -rf "$audit_root"
@@ -32,7 +39,11 @@ dotnet new nugetconfig --force
 dotnet nuget add source "$package_feed" --name dotprolog-local --configfile nuget.config
 dotnet new install "$package_feed/DotProlog.Templates.$version.nupkg"
 
-dotnet new prolog-console -n HelloProlog --DotPrologVersion "$version"
+# Adding another framework must preserve the existing template default.
+dotnet new prolog-console -n DefaultConsole --DotPrologVersion "$version"
+grep -F '<TargetFramework>net10.0</TargetFramework>' DefaultConsole/DefaultConsole.dplproj
+
+dotnet new prolog-console -n HelloProlog --DotPrologVersion "$version" --Framework "$target_framework"
 dotnet build HelloProlog/HelloProlog.dplproj -c Release
 dotnet run --project HelloProlog/HelloProlog.dplproj -c Release --no-build |
     grep -Fx "Hello from Prolog on .NET!"
@@ -46,11 +57,29 @@ if [[ -f "$native_output/HelloProlog.exe" ]]; then
 fi
 "$native_executable" | grep -Fx "Hello from Prolog on .NET!"
 
-dotnet new prolog-test -n Tests --DotPrologVersion "$version"
+dotnet new prolog-test -n Tests --DotPrologVersion "$version" --Framework "$target_framework"
 (
     cd Tests
     dotnet test --project Tests.dplproj --minimum-expected-tests 2 --no-ansi
 )
+
+# Prove the typed facade composes through a real ProjectReference on the selected framework.
+dotnet new prolog-lib -n Rules --DotPrologVersion "$version" --Framework "$target_framework"
+mkdir Consumer
+cat >Consumer/Consumer.csproj <<EOF
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>$target_framework</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../Rules/Rules.dplproj" /></ItemGroup>
+</Project>
+EOF
+cat >Consumer/Program.cs <<'EOF'
+var rules = Rules.RulesModule.Create();
+System.Console.WriteLine(rules.Double(21));
+EOF
+dotnet run --project Consumer/Consumer.csproj -c Release | grep -Fx "42"
 
 test -f "$package_feed/DotProlog.Tool.$version.nupkg"
 test -f "$package_feed/DotProlog.Tool.any.$version.nupkg"
@@ -424,7 +453,7 @@ test "$lint_exit" -eq 1
 printf '%s\n' "$lint_output" | grep -F 'warning DPL3054'
 
 # The packed SDK reports all three warnings through MSBuild without executing an unrelated source unit.
-dotnet new prolog-lib -n ContractLibrary --DotPrologVersion "$version"
+dotnet new prolog-lib -n ContractLibrary --DotPrologVersion "$version" --Framework "$target_framework"
 printf '%s\n' ':- module(rules, [p/1, q/1, r/2]).' 'p(wrong).' 'q(1).' 'q(wrong).' \
     'r(1, 1) :- a = b.' 'r(1, wrong) :- true.' >ContractLibrary/rules.pl
 printf '%s\n' ':- clr_module('\''Rules'\'').' \
