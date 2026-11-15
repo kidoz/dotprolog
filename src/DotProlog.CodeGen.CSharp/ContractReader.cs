@@ -26,7 +26,7 @@ public static class ContractReader
         ArgumentNullException.ThrowIfNull(text);
         ArgumentNullException.ThrowIfNull(defaultNamespace);
 
-        ParseResult parsed = TermReader.ReadProgram(text, fileName);
+        var parsed = TermReader.ReadProgram(text, fileName);
         List<Diagnostic> diagnostics = [.. parsed.Diagnostics];
 
         if (!parsed.Success)
@@ -38,7 +38,7 @@ public static class ContractReader
         string? declaredNamespace = null;
         List<ContractExport> exports = [];
 
-        foreach (SyntaxTerm clause in parsed.Clauses)
+        foreach (var clause in parsed.Clauses)
         {
             if (clause is not CompoundTerm { Name: ":-", Arity: 1 } directive)
             {
@@ -86,7 +86,7 @@ public static class ContractReader
 
                 case CompoundTerm { Name: "clr_export", Arity: 3 or 4 } export:
                 {
-                    ContractExport? read = ReadExport(export, diagnostics, fileName);
+                    var read = ReadExport(export, diagnostics, fileName);
                     if (read is not null)
                     {
                         exports.Add(read);
@@ -129,9 +129,7 @@ public static class ContractReader
         );
     }
 
-    /// <summary>
-    /// Rejects two exports that would generate the same method name and parameter types.
-    /// </summary>
+    /// <summary>Rejects emitted methods, fields, result types, and parameters that collide after normalization.</summary>
     /// <remarks>
     /// A predicate exported in more than one mode gets one method per mode, and overloading sorts most
     /// of them out. Two modes with the same input types do clash, though — <c>append(+,-,+)</c> and
@@ -141,27 +139,129 @@ public static class ContractReader
     /// </remarks>
     private static void RejectClashingSignatures(List<ContractExport> exports, List<Diagnostic> diagnostics, string? fileName)
     {
-        HashSet<string> seen = new(StringComparer.Ordinal);
+        HashSet<string> methods = new(StringComparer.Ordinal) { "Create()", "Dispose()" };
+        HashSet<string> resultTypes = new(StringComparer.Ordinal);
+        HashSet<string> fields = new(StringComparer.Ordinal);
+        HashSet<(string Name, int Arity)> predicates = [];
 
-        foreach (ContractExport export in exports)
+        foreach (var export in exports)
         {
-            var name = export.ClrName ?? export.PredicateName;
-            var signature = $"{name}({string.Join(",", export.Inputs.Select(input => input.Type.ClrTypeName))})";
+            if (predicates.Add((export.PredicateName, export.Arity)))
+            {
+                var field = $"_{SyntaxFacts.Camel(export.PredicateName)}{export.Arity}";
+                if (!fields.Add(field))
+                {
+                    Report(
+                        diagnostics,
+                        CodeGenDiagnosticIds.EmittedNameCollision,
+                        $"Predicate {export.PredicateName}/{export.Arity} would generate the backing field {field}, which another predicate already generates.",
+                        SourceSpan.None,
+                        fileName
+                    );
+                }
+            }
 
-            if (seen.Add(signature))
+            var methodName = export.ClrName ?? SyntaxFacts.Pascal(export.PredicateName);
+            var emittedName =
+                export.Determinism == Determinism.Semidet && export.Outputs.Any() ? $"Try{methodName}" : methodName;
+            var parameterTypes = export.Inputs.Select(input => input.Type.ClrTypeName).ToList();
+            if (export.IsStreaming)
+            {
+                parameterTypes.Add("global::System.Threading.CancellationToken");
+            }
+
+            var signature = $"{emittedName}({string.Join(",", parameterTypes)})";
+            if (!methods.Add(signature))
+            {
+                Report(
+                    diagnostics,
+                    CodeGenDiagnosticIds.DuplicateMethodSignature,
+                    $"{export.PredicateName}/{export.Arity} would generate the method {signature}, which collides with another generated member. "
+                        + "Give one of them a name with clr_export/4.",
+                    SourceSpan.None,
+                    fileName
+                );
+            }
+
+            RejectParameterCollisions(export, diagnostics, fileName);
+
+            ContractArgument[] outputs = [.. export.Outputs];
+            if (outputs.Length <= 1)
             {
                 continue;
             }
 
-            Report(
-                diagnostics,
-                CodeGenDiagnosticIds.DuplicateMethodSignature,
-                $"{export.PredicateName}/{export.Arity} would generate a method that another export already generates. "
-                    + "Give one of them a name with clr_export/4.",
-                SourceSpan.None,
-                fileName
-            );
+            var resultType = $"{methodName}Result";
+            if (!resultTypes.Add(resultType))
+            {
+                Report(
+                    diagnostics,
+                    CodeGenDiagnosticIds.EmittedNameCollision,
+                    $"More than one export would generate the result type {resultType}. Give one of them a name with clr_export/4.",
+                    SourceSpan.None,
+                    fileName
+                );
+            }
+
+            HashSet<string> members = new(StringComparer.Ordinal);
+            foreach (var output in outputs)
+            {
+                var member = SyntaxFacts.Pascal(output.Name);
+                if (member == resultType || !members.Add(member))
+                {
+                    Report(
+                        diagnostics,
+                        CodeGenDiagnosticIds.EmittedNameCollision,
+                        $"Output {output.Name} would generate the result member {member}, which collides with its result type or another member.",
+                        SourceSpan.None,
+                        fileName
+                    );
+                }
+            }
         }
+    }
+
+    private static void RejectParameterCollisions(ContractExport export, List<Diagnostic> diagnostics, string? fileName)
+    {
+        HashSet<string> parameters = new(StringComparer.Ordinal);
+        foreach (var input in export.Inputs)
+        {
+            RejectParameterCollision(input.Name, SyntaxFacts.Camel(input.Name), parameters, diagnostics, fileName);
+        }
+
+        if (export.IsStreaming)
+        {
+            RejectParameterCollision("cancellationToken", "cancellationToken", parameters, diagnostics, fileName);
+        }
+
+        if (export.Determinism == Determinism.Semidet && export.Outputs.Any())
+        {
+            ContractArgument[] outputs = [.. export.Outputs];
+            var name = outputs.Length > 1 ? "result" : SyntaxFacts.Camel(outputs[0].Name);
+            RejectParameterCollision(name, name, parameters, diagnostics, fileName);
+        }
+    }
+
+    private static void RejectParameterCollision(
+        string sourceName,
+        string emittedName,
+        HashSet<string> parameters,
+        List<Diagnostic> diagnostics,
+        string? fileName
+    )
+    {
+        if (parameters.Add(emittedName))
+        {
+            return;
+        }
+
+        Report(
+            diagnostics,
+            CodeGenDiagnosticIds.EmittedNameCollision,
+            $"Argument {sourceName} would generate the parameter {emittedName}, which collides with another generated parameter.",
+            SourceSpan.None,
+            fileName
+        );
     }
 
     private static ContractExport? ReadExport(CompoundTerm export, List<Diagnostic> diagnostics, string? fileName)
@@ -191,7 +291,7 @@ public static class ContractReader
 
         if (
             export.Arguments[1] is not AtomTerm determinismTerm
-            || !TryReadDeterminism(determinismTerm.Name, out Determinism determinism)
+            || !TryReadDeterminism(determinismTerm.Name, out var determinism)
         )
         {
             Report(
@@ -206,11 +306,11 @@ public static class ContractReader
         }
 
         List<ContractArgument> arguments = [];
-        SyntaxTerm list = export.Arguments[2];
+        var list = export.Arguments[2];
 
         while (list is CompoundTerm { Name: ".", Arity: 2 } pair)
         {
-            ContractArgument? argument = ReadArgument(pair.Arguments[0], diagnostics, fileName);
+            var argument = ReadArgument(pair.Arguments[0], diagnostics, fileName);
             if (argument is null)
             {
                 return null;
@@ -339,7 +439,7 @@ public static class ContractReader
             return null;
         }
 
-        ContractType? type = ReadType(specification.Arguments[1], diagnostics, fileName);
+        var type = ReadType(specification.Arguments[1], diagnostics, fileName);
         if (type is null)
         {
             return null;
@@ -366,7 +466,7 @@ public static class ContractReader
 
             case CompoundTerm { Name: "list", Arity: 1 } list:
             {
-                ContractType? element = ReadType(list.Arguments[0], diagnostics, fileName);
+                var element = ReadType(list.Arguments[0], diagnostics, fileName);
                 return element is null ? null : new ContractType(ContractTypeKind.List, element);
             }
 

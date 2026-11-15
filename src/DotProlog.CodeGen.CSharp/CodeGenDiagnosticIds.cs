@@ -44,4 +44,10 @@ public static class CodeGenDiagnosticIds
 
     /// <summary>A <c>multi</c> export declares no outputs, a shape the facade contract leaves undefined.</summary>
     public const string MultiExportNeedsOutput = "DPL2014";
+
+    /// <summary>A contracted predicate is not defined by the generated Prolog program.</summary>
+    public const string MissingPredicate = "DPL2015";
+
+    /// <summary>Two or more emitted C# identifiers collide after normalization.</summary>
+    public const string EmittedNameCollision = "DPL2016";
 }

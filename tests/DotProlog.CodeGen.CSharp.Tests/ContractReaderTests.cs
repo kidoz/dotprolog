@@ -9,14 +9,14 @@ public sealed class ContractReaderTests
 
     private static ModuleContract ReadValid(string contract)
     {
-        ContractReadResult result = Read(contract);
+        var result = Read(contract);
         Assert.True(result.Success, string.Join("; ", result.Diagnostics));
         return result.Contract!;
     }
 
     private static string ErrorId(string contract)
     {
-        ContractReadResult result = Read(contract);
+        var result = Read(contract);
         Assert.False(result.Success);
         return result.Diagnostics.First(d => d.Severity == DiagnosticSeverity.Error).Id;
     }
@@ -24,7 +24,7 @@ public sealed class ContractReaderTests
     [Fact]
     public void ReadsTheModuleAndItsExports()
     {
-        ModuleContract contract = ReadValid(
+        var contract = ReadValid(
             """
             :- clr_module('Pricing').
             :- clr_export(discount/3, det, [in(price, float), in(percent, integer), out(result, float)]).
@@ -32,7 +32,7 @@ public sealed class ContractReaderTests
         );
 
         Assert.Equal("Pricing", contract.ClrTypeName);
-        ContractExport export = Assert.Single(contract.Exports);
+        var export = Assert.Single(contract.Exports);
         Assert.Equal("discount", export.PredicateName);
         Assert.Equal(3, export.Arity);
         Assert.Equal(Determinism.Det, export.Determinism);
@@ -59,7 +59,7 @@ public sealed class ContractReaderTests
     [InlineData("term", "global::DotProlog.Runtime.PrologValue")]
     public void MapsEachScalarType(string prologType, string clrType)
     {
-        ModuleContract contract = ReadValid($":- clr_module('M').\n:- clr_export(p/1, det, [out(v, {prologType})]).");
+        var contract = ReadValid($":- clr_module('M').\n:- clr_export(p/1, det, [out(v, {prologType})]).");
 
         Assert.Equal(clrType, contract.Exports[0].Arguments[0].Type.ClrTypeName);
     }
@@ -67,7 +67,7 @@ public sealed class ContractReaderTests
     [Fact]
     public void MapsNestedListTypes()
     {
-        ModuleContract contract = ReadValid(":- clr_module('M').\n:- clr_export(p/1, det, [out(v, list(list(atom)))]).");
+        var contract = ReadValid(":- clr_module('M').\n:- clr_export(p/1, det, [out(v, list(list(atom)))]).");
 
         Assert.Equal(
             "global::System.Collections.Generic.IReadOnlyList<global::System.Collections.Generic.IReadOnlyList<string>>",
@@ -82,7 +82,7 @@ public sealed class ContractReaderTests
     [InlineData("nondet", Determinism.Nondet)]
     public void ReadsEachDeterminism(string name, Determinism expected)
     {
-        ModuleContract contract = ReadValid($":- clr_module('M').\n:- clr_export(p/1, {name}, [out(v, atom)]).");
+        var contract = ReadValid($":- clr_module('M').\n:- clr_export(p/1, {name}, [out(v, atom)]).");
 
         Assert.Equal(expected, contract.Exports[0].Determinism);
     }
@@ -158,7 +158,7 @@ public sealed class ContractReaderTests
     [Fact]
     public void ClrExportFourNamesTheGeneratedMethod()
     {
-        ModuleContract contract = ReadValid(
+        var contract = ReadValid(
             ":- clr_module('M').\n:- clr_export(nrev/2, det, [in(l, list(atom)), out(r, list(atom))], 'NaiveReverse')."
         );
 
@@ -178,7 +178,7 @@ public sealed class ContractReaderTests
     public void TwoModesWithDifferentInputsOverloadCleanly()
     {
         // append(+,+,-) and append(+,-,-) take different numbers of inputs, so C# overloading covers it.
-        ModuleContract contract = ReadValid(
+        var contract = ReadValid(
             """
             :- clr_module('M').
             :- clr_export(append/3, det, [in(a, list(atom)), in(b, list(atom)), out(c, list(atom))]).
@@ -202,7 +202,7 @@ public sealed class ContractReaderTests
         Assert.Equal(CodeGenDiagnosticIds.DuplicateMethodSignature, ErrorId(Clashing));
 
         // Naming one of them resolves it, which is what clr_export/4 is for.
-        ModuleContract resolved = ReadValid(
+        var resolved = ReadValid(
             """
             :- clr_module('M').
             :- clr_export(append/3, nondet, [in(a, list(atom)), out(b, list(atom)), in(c, list(atom))], 'AppendLeft').
@@ -211,6 +211,75 @@ public sealed class ContractReaderTests
         );
 
         Assert.Equal("AppendLeft", resolved.Exports[0].ClrName);
+    }
+
+    [Fact]
+    public void MethodNamesThatCollideAfterNormalizationAreRejected()
+    {
+        const string Contract = """
+            :- clr_module('M').
+            :- clr_export(foo_bar/1, nondet, [out(v, atom)]).
+            :- clr_export(foo__bar/1, nondet, [out(v, atom)]).
+            """;
+
+        var result = Read(Contract);
+        Assert.False(result.Success);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == CodeGenDiagnosticIds.DuplicateMethodSignature);
+    }
+
+    [Fact]
+    public void BackingFieldsThatCollideAfterNormalizationAreRejected()
+    {
+        const string Contract = """
+            :- clr_module('M').
+            :- clr_export(foo_bar/1, det, [out(v, atom)], 'First').
+            :- clr_export(foo__bar/1, det, [out(v, atom)], 'Second').
+            """;
+
+        Assert.Equal(CodeGenDiagnosticIds.EmittedNameCollision, ErrorId(Contract));
+    }
+
+    [Theory]
+    [InlineData(":- clr_export(p/2, nondet, [in(cancellation_token, integer), out(v, integer)]).")]
+    [InlineData(":- clr_export(p/2, semidet, [in(value, atom), out(value, atom)]).")]
+    [InlineData(":- clr_export(p/3, semidet, [in(result, atom), out(value, atom), out(other, atom)]).")]
+    public void ParameterNamesThatCollideAfterNormalizationAreRejected(string export)
+    {
+        Assert.Equal(CodeGenDiagnosticIds.EmittedNameCollision, ErrorId($":- clr_module('M'). {export}"));
+    }
+
+    [Fact]
+    public void ResultTypesThatCollideAcrossOverloadsAreRejected()
+    {
+        const string Contract = """
+            :- clr_module('M').
+            :- clr_export(first/3, det, [in(input, atom), out(a, atom), out(b, atom)], 'Convert').
+            :- clr_export(second/3, det, [in(input, integer), out(a, atom), out(b, atom)], 'Convert').
+            """;
+
+        Assert.Equal(CodeGenDiagnosticIds.EmittedNameCollision, ErrorId(Contract));
+    }
+
+    [Theory]
+    [InlineData("[out(a_b, atom), out(a__b, atom)]")]
+    [InlineData("[out(convert_result, atom), out(other, atom)]")]
+    public void ResultMembersThatCollideAfterNormalizationAreRejected(string arguments)
+    {
+        Assert.Equal(
+            CodeGenDiagnosticIds.EmittedNameCollision,
+            ErrorId($":- clr_module('M'). :- clr_export(convert/2, det, {arguments}).")
+        );
+    }
+
+    [Theory]
+    [InlineData("Create")]
+    [InlineData("Dispose")]
+    public void GeneratedFactoryAndDisposalNamesAreReserved(string name)
+    {
+        Assert.Equal(
+            CodeGenDiagnosticIds.DuplicateMethodSignature,
+            ErrorId($":- clr_module('M'). :- clr_export(p/0, semidet, [], '{name}').")
+        );
     }
 
     [Theory]
@@ -267,7 +336,7 @@ public sealed class ContractReaderTests
     [Fact]
     public void UnderscoredNamesStillMapToIdentifiers()
     {
-        ModuleContract contract = ReadValid(
+        var contract = ReadValid(
             ":- clr_module('M').\n:- clr_export('_private_pred'/1, nondet, [out('_v_1', atom)])."
         );
 
@@ -288,7 +357,7 @@ public sealed class ContractReaderTests
     public void ANondetExportWithNoOutputsIsAccepted()
     {
         // Its facade streams a Unit per solution, per the facade determinism table.
-        ModuleContract contract = ReadValid(":- clr_module('M').\n:- clr_export(p/1, nondet, [in(v, atom)]).");
+        var contract = ReadValid(":- clr_module('M').\n:- clr_export(p/1, nondet, [in(v, atom)]).");
 
         Assert.Empty(contract.Exports[0].Outputs);
     }
@@ -296,7 +365,7 @@ public sealed class ContractReaderTests
     [Fact]
     public void ReaderDiagnosticsSurfaceFromTheContractItself()
     {
-        ContractReadResult result = Read(":- clr_module('M')\n:- clr_export(p/1, det, [out(v, atom)]).");
+        var result = Read(":- clr_module('M')\n:- clr_export(p/1, det, [out(v, atom)]).");
 
         Assert.False(result.Success);
         Assert.Contains(result.Diagnostics, d => d.Id == DiagnosticIds.MissingEndToken);

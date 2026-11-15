@@ -138,6 +138,34 @@ internal static class SyntaxFacts
         return true;
     }
 
+    /// <summary>Turns a Prolog identifier such as <c>in_stock</c> into <c>InStock</c>.</summary>
+    internal static string Pascal(string name)
+    {
+        var text = new StringBuilder(name.Length);
+        var upper = true;
+
+        foreach (var c in name)
+        {
+            if (c == '_')
+            {
+                upper = true;
+                continue;
+            }
+
+            text.Append(upper ? char.ToUpperInvariant(c) : c);
+            upper = false;
+        }
+
+        return text.Length == 0 ? "Predicate" : text.ToString();
+    }
+
+    /// <summary>Turns a Prolog identifier into its unescaped camel-case C# spelling.</summary>
+    internal static string Camel(string name)
+    {
+        var pascal = Pascal(name);
+        return char.ToLowerInvariant(pascal[0]) + pascal[1..];
+    }
+
     /// <summary>
     /// A C# string literal holding <paramref name="value"/>. Control characters and the line
     /// separators U+2028 and U+2029 are escaped as well as quotes and backslashes, because C#
