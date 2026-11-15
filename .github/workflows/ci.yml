@@ -137,10 +137,13 @@ jobs:
           dotnet pack src/DotProlog.Tool -c Release -r any \
             -o artifacts -p:ContinuousIntegrationBuild=true
           dotnet pack src/DotProlog.Tool -c Release \
-            -o artifacts -p:ContinuousIntegrationBuild=true
+            -o "$RUNNER_TEMP/dotprolog-tool-pointer" -p:ContinuousIntegrationBuild=true
           version=$(grep -oE '<VersionPrefix>[^<]+' Directory.Build.props | cut -d'>' -f2)
           test -f "artifacts/DotProlog.Tool.${{ matrix.rid }}.$version.nupkg"
           test -f "artifacts/DotProlog.Tool.any.$version.nupkg"
+          # SDK 11 can recursively pack RID implementations here; the explicit packs above own them.
+          test "$(find "$RUNNER_TEMP/dotprolog-tool-pointer" -maxdepth 1 -name '*.nupkg' | wc -l)" -eq 1
+          cp "$RUNNER_TEMP/dotprolog-tool-pointer/DotProlog.Tool.$version.nupkg" artifacts/
           dotnet tool exec --source artifacts "DotProlog.Tool@$version" \
             run samples/HelloProlog/hello.pl |
             grep -Fx "Hello! World!"
@@ -216,6 +219,10 @@ jobs:
         run: |
           dotnet pack src/DotProlog.Tool -c Release -r linux-x64 -o artifacts -p:ContinuousIntegrationBuild=true
           dotnet pack src/DotProlog.Tool -c Release -r any -o artifacts -p:ContinuousIntegrationBuild=true
+          dotnet pack src/DotProlog.Tool -c Release -o "$RUNNER_TEMP/dotprolog-tool-pointer" -p:ContinuousIntegrationBuild=true
+          # The pointer pack must not duplicate or replace the explicitly packed implementations.
+          test "$(find "$RUNNER_TEMP/dotprolog-tool-pointer" -maxdepth 1 -name '*.nupkg' | wc -l)" -eq 1
+          cp "$RUNNER_TEMP/dotprolog-tool-pointer"/DotProlog.Tool.*.nupkg artifacts/
           dotnet pack DotProlog.slnx -c Release --no-build -o artifacts -p:ContinuousIntegrationBuild=true
 
       - name: Verify .NET 11 templates, tests, SDK and NativeAOT
