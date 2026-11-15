@@ -40,7 +40,19 @@ cat >nuget.config <<'EOF'
 <configuration>
   <packageSources>
     <clear />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
   </packageSources>
+  <packageSourceMapping>
+    <packageSource key="dotprolog-local">
+      <package pattern="DotProlog.*" />
+    </packageSource>
+    <packageSource key="dotprolog-user">
+      <package pattern="Rules" />
+    </packageSource>
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
 </configuration>
 EOF
 dotnet nuget add source "$package_feed" --name dotprolog-local --configfile nuget.config
@@ -51,7 +63,7 @@ mkdir UpstreamIsolation
 cat >UpstreamIsolation/UpstreamIsolation.csproj <<EOF
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><TargetFramework>$target_framework</TargetFramework></PropertyGroup>
-  <ItemGroup><PackageReference Include="DotProlog.Compiler" Version="0.0.0" /></ItemGroup>
+  <ItemGroup><PackageReference Include="DotProlog.Compiler" Version="[0.0.0]" /></ItemGroup>
 </Project>
 EOF
 if dotnet restore UpstreamIsolation/UpstreamIsolation.csproj >"$audit_root/upstream-isolation.log" 2>&1; then

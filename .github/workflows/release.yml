@@ -235,6 +235,7 @@ jobs:
       - name: Verify package checksums and exact inventory
         run: |
           python tests/Integration/test_release_assets.py
+          python tests/Integration/test_release_version.py
           version=$(grep -oE '<VersionPrefix>[^<]+' Directory.Build.props | cut -d'>' -f2)
           python tests/Integration/verify-release-assets.py --version "$version" --directory artifacts
 
@@ -331,6 +332,14 @@ jobs:
       # A manual run publishes the packages already attached to that version's GitHub release.
       # Download the complete asset set so its release-level SHA256SUMS can be checked in full;
       # the inventory gate then rejects missing, extra, or wrong-version NuGet packages.
+      - name: Validate the publication version
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          version=$(tests/Integration/resolve-release-version.sh "$REQUESTED_VERSION")
+          printf 'DOTPROLOG_RELEASE_VERSION=%s\n' "$version" >> "$GITHUB_ENV"
+
       - name: Download the release assets
         if: github.event_name == 'workflow_dispatch'
         env:
@@ -338,16 +347,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          gh release download "v${{ inputs.version }}" --repo "$GITHUB_REPOSITORY" --dir artifacts
+          gh release download "v$DOTPROLOG_RELEASE_VERSION" --repo "$GITHUB_REPOSITORY" --dir artifacts
           ls artifacts
 
       - name: Verify release checksums and exact package inventory
         run: |
           set -euo pipefail
-          version="${{ inputs.version }}"
-          if [ -z "$version" ]; then
-            version=$(grep -oE '<VersionPrefix>[^<]+' Directory.Build.props | cut -d'>' -f2)
-          fi
+          version="$DOTPROLOG_RELEASE_VERSION"
           python tests/Integration/verify-release-assets.py --version "$version" --directory artifacts
 
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
@@ -372,10 +378,7 @@ jobs:
             echo "::error::Trusted publishing did not return an API key."
             exit 1
           fi
-          version="${{ inputs.version }}"
-          if [ -z "$version" ]; then
-            version=$(grep -oE '<VersionPrefix>[^<]+' Directory.Build.props | cut -d'>' -f2)
-          fi
+          version="$DOTPROLOG_RELEASE_VERSION"
           pointer="DotProlog.Tool.$version.nupkg"
 
           # Only the .nupkg files are pushed: each carries its adjacent .snupkg with it, and
@@ -398,10 +401,7 @@ jobs:
       - name: Verify public tools and all templates from NuGet.org
         run: |
           set -euo pipefail
-          version="${{ inputs.version }}"
-          if [ -z "$version" ]; then
-            version=$(grep -oE '<VersionPrefix>[^<]+' Directory.Build.props | cut -d'>' -f2)
-          fi
+          version="$DOTPROLOG_RELEASE_VERSION"
           tests/Integration/verify-public-release.sh "$version"
 
   publish-propack:
