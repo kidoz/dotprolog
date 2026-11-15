@@ -79,7 +79,7 @@ public sealed class SourceDirectiveTests : IDisposable
         using var engine = new PrologEngine();
         var main = Write("main.pl", ":- include(missing).");
 
-        LoadResult loaded = engine.ConsultFile(main);
+        var loaded = engine.ConsultFile(main);
 
         Assert.Equal(CompilerDiagnosticIds.IncludeNotFound, Assert.Single(loaded.Diagnostics).Id);
     }
@@ -90,7 +90,7 @@ public sealed class SourceDirectiveTests : IDisposable
         var main = Write("main.pl", ":- include(main).");
         using var engine = new PrologEngine();
 
-        LoadResult loaded = engine.ConsultFile(main);
+        var loaded = engine.ConsultFile(main);
 
         Assert.Equal(CompilerDiagnosticIds.IncludeCycle, Assert.Single(loaded.Diagnostics).Id);
     }
@@ -132,7 +132,7 @@ public sealed class SourceDirectiveTests : IDisposable
         using var engine = new PrologEngine();
         var main = Write("main.pl", ":- ensure_loaded(missing).");
 
-        LoadResult loaded = engine.ConsultFile(main);
+        var loaded = engine.ConsultFile(main);
 
         Assert.Equal(CompilerDiagnosticIds.EnsureLoadedNotFound, Assert.Single(loaded.Diagnostics).Id);
     }
@@ -218,7 +218,7 @@ public sealed class SourceDirectiveTests : IDisposable
         var output = new StringWriter();
         using var engine = new PrologEngine { Output = output, Input = TextReader.Null };
 
-        LoadResult loaded = engine.ConsultText(
+        var loaded = engine.ConsultText(
             """
             value(before).
             :- (findall(X, value(X), Xs), write(Xs)).
@@ -257,7 +257,7 @@ public sealed class SourceDirectiveTests : IDisposable
     {
         var output = new StringWriter();
         using var engine = new PrologEngine(mode) { Output = output, Input = TextReader.Null };
-        LoadResult loaded = engine.ConsultText(
+        var loaded = engine.ConsultText(
             """
             :- dynamic(value/2).
             value(before, X) :- X = before.
@@ -268,7 +268,7 @@ public sealed class SourceDirectiveTests : IDisposable
                 clause(value(after, A), Body), Body == (A = after),
                 findall(pair(Tag, Value), value(Tag, Value), Values), write(Values)
             )).
-            """,
+            """ + "\n",
             "stored-rules.pl"
         );
 
@@ -306,9 +306,135 @@ public sealed class SourceDirectiveTests : IDisposable
     {
         using var engine = new PrologEngine();
 
-        LoadResult loaded = engine.ConsultText(source, "invalid.pl");
+        var loaded = engine.ConsultText(source, "invalid.pl");
 
         Assert.Equal(diagnosticId, Assert.Single(loaded.Diagnostics).Id);
+    }
+
+    [Theory]
+    [InlineData("multifile")]
+    [InlineData("discontiguous")]
+    public void DeclarationOnlyStaticProceduresExistButFail(string declaration)
+    {
+        using var engine = new PrologEngine();
+
+        var loaded = engine.ConsultText($":- {declaration}(value/1).");
+
+        Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
+        Assert.Equal(RunResult.Failure, engine.RunGoal("value(_)", out _));
+        Assert.Equal(RunResult.Success, engine.RunGoal("current_predicate(value/1)", out _));
+        Assert.Equal(
+            RunResult.Success,
+            engine.RunGoal("catch(assertz(value(now)), error(permission_error(modify,static_procedure,value/1), _), true)", out _)
+        );
+    }
+
+    [Fact]
+    public void MainInitializationWaitsForLaterSourceUnits()
+    {
+        var output = new StringWriter();
+        using var engine = new PrologEngine { Output = output };
+
+        Assert.True(engine.ConsultText(":- initialization(write(main), main).", "first.pl").Success);
+        Assert.True(engine.ConsultText(":- initialization(write(later)).", "second.pl").Success);
+        Assert.Equal(RunResult.Halted, engine.RunPendingGoals());
+
+        Assert.Equal("latermain", output.ToString());
+    }
+
+    [Fact]
+    public void LastMainInitializationAcrossSourceUnitsWins()
+    {
+        var output = new StringWriter();
+        using var engine = new PrologEngine { Output = output };
+
+        Assert.True(engine.ConsultText(":- initialization(write(first), main).", "first.pl").Success);
+        Assert.True(engine.ConsultText(":- initialization(write(second), main).", "second.pl").Success);
+        Assert.Equal(RunResult.Halted, engine.RunPendingGoals());
+
+        Assert.Equal("second", output.ToString());
+    }
+
+    [Theory]
+    [InlineData("include")]
+    [InlineData("use_module")]
+    [InlineData("ensure_loaded")]
+    public void SourceChainBudgetAllowsSixtyFourEdges(string directive)
+    {
+        var main = WriteChain(Enumerable.Repeat(directive, PrologEngine.MaxSourceChainDepth).ToArray());
+        using var engine = new PrologEngine { Output = TextWriter.Null };
+
+        var loaded = engine.ConsultFile(main);
+
+        Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
+        Assert.Equal(RunResult.Success, engine.RunGoal("leaf(ok)", out _));
+    }
+
+    [Theory]
+    [InlineData("include", false)]
+    [InlineData("use_module", false)]
+    [InlineData("ensure_loaded", false)]
+    [InlineData("include", true)]
+    [InlineData("use_module", true)]
+    [InlineData("ensure_loaded", true)]
+    public void SourceChainBudgetReportsTheRejectingDirectiveAndRecovers(string directive, bool generated)
+    {
+        ArgumentNullException.ThrowIfNull(directive);
+        var main = WriteChain(Enumerable.Repeat(directive, PrologEngine.MaxSourceChainDepth + 1).ToArray());
+        using var engine = new PrologEngine { Output = TextWriter.Null };
+
+        var loaded = generated
+            ? engine.CompileForGeneratedCode(File.ReadAllText(main), main, _ => { }, [], [])
+            : engine.ConsultFile(main);
+
+        var diagnostic = Assert.Single(loaded.Diagnostics, item => item.Id == PrologEngine.SourceChainDepthExceeded);
+        Assert.Equal(Path.Combine(_directory, $"source{PrologEngine.MaxSourceChainDepth}.pl"), diagnostic.FileName);
+        var expectedStart = directive == "use_module" ? 3 : 4 + directive.Length;
+        Assert.Equal(expectedStart, diagnostic.Span.Start);
+        Assert.Equal(1, diagnostic.Span.Line);
+        Assert.Equal(expectedStart + 1, diagnostic.Span.Column);
+
+        Assert.True(engine.ConsultText("recovered.", "recovery.pl").Success);
+        Assert.Equal(RunResult.Success, engine.RunGoal("recovered", out _));
+
+        if (!generated && directive == "use_module")
+        {
+            Write($"source{PrologEngine.MaxSourceChainDepth}.pl", "leaf(ok).");
+            var retried = engine.ConsultFile(main);
+            Assert.True(retried.Success, string.Join("; ", retried.Diagnostics));
+            Assert.Equal(RunResult.Success, engine.RunGoal("leaf(ok)", out _));
+        }
+    }
+
+    [Fact]
+    public void MixedSourceDependencyKindsShareOneDepthBudget()
+    {
+        string[] directives = [.. Enumerable.Range(0, PrologEngine.MaxSourceChainDepth + 1).Select(DependencyKind)];
+        var main = WriteChain(directives);
+        using var engine = new PrologEngine { Output = TextWriter.Null };
+
+        var loaded = engine.ConsultFile(main);
+
+        var diagnostic = Assert.Single(loaded.Diagnostics, item => item.Id == PrologEngine.SourceChainDepthExceeded);
+        Assert.Equal(Path.Combine(_directory, $"source{PrologEngine.MaxSourceChainDepth}.pl"), diagnostic.FileName);
+    }
+
+    private static string DependencyKind(int index) =>
+        (index % 3) switch
+        {
+            0 => "include",
+            1 => "use_module",
+            _ => "ensure_loaded",
+        };
+
+    private string WriteChain(string[] directives)
+    {
+        for (var index = 0; index <= directives.Length; index++)
+        {
+            Write($"source{index}.pl", index == directives.Length ? "leaf(ok)." : $":- {directives[index]}(source{index + 1}).");
+        }
+
+        return Path.Combine(_directory, "source0.pl");
     }
 
     /// <summary>Escapes a host path for use inside a single-quoted atom, where `\` starts an escape.</summary>
@@ -327,7 +453,7 @@ public sealed class SourceDirectiveTests : IDisposable
         var output = new StringWriter();
         using var engine = new PrologEngine { Output = output, Input = TextReader.Null };
 
-        LoadResult loaded = engine.ConsultFile(path);
+        var loaded = engine.ConsultFile(path);
         Assert.Empty(loaded.Diagnostics);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
         return output.ToString();

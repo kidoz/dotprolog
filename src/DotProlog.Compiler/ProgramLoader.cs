@@ -18,6 +18,10 @@ public sealed class ProgramLoader
 
     internal CompilationSourceMap? SourceMap { get; set; }
 
+    internal Func<SyntaxTerm, (int Depth, string? FileName)>? SourceSiteOf { get; set; }
+
+    internal int MainInitializationAddress { get; private set; } = -1;
+
     /// <summary>Creates a loader that appends to <paramref name="program"/>.</summary>
     /// <param name="program">The program to load into.</param>
     /// <param name="machine">
@@ -62,8 +66,8 @@ public sealed class ProgramLoader
     /// <param name="clauses">Clauses and directives in source order.</param>
     /// <param name="fileName">File name used in diagnostics, when known.</param>
     /// <param name="directiveExecutor">
-    /// Optional executor for ordinary directives. When present, each directive runs at its source
-    /// position; otherwise its address is returned for a non-reentrant runtime consult to queue.
+    /// Optional preparation callback for ordinary directives. When present, each directive is offered
+    /// at its source position; otherwise its address is returned for a non-reentrant runtime consult to queue.
     /// </param>
     public LoadResult Load(
         IReadOnlyList<SyntaxTerm> clauses,
@@ -72,15 +76,16 @@ public sealed class ProgramLoader
     )
     {
         ArgumentNullException.ThrowIfNull(clauses);
+        MainInitializationAddress = -1;
 
         // double_quotes belongs to the load unit. A directive still changes how the rest of this file
         // reads, but the entering value is restored afterwards, so a library that declares its own
         // convention cannot silently change how whatever is consulted next is read.
-        bool isoModuleText = ContainsIsoModuleMarker(clauses);
-        DoubleQuotesMode entering = _program.Flags.DoubleQuotes;
-        OperatorTable? enteringOperators = isoModuleText ? _program.Operators.Copy() : null;
-        CharacterConversionTable? enteringConversions = isoModuleText ? _program.CharacterConversions.Copy() : null;
-        PrologFlags? enteringFlags = isoModuleText ? _program.Flags.Copy() : null;
+        var isoModuleText = ContainsIsoModuleMarker(clauses);
+        var entering = _program.Flags.DoubleQuotes;
+        var enteringOperators = isoModuleText ? _program.Operators.Copy() : null;
+        var enteringConversions = isoModuleText ? _program.CharacterConversions.Copy() : null;
+        var enteringFlags = isoModuleText ? _program.Flags.Copy() : null;
         try
         {
             return isoModuleText
@@ -127,7 +132,7 @@ public sealed class ProgramLoader
                 _program.Symbols.InternFunctor(ModuleTable.QualifiedName(unit.Module, indicator.Name), indicator.Arity)
             ),
         ];
-        HashSet<int> dynamicPredicates = DeclareDynamicPredicates(unit, resolver, diagnostics, fileName);
+        var dynamicPredicates = DeclareDynamicPredicates(unit, resolver, diagnostics, fileName);
         Dictionary<int, List<(SyntaxTerm Head, SyntaxTerm? Body)>> accumulated = [];
         Dictionary<int, List<(SyntaxTerm Head, SyntaxTerm? Body)>> pending = [];
         // ISO module bodies keep source goals for clause/2 and retract/1. Other load units
@@ -137,13 +142,13 @@ public sealed class ProgramLoader
         HashSet<int> dirty = [];
         var halted = false;
 
-        foreach (LoadItem item in unit.Items)
+        foreach (var item in unit.Items)
         {
             if (item is ClauseItem clause)
             {
-                SyntaxTerm resolvedHead = resolver.ResolveHead(clause.Head);
+                var resolvedHead = resolver.ResolveHead(clause.Head);
                 SourceMap?.SetDocument(resolvedHead, SourceMap.DocumentOf(clause.Head, fileName));
-                SyntaxTerm? resolvedBody = clause.Body is null ? null : resolver.ResolveGoal(clause.Body);
+                var resolvedBody = clause.Body is null ? null : resolver.ResolveGoal(clause.Body);
 
                 if (!TryGetHeadFunctor(resolvedHead, out var functorId))
                 {
@@ -196,11 +201,12 @@ public sealed class ProgramLoader
             }
 
             FlushPredicates();
-            SyntaxTerm goal = ((DirectiveItem)item).Goal;
+            var directiveItem = (DirectiveItem)item;
+            var goal = directiveItem.Goal;
             var sourceFile = SourceMap?.DocumentOf(goal, fileName) ?? fileName;
             if (goal is CompoundTerm { Name: "ensure_loaded", Arity: 1 } ensureLoaded)
             {
-                EnsureLoaded(ensureLoaded, diagnostics, fileName);
+                EnsureLoaded(ensureLoaded, diagnostics, directiveItem.SourceFile, directiveItem.SourceDepth);
                 continue;
             }
 
@@ -210,7 +216,7 @@ public sealed class ProgramLoader
                 (goal, isMain) = timed;
             }
 
-            SyntaxTerm resolvedDirective =
+            var resolvedDirective =
                 forcedModule is not null && goal is CompoundTerm { Name: "initialization", Arity: 1 } initializationGoal
                     ? initializationGoal with
                     {
@@ -241,7 +247,7 @@ public sealed class ProgramLoader
                 continue;
             }
 
-            RunResult result = directiveExecutor(address);
+            var result = directiveExecutor(address);
             if (result == RunResult.Halted)
             {
                 halted = true;
@@ -252,11 +258,13 @@ public sealed class ProgramLoader
         if (!halted)
         {
             FlushPredicates();
+            DefineDeclaredEmptyPredicates();
         }
 
         // SWI-Prolog starts the main goal once everything else has loaded and initialized.
         if (main >= 0)
         {
+            MainInitializationAddress = main;
             initialization.Add(main);
         }
 
@@ -281,10 +289,10 @@ public sealed class ProgramLoader
                     continue;
                 }
 
-                PredicateIndicator sourceIndicator = SourceIndicatorOf(unit.Module, functorId);
+                var sourceIndicator = SourceIndicatorOf(unit.Module, functorId);
                 if (_modules.IsMultifile(unit.Module, sourceIndicator))
                 {
-                    IReadOnlyList<(SyntaxTerm Head, SyntaxTerm? Body)> multifileClauses = _modules.AppendMultifileClauses(
+                    var multifileClauses = _modules.AppendMultifileClauses(
                         unit.Module,
                         sourceIndicator,
                         pending[functorId]
@@ -301,6 +309,33 @@ public sealed class ProgramLoader
             dirty.Clear();
             dirtyOrder.Clear();
         }
+
+        void DefineDeclaredEmptyPredicates()
+        {
+            foreach (var declarations in unit.Multifile.Concat(unit.Discontiguous))
+            {
+                foreach (var item in Indicators(declarations))
+                {
+                    if (!TryIndicator(item, out var indicator))
+                    {
+                        continue;
+                    }
+
+                    var functorId = _program.Symbols.InternFunctor(
+                        ModuleTable.QualifiedName(unit.Module, indicator.Name),
+                        indicator.Arity
+                    );
+                    if (
+                        !accumulated.ContainsKey(functorId)
+                        && !dynamicPredicates.Contains(functorId)
+                        && !_program.IsDefined(functorId)
+                    )
+                    {
+                        EmitPredicate(functorId, [], diagnostics, fileName, unitDefinitions);
+                    }
+                }
+            }
+        }
     }
 
     private static bool ContainsIsoModuleMarker(IReadOnlyList<SyntaxTerm> clauses) =>
@@ -312,11 +347,11 @@ public sealed class ProgramLoader
 
     private void RetainIsoStaticClause(string module, SyntaxTerm head, SyntaxTerm? body)
     {
-        Machine machine = _machine!;
+        var machine = _machine!;
         Dictionary<string, Cell> variables = [];
-        Cell headCell = TermReifier.ToHeap(machine, head, variables);
-        Cell bodyCell = body is null ? Cell.Atom(machine.Symbols.True) : TermReifier.ToHeap(machine, body, variables);
-        Cell clause = machine.CreateStructure(machine.Symbols.InternFunctor(":-", 2), [headCell, bodyCell]);
+        var headCell = TermReifier.ToHeap(machine, head, variables);
+        var bodyCell = body is null ? Cell.Atom(machine.Symbols.True) : TermReifier.ToHeap(machine, body, variables);
+        var clause = machine.CreateStructure(machine.Symbols.InternFunctor(":-", 2), [headCell, bodyCell]);
         var term = new TermBuffer();
         var root = term.Copy(machine, DatabaseBuiltins.NormalizeClause(machine, clause));
 
@@ -329,14 +364,14 @@ public sealed class ProgramLoader
         }
         else
         {
-            Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(headCell.Index).Index);
+            var functor = machine.Symbols.GetFunctor(machine.HeapAt(headCell.Index).Index);
             compiledName = machine.Symbols.AtomName(functor.NameAtom);
             arity = functor.Arity;
         }
 
         var separator = compiledName.LastIndexOf(':');
-        string name = separator >= 0 ? compiledName[(separator + 1)..] : compiledName;
-        ModulePredicateDefinition metadata = _modules
+        var name = separator >= 0 ? compiledName[(separator + 1)..] : compiledName;
+        var metadata = _modules
             .Catalog.Declare(module)
             .Predicate(new ModulePredicateIndicator(name, arity));
         metadata.AddStaticClause(term.Cells, root);
@@ -358,7 +393,7 @@ public sealed class ProgramLoader
         var currentBodyIsImplicitUser = false;
         var userTextSeen = false;
 
-        foreach (SyntaxTerm clause in clauses)
+        foreach (var clause in clauses)
         {
             if (clause is CompoundTerm { Name: ":-", Arity: 1, Arguments: [CompoundTerm marker] })
             {
@@ -383,7 +418,7 @@ public sealed class ProgramLoader
                     currentBodyIsImplicitUser = false;
                     if (
                         (name.Name == ModuleTable.UserModule && userTextSeen)
-                        || (_modules.Catalog.TryGet(name.Name, out ModuleDefinition? existing) && existing!.InterfacePrepared)
+                        || (_modules.Catalog.TryGet(name.Name, out var existing) && existing!.InterfacePrepared)
                     )
                     {
                         ReportInvalidIsoModuleText(
@@ -448,7 +483,7 @@ public sealed class ProgramLoader
                     if (
                         name.Name != ModuleTable.UserModule
                         && (
-                            !_modules.Catalog.TryGet(name.Name, out ModuleDefinition? definition)
+                            !_modules.Catalog.TryGet(name.Name, out var definition)
                             || !definition!.InterfacePrepared
                         )
                     )
@@ -480,7 +515,7 @@ public sealed class ProgramLoader
                         continue;
                     }
 
-                    if (enclosingBodies.TryPop(out IsoBody? enclosing))
+                    if (enclosingBodies.TryPop(out var enclosing))
                     {
                         currentBody = new IsoBody(enclosing.Module, enclosing.Span);
                         bodies.Add(currentBody);
@@ -533,22 +568,22 @@ public sealed class ProgramLoader
             );
         }
 
-        foreach (IsoInterface moduleInterface in interfaces)
+        foreach (var moduleInterface in interfaces)
         {
             PrepareIsoInterface(moduleInterface, diagnostics, fileName);
         }
 
-        foreach (IsoBody body in bodies)
+        foreach (var body in bodies)
         {
             PredeclareIsoBody(body, diagnostics, fileName);
         }
 
         List<int> directives = [];
         List<int> initialization = [];
-        foreach (IsoBody body in bodies)
+        foreach (var body in bodies)
         {
-            ModuleDefinition definition = _modules.Catalog.Declare(body.Module);
-            if (definition.TryTakePreparedBody(out ModuleReaderState? state))
+            var definition = _modules.Catalog.Declare(body.Module);
+            if (definition.TryTakePreparedBody(out var state))
             {
                 _program.Operators.ReplaceWith(state!.Operators);
                 _program.CharacterConversions.ReplaceWith(state.CharacterConversions);
@@ -561,8 +596,8 @@ public sealed class ProgramLoader
                 _program.Flags.ReplaceWith(definition.Flags);
             }
 
-            List<SyntaxTerm> executable = PrepareIsoBody(body, diagnostics, fileName);
-            LoadResult result = LoadScoped(executable, fileName, directiveExecutor, body.Module);
+            var executable = PrepareIsoBody(body, diagnostics, fileName);
+            var result = LoadScoped(executable, fileName, directiveExecutor, body.Module);
             definition.SeedReaderState(_program.Operators, _program.CharacterConversions, _program.Flags);
             diagnostics.AddRange(result.Diagnostics);
             directives.AddRange(result.DirectiveAddresses);
@@ -575,7 +610,7 @@ public sealed class ProgramLoader
 
     private void PrepareIsoInterface(IsoInterface moduleInterface, List<Diagnostic> diagnostics, string? fileName)
     {
-        foreach (SyntaxTerm clause in moduleInterface.Directives)
+        foreach (var clause in moduleInterface.Directives)
         {
             if (clause is not CompoundTerm { Name: ":-", Arity: 1 } directive)
             {
@@ -583,7 +618,7 @@ public sealed class ProgramLoader
                 continue;
             }
 
-            SyntaxTerm goal = directive.Arguments[0];
+            var goal = directive.Arguments[0];
             switch (goal)
             {
                 case CompoundTerm { Name: "export", Arity: 1 } export:
@@ -595,7 +630,7 @@ public sealed class ProgramLoader
                     break;
 
                 case CompoundTerm { Name: "reexport", Arity: 1 } reexport:
-                    foreach (SyntaxTerm item in Indicators(reexport.Arguments[0]))
+                    foreach (var item in Indicators(reexport.Arguments[0]))
                     {
                         if (item is AtomTerm source)
                         {
@@ -642,9 +677,9 @@ public sealed class ProgramLoader
 
     private void PredeclareIsoBody(IsoBody body, List<Diagnostic> diagnostics, string? fileName)
     {
-        foreach (SyntaxTerm clause in body.Clauses)
+        foreach (var clause in body.Clauses)
         {
-            SyntaxTerm candidate = clause;
+            var candidate = clause;
             if (clause is CompoundTerm { Name: ":-", Arity: 2 } rule)
             {
                 candidate = rule.Arguments[0];
@@ -684,9 +719,9 @@ public sealed class ProgramLoader
                 && declaration.Arity == 1
             )
             {
-                foreach (SyntaxTerm item in Indicators(declaration.Arguments[0]))
+                foreach (var item in Indicators(declaration.Arguments[0]))
                 {
-                    if (TryIndicator(item, out PredicateIndicator indicator))
+                    if (TryIndicator(item, out var indicator))
                     {
                         DefineIsoBodyPredicate(body.Module, indicator, item, diagnostics, fileName);
                     }
@@ -747,7 +782,7 @@ public sealed class ProgramLoader
     )
     {
         if (
-            _modules.Catalog.TryGet(module, out ModuleDefinition? definition)
+            _modules.Catalog.TryGet(module, out var definition)
             && definition!.Imports.ContainsKey(new ModulePredicateIndicator(indicator.Name, indicator.Arity))
         )
         {
@@ -765,7 +800,7 @@ public sealed class ProgramLoader
     private List<SyntaxTerm> PrepareIsoBody(IsoBody body, List<Diagnostic> diagnostics, string? fileName)
     {
         List<SyntaxTerm> executable = [];
-        foreach (SyntaxTerm clause in body.Clauses)
+        foreach (var clause in body.Clauses)
         {
             if (clause is CompoundTerm { Name: ":-", Arity: 1, Arguments: [CompoundTerm import] })
             {
@@ -777,7 +812,7 @@ public sealed class ProgramLoader
 
                 if (import is { Name: "import", Arity: 1 })
                 {
-                    foreach (SyntaxTerm item in Indicators(import.Arguments[0]))
+                    foreach (var item in Indicators(import.Arguments[0]))
                     {
                         if (item is AtomTerm sourceModule)
                         {
@@ -807,9 +842,9 @@ public sealed class ProgramLoader
     private void DeclareIsoExports(string module, SyntaxTerm declarations, List<Diagnostic> diagnostics, string? fileName)
     {
         List<PredicateIndicator> exports = [];
-        foreach (SyntaxTerm item in Indicators(declarations))
+        foreach (var item in Indicators(declarations))
         {
-            if (TryIndicator(item, out PredicateIndicator indicator))
+            if (TryIndicator(item, out var indicator))
             {
                 if (IsPredefinedProcedure(indicator))
                 {
@@ -848,9 +883,9 @@ public sealed class ProgramLoader
             return;
         }
 
-        foreach (SyntaxTerm item in Indicators(declarations))
+        foreach (var item in Indicators(declarations))
         {
-            if (!TryIndicator(item, out PredicateIndicator indicator))
+            if (!TryIndicator(item, out var indicator))
             {
                 ReportInvalidIsoModuleText(diagnostics, "An import must be a predicate indicator.", item, fileName);
                 continue;
@@ -862,7 +897,7 @@ public sealed class ProgramLoader
                 continue;
             }
 
-            if (!_modules.TryImport(importer, indicator, source, out string? conflict))
+            if (!_modules.TryImport(importer, indicator, source, out var conflict))
             {
                 ReportInvalidIsoModuleText(
                     diagnostics,
@@ -882,9 +917,9 @@ public sealed class ProgramLoader
             return;
         }
 
-        foreach (PredicateIndicator indicator in _modules.ExportsOf(source))
+        foreach (var indicator in _modules.ExportsOf(source))
         {
-            if (!_modules.TryImport(importer, indicator, source, out string? conflict))
+            if (!_modules.TryImport(importer, indicator, source, out var conflict))
             {
                 ReportInvalidIsoModuleText(
                     diagnostics,
@@ -916,7 +951,7 @@ public sealed class ProgramLoader
 
     private void DeclareIsoMeta(string module, SyntaxTerm declarations, List<Diagnostic> diagnostics, string? fileName)
     {
-        foreach (SyntaxTerm item in Indicators(declarations))
+        foreach (var item in Indicators(declarations))
         {
             if (item is not CompoundTerm specification)
             {
@@ -975,7 +1010,7 @@ public sealed class ProgramLoader
         bool codePoints
     )
     {
-        bool valid = directive switch
+        var valid = directive switch
         {
             { Name: "op", Arguments: [IntegerTerm priority, AtomTerm type, var names] } => priority.Value is >= 0 and <= 1200
                 && type.Name is "xfx" or "xfy" or "yfx" or "fx" or "fy" or "xf" or "yf"
@@ -1006,7 +1041,7 @@ public sealed class ProgramLoader
 
     private static IEnumerable<SyntaxTerm> OperatorNames(SyntaxTerm term)
     {
-        SyntaxTerm current = term;
+        var current = term;
         while (current is CompoundTerm { Name: ".", Arity: 2 } cons)
         {
             yield return cons.Arguments[0];
@@ -1070,7 +1105,7 @@ public sealed class ProgramLoader
             return;
         }
 
-        foreach (PredicateIndicator export in _modules.ExportsOf(unit.Module))
+        foreach (var export in _modules.ExportsOf(unit.Module))
         {
             if (!unit.Defines.Contains(export))
             {
@@ -1086,18 +1121,20 @@ public sealed class ProgramLoader
     /// <summary>Runs the first pass: declarations, and the set of predicates the unit defines.</summary>
     private void Collect(IReadOnlyList<SyntaxTerm> clauses, LoadUnit unit, List<Diagnostic> diagnostics, string? fileName)
     {
-        DoubleQuotesMode doubleQuotes = _program.Flags.DoubleQuotes;
+        var doubleQuotes = _program.Flags.DoubleQuotes;
         var firstTerm = true;
 
-        foreach (SyntaxTerm rawClause in clauses)
+        foreach (var rawClause in clauses)
         {
-            SyntaxTerm clause = TermNormalizer.Normalize(rawClause, doubleQuotes, _program.Flags.CodePointCharacters);
+            (var sourceDepth, var sourceFile) = SourceSiteOf?.Invoke(rawClause) ?? (0, fileName);
+            sourceFile ??= fileName;
+            var clause = TermNormalizer.Normalize(rawClause, doubleQuotes, _program.Flags.CodePointCharacters);
             var isFirstTerm = firstTerm;
             firstTerm = false;
 
             if (clause is CompoundTerm { Name: ":-", Arity: 1 } directive)
             {
-                SyntaxTerm goal = directive.Arguments[0];
+                var goal = directive.Arguments[0];
 
                 switch (goal)
                 {
@@ -1143,7 +1180,7 @@ public sealed class ProgramLoader
                             continue;
                         }
 
-                        UseModule(import, unit, diagnostics, fileName);
+                        UseModule(import, unit, diagnostics, sourceFile, sourceDepth);
                         continue;
 
                     case CompoundTerm { Name: "meta_predicate", Arity: 1 } meta:
@@ -1175,6 +1212,8 @@ public sealed class ProgramLoader
                             diagnostics,
                             fileName
                         );
+                        unit.Discontiguous.Add(discontiguous.Arguments[0]);
+                        AddDeclaredPredicates(discontiguous.Arguments[0], unit.Defines);
                         continue;
 
                     // A dynamic declaration changes how later clauses are stored, so it is collected
@@ -1184,9 +1223,9 @@ public sealed class ProgramLoader
 
                         // A dynamic predicate belongs to the module whether or not the file holds a
                         // clause of it, so a call to it resolves the same way as one with clauses.
-                        foreach (SyntaxTerm indicator in Indicators(dynamic.Arguments[0]))
+                        foreach (var indicator in Indicators(dynamic.Arguments[0]))
                         {
-                            if (TryIndicator(indicator, out PredicateIndicator declared))
+                            if (TryIndicator(indicator, out var declared))
                             {
                                 unit.Defines.Add(declared);
                             }
@@ -1202,7 +1241,7 @@ public sealed class ProgramLoader
                     TryDoubleQuotesDirective(
                         goal,
                         _program.LanguageMode != PrologLanguageMode.StrictIso,
-                        out DoubleQuotesMode selected
+                        out var selected
                     )
                 )
                 {
@@ -1211,11 +1250,11 @@ public sealed class ProgramLoader
                 }
 
                 SourceMap?.SetDocument(goal, SourceMap.DocumentOf(rawClause, fileName));
-                unit.Items.Add(new DirectiveItem(goal));
+                unit.Items.Add(new DirectiveItem(goal, sourceDepth, sourceFile));
                 continue;
             }
 
-            SyntaxTerm head = clause;
+            var head = clause;
             SyntaxTerm? body = null;
 
             // A grammar rule becomes an ordinary clause before anything else looks at it, so the
@@ -1226,7 +1265,7 @@ public sealed class ProgramLoader
                     GrammarHeadIsReserved(
                         grammarRule.Arguments[0],
                         _program.LanguageMode == PrologLanguageMode.StrictIso,
-                        out SyntaxTerm culprit
+                        out var culprit
                     )
                 )
                 {
@@ -1247,7 +1286,7 @@ public sealed class ProgramLoader
                         fileName,
                         _program.LanguageMode,
                         out head,
-                        out SyntaxTerm translated
+                        out var translated
                     )
                 )
                 {
@@ -1299,7 +1338,7 @@ public sealed class ProgramLoader
             unit.Items.Add(new ClauseItem(head, body));
         }
 
-        foreach (PredicateIndicator predicate in unit.Defines)
+        foreach (var predicate in unit.Defines)
         {
             _modules.Define(unit.Module, predicate);
         }
@@ -1332,7 +1371,7 @@ public sealed class ProgramLoader
     private static bool GrammarHeadIsReserved(SyntaxTerm head, bool strictIso, out SyntaxTerm culprit)
     {
         culprit = head;
-        SyntaxTerm nonTerminal = head is CompoundTerm { Name: ",", Arity: 2 } semicontext ? semicontext.Arguments[0] : head;
+        var nonTerminal = head is CompoundTerm { Name: ",", Arity: 2 } semicontext ? semicontext.Arguments[0] : head;
         culprit = nonTerminal;
 
         return nonTerminal switch
@@ -1347,7 +1386,7 @@ public sealed class ProgramLoader
     }
 
     /// <summary>Loads an <c>ensure_loaded/1</c> declaration once, relative to its source unit.</summary>
-    private void EnsureLoaded(CompoundTerm declaration, List<Diagnostic> diagnostics, string? fileName)
+    private void EnsureLoaded(CompoundTerm declaration, List<Diagnostic> diagnostics, string? fileName, int sourceDepth)
     {
         if (declaration.Arguments[0] is not AtomTerm file)
         {
@@ -1374,9 +1413,29 @@ public sealed class ProgramLoader
             return;
         }
 
+        if (
+            sourceDepth >= PrologEngine.MaxSourceChainDepth
+            && (_program.RuntimeCompiler is not PrologEngine engine || engine.NeedsEnsureLoaded(path))
+        )
+        {
+            ReportSourceDepthExceeded(diagnostics, "ensure_loaded", file, fileName);
+            return;
+        }
+
         try
         {
-            _program.RuntimeCompiler.EnsureLoadedFile(_machine, path);
+            if (_program.RuntimeCompiler is PrologEngine prologEngine)
+            {
+                var dependency = prologEngine.EnsureLoadedDependency(_machine, path, sourceDepth + 1);
+                if (dependency is { Success: false })
+                {
+                    diagnostics.AddRange(dependency.Diagnostics);
+                }
+            }
+            else
+            {
+                _program.RuntimeCompiler.EnsureLoadedFile(_machine, path);
+            }
         }
         catch (PrologException exception)
         {
@@ -1386,9 +1445,9 @@ public sealed class ProgramLoader
 
     private static void AddDeclaredPredicates(SyntaxTerm declarations, HashSet<PredicateIndicator> defines)
     {
-        foreach (SyntaxTerm item in Indicators(declarations))
+        foreach (var item in Indicators(declarations))
         {
-            if (TryIndicator(item, out PredicateIndicator indicator))
+            if (TryIndicator(item, out var indicator))
             {
                 defines.Add(indicator);
             }
@@ -1403,7 +1462,7 @@ public sealed class ProgramLoader
         string? fileName
     )
     {
-        foreach (SyntaxTerm item in Indicators(declarations))
+        foreach (var item in Indicators(declarations))
         {
             if (TryIndicator(item, out _))
             {
@@ -1437,9 +1496,9 @@ public sealed class ProgramLoader
         unit.Module = name.Name;
         List<PredicateIndicator> exports = [];
 
-        foreach (SyntaxTerm export in Indicators(declaration.Arguments[1]))
+        foreach (var export in Indicators(declaration.Arguments[1]))
         {
-            if (TryIndicator(export, out PredicateIndicator indicator))
+            if (TryIndicator(export, out var indicator))
             {
                 exports.Add(indicator);
                 continue;
@@ -1458,7 +1517,7 @@ public sealed class ProgramLoader
     }
 
     /// <summary>Loads the file a <c>use_module</c> names and imports what it exports.</summary>
-    private void UseModule(CompoundTerm import, LoadUnit unit, List<Diagnostic> diagnostics, string? fileName)
+    private void UseModule(CompoundTerm import, LoadUnit unit, List<Diagnostic> diagnostics, string? fileName, int sourceDepth)
     {
         string? path;
         string sourceName;
@@ -1499,6 +1558,11 @@ public sealed class ProgramLoader
         }
 
         var loaded = _modules.LoadedModuleOf(path);
+        if (_program.RuntimeCompiler is PrologEngine prologEngine && prologEngine.HasFailedSource(path))
+        {
+            loaded = null;
+        }
+
         if (loaded is null)
         {
             if (_program.RuntimeCompiler is null || _machine is null)
@@ -1513,8 +1577,27 @@ public sealed class ProgramLoader
                 return;
             }
 
+            if (sourceDepth >= PrologEngine.MaxSourceChainDepth)
+            {
+                ReportSourceDepthExceeded(diagnostics, "use_module", import, fileName);
+                return;
+            }
+
             _modules.BeginLoad(path);
-            _program.RuntimeCompiler.ConsultFile(_machine, path);
+            if (_program.RuntimeCompiler is PrologEngine engine)
+            {
+                var dependency = engine.ConsultDependency(path, sourceDepth + 1);
+                if (!dependency.Success)
+                {
+                    diagnostics.AddRange(dependency.Diagnostics);
+                    return;
+                }
+            }
+            else
+            {
+                _program.RuntimeCompiler.ConsultFile(_machine, path);
+            }
+
             loaded = _modules.LoadedModuleOf(path) ?? ModuleTable.UserModule;
         }
 
@@ -1525,9 +1608,9 @@ public sealed class ProgramLoader
         if (import.Arity == 2)
         {
             List<PredicateIndicator> listed = [];
-            foreach (SyntaxTerm item in Indicators(import.Arguments[1]))
+            foreach (var item in Indicators(import.Arguments[1]))
             {
-                if (TryIndicator(item, out PredicateIndicator indicator))
+                if (TryIndicator(item, out var indicator))
                 {
                     listed.Add(indicator);
                     continue;
@@ -1545,7 +1628,7 @@ public sealed class ProgramLoader
             wanted = listed;
         }
 
-        foreach (PredicateIndicator indicator in wanted)
+        foreach (var indicator in wanted)
         {
             if (!_modules.Exports(loaded, indicator))
             {
@@ -1593,7 +1676,7 @@ public sealed class ProgramLoader
 
     private void DeclareMeta(SyntaxTerm specification, List<Diagnostic> diagnostics, string? fileName)
     {
-        foreach (SyntaxTerm item in Indicators(specification))
+        foreach (var item in Indicators(specification))
         {
             if (item is not CompoundTerm spec)
             {
@@ -1641,7 +1724,7 @@ public sealed class ProgramLoader
     {
         HashSet<int> declared = [];
 
-        foreach (SyntaxTerm indicators in unit.Dynamic)
+        foreach (var indicators in unit.Dynamic)
         {
             DeclareDynamic(indicators, declared, diagnostics, fileName, unit.Module);
         }
@@ -1653,11 +1736,11 @@ public sealed class ProgramLoader
     /// <summary>Validates and persists the unit's static multifile declarations.</summary>
     private void DeclareMultifilePredicates(LoadUnit unit, List<Diagnostic> diagnostics, string? fileName)
     {
-        foreach (SyntaxTerm declarations in unit.Multifile)
+        foreach (var declarations in unit.Multifile)
         {
-            foreach (SyntaxTerm item in Indicators(declarations))
+            foreach (var item in Indicators(declarations))
             {
-                if (!TryIndicator(item, out PredicateIndicator indicator))
+                if (!TryIndicator(item, out var indicator))
                 {
                     Report(
                         diagnostics,
@@ -1680,12 +1763,12 @@ public sealed class ProgramLoader
         switch (term)
         {
             case CompoundTerm { Name: ",", Arity: 2 } sequence:
-                foreach (SyntaxTerm item in Indicators(sequence.Arguments[0]))
+                foreach (var item in Indicators(sequence.Arguments[0]))
                 {
                     yield return item;
                 }
 
-                foreach (SyntaxTerm item in Indicators(sequence.Arguments[1]))
+                foreach (var item in Indicators(sequence.Arguments[1]))
                 {
                     yield return item;
                 }
@@ -1695,7 +1778,7 @@ public sealed class ProgramLoader
             case CompoundTerm { Name: ".", Arity: 2 } cons:
                 yield return cons.Arguments[0];
 
-                foreach (SyntaxTerm item in Indicators(cons.Arguments[1]))
+                foreach (var item in Indicators(cons.Arguments[1]))
                 {
                     yield return item;
                 }
@@ -1750,6 +1833,8 @@ public sealed class ProgramLoader
 
         internal List<SyntaxTerm> Multifile { get; } = [];
 
+        internal List<SyntaxTerm> Discontiguous { get; } = [];
+
         internal List<LoadItem> Items { get; } = [];
     }
 
@@ -1775,7 +1860,7 @@ public sealed class ProgramLoader
 
     private sealed record ClauseItem(SyntaxTerm Head, SyntaxTerm? Body) : LoadItem;
 
-    private sealed record DirectiveItem(SyntaxTerm Goal) : LoadItem;
+    private sealed record DirectiveItem(SyntaxTerm Goal, int SourceDepth, string? SourceFile) : LoadItem;
 
     /// <summary>
     /// Applies a valid <c>double_quotes</c> directive while collecting, because it changes how
@@ -1819,9 +1904,9 @@ public sealed class ProgramLoader
         string module
     )
     {
-        foreach (SyntaxTerm term in Indicators(indicators))
+        foreach (var term in Indicators(indicators))
         {
-            if (!TryIndicator(term, out PredicateIndicator indicator))
+            if (!TryIndicator(term, out var indicator))
             {
                 Report(
                     diagnostics,
@@ -1862,13 +1947,13 @@ public sealed class ProgramLoader
         IReadOnlySet<int> unitDefinitions
     )
     {
-        DynamicPredicate predicate = _program.DeclareDynamic(functorId, _userPredicates);
-        Machine machine = _machine!;
+        var predicate = _program.DeclareDynamic(functorId, _userPredicates);
+        var machine = _machine!;
         var rule = _program.Symbols.InternFunctor(":-", 2);
 
         for (var index = 0; index < clauses.Count; index++)
         {
-            (SyntaxTerm head, SyntaxTerm? body) = clauses[index];
+            (var head, var body) = clauses[index];
             var compiler = new ClauseCompiler(
                 _program,
                 _program.ReuseDynamicCode ? null : _constants,
@@ -1889,13 +1974,13 @@ public sealed class ProgramLoader
             {
                 // retract/1 matches against the clause as a term, so keep a detached copy of it.
                 Dictionary<string, Cell> variables = [];
-                Cell headCell = TermReifier.ToHeap(machine, storedClauses[index].Head, variables);
-                Cell bodyCell = storedClauses[index].Body is null
+                var headCell = TermReifier.ToHeap(machine, storedClauses[index].Head, variables);
+                var bodyCell = storedClauses[index].Body is null
                     ? Cell.Atom(machine.Symbols.True)
                     : TermReifier.ToHeap(machine, storedClauses[index].Body!, variables);
 
                 var term = new TermBuffer();
-                Cell clause = machine.CreateStructure(rule, [headCell, bodyCell]);
+                var clause = machine.CreateStructure(rule, [headCell, bodyCell]);
                 var root = term.Copy(machine, DatabaseBuiltins.NormalizeClause(machine, clause));
 
                 predicate.Append(
@@ -1918,6 +2003,20 @@ public sealed class ProgramLoader
         }
     }
 
+    private static void ReportSourceDepthExceeded(
+        List<Diagnostic> diagnostics,
+        string directive,
+        SyntaxTerm location,
+        string? fileName
+    ) =>
+        Report(
+            diagnostics,
+            PrologEngine.SourceChainDepthExceeded,
+            $"Source dependency chain at {directive}/1 exceeds the maximum depth of {PrologEngine.MaxSourceChainDepth}.",
+            location.Span,
+            fileName
+        );
+
     private static void Report(List<Diagnostic> diagnostics, string id, string message, SourceSpan span, string? fileName) =>
         diagnostics.Add(new Diagnostic(id, DiagnosticSeverity.Error, message, span, fileName));
 
@@ -1938,7 +2037,7 @@ public sealed class ProgramLoader
             return null;
         }
 
-        SyntaxTerm inner = timed.Arguments[0];
+        var inner = timed.Arguments[0];
         return when.Name switch
         {
             "now" => (inner, false),
@@ -1963,7 +2062,7 @@ public sealed class ProgramLoader
     )
     {
         deferred = goal is CompoundTerm { Name: "initialization", Arity: 1 };
-        SyntaxTerm actual = deferred ? ((CompoundTerm)goal).Arguments[0] : goal;
+        var actual = deferred ? ((CompoundTerm)goal).Arguments[0] : goal;
 
         var compiler = new ClauseCompiler(
             _program,
@@ -1992,6 +2091,11 @@ public sealed class ProgramLoader
         }
 
         var entry = _program.CodeLength;
+        if (clauses.Count == 0)
+        {
+            _program.Emit(OpCode.Fail);
+        }
+
         var pendingAlternative = -1;
         var compiler = new ClauseCompiler(
             _program,
@@ -2055,7 +2159,7 @@ public sealed class ProgramLoader
             sourceMap: SourceMap
         );
 
-        foreach ((SyntaxTerm head, SyntaxTerm? body) in clauses)
+        foreach ((var head, var body) in clauses)
         {
             var address = compiler.Compile(head, body);
             if (address < 0)
@@ -2121,7 +2225,7 @@ public sealed class ProgramLoader
 
     private PredicateIndicator SourceIndicatorOf(string module, int functorId)
     {
-        Functor functor = _program.Symbols.GetFunctor(functorId);
+        var functor = _program.Symbols.GetFunctor(functorId);
         var compiledName = _program.Symbols.AtomName(functor.NameAtom);
         var sourceName = module == ModuleTable.UserModule ? compiledName : compiledName[(module.Length + 1)..];
         return new PredicateIndicator(sourceName, functor.Arity);

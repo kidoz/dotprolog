@@ -15,12 +15,19 @@ namespace DotProlog.Compiler;
 public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler, IDisposable
 {
     private const int ControlGoalCacheLimit = 1024;
+    internal const int MaxSourceChainDepth = 64;
+    internal const string SourceChainDepthExceeded = "DPL1020";
 
     private readonly ModuleTable _modules;
     private readonly List<int> _pendingDirectives = [];
     private readonly List<int> _pendingInitialization = [];
+    private int _pendingMainInitialization = -1;
+    private List<int>? _generatedInitialization;
+    private List<int>? _generatedMainInitialization;
+    private Action<int>? _generatedDirectiveObserver;
     private readonly HashSet<string> _loadedSourceFiles = new(PathComparer);
     private readonly HashSet<string> _loadingSourceFiles = new(PathComparer);
+    private readonly HashSet<string> _failedSourceFiles = new(PathComparer);
     private readonly Dictionary<string, (int Address, int ArgumentCount)> _controlGoals = new(StringComparer.Ordinal);
     private bool _preparationHalted;
 
@@ -60,7 +67,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
     /// <summary>Compiles one of the built-in libraries, which must not fail.</summary>
     private void LoadLibrary(string source, string name)
     {
-        LoadResult loaded = new ProgramLoader(Program, Machine, _modules, userPredicates: false).Load(
+        var loaded = new ProgramLoader(Program, Machine, _modules, userPredicates: false).Load(
             ReadOrThrow(source, name),
             name
         );
@@ -73,7 +80,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
 
     private IReadOnlyList<SyntaxTerm> ReadOrThrow(string source, string fileName)
     {
-        ParseResult parsed = TermReader.ReadProgram(
+        var parsed = TermReader.ReadProgram(
             source,
             fileName,
             Program.Operators,
@@ -135,24 +142,43 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
     public LoadResult ConsultFile(string path)
     {
         ArgumentNullException.ThrowIfNull(path);
+        return ConsultFile(path, 0);
+    }
+
+    private LoadResult ConsultFile(string path, int sourceDepth)
+    {
         var absolute = Path.GetFullPath(path);
-        LoadResult loaded = ConsultText(File.ReadAllText(absolute), absolute);
+        _failedSourceFiles.Remove(absolute);
+        var loaded = ConsultText(File.ReadAllText(absolute), absolute, sourceDepth);
         if (loaded.Success)
         {
             _loadedSourceFiles.Add(absolute);
+        }
+        else if (!_loadedSourceFiles.Contains(absolute))
+        {
+            _failedSourceFiles.Add(absolute);
         }
 
         return loaded;
     }
 
+    internal LoadResult ConsultDependency(string path, int sourceDepth) => ConsultFile(path, sourceDepth);
+
+    internal bool HasFailedSource(string path) => _failedSourceFiles.Contains(path);
+
+    internal bool NeedsEnsureLoaded(string path) => !_loadedSourceFiles.Contains(path) && !_loadingSourceFiles.Contains(path);
+
     /// <summary>Reads and compiles <paramref name="text"/> as a Prolog source unit.</summary>
     /// <param name="text">Prolog source.</param>
     /// <param name="fileName">File name used in diagnostics, when known.</param>
-    public LoadResult ConsultText(string text, string? fileName = null)
+    public LoadResult ConsultText(string text, string? fileName = null) => ConsultText(text, fileName, 0);
+
+    private LoadResult ConsultText(string text, string? fileName, int sourceDepth)
     {
         ArgumentNullException.ThrowIfNull(text);
 
-        ParseResult parsed = ReadProgramWithIncludes(text, fileName);
+        var sourceSites = new SourceLoadContext();
+        var parsed = ReadProgramWithIncludes(text, fileName, sourceDepth, sourceSites);
         if (!parsed.Success)
         {
             return new LoadResult(parsed.Diagnostics, [], []);
@@ -161,8 +187,13 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
         var loader = new ProgramLoader(Program, Machine, _modules, userPredicates: true, libraryFiles: LibraryFiles)
         {
             SourceMap = SourceMap,
+            SourceSiteOf = sourceSites.SiteOf,
         };
-        LoadResult loaded = loader.Load(parsed.Clauses, fileName, Machine.IsRunning ? null : ExecutePreparationDirective);
+        Func<int, RunResult>? directiveExecutor =
+            Machine.IsRunning ? null
+            : _generatedDirectiveObserver is not null ? ObserveGeneratedDirective
+            : ExecutePreparationDirective;
+        var loaded = loader.Load(parsed.Clauses, fileName, directiveExecutor);
         List<Diagnostic> diagnostics = [.. parsed.Diagnostics, .. loaded.Diagnostics];
 
         // Which module a file declared is what use_module/1 needs to know when it is imported later.
@@ -175,8 +206,20 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
 
         if (loaded.Success)
         {
-            _pendingDirectives.AddRange(loaded.DirectiveAddresses);
-            _pendingInitialization.AddRange(loaded.InitializationAddresses);
+            if (_generatedInitialization is null)
+            {
+                _pendingDirectives.AddRange(loaded.DirectiveAddresses);
+                EnqueueInitialization(loaded.InitializationAddresses, loader.MainInitializationAddress);
+            }
+            else
+            {
+                CollectGeneratedInitialization(
+                    loaded.InitializationAddresses,
+                    loader.MainInitializationAddress,
+                    _generatedInitialization,
+                    _generatedMainInitialization!
+                );
+            }
         }
 
         return new LoadResult(diagnostics, loaded.DirectiveAddresses, loaded.InitializationAddresses);
@@ -184,42 +227,113 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
 
     /// <summary>
     /// Compiles a build-time source while reporting each executable directive at its publication
-    /// point. The generated-C# backend uses the snapshots to reproduce source preparation at
-    /// application startup.
+    /// point. Generated backends use the snapshots to reproduce source preparation at application
+    /// startup.
     /// </summary>
-    internal LoadResult CompileForGeneratedCode(string text, string? fileName, Action<int> directiveObserver)
+    internal LoadResult CompileForGeneratedCode(
+        string text,
+        string? fileName,
+        Action<int> directiveObserver,
+        List<int> initialization,
+        List<int> mainInitialization
+    )
     {
         ArgumentNullException.ThrowIfNull(text);
         ArgumentNullException.ThrowIfNull(directiveObserver);
+        ArgumentNullException.ThrowIfNull(initialization);
+        ArgumentNullException.ThrowIfNull(mainInitialization);
 
-        ParseResult parsed = ReadProgramWithIncludes(text, fileName);
+        var sourceSites = new SourceLoadContext();
+        var parsed = ReadProgramWithIncludes(text, fileName, 0, sourceSites);
         if (!parsed.Success)
         {
             return new LoadResult(parsed.Diagnostics, [], []);
         }
 
-        var loader = new ProgramLoader(Program, Machine, _modules, userPredicates: true, libraryFiles: LibraryFiles)
+        var previousObserver = _generatedDirectiveObserver;
+        var previousInitialization = _generatedInitialization;
+        var previousMain = _generatedMainInitialization;
+        _generatedDirectiveObserver = directiveObserver;
+        _generatedInitialization = initialization;
+        _generatedMainInitialization = mainInitialization;
+        try
         {
-            SourceMap = SourceMap,
-        };
-        LoadResult loaded = loader.Load(
-            parsed.Clauses,
-            fileName,
-            address =>
+            var loader = new ProgramLoader(Program, Machine, _modules, userPredicates: true, libraryFiles: LibraryFiles)
             {
-                directiveObserver(address);
-                return RunResult.Success;
+                SourceMap = SourceMap,
+                SourceSiteOf = sourceSites.SiteOf,
+            };
+            var loaded = loader.Load(parsed.Clauses, fileName, ObserveGeneratedDirective);
+            List<Diagnostic> diagnostics = [.. parsed.Diagnostics, .. loaded.Diagnostics];
+            if (loaded.Success)
+            {
+                CollectGeneratedInitialization(
+                    loaded.InitializationAddresses,
+                    loader.MainInitializationAddress,
+                    initialization,
+                    mainInitialization
+                );
             }
-        );
-        List<Diagnostic> diagnostics = [.. parsed.Diagnostics, .. loaded.Diagnostics];
-        return new LoadResult(diagnostics, loaded.DirectiveAddresses, loaded.InitializationAddresses);
+
+            return new LoadResult(diagnostics, loaded.DirectiveAddresses, loaded.InitializationAddresses);
+        }
+        finally
+        {
+            _generatedDirectiveObserver = previousObserver;
+            _generatedInitialization = previousInitialization;
+            _generatedMainInitialization = previousMain;
+        }
+    }
+
+    private RunResult ObserveGeneratedDirective(int address)
+    {
+        _generatedDirectiveObserver!(address);
+        return RunResult.Success;
+    }
+
+    private void EnqueueInitialization(IReadOnlyList<int> addresses, int main)
+    {
+        foreach (var address in addresses)
+        {
+            if (address != main)
+            {
+                _pendingInitialization.Add(address);
+            }
+        }
+
+        if (main >= 0)
+        {
+            _pendingMainInitialization = main;
+        }
+    }
+
+    private static void CollectGeneratedInitialization(
+        IReadOnlyList<int> addresses,
+        int main,
+        List<int> initialization,
+        List<int> mainInitialization
+    )
+    {
+        foreach (var address in addresses)
+        {
+            if (address != main)
+            {
+                initialization.Add(address);
+            }
+        }
+
+        if (main >= 0)
+        {
+            mainInitialization.Clear();
+            mainInitialization.Add(main);
+        }
     }
 
     /// <summary>
     /// Reads a source unit while expanding ISO <c>include/1</c> declarations at their source
     /// position. All nested readers share the program's reader state.
     /// </summary>
-    private ParseResult ReadProgramWithIncludes(string text, string? fileName)
+    private ParseResult ReadProgramWithIncludes(string text, string? fileName, int sourceDepth, SourceLoadContext sourceSites)
     {
         HashSet<string> active = new(PathComparer);
         var moduleReaderState = new IsoModuleReaderState(Program);
@@ -231,14 +345,14 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
 
         try
         {
-            return ReadSource(text, fileName);
+            return ReadSource(text, fileName, sourceDepth);
         }
         finally
         {
             moduleReaderState.Complete();
         }
 
-        ParseResult ReadSource(string source, string? sourceName)
+        ParseResult ReadSource(string source, string? sourceName, int depth)
         {
             SourceMap?.Register(sourceName, source);
             return TermReader.ReadProgram(
@@ -247,9 +361,10 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
                 Program.Operators,
                 Program.CharacterConversions,
                 Program.Flags,
-                clause => ExpandInclude(clause, sourceName),
+                clause => ExpandInclude(clause, sourceName, depth),
                 clause =>
                 {
+                    sourceSites.Register(clause, depth, sourceName);
                     SourceMap?.SetDocument(clause, sourceName);
                     moduleReaderState.AtBoundary(clause);
                 },
@@ -257,7 +372,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
             );
         }
 
-        ParseResult? ExpandInclude(SyntaxTerm clause, string? includingFile)
+        ParseResult? ExpandInclude(SyntaxTerm clause, string? includingFile, int includingDepth)
         {
             if (
                 clause is not CompoundTerm { Name: ":-", Arity: 1 } directive
@@ -300,7 +415,17 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
 
             try
             {
-                return ReadSource(File.ReadAllText(path), path);
+                if (includingDepth >= MaxSourceChainDepth)
+                {
+                    return IncludeError(
+                        SourceChainDepthExceeded,
+                        $"Source dependency chain exceeds the maximum depth of {MaxSourceChainDepth}.",
+                        file.Span,
+                        includingFile
+                    );
+                }
+
+                return ReadSource(File.ReadAllText(path), path, includingDepth + 1);
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
@@ -316,6 +441,16 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
                 active.Remove(path);
             }
         }
+    }
+
+    private sealed class SourceLoadContext
+    {
+        private readonly Dictionary<SyntaxTerm, (int Depth, string? FileName)> _sites = new(ReferenceEqualityComparer.Instance);
+
+        internal void Register(SyntaxTerm clause, int depth, string? fileName) => _sites[clause] = (depth, fileName);
+
+        internal (int Depth, string? FileName) SiteOf(SyntaxTerm clause) =>
+            _sites.TryGetValue(clause, out var site) ? site : (0, null);
     }
 
     /// <summary>Switches the shared lexer state at ISO interface and body boundaries.</summary>
@@ -372,7 +507,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
                         return;
                     }
 
-                    if (_program.Modules.TryGet(_activeModule, out ModuleDefinition? enclosing))
+                    if (_program.Modules.TryGet(_activeModule, out var enclosing))
                     {
                         enclosing!.SeedReaderState(_program.Operators, _program.CharacterConversions, _program.Flags);
                     }
@@ -384,7 +519,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
                     CaptureRoot();
                 }
 
-                ModuleDefinition startDefinition = _program.Modules.Declare(startName.Name);
+                var startDefinition = _program.Modules.Declare(startName.Name);
                 if (marker.Name == "module")
                 {
                     startDefinition.SeedReaderState(_rootOperators, _rootConversions, _rootFlags);
@@ -408,7 +543,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
             if (
                 marker is { Name: "end_module" or "end_body", Arity: 1, Arguments: [AtomTerm endName] }
                 && _activeModule == endName.Name
-                && _program.Modules.TryGet(endName.Name, out ModuleDefinition? endDefinition)
+                && _program.Modules.TryGet(endName.Name, out var endDefinition)
             )
             {
                 if (!_inInterface)
@@ -417,9 +552,9 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
                 }
 
                 _inInterface = false;
-                if (_enclosingModules.TryPop(out string? enclosingModule))
+                if (_enclosingModules.TryPop(out var enclosingModule))
                 {
-                    ModuleDefinition enclosing = _program.Modules.Declare(enclosingModule);
+                    var enclosing = _program.Modules.Declare(enclosingModule);
                     enclosing.RecordPreparedBody();
                     Install(enclosing);
                     _activeModule = enclosingModule;
@@ -495,7 +630,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
         private void StartImplicitUserBody()
         {
             CaptureRoot();
-            ModuleDefinition user = _program.Modules.Declare(ModuleTable.UserModule);
+            var user = _program.Modules.Declare(ModuleTable.UserModule);
             if (_startedBodies.Add(ModuleTable.UserModule))
             {
                 user.SeedReaderState(_rootOperators, _rootConversions, _rootFlags);
@@ -531,7 +666,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
                 return;
             }
 
-            ModuleDefinition user = _program.Modules.Declare(ModuleTable.UserModule);
+            var user = _program.Modules.Declare(ModuleTable.UserModule);
             user.SeedReaderState(_rootOperators, _rootConversions, _rootFlags);
             user.RecordPreparedBody();
             user.SeedReaderState(_program.Operators, _program.CharacterConversions, _program.Flags);
@@ -542,7 +677,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
 
         private void CloseImplicitUserBody()
         {
-            ModuleDefinition user = _program.Modules.Declare(ModuleTable.UserModule);
+            var user = _program.Modules.Declare(ModuleTable.UserModule);
             user.SeedReaderState(_program.Operators, _program.CharacterConversions, _program.Flags);
             CaptureRoot();
             _activeModule = null;
@@ -636,7 +771,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
     /// <exception cref="PrologException">The source did not compile.</exception>
     public void ConsultOrThrow(string text, string fileName)
     {
-        LoadResult loaded = ConsultText(text, fileName);
+        var loaded = ConsultText(text, fileName);
         if (!loaded.Success)
         {
             throw new PrologException($"{fileName} did not compile: {string.Join("; ", loaded.Diagnostics)}");
@@ -658,24 +793,35 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
         if (_preparationHalted)
         {
             _preparationHalted = false;
-            _pendingDirectives.Clear();
-            _pendingInitialization.Clear();
+            ClearPendingGoals();
             return RunResult.Halted;
         }
 
-        while (_pendingDirectives.Count > 0 || _pendingInitialization.Count > 0)
+        while (_pendingDirectives.Count > 0 || _pendingInitialization.Count > 0 || _pendingMainInitialization >= 0)
         {
             var directive = _pendingDirectives.Count > 0;
-            List<int> queue = directive ? _pendingDirectives : _pendingInitialization;
-            var address = queue[0];
-            queue.RemoveAt(0);
-            var waiting = _pendingInitialization.Count;
+            int address;
+            if (directive)
+            {
+                address = _pendingDirectives[0];
+                _pendingDirectives.RemoveAt(0);
+            }
+            else if (_pendingInitialization.Count > 0)
+            {
+                address = _pendingInitialization[0];
+                _pendingInitialization.RemoveAt(0);
+            }
+            else
+            {
+                address = _pendingMainInitialization;
+                _pendingMainInitialization = -1;
+            }
 
-            RunResult result = Machine.Run(address);
+            var waiting = _pendingInitialization.Count;
+            var result = Machine.Run(address);
             if (result == RunResult.Halted)
             {
-                _pendingDirectives.Clear();
-                _pendingInitialization.Clear();
+                ClearPendingGoals();
                 return result;
             }
 
@@ -687,7 +833,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
             var queued = _pendingInitialization.Count - waiting;
             if (queued > 0)
             {
-                List<int> consulted = _pendingInitialization.GetRange(waiting, queued);
+                var consulted = _pendingInitialization.GetRange(waiting, queued);
                 _pendingInitialization.RemoveRange(waiting, queued);
                 _pendingInitialization.InsertRange(0, consulted);
             }
@@ -696,9 +842,76 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
         return RunResult.Success;
     }
 
+    /// <summary>Runs one generated source-position directive and any goals queued by runtime consultation.</summary>
+    /// <remarks>Generated-code contract. Failure retains the ordinary directive warning policy.</remarks>
+    public RunResult RunPreparationDirective(int address)
+    {
+        var result = ExecutePreparationDirective(address);
+        if (result == RunResult.Halted)
+        {
+            return result;
+        }
+
+        var pending = RunPendingGoals();
+        if (pending == RunResult.Halted)
+        {
+            _preparationHalted = true;
+        }
+
+        return pending == RunResult.Halted ? pending : result;
+    }
+
+    /// <summary>Runs generated initialization goals and drains goals queued by runtime consultation.</summary>
+    /// <remarks>
+    /// Generated-code contract. Initialization failure stops the sequence; halt stops it immediately and
+    /// preserves the requested exit code. Ordinary consulted initialization keeps
+    /// <see cref="RunPendingGoals"/>'s warning-and-continue policy.
+    /// </remarks>
+    public RunResult RunInitializers(IReadOnlyList<int> initialization)
+    {
+        ArgumentNullException.ThrowIfNull(initialization);
+        var pending = RunPendingGoals();
+        if (pending == RunResult.Halted)
+        {
+            return pending;
+        }
+
+        foreach (var target in initialization)
+        {
+            var result = Machine.Run(target);
+            if (result != RunResult.Halted)
+            {
+                pending = RunPendingGoals();
+                if (pending == RunResult.Halted)
+                {
+                    result = pending;
+                }
+            }
+
+            if (result != RunResult.Success)
+            {
+                if (result == RunResult.Halted)
+                {
+                    ClearPendingGoals();
+                }
+
+                return result;
+            }
+        }
+
+        return RunResult.Success;
+    }
+
+    private void ClearPendingGoals()
+    {
+        _pendingDirectives.Clear();
+        _pendingInitialization.Clear();
+        _pendingMainInitialization = -1;
+    }
+
     private RunResult ExecutePreparationDirective(int address)
     {
-        RunResult result = Machine.Run(address);
+        var result = Machine.Run(address);
         if (result == RunResult.Failure)
         {
             Output.Write("Warning: directive failed.\n");
@@ -722,7 +935,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
     {
         ArgumentNullException.ThrowIfNull(goalText);
 
-        ParseResult parsed = ReadTerm(goalText);
+        var parsed = ReadTerm(goalText);
         if (!parsed.Success || parsed.Clauses.Count == 0)
         {
             diagnostics = parsed.Diagnostics;
@@ -750,15 +963,15 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
     {
         ArgumentNullException.ThrowIfNull(goalText);
 
-        ParseResult parsed = ReadTerm(goalText);
+        var parsed = ReadTerm(goalText);
         if (!parsed.Success || parsed.Clauses.Count == 0)
         {
             throw new PrologException($"The goal did not parse: {string.Join("; ", parsed.Diagnostics)}");
         }
 
-        SyntaxTerm goal = parsed.Clauses[0];
+        var goal = parsed.Clauses[0];
         var names = CollectVariableNames(goal);
-        SyntaxTerm body = goal;
+        var body = goal;
 
         if (names.Length > 0)
         {
@@ -795,7 +1008,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
 
         while (pending.Count > 0)
         {
-            SyntaxTerm term = pending[^1];
+            var term = pending[^1];
             pending.RemoveAt(pending.Count - 1);
 
             switch (term)
@@ -854,9 +1067,9 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
     {
         ArgumentNullException.ThrowIfNull(machine);
 
-        var key = ControlGoalKey(machine, goal, out List<Cell> goalVariables);
+        var key = ControlGoalKey(machine, goal, out var goalVariables);
 
-        if (_controlGoals.TryGetValue(key, out (int Address, int ArgumentCount) cached))
+        if (_controlGoals.TryGetValue(key, out var cached))
         {
             for (var i = 0; i < cached.ArgumentCount; i++)
             {
@@ -868,7 +1081,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
         }
 
         var variables = new Dictionary<string, Cell>(StringComparer.Ordinal);
-        SyntaxTerm body = TermReifier.ToControlSyntax(machine, goal, variables);
+        var body = TermReifier.ToControlSyntax(machine, goal, variables);
         var names = CollectVariableNames(body);
 
         if (names.Length >= Machine.ArgumentRegisterCount || names.Length > arguments.Length)
@@ -896,7 +1109,15 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
 
         if (address < 0)
         {
-            throw new PrologException($"The meta-called control term did not compile: {string.Join("; ", diagnostics)}");
+            if (
+                diagnostics.Any(diagnostic => diagnostic.Id == CompilerDiagnosticIds.StrictIsoViolation)
+                && StrictControlError(machine, body) is { } strictError
+            )
+            {
+                throw strictError;
+            }
+
+            throw PrologErrors.Type(machine, "callable", goal);
         }
 
         if (_controlGoals.Count < ControlGoalCacheLimit)
@@ -905,6 +1126,43 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
         }
 
         return address;
+    }
+
+    private PrologException? StrictControlError(Machine machine, SyntaxTerm goal)
+    {
+        List<SyntaxTerm> pending = [goal];
+        while (pending.Count > 0)
+        {
+            var current = pending[^1];
+            pending.RemoveAt(pending.Count - 1);
+            if (current is not (AtomTerm or CompoundTerm))
+            {
+                continue;
+            }
+
+            var name = current is AtomTerm atom ? atom.Name : ((CompoundTerm)current).Name;
+            var arity = current is CompoundTerm compound ? compound.Arity : 0;
+            var functor = Program.Symbols.InternFunctor(name, arity);
+            if (name == "*->" && arity == 2 || Program.IsStrictIsoExtension(functor))
+            {
+                return PrologErrors.Permission(machine, "access", "implementation_specific_feature", functor);
+            }
+
+            if (current is not CompoundTerm control || name == "call")
+            {
+                continue;
+            }
+
+            if ((arity == 2 && name is "," or ";" or "->" or "*->") || (arity == 1 && name == "\\+"))
+            {
+                for (var i = control.Arity - 1; i >= 0; i--)
+                {
+                    pending.Add(control.Arguments[i]);
+                }
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -930,7 +1188,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
 
         while (work.Count > 0)
         {
-            (Cell source, var position) = work[^1];
+            (var source, var position) = work[^1];
             work.RemoveAt(work.Count - 1);
 
             if (position == LeavingPosition)
@@ -940,7 +1198,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
                 continue;
             }
 
-            Cell cell = machine.Dereference(source);
+            var cell = machine.Dereference(source);
             switch (cell.Tag)
             {
                 case CellTag.Reference:
@@ -986,7 +1244,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
                     }
 
                     var functorId = machine.HeapAt(cell.Index).Index;
-                    Functor functor = machine.Symbols.GetFunctor(functorId);
+                    var functor = machine.Symbols.GetFunctor(functorId);
                     var name = machine.Symbols.AtomName(functor.NameAtom);
                     var control =
                         (functor.Arity == 2 && name is "," or ";" or "->" or "*->") || (functor.Arity == 1 && name == "\\+");
@@ -1051,13 +1309,13 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
         // The clause is inspected as cells before it is reified, because an error raised here has
         // to name the offending part of the term the program passed, and catch/3 can only unify
         // against a term the machine built.
-        Cell whole = machine.Dereference(clause);
+        var whole = machine.Dereference(clause);
         if (whole.Tag == CellTag.Reference)
         {
             throw PrologErrors.Instantiation(machine);
         }
 
-        Cell headCell = whole;
+        var headCell = whole;
         Cell bodyCell = default;
         var hasBody = false;
         var rule2 = machine.Symbols.InternFunctor(":-", 2);
@@ -1084,8 +1342,8 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
             throw PrologErrors.Type(machine, "callable", bodyCell);
         }
 
-        SyntaxTerm term = TermReifier.ToSyntax(machine, clause);
-        SyntaxTerm head = term;
+        var term = TermReifier.ToSyntax(machine, clause);
+        var head = term;
         SyntaxTerm? body = null;
         List<Diagnostic> diagnostics = [];
 
@@ -1100,7 +1358,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
                     null,
                     Program.LanguageMode,
                     out head,
-                    out SyntaxTerm translated
+                    out var translated
                 )
             )
             {
@@ -1115,7 +1373,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
             body = rule.Arguments[1];
         }
 
-        string compiledHeadName = head switch
+        var compiledHeadName = head switch
         {
             AtomTerm atom => atom.Name,
             CompoundTerm compound => compound.Name,
@@ -1124,9 +1382,9 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
         var moduleSeparator = compiledHeadName.LastIndexOf(':');
         if (moduleSeparator > 0)
         {
-            string module = compiledHeadName[..moduleSeparator];
-            string sourceName = compiledHeadName[(moduleSeparator + 1)..];
-            int arity = head is CompoundTerm compound ? compound.Arity : 0;
+            var module = compiledHeadName[..moduleSeparator];
+            var sourceName = compiledHeadName[(moduleSeparator + 1)..];
+            var arity = head is CompoundTerm compound ? compound.Arity : 0;
             var indicator = new PredicateIndicator(sourceName, arity);
             _modules.Define(module, indicator);
             if (body is not null)
@@ -1171,7 +1429,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
         var resolved =
             ResolveSourcePath(path, null)
             ?? throw ExistenceError(machine, "source_sink", Cell.Atom(machine.Symbols.InternAtom(path)));
-        LoadResult loaded = ConsultFile(resolved);
+        var loaded = ConsultFile(resolved);
         if (!loaded.Success)
         {
             throw SyntaxError(machine, $"{resolved}: {string.Join("; ", loaded.Diagnostics)}");
@@ -1179,7 +1437,18 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
     }
 
     /// <inheritdoc />
-    public void EnsureLoadedFile(Machine machine, string path)
+    public void EnsureLoadedFile(Machine machine, string path) => EnsureLoadedFile(machine, path, 0);
+
+    internal void EnsureLoadedFile(Machine machine, string path, int sourceDepth)
+    {
+        var loaded = EnsureLoadedDependency(machine, path, sourceDepth);
+        if (loaded is { Success: false })
+        {
+            throw SyntaxError(machine, $"{path}: {string.Join("; ", loaded.Diagnostics)}");
+        }
+    }
+
+    internal LoadResult? EnsureLoadedDependency(Machine machine, string path, int sourceDepth)
     {
         ArgumentNullException.ThrowIfNull(machine);
         ArgumentNullException.ThrowIfNull(path);
@@ -1189,16 +1458,12 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
             ?? throw ExistenceError(machine, "source_sink", Cell.Atom(machine.Symbols.InternAtom(path)));
         if (_loadedSourceFiles.Contains(resolved) || !_loadingSourceFiles.Add(resolved))
         {
-            return;
+            return null;
         }
 
         try
         {
-            LoadResult loaded = ConsultFile(resolved);
-            if (!loaded.Success)
-            {
-                throw SyntaxError(machine, $"{resolved}: {string.Join("; ", loaded.Diagnostics)}");
-            }
+            return ConsultFile(resolved, sourceDepth);
         }
         finally
         {
@@ -1259,29 +1524,73 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
         variables = Cell.Atom(machine.Symbols.EmptyList);
         singletons = Cell.Atom(machine.Symbols.EmptyList);
 
-        var end = ClauseScanner.FindClauseEnd(buffer, characterConversions, flags);
-        while (end < 0)
+        var incremental = new IncrementalTermInput(buffer, characterConversions, flags);
+        while (true)
         {
-            var chunk = ReadLinePreservingTerminator(input);
-            if (chunk is null)
+            var end = incremental.FindClauseEnd();
+            if (end >= 0)
             {
-                // What is left at end of input is either nothing, which is end_of_file, or a clause
-                // missing its terminator. Reading the incomplete text as if it were whole would
-                // quietly return a prefix of what the file says.
-                var blank = ClauseScanner.IsBlank(buffer, characterConversions, flags);
-                buffer = string.Empty;
-
-                return blank ? false : throw SyntaxError(machine, "unexpected_end_of_file");
+                var text = incremental.Take(end, out buffer);
+                return ReifyReadTerm(
+                    machine,
+                    text,
+                    operators,
+                    characterConversions,
+                    flags,
+                    out term,
+                    out variableNames,
+                    out variables,
+                    out singletons
+                );
             }
 
-            buffer += chunk;
-            end = ClauseScanner.FindClauseEnd(buffer, characterConversions, flags);
+            var chunk = ReadLinePreservingTerminator(input);
+            if (chunk is not null)
+            {
+                incremental.Append(chunk);
+                continue;
+            }
+
+            end = incremental.FindClauseEndAtEndOfInput();
+            if (end >= 0)
+            {
+                var text = incremental.Take(end, out buffer);
+                return ReifyReadTerm(
+                    machine,
+                    text,
+                    operators,
+                    characterConversions,
+                    flags,
+                    out term,
+                    out variableNames,
+                    out variables,
+                    out singletons
+                );
+            }
+
+            // What is left at end of input is either nothing, which is end_of_file, or a clause
+            // missing its terminator. Reading the incomplete text as if it were whole would
+            // quietly return a prefix of what the file says.
+            var blank = ClauseScanner.IsBlank(incremental.RemainingText(), characterConversions, flags);
+            buffer = string.Empty;
+
+            return blank ? false : throw SyntaxError(machine, "unexpected_end_of_file");
         }
+    }
 
-        var text = buffer[..end];
-        buffer = buffer[end..];
-
-        ParseResult parsed = TermReader.ReadTerm(
+    private static bool ReifyReadTerm(
+        Machine machine,
+        string text,
+        OperatorTable operators,
+        CharacterConversionTable characterConversions,
+        PrologFlags flags,
+        out Cell term,
+        out Cell variableNames,
+        out Cell variables,
+        out Cell singletons
+    )
+    {
+        var parsed = TermReader.ReadTerm(
             text,
             operators: operators,
             characterConversions: characterConversions,
@@ -1311,11 +1620,11 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
         List<Cell> pairs = [];
         List<Cell> singletonPairs = [];
         var equals = machine.Symbols.InternFunctor("=", 2);
-        foreach (NamedVariable named in CollectNamedVariables(parsed.Clauses[0]))
+        foreach (var named in CollectNamedVariables(parsed.Clauses[0]))
         {
-            if (namedVariables.TryGetValue(named.Name, out Cell variable))
+            if (namedVariables.TryGetValue(named.Name, out var variable))
             {
-                Cell pair = machine.CreateStructure(equals, [Cell.Atom(machine.Symbols.InternAtom(named.Name)), variable]);
+                var pair = machine.CreateStructure(equals, [Cell.Atom(machine.Symbols.InternAtom(named.Name)), variable]);
                 pairs.Add(pair);
 
                 if (named.Count == 1)
@@ -1329,6 +1638,435 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
         variables = machine.CreateList(variableOrder.ToArray(), Cell.Atom(machine.Symbols.EmptyList));
         singletons = machine.CreateList(singletonPairs.ToArray(), Cell.Atom(machine.Symbols.EmptyList));
         return true;
+    }
+
+    private sealed class IncrementalTermInput
+    {
+        private const string SymbolCharacters = "+-*/\\^<>=~:.?@#&$";
+
+        private readonly System.Text.StringBuilder _text = new();
+        private readonly CharacterConversionTable _characterConversions;
+        private readonly PrologFlags _flags;
+        private int _position;
+        private ScanState _state;
+        private char _quote;
+        private int _numberStart;
+
+        internal IncrementalTermInput(string text, CharacterConversionTable characterConversions, PrologFlags flags)
+        {
+            _text.Append(text);
+            _characterConversions = characterConversions;
+            _flags = flags;
+        }
+
+        internal void Append(string text) => _text.Append(text);
+
+        internal string RemainingText() => _text.ToString();
+
+        internal string Take(int end, out string remainder)
+        {
+            remainder = _text.ToString(end, _text.Length - end);
+            return _text.ToString(0, end);
+        }
+
+        internal int FindClauseEndAtEndOfInput()
+        {
+            var end = FindClauseEnd();
+            return end >= 0 ? end : ClauseScanner.FindClauseEnd(_text.ToString(), _characterConversions, _flags);
+        }
+
+        internal int FindClauseEnd()
+        {
+            while (_position < _text.Length)
+            {
+                switch (_state)
+                {
+                    case ScanState.Quoted:
+                        if (ReadQuotedCharacter())
+                        {
+                            continue;
+                        }
+
+                        return -1;
+
+                    case ScanState.QuoteEscape:
+                        _position++;
+                        _state = ScanState.Quoted;
+                        continue;
+
+                    case ScanState.LineComment:
+                    {
+                        var code = ConvertedAt(_position, out var width);
+                        if (width == 0)
+                        {
+                            return -1;
+                        }
+
+                        _position += width;
+                        if (code == '\n')
+                        {
+                            _state = ScanState.Normal;
+                        }
+
+                        continue;
+                    }
+
+                    case ScanState.BlockComment:
+                    {
+                        var code = ConvertedAt(_position, out var width);
+                        if (width == 0)
+                        {
+                            return -1;
+                        }
+
+                        if (code == '*')
+                        {
+                            if (!TryConvertedAt(_position + width, out var next, out var nextWidth) || nextWidth == 0)
+                            {
+                                return -1;
+                            }
+
+                            if (next == '/')
+                            {
+                                _position += width + nextWidth;
+                                _state = ScanState.Normal;
+                                continue;
+                            }
+                        }
+
+                        _position += width;
+                        continue;
+                    }
+
+                    case ScanState.CharacterCode:
+                        if (ReadCharacterCode())
+                        {
+                            continue;
+                        }
+
+                        return -1;
+
+                    case ScanState.CharacterCodeEscape:
+                        _position++;
+                        _state = ScanState.Normal;
+                        continue;
+
+                    case ScanState.Number:
+                    {
+                        var code = ConvertedAt(_position, out var width);
+                        if (code == '.')
+                        {
+                            if (!TryConvertedAt(_position + width, out var next, out _) || next < 0)
+                            {
+                                return -1;
+                            }
+
+                            if (next is >= '0' and <= '9')
+                            {
+                                _position += width;
+                                continue;
+                            }
+
+                            _state = ScanState.Symbol;
+                            continue;
+                        }
+
+                        if (_text[_position] == '\'' && _position == _numberStart + 1 && ConvertedAt(_numberStart, out _) == '0')
+                        {
+                            if (!TryCharacterCodeStart(_position, out var starts))
+                            {
+                                return -1;
+                            }
+
+                            if (starts)
+                            {
+                                _position++;
+                                _state = ScanState.CharacterCode;
+                                continue;
+                            }
+                        }
+
+                        if (code is >= '0' and <= '9' || code == '_' || code is >= 'A' and <= 'Z' || code is >= 'a' and <= 'z')
+                        {
+                            _position += width;
+                            continue;
+                        }
+
+                        _state = ScanState.Normal;
+                        continue;
+                    }
+
+                    case ScanState.Symbol:
+                    {
+                        var code = ConvertedAt(_position, out var width);
+                        if (!IsSymbol(code))
+                        {
+                            _state = ScanState.Normal;
+                            continue;
+                        }
+
+                        if (code != '.')
+                        {
+                            _position += width;
+                            continue;
+                        }
+
+                        if (!TryConvertedAt(_position + width, out var next, out var nextWidth) || nextWidth == 0)
+                        {
+                            return -1;
+                        }
+
+                        if (!IsSymbol(next) && (IsLayout(next) || next == '%'))
+                        {
+                            var candidate = _position + width;
+                            var confirmed = ClauseScanner.FindClauseEnd(_text.ToString(), _characterConversions, _flags);
+                            if (confirmed >= 0)
+                            {
+                                return confirmed;
+                            }
+
+                            _position = candidate;
+                            _state = ScanState.Normal;
+                            continue;
+                        }
+
+                        _position += width;
+                        continue;
+                    }
+
+                    default:
+                    {
+                        var code = ConvertedAt(_position, out var width);
+                        if (width == 0)
+                        {
+                            return -1;
+                        }
+
+                        if (IsLayout(code))
+                        {
+                            _position += width;
+                            continue;
+                        }
+
+                        if (code == '%')
+                        {
+                            _position += width;
+                            _state = ScanState.LineComment;
+                            continue;
+                        }
+
+                        if (code == '/')
+                        {
+                            if (!TryConvertedAt(_position + width, out var next, out var nextWidth) || nextWidth == 0)
+                            {
+                                return -1;
+                            }
+
+                            if (next == '*')
+                            {
+                                _position += width + nextWidth;
+                                _state = ScanState.BlockComment;
+                                continue;
+                            }
+                        }
+
+                        var raw = _text[_position];
+                        if (raw is '\'' or '"' or '`')
+                        {
+                            _position++;
+                            _quote = raw;
+                            _state = ScanState.Quoted;
+                            continue;
+                        }
+
+                        if (code is >= '0' and <= '9')
+                        {
+                            _numberStart = _position;
+                            _position += width;
+                            _state = ScanState.Number;
+                            continue;
+                        }
+
+                        if (IsSymbol(code))
+                        {
+                            _state = ScanState.Symbol;
+                            continue;
+                        }
+
+                        _position += width;
+                        continue;
+                    }
+                }
+            }
+
+            return -1;
+        }
+
+        private bool ReadQuotedCharacter()
+        {
+            var current = _text[_position];
+            if (current == '\\')
+            {
+                _position++;
+                _state = ScanState.QuoteEscape;
+                return true;
+            }
+
+            if (current != _quote)
+            {
+                _position++;
+                return true;
+            }
+
+            if (_position + 1 >= _text.Length)
+            {
+                return false;
+            }
+
+            if (_text[_position + 1] == _quote)
+            {
+                _position += 2;
+                return true;
+            }
+
+            _position++;
+            _state = ScanState.Normal;
+            return true;
+        }
+
+        private bool ReadCharacterCode()
+        {
+            var current = _text[_position];
+            if (current == '\'')
+            {
+                if (_position + 1 >= _text.Length)
+                {
+                    return false;
+                }
+
+                _position += 2;
+                _state = ScanState.Normal;
+                return true;
+            }
+
+            if (current == '\\')
+            {
+                _position++;
+                _state = ScanState.CharacterCodeEscape;
+                return true;
+            }
+
+            var width =
+                _flags.CodePointCharacters
+                && char.IsHighSurrogate(current)
+                && _position + 1 < _text.Length
+                && char.IsLowSurrogate(_text[_position + 1])
+                    ? 2
+                    : 1;
+            _position += width;
+            _state = ScanState.Normal;
+            return true;
+        }
+
+        private bool TryCharacterCodeStart(int quote, out bool starts)
+        {
+            starts = false;
+            if (quote + 1 >= _text.Length)
+            {
+                return false;
+            }
+
+            var next = _text[quote + 1];
+            if (next is not ('\'' or '\\'))
+            {
+                starts = true;
+                return true;
+            }
+
+            if (quote + 2 >= _text.Length)
+            {
+                return false;
+            }
+
+            starts = next == '\'' ? _text[quote + 2] == '\'' : _text[quote + 2] != '\n';
+            return true;
+        }
+
+        private int ConvertedAt(int position, out int width)
+        {
+            TryConvertedAt(position, out var code, out width);
+            return code;
+        }
+
+        private bool TryConvertedAt(int position, out int code, out int width)
+        {
+            code = -1;
+            width = 1;
+            if (position < 0 || position >= _text.Length)
+            {
+                return false;
+            }
+
+            var current = _text[position];
+            code = current;
+            if (current is '\'' or '"' or '`')
+            {
+                return true;
+            }
+
+            if (_flags.CodePointCharacters && char.IsHighSurrogate(current))
+            {
+                if (position + 1 >= _text.Length)
+                {
+                    width = 0;
+                    return true;
+                }
+
+                if (char.IsLowSurrogate(_text[position + 1]))
+                {
+                    code = char.ConvertToUtf32(current, _text[position + 1]);
+                    width = 2;
+                }
+            }
+
+            if (_flags.CodePointCharacters && char.IsSurrogate(current))
+            {
+                return true;
+            }
+
+            if (_flags.CharConversion)
+            {
+                code = _characterConversions.Convert(code);
+            }
+
+            return true;
+        }
+
+        private bool IsLayout(int code) =>
+            code >= 0
+            && (
+                _flags.CodePointCharacters
+                    ? code <= char.MaxValue
+                        ? char.IsWhiteSpace((char)code)
+                        : System.Text.Rune.IsWhiteSpace(new System.Text.Rune(code))
+                    : code is ' ' or '\t' or '\n' or '\v' or '\f' or '\r'
+            );
+
+        private static bool IsSymbol(int code) =>
+            code >= 0 && code <= char.MaxValue && SymbolCharacters.Contains((char)code, StringComparison.Ordinal);
+
+        private enum ScanState
+        {
+            Normal,
+            Quoted,
+            QuoteEscape,
+            LineComment,
+            BlockComment,
+            Number,
+            CharacterCode,
+            CharacterCodeEscape,
+            Symbol,
+        }
     }
 
     private static string? ReadLinePreservingTerminator(TextReader input)
@@ -1358,24 +2096,24 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
     /// </summary>
     private static PrologException SyntaxError(Machine machine, string what)
     {
-        Cell formal = machine.CreateStructure(
+        var formal = machine.CreateStructure(
             machine.Symbols.InternFunctor("syntax_error", 1),
             [Cell.Atom(machine.Symbols.InternAtom(what))]
         );
 
-        Cell error = machine.CreateStructure(machine.Symbols.InternFunctor("error", 2), [formal, machine.CreateVariable()]);
+        var error = machine.CreateStructure(machine.Symbols.InternFunctor("error", 2), [formal, machine.CreateVariable()]);
         return machine.CreateBall(error, $"syntax_error({what})");
     }
 
     /// <summary>Builds a catchable <c>error(existence_error(Kind, Culprit), _)</c>.</summary>
     private static PrologException ExistenceError(Machine machine, string kind, Cell culprit)
     {
-        Cell formal = machine.CreateStructure(
+        var formal = machine.CreateStructure(
             machine.Symbols.InternFunctor("existence_error", 2),
             [Cell.Atom(machine.Symbols.InternAtom(kind)), culprit]
         );
 
-        Cell error = machine.CreateStructure(machine.Symbols.InternFunctor("error", 2), [formal, machine.CreateVariable()]);
+        var error = machine.CreateStructure(machine.Symbols.InternFunctor("error", 2), [formal, machine.CreateVariable()]);
         return machine.CreateBall(error, $"existence_error({kind}, {TermWriter.ToDisplayString(machine, culprit)})");
     }
 }
