@@ -38,7 +38,7 @@ public sealed class DynamicCodeReclamationTests
         var goal = engine.CompileGoal("item(live), marker(314159)", out var diagnostics);
         Assert.Empty(diagnostics);
         engine.Machine.BeginCall();
-        Cell clause = PrologInput
+        var clause = PrologInput
             .Compound(":-", PrologInput.Atom("raw"), PrologInput.Compound("marker", PrologInput.Integer(314159)))
             .Build(engine.Machine);
         var raw = engine.CompileClause(engine.Machine, clause, out _);
@@ -53,6 +53,46 @@ public sealed class DynamicCodeReclamationTests
             Assert.Equal(RunResult.Success, engine.Machine.Run(raw));
             Assert.Equal(code, engine.Program.CodeLength);
             Assert.Equal(constants, engine.Program.ConstantCount);
+        }
+    }
+
+    [Fact]
+    public void DisposingHostEnumerationEarlyReleasesDynamicClausesAndPermitsReuse()
+    {
+        using var engine = new PrologEngine();
+        engine.ConsultOrThrow(
+            """
+            :- dynamic p/1.
+            p(first). p(second).
+            replace :- retractall(p(_)), assertz(p(new)).
+            """,
+            "reader.pl"
+        );
+        var host = new PrologHost(engine.Machine);
+        var p = host.Bind("p", 1);
+        var reader = host.CallAll(p, PrologInput.Output).GetEnumerator();
+        Assert.True(reader.MoveNext());
+        Assert.Equal("first", Assert.Single(reader.Current).ToString());
+
+        reader.Dispose();
+
+        Assert.False(engine.Machine.HasAlternatives);
+        Assert.True(host.Prove(host.Bind("replace", 0)));
+        Assert.Equal("new", Assert.Single(host.CallOnce(p, PrologInput.Output)!).ToString());
+        Assert.True(host.Prove(host.Bind("replace", 0)));
+        var code = engine.Program.CodeLength;
+        var constants = engine.Program.ConstantCount;
+        for (var i = 0; i < 10; i++)
+        {
+            Assert.True(host.Prove(host.Bind("replace", 0)));
+            Assert.True(
+                engine.Program.CodeLength <= code,
+                $"Code grew from {code} to {engine.Program.CodeLength} after the abandoned reader was disposed."
+            );
+            Assert.True(
+                engine.Program.ConstantCount <= constants,
+                $"Constants grew from {constants} to {engine.Program.ConstantCount} after the abandoned reader was disposed."
+            );
         }
     }
 
@@ -100,7 +140,7 @@ public sealed class DynamicCodeReclamationTests
     public void FailedCompilationOrPublicationDoesNotConsumePrivateCodeOrConstants(PrologLanguageMode mode, string assertion)
     {
         using var engine = new PrologEngine(mode);
-        engine.ConsultOrThrow($"fixed(1). attempt :- catch({assertion}, error(_, _), true).", "failure.pl");
+        engine.ConsultOrThrow($"fixed(1). attempt :- catch({assertion}, error(_, _), true).\n", "failure.pl");
         var host = new PrologHost(engine.Machine);
         var attempt = host.Bind("attempt", 0);
         var code = engine.Program.CodeLength;
@@ -131,7 +171,7 @@ public sealed class DynamicCodeReclamationTests
             "self.pl"
         );
         var host = new PrologHost(engine.Machine);
-        PrologValue result = Assert.Single(host.CallOnce(host.Bind("self", 1), PrologInput.Output)!);
+        var result = Assert.Single(host.CallOnce(host.Bind("self", 1), PrologInput.Output)!);
         Assert.Equal("old", result.ToString());
         Assert.False(host.Prove(host.Bind("self", 1), PrologInput.Output));
         Assert.Equal("old", result.ToString());

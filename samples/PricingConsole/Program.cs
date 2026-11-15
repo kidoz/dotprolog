@@ -15,7 +15,7 @@ internal static class Program
 {
     private static void Main()
     {
-        IPricingModule pricing = PricingModule.Create();
+        using var pricing = PricingModule.Create();
 
         // det: one solution, one output.
         Console.WriteLine($"100 less 15% = {pricing.Discount(100.0, 15)}");
@@ -32,7 +32,7 @@ internal static class Program
 
         // nondet: every solution, streamed as the loop pulls them.
         Console.WriteLine("bundles of [widget, gadget]:");
-        foreach (IReadOnlyList<string> bundle in pricing.Bundle(["widget", "gadget"]))
+        foreach (var bundle in pricing.Bundle(["widget", "gadget"]))
         {
             Console.WriteLine($"  [{string.Join(", ", bundle)}]");
         }

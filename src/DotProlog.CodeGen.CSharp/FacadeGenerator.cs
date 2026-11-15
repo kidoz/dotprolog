@@ -103,7 +103,8 @@ public static class FacadeGenerator
             languageMode,
             flagOverrides,
             out diagnostics,
-            libraryFiles
+            libraryFiles,
+            contract.Exports
         );
         if (diagnostics.Any(diagnostic => diagnostic.Severity == DotProlog.Syntax.DiagnosticSeverity.Error))
         {
@@ -117,7 +118,7 @@ public static class FacadeGenerator
 
     private static void AppendResultTypes(StringBuilder text, ModuleContract contract)
     {
-        foreach (ContractExport export in contract.Exports.Where(e => e.Outputs.Count() > 1))
+        foreach (var export in contract.Exports.Where(e => e.Outputs.Count() > 1))
         {
             var members = string.Join(", ", export.Outputs.Select(output => $"{output.Type.ClrTypeName} {Pascal(output.Name)}"));
 
@@ -136,10 +137,13 @@ public static class FacadeGenerator
             CultureInfo.InvariantCulture,
             $"/// <summary>The Prolog module <c>{contract.ClrTypeName}</c>, callable from .NET.</summary>"
         );
-        text.AppendLine(CultureInfo.InvariantCulture, $"public partial interface I{contract.ClrTypeName}Module");
+        text.AppendLine(
+            CultureInfo.InvariantCulture,
+            $"public partial interface I{contract.ClrTypeName}Module : global::System.IDisposable"
+        );
         text.AppendLine("{");
 
-        foreach (ContractExport export in contract.Exports)
+        foreach (var export in contract.Exports)
         {
             text.AppendLine(
                 CultureInfo.InvariantCulture,
@@ -169,13 +173,14 @@ public static class FacadeGenerator
             $"/// <summary>The generated implementation of <see cref=\"I{type}\"/>.</summary>"
         );
         text.AppendLine(
-            "/// <remarks>An instance owns a machine, so it runs one call at a time and is not thread-safe.</remarks>"
+            "/// <remarks>An instance runs one call at a time and is not thread-safe. Only Create() transfers engine ownership to the facade.</remarks>"
         );
         text.AppendLine(CultureInfo.InvariantCulture, $"public sealed partial class {type} : I{type}");
         text.AppendLine("{");
         text.AppendLine("    private readonly global::DotProlog.Runtime.PrologHost _host;");
+        text.AppendLine("    private global::DotProlog.Compiler.PrologEngine? _ownedEngine;");
 
-        foreach (ContractExport export in contract.Exports)
+        foreach (var export in contract.Exports.DistinctBy(export => (export.PredicateName, export.Arity)))
         {
             text.AppendLine(
                 CultureInfo.InvariantCulture,
@@ -184,11 +189,15 @@ public static class FacadeGenerator
         }
 
         text.AppendLine();
-        text.AppendLine(CultureInfo.InvariantCulture, $"    private {type}(global::DotProlog.Compiler.PrologEngine engine)");
+        text.AppendLine(
+            CultureInfo.InvariantCulture,
+            $"    private {type}(global::DotProlog.Compiler.PrologEngine engine, bool ownsEngine)"
+        );
         text.AppendLine("    {");
         text.AppendLine("        _host = new global::DotProlog.Runtime.PrologHost(engine.Machine);");
+        text.AppendLine("        _ownedEngine = ownsEngine ? engine : null;");
 
-        foreach (ContractExport export in contract.Exports)
+        foreach (var export in contract.Exports)
         {
             text.AppendLine(
                 CultureInfo.InvariantCulture,
@@ -205,25 +214,54 @@ public static class FacadeGenerator
             CultureInfo.InvariantCulture,
             $"        var engine = new global::DotProlog.Compiler.PrologEngine({FlagOverridesSyntax.EngineArguments(languageMode, flagOverrides)});"
         );
-        text.AppendLine("        return Create(engine);");
+        text.AppendLine("        try");
+        text.AppendLine("        {");
+        text.AppendLine("            return Create(engine, ownsEngine: true);");
+        text.AppendLine("        }");
+        text.AppendLine("        catch");
+        text.AppendLine("        {");
+        text.AppendLine("            engine.Dispose();");
+        text.AppendLine("            throw;");
+        text.AppendLine("        }");
         text.AppendLine("    }");
         text.AppendLine();
-        text.AppendLine("    /// <summary>Loads the module into an existing engine.</summary>");
+        text.AppendLine("    /// <summary>Loads the module into an existing engine, which remains caller-owned.</summary>");
         text.AppendLine(
             CultureInfo.InvariantCulture,
             $"    public static I{type} Create(global::DotProlog.Compiler.PrologEngine engine)"
         );
         text.AppendLine("    {");
         text.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(engine);");
+        text.AppendLine("        return Create(engine, ownsEngine: false);");
+        text.AppendLine("    }");
+        text.AppendLine();
+        text.AppendLine(
+            CultureInfo.InvariantCulture,
+            $"    private static I{type} Create(global::DotProlog.Compiler.PrologEngine engine, bool ownsEngine)"
+        );
+        text.AppendLine("    {");
+        text.AppendLine("        global::DotProlog.Generated.ForeignPredicateRegistry.Register(engine.Program.Builtins);");
         text.AppendLine("        int[] initialization = __CompiledModule.Install(engine);");
-        text.AppendLine("        foreach (int target in initialization)");
+        text.AppendLine("        global::DotProlog.Runtime.RunResult result = engine.RunInitializers(initialization);");
+        text.AppendLine("        if (result != global::DotProlog.Runtime.RunResult.Success)");
         text.AppendLine("        {");
-        text.AppendLine("            engine.Machine.Run(target);");
+        text.AppendLine(
+            "            throw new global::DotProlog.Runtime.PrologException(result == global::DotProlog.Runtime.RunResult.Halted ? $\"Initialization halted with exit code {engine.Machine.ExitCode}.\" : \"Initialization failed.\");"
+        );
         text.AppendLine("        }");
-        text.AppendLine(CultureInfo.InvariantCulture, $"        return new {type}(engine);");
+        text.AppendLine(CultureInfo.InvariantCulture, $"        return new {type}(engine, ownsEngine);");
+        text.AppendLine("    }");
+        text.AppendLine();
+        text.AppendLine(
+            "    /// <summary>Disposes the fresh engine created by <see cref=\"Create()\"/>, if this instance owns one.</summary>"
+        );
+        text.AppendLine("    public void Dispose()");
+        text.AppendLine("    {");
+        text.AppendLine("        _ownedEngine?.Dispose();");
+        text.AppendLine("        _ownedEngine = null;");
         text.AppendLine("    }");
 
-        foreach (ContractExport export in contract.Exports)
+        foreach (var export in contract.Exports)
         {
             text.AppendLine();
             AppendMethod(text, export);
@@ -257,7 +295,7 @@ public static class FacadeGenerator
         {
             text.AppendLine(
                 CultureInfo.InvariantCulture,
-                $"        foreach (global::DotProlog.Runtime.PrologValue[] __outputs in _host.CallAll({call}))"
+                $"        foreach (global::DotProlog.Runtime.PrologValue[] __outputs in _host.CallAll({Field(export)}, cancellationToken{(arguments.Length == 0 ? string.Empty : ", " + arguments)}))"
             );
             text.AppendLine("        {");
             text.AppendLine("            cancellationToken.ThrowIfCancellationRequested();");
@@ -313,7 +351,7 @@ public static class FacadeGenerator
     {
         var wrote = false;
 
-        foreach (ContractArgument input in export.Inputs.Where(input => IsReferenceType(input.Type)))
+        foreach (var input in export.Inputs.Where(input => IsReferenceType(input.Type)))
         {
             text.AppendLine(
                 CultureInfo.InvariantCulture,
@@ -409,31 +447,12 @@ public static class FacadeGenerator
 
     private static string Lower(Determinism determinism) => determinism.ToString().ToLowerInvariant();
 
-    /// <summary>Turns a Prolog identifier such as <c>in_stock</c> into <c>InStock</c>.</summary>
-    private static string Pascal(string name)
-    {
-        var text = new StringBuilder(name.Length);
-        var upper = true;
-
-        foreach (var c in name)
-        {
-            if (c == '_')
-            {
-                upper = true;
-                continue;
-            }
-
-            text.Append(upper ? char.ToUpperInvariant(c) : c);
-            upper = false;
-        }
-
-        return text.Length == 0 ? "Predicate" : text.ToString();
-    }
+    private static string Pascal(string name) => SyntaxFacts.Pascal(name);
 
     /// <summary>A parameter or local name, escaped with <c>@</c> when it collides with a keyword.</summary>
     private static string Camel(string name)
     {
-        var camel = LowerFirst(Pascal(name));
+        var camel = SyntaxFacts.Camel(name);
         return SyntaxFacts.IsKeyword(camel) ? "@" + camel : camel;
     }
 

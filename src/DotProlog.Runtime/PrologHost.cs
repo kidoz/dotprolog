@@ -6,7 +6,7 @@ namespace DotProlog.Runtime;
 /// <remarks>
 /// <para>
 /// This is the surface a generated facade sits on. It deliberately says nothing about determinism:
-/// the caller picks <see cref="Prove(PrologPredicate, PrologInput[])"/>, <see cref="CallOnce(PrologPredicate, PrologInput[])"/>, or <see cref="CallAll"/> according to
+/// the caller picks <see cref="Prove(PrologPredicate, PrologInput[])"/>, <see cref="CallOnce(PrologPredicate, PrologInput[])"/>, or <see cref="CallAll(PrologPredicate, CancellationToken, PrologInput[])"/> according to
 /// the contract, and the facade's signature follows from that choice.
 /// </para>
 /// <para>
@@ -79,7 +79,7 @@ public sealed class PrologHost
     {
         ValidateArguments(predicate, arguments.Length);
         Span<Cell> cells = stackalloc Cell[arguments.Length];
-        RunResult result = Start(predicate, arguments, cells);
+        var result = Start(predicate, arguments, cells);
         return result == RunResult.Success ? ReadOutputs(arguments, cells) : null;
     }
 
@@ -87,14 +87,51 @@ public sealed class PrologHost
     /// Calls the predicate and yields the output values of every solution, resuming the engine only
     /// as the consumer asks for the next one.
     /// </summary>
-    public IEnumerable<PrologValue[]> CallAll(PrologPredicate predicate, params PrologInput[] arguments)
-    {
-        RunResult result = Start(predicate, arguments, out Cell[] cells);
+    public IEnumerable<PrologValue[]> CallAll(PrologPredicate predicate, params PrologInput[] arguments) =>
+        CallAll(predicate, CancellationToken.None, arguments);
 
-        while (result == RunResult.Success)
+    /// <summary>
+    /// Calls the predicate with cooperative cancellation and yields every solution on demand.
+    /// Disposing the enumerator before exhaustion discards the remaining call state.
+    /// </summary>
+    public IEnumerable<PrologValue[]> CallAll(
+        PrologPredicate predicate,
+        CancellationToken cancellationToken,
+        params PrologInput[] arguments
+    )
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        var previousToken = _machine.CancellationToken;
+        var callStarted = false;
+        var completed = false;
+        _machine.CancellationToken = cancellationToken;
+        try
         {
-            yield return ReadOutputs(arguments, cells);
-            result = _machine.Redo();
+            cancellationToken.ThrowIfCancellationRequested();
+            callStarted = true;
+            var result = Start(predicate, arguments, out var cells);
+
+            while (result == RunResult.Success)
+            {
+                yield return ReadOutputs(arguments, cells);
+                result = _machine.Redo();
+            }
+
+            completed = true;
+        }
+        finally
+        {
+            try
+            {
+                if (callStarted && !completed)
+                {
+                    _machine.BeginCall();
+                }
+            }
+            finally
+            {
+                _machine.CancellationToken = previousToken;
+            }
         }
     }
 
@@ -131,7 +168,7 @@ public sealed class PrologHost
     private PrologValue[] ReadOutputs(ReadOnlySpan<PrologInput> arguments, ReadOnlySpan<Cell> cells)
     {
         var count = 0;
-        foreach (PrologInput argument in arguments)
+        foreach (var argument in arguments)
         {
             if (argument.IsOutput)
             {

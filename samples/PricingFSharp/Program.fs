@@ -6,7 +6,7 @@ open PricingRules
 /// assembly and needs nothing language-specific to consume.
 [<EntryPoint>]
 let main _ =
-    let pricing = PricingModule.Create()
+    use pricing = PricingModule.Create()
 
     printfn "F#: 100 less 15%% = %g" (pricing.Discount(100.0, 15L))
     printfn "F#: tier of 1200 is %s" (pricing.Tier 1200L)

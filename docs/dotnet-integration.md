@@ -60,7 +60,10 @@ PrologValue[]? result = host.CallOnce(
 | `CallAll` | Lazy sequence of output-value arrays, one per solution |
 
 These methods do not validate a determinism declaration. Generated facades select the call shape
-from the `.dpli` contract.
+from the `.dpli` contract. Streaming facade methods and the token-aware `CallAll` overload observe
+cooperative cancellation before the first solution and while resuming for later solutions. Disposing
+an enumerator before exhaustion discards the remaining call state and permits immediate engine reuse.
+Cancellation cannot interrupt arbitrary blocking foreign code.
 
 ## Define a `.dplproj` library
 
@@ -92,11 +95,43 @@ The contract assigns CLR types, argument modes, and determinism:
 The SDK generates an interface and implementation during the build:
 
 ```csharp
-IPricingModule pricing = PricingModule.Create();
+using IPricingModule pricing = PricingModule.Create();
 
 double result = pricing.Discount(100.0, 15);
 bool found = pricing.InCatalogue("widget");
 ```
+
+## Write a C# foreign predicate
+
+A `.dplproj` automatically includes the foreign-predicate incremental generator; no additional
+package or `Analyzer` item is required. Mark a non-generic public or internal static method with
+`PrologPredicate`. It returns `bool` for success or failure and accepts a `ref PrologContext` followed
+by exactly `Arity` `Cell` arguments:
+
+```csharp
+using DotProlog.Runtime;
+
+internal static class CustomerPredicates
+{
+    [PrologPredicate(Module = "customer", Name = "write_customer", Arity = 1)]
+    internal static bool WriteCustomer(ref PrologContext context, Cell customer)
+    {
+        context.Machine.Output.WriteLine(context.Format(customer));
+        return true;
+    }
+}
+```
+
+This example registers `customer:write_customer/1`; omit `Module` for an unqualified predicate.
+`PrologContext.Machine` exposes the current engine operations, including unification, and `Format`
+renders a cell with the program's current operators. Cells and the context belong to the active call;
+do not retain them after returning. Foreign code does not make an engine re-entrant or thread-safe.
+
+Only deterministic (`det`) foreign predicates are supported. Invalid signatures, invalid names or
+arities, duplicate registrations, and unsupported determinism produce positioned `DPL4001`–`DPL4004`
+build diagnostics. Generated applications and facade `Create` paths install the static registry before
+module installation and initialization. Registration uses direct delegates, not runtime reflection or
+assembly scanning, and works for both compiled predicates and bytecode consulted at run time.
 
 ## Reference Prolog from another .NET language
 
@@ -107,7 +142,10 @@ Consumers reference a `.dplproj` as an ordinary project:
 ```
 
 The generated facade is ordinary .NET code, so C#, F#, and Visual Basic consume the same assembly.
-The repository exercises all three languages against `samples/PricingRules`.
+The repository exercises all three languages against `samples/PricingRules`. Generated module
+interfaces implement `IDisposable`. Parameterless `Create()` transfers ownership of its fresh engine
+to the facade; `Create(engine)` leaves the caller-provided engine caller-owned in both cases. Dispose
+facades deterministically, especially when using the parameterless factory.
 
 ### SDK language settings
 

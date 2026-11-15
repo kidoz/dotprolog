@@ -8,7 +8,7 @@ Module Program
     Private ReadOnly Catalogue As String() = {"widget", "gadget"}
 
     Sub Main()
-        Dim pricing As IPricingModule = PricingModule.Create()
+        Using pricing As IPricingModule = PricingModule.Create()
 
         Console.WriteLine("VB: 100 less 15% = {0}", pricing.Discount(100.0, 15L))
         Console.WriteLine("VB: tier of 1200 is {0}", pricing.Tier(1200L))
@@ -25,6 +25,7 @@ Module Program
         If pricing.TryStockLevel("widget", level) Then
             Console.WriteLine("VB: widget stock is {0}", level)
         End If
+        End Using
     End Sub
 
 End Module
