@@ -4,8 +4,8 @@ namespace DotProlog.Runtime;
 /// Reading and building Prolog lists, which most library builtins need and none should re-derive.
 /// </summary>
 /// <remarks>
-/// A cyclic list makes these loop forever. Only a term like <c>X = [a|X]</c> can create one, since
-/// unification has no occurs check, and that is the same bargain the rest of the engine makes.
+/// Cycles are detected by Brent's method. Reading one raises <c>type_error(list, List)</c> with the
+/// original cyclic term as culprit; <see cref="IsProper"/> simply fails.
 /// </remarks>
 internal static class TermList
 {
@@ -16,12 +16,26 @@ internal static class TermList
     /// </summary>
     internal static Cell Read(Machine machine, Cell list, List<Cell> elements)
     {
-        Cell cell = machine.Dereference(list);
+        var cell = machine.Dereference(list);
+        var mark = cell;
+        long power = 1,
+            steps = 0;
 
         while (cell.Tag == CellTag.Structure && machine.HeapAt(cell.Index).Index == machine.Symbols.ListFunctor)
         {
             elements.Add(machine.HeapAt(cell.Index + 1));
             cell = machine.Dereference(machine.HeapAt(cell.Index + 2));
+            if (cell == mark)
+            {
+                throw PrologErrors.Type(machine, "list", machine.Dereference(list));
+            }
+
+            if (++steps == power)
+            {
+                mark = cell;
+                power *= 2;
+                steps = 0;
+            }
         }
 
         return cell;
@@ -38,7 +52,7 @@ internal static class TermList
     internal static List<Cell> ReadProper(Machine machine, Cell list)
     {
         List<Cell> elements = [];
-        Cell tail = Read(machine, list, elements);
+        var tail = Read(machine, list, elements);
 
         if (IsEmpty(machine, tail))
         {
@@ -51,17 +65,8 @@ internal static class TermList
     }
 
     /// <summary>Whether <paramref name="list"/> is a proper list, without collecting its elements.</summary>
-    internal static bool IsProper(Machine machine, Cell list)
-    {
-        Cell cell = machine.Dereference(list);
-
-        while (cell.Tag == CellTag.Structure && machine.HeapAt(cell.Index).Index == machine.Symbols.ListFunctor)
-        {
-            cell = machine.Dereference(machine.HeapAt(cell.Index + 2));
-        }
-
-        return IsEmpty(machine, cell);
-    }
+    internal static bool IsProper(Machine machine, Cell list) =>
+        TrySkip(machine, list, out _, out var tail) && IsEmpty(machine, tail);
 
     /// <summary>
     /// Counts the cells of <paramref name="list"/> and finds what it ends in, as
@@ -70,8 +75,8 @@ internal static class TermList
     /// </summary>
     internal static bool TrySkip(Machine machine, Cell list, out long count, out Cell tail)
     {
-        Cell cell = machine.Dereference(list);
-        Cell mark = cell;
+        var cell = machine.Dereference(list);
+        var mark = cell;
         long power = 1,
             steps = 0;
         count = 0;

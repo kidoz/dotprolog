@@ -130,11 +130,14 @@ internal static class PrologText
         var builder = new StringBuilder();
         text = string.Empty;
         bool? codes = null;
-        Cell cell = list;
+        var cell = list;
+        var mark = cell;
+        long power = 1,
+            steps = 0;
 
         while (IsListCell(machine, cell))
         {
-            Cell element = machine.Dereference(machine.HeapAt(cell.Index + 1));
+            var element = machine.Dereference(machine.HeapAt(cell.Index + 1));
             if (element.Tag == CellTag.Reference)
             {
                 return raise ? throw PrologErrors.Instantiation(machine) : false;
@@ -154,7 +157,7 @@ internal static class PrologText
             }
             else
             {
-                string? name = element.Tag == CellTag.Atom ? machine.Symbols.AtomName(element.Index) : null;
+                var name = element.Tag == CellTag.Atom ? machine.Symbols.AtomName(element.Index) : null;
                 if (name is null || !IsCharacter(machine, name))
                 {
                     return raise ? throw PrologErrors.Type(machine, first ? "character_code" : "character", element) : false;
@@ -164,6 +167,17 @@ internal static class PrologText
             }
 
             cell = machine.Dereference(machine.HeapAt(cell.Index + 2));
+            if (cell == mark)
+            {
+                return raise ? throw Rejected(machine, list, kinds) : false;
+            }
+
+            if (++steps == power)
+            {
+                mark = cell;
+                power *= 2;
+                steps = 0;
+            }
         }
 
         if (TermList.IsEmpty(machine, cell))

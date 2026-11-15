@@ -11,7 +11,7 @@ public sealed class EmbeddingTests
     [Fact]
     public void SpanHostCallsPreserveOutputsFailureAndDetachedValuesAcrossReuse()
     {
-        using PrologEngine engine = NewEngine("pair(1, a). pair(2, b).");
+        using var engine = NewEngine("pair(1, a). pair(2, b).");
         var host = new PrologHost(engine.Machine);
         var predicate = host.Bind("pair", 2);
         PrologInput[] inputs = [PrologInput.Integer(1), PrologInput.Output];
@@ -34,10 +34,19 @@ public sealed class EmbeddingTests
     }
 
     [Fact]
+    public void IntegerMarshallingUsesValueRatherThanStorageRepresentation()
+    {
+        Assert.Equal(42, PrologMarshal.ToInteger(new PrologInteger(42)));
+        Assert.Equal(long.MinValue, PrologMarshal.ToInteger(new PrologBigInteger(long.MinValue)));
+        Assert.Equal(long.MaxValue, PrologMarshal.ToInteger(new PrologBigInteger(long.MaxValue)));
+        Assert.Throws<PrologException>(() => PrologMarshal.ToInteger(new PrologBigInteger(System.Numerics.BigInteger.One << 80)));
+    }
+
+    [Fact]
     public void ConsultRejectsExcessiveSourceDepthAndRemainsUsable()
     {
         using var engine = new PrologEngine();
-        LoadResult loaded = engine.ConsultText(new string('(', 20_000) + "a" + new string(')', 20_000) + ".", "deep.pl");
+        var loaded = engine.ConsultText(new string('(', 20_000) + "a" + new string(')', 20_000) + ".", "deep.pl");
         Assert.False(loaded.Success);
         Assert.Equal("DPL0012", Assert.Single(loaded.Diagnostics).Id);
         Assert.True(engine.Query("true").Prove());
@@ -50,9 +59,9 @@ public sealed class EmbeddingTests
     public void QueryRejectsCyclicHostValuesAndCanBeReused(string goal)
     {
         using var engine = new PrologEngine();
-        PrologException first = Assert.Throws<PrologException>(() => engine.Query(goal).FirstOrDefault());
+        var first = Assert.Throws<PrologException>(() => engine.Query(goal).FirstOrDefault());
         Assert.Contains("representation_error(cyclic_term)", first.Message, StringComparison.Ordinal);
-        PrologException all = Assert.Throws<PrologException>(() => engine.Query(goal).Solutions().ToArray());
+        var all = Assert.Throws<PrologException>(() => engine.Query(goal).Solutions().ToArray());
         Assert.Contains("representation_error(cyclic_term)", all.Message, StringComparison.Ordinal);
         Assert.True(engine.Query("true").Prove());
     }
@@ -63,12 +72,12 @@ public sealed class EmbeddingTests
     [InlineData("cyclic(X) :- X = f(Y), Y = g(X).")]
     public void HostRejectsCyclicOutputs(string source)
     {
-        using PrologEngine engine = NewEngine(source);
+        using var engine = NewEngine(source);
         var host = new PrologHost(engine.Machine);
-        PrologPredicate predicate = host.Bind("cyclic", 1);
-        PrologException first = Assert.Throws<PrologException>(() => host.CallOnce(predicate, PrologInput.Output));
+        var predicate = host.Bind("cyclic", 1);
+        var first = Assert.Throws<PrologException>(() => host.CallOnce(predicate, PrologInput.Output));
         Assert.Contains("representation_error(cyclic_term)", first.Message, StringComparison.Ordinal);
-        PrologException all = Assert.Throws<PrologException>(() => host.CallAll(predicate, PrologInput.Output).ToArray());
+        var all = Assert.Throws<PrologException>(() => host.CallAll(predicate, PrologInput.Output).ToArray());
         Assert.Contains("representation_error(cyclic_term)", all.Message, StringComparison.Ordinal);
         Assert.True(engine.Query("true").Prove());
     }
@@ -77,15 +86,88 @@ public sealed class EmbeddingTests
     public void MarshallingAcceptsSharedFiniteStructuresAndDeepFiniteValues()
     {
         using var engine = new PrologEngine();
-        PrologSolution solution = engine.Query("X = f(a), Y = pair(X,X)").FirstOrDefault()!;
+        var solution = engine.Query("X = f(a), Y = pair(X,X)").FirstOrDefault()!;
         Assert.Equal("pair(f(a),f(a))", solution["Y"].ToString());
         engine.ConsultOrThrow("nest(0, a) :- !. nest(N, f(X)) :- M is N-1, nest(M, X).", "nest.pl");
-        PrologValue value = engine.Query("nest(20000, X)").FirstOrDefault()!["X"];
+        var value = engine.Query("nest(20000, X)").FirstOrDefault()!["X"];
+        AssertDeepCompound(value);
+    }
+
+    [Fact]
+    public void DeepDetachedCompoundRoundTripsThroughHostCall()
+    {
+        using var engine = NewEngine("identity(X, X). nest(0, a) :- !. nest(N, f(X)) :- M is N-1, nest(M, X).");
+        var original = engine.Query("nest(20000, X)").FirstOrDefault()!["X"];
+        var host = new PrologHost(engine.Machine);
+
+        var roundTripped = Assert.Single(
+            host.CallOnce(host.Bind("identity", 2), PrologInput.FromValue(original), PrologInput.Output)!
+        );
+
+        Assert.NotSame(original, roundTripped);
+        AssertDeepCompound(original);
+        AssertDeepCompound(roundTripped);
+    }
+
+    [Fact]
+    public void DeepDetachedListRoundTripsThroughHostCall()
+    {
+        using var engine = NewEngine("identity(X, X). list(0, []) :- !. list(N, [a|X]) :- M is N-1, list(M, X).");
+        var original = engine.Query("list(20000, X)").FirstOrDefault()!["X"];
+        var host = new PrologHost(engine.Machine);
+
+        var roundTripped = Assert.Single(
+            host.CallOnce(host.Bind("identity", 2), PrologInput.FromValue(original), PrologInput.Output)!
+        );
+
+        Assert.NotSame(original, roundTripped);
+        AssertDeepList(original);
+        AssertDeepList(roundTripped);
+    }
+
+    [Fact]
+    public void DeepNestedListInputRoundTripsThroughHostCall()
+    {
+        using var engine = NewEngine("identity(X, X).");
+        var host = new PrologHost(engine.Machine);
+        var input = PrologInput.Atom("a");
         for (var i = 0; i < 20_000; i++)
         {
-            value = Assert.Single(Assert.IsType<PrologCompound>(value).Arguments);
+            input = PrologInput.List(input);
         }
-        Assert.Equal("a", Assert.IsType<PrologAtom>(value).Name);
+
+        var roundTripped = Assert.Single(host.CallOnce(host.Bind("identity", 2), input, PrologInput.Output)!);
+
+        for (var i = 0; i < 20_000; i++)
+        {
+            Assert.True(roundTripped.TryGetList(out var items));
+            roundTripped = Assert.Single(items);
+        }
+        Assert.Equal(new PrologAtom("a"), roundTripped);
+    }
+
+    private static void AssertDeepCompound(PrologValue value)
+    {
+        for (var i = 0; i < 20_000; i++)
+        {
+            var compound = Assert.IsType<PrologCompound>(value);
+            Assert.Equal("f", compound.Name);
+            value = Assert.Single(compound.Arguments);
+        }
+        Assert.Equal(new PrologAtom("a"), value);
+    }
+
+    private static void AssertDeepList(PrologValue value)
+    {
+        for (var i = 0; i < 20_000; i++)
+        {
+            var pair = Assert.IsType<PrologCompound>(value);
+            Assert.Equal(".", pair.Name);
+            Assert.Equal(2, pair.Arguments.Count);
+            Assert.Equal(new PrologAtom("a"), pair.Arguments[0]);
+            value = pair.Arguments[1];
+        }
+        Assert.Equal(new PrologAtom("[]"), value);
     }
 
     private static PrologEngine NewEngine(string? source = null)
@@ -93,7 +175,7 @@ public sealed class EmbeddingTests
         var engine = new PrologEngine { Output = TextWriter.Null };
         if (source is not null)
         {
-            LoadResult loaded = engine.ConsultText(source, "test.pl");
+            var loaded = engine.ConsultText(source, "test.pl");
             Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
         }
 
@@ -103,7 +185,7 @@ public sealed class EmbeddingTests
     [Fact]
     public void EnumeratesEverySolutionOfAPredicate()
     {
-        using PrologEngine engine = NewEngine("colour(red).\ncolour(green).\ncolour(blue).");
+        using var engine = NewEngine("colour(red).\ncolour(green).\ncolour(blue).");
 
         string[] colours = [.. engine.Query("colour(C)").Solutions().Select(s => s["C"].ToString())];
 
@@ -113,9 +195,9 @@ public sealed class EmbeddingTests
     [Fact]
     public void ReportsEveryVariableOfTheGoal()
     {
-        using PrologEngine engine = NewEngine("pair(a, 1).\npair(b, 2).");
+        using var engine = NewEngine("pair(a, 1).\npair(b, 2).");
 
-        PrologQuery query = engine.Query("pair(Name, Number)");
+        var query = engine.Query("pair(Name, Number)");
 
         Assert.Equal(["Name", "Number"], query.VariableNames);
         Assert.Equal(["a=1", "b=2"], query.Solutions().Select(s => $"{s["Name"]}={s["Number"]}"));
@@ -124,8 +206,8 @@ public sealed class EmbeddingTests
     [Fact]
     public void YieldsOneEmptySolutionForAGroundGoalThatSucceeds()
     {
-        using PrologEngine engine = NewEngine();
-        PrologSolution solution = Assert.Single(engine.Query("1 < 2").Solutions());
+        using var engine = NewEngine();
+        var solution = Assert.Single(engine.Query("1 < 2").Solutions());
 
         Assert.Empty(solution.Bindings);
         Assert.Equal("true", solution.ToString());
@@ -134,14 +216,14 @@ public sealed class EmbeddingTests
     [Fact]
     public void YieldsNothingForAGoalThatFails()
     {
-        using PrologEngine engine = NewEngine();
+        using var engine = NewEngine();
         Assert.Empty(engine.Query("1 > 2").Solutions());
     }
 
     [Fact]
     public void ProveReportsSuccessWithoutMarshalling()
     {
-        using PrologEngine engine = NewEngine("ok.");
+        using var engine = NewEngine("ok.");
 
         Assert.True(engine.Query("ok").Prove());
         Assert.False(engine.Query("fail").Prove());
@@ -150,7 +232,7 @@ public sealed class EmbeddingTests
     [Fact]
     public void FirstOrDefaultStopsAfterOneAnswer()
     {
-        using PrologEngine engine = NewEngine("n(1).\nn(2).");
+        using var engine = NewEngine("n(1).\nn(2).");
 
         Assert.Equal("1", engine.Query("n(X)").FirstOrDefault()?["X"].ToString());
         Assert.Null(engine.Query("n(99)").FirstOrDefault());
@@ -159,7 +241,7 @@ public sealed class EmbeddingTests
     [Fact]
     public void SolutionsAreProducedLazilySoAnInfiniteGoalIsUsable()
     {
-        using PrologEngine engine = NewEngine();
+        using var engine = NewEngine();
 
         long[] first =
         [
@@ -172,8 +254,8 @@ public sealed class EmbeddingTests
     [Fact]
     public void AQueryCanBeRunMoreThanOnce()
     {
-        using PrologEngine engine = NewEngine("n(1).\nn(2).");
-        PrologQuery query = engine.Query("n(X)");
+        using var engine = NewEngine("n(1).\nn(2).");
+        var query = engine.Query("n(X)");
 
         Assert.Equal(2, query.Solutions().Count());
         Assert.Equal(2, query.Solutions().Count());
@@ -182,9 +264,9 @@ public sealed class EmbeddingTests
     [Fact]
     public void MarshalsEachTermKind()
     {
-        using PrologEngine engine = NewEngine();
+        using var engine = NewEngine();
 
-        PrologSolution solution = Assert.Single(engine.Query("X = f(atom, 42, 1.5, Y, [a,b])").Solutions());
+        var solution = Assert.Single(engine.Query("X = f(atom, 42, 1.5, Y, [a,b])").Solutions());
         var term = Assert.IsType<PrologCompound>(solution["X"]);
 
         Assert.Equal("f", term.Name);
@@ -197,20 +279,20 @@ public sealed class EmbeddingTests
     [Fact]
     public void ReadsAProperListBackAsAList()
     {
-        using PrologEngine engine = NewEngine();
+        using var engine = NewEngine();
 
-        PrologSolution solution = Assert.Single(engine.Query("X = [a,b,c]").Solutions());
+        var solution = Assert.Single(engine.Query("X = [a,b,c]").Solutions());
 
-        Assert.True(solution["X"].TryGetList(out IReadOnlyList<PrologValue> items));
+        Assert.True(solution["X"].TryGetList(out var items));
         Assert.Equal(["a", "b", "c"], items.Select(i => i.ToString()));
     }
 
     [Fact]
     public void APartialListIsNotAProperList()
     {
-        using PrologEngine engine = NewEngine();
+        using var engine = NewEngine();
 
-        PrologSolution solution = Assert.Single(engine.Query("X = [a|_]").Solutions());
+        var solution = Assert.Single(engine.Query("X = [a|_]").Solutions());
 
         Assert.False(solution["X"].TryGetList(out _));
     }
@@ -220,7 +302,7 @@ public sealed class EmbeddingTests
     {
         // Bindings are marshalled as each answer is produced, so collecting them all is safe even
         // though backtracking discards the heap they came from.
-        using PrologEngine engine = NewEngine("n(1).\nn(2).\nn(3).");
+        using var engine = NewEngine("n(1).\nn(2).\nn(3).");
 
         List<PrologSolution> all = [.. engine.Query("n(X)").Solutions()];
 
@@ -230,9 +312,9 @@ public sealed class EmbeddingTests
     [Fact]
     public void AnUncaughtBallReachesTheHost()
     {
-        using PrologEngine engine = NewEngine();
+        using var engine = NewEngine();
 
-        PrologException error = Assert.Throws<PrologException>(() => engine.Query("throw(oops)").Prove());
+        var error = Assert.Throws<PrologException>(() => engine.Query("throw(oops)").Prove());
 
         Assert.Equal("oops", error.Message);
     }
@@ -246,7 +328,7 @@ public sealed class EmbeddingTests
     [Fact]
     public void QueriesSeeClausesAssertedThroughAnEarlierQuery()
     {
-        using PrologEngine engine = NewEngine();
+        using var engine = NewEngine();
 
         Assert.True(engine.Query("assertz(fact(one)), assertz(fact(two))").Prove());
         Assert.Equal(["one", "two"], engine.Query("fact(X)").Solutions().Select(s => s["X"].ToString()));

@@ -67,7 +67,7 @@ public readonly record struct PrologInput
     /// <summary>Passes a rational number, canonicalized; a denominator that divides out passes an integer.</summary>
     public static PrologInput Rational(BigInteger numerator, BigInteger denominator)
     {
-        PrologNumber value = PrologNumber.FromRational(numerator, denominator);
+        var value = PrologNumber.FromRational(numerator, denominator);
         return value.IsRational
             ? new PrologInput(PrologInputKind.Rational, null, 0, 0, null, value.Numerator, value.Denominator)
             : Big(value.Big);
@@ -79,8 +79,17 @@ public readonly record struct PrologInput
             ? new PrologInput(PrologInputKind.Integer, null, (long)value, 0, null)
             : new PrologInput(PrologInputKind.BigInteger, null, 0, 0, null, value);
 
-    /// <summary>Passes a floating-point number.</summary>
-    public static PrologInput Float(double value) => new(PrologInputKind.Float, null, 0, value, null);
+    /// <summary>Passes a finite floating-point number.</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> is NaN or infinite.</exception>
+    public static PrologInput Float(double value)
+    {
+        if (!double.IsFinite(value))
+        {
+            throw new ArgumentOutOfRangeException(nameof(value), value, "Prolog floats must be finite.");
+        }
+
+        return new PrologInput(PrologInputKind.Float, null, 0, value, null);
+    }
 
     /// <summary>Passes a list.</summary>
     public static PrologInput List(params PrologInput[] items)
@@ -102,7 +111,47 @@ public readonly record struct PrologInput
     {
         ArgumentNullException.ThrowIfNull(value);
 
-        return value switch
+        if (value is not PrologCompound root)
+        {
+            return ConvertNonCompound(value);
+        }
+
+        var pending = new Stack<ValueFrame>();
+        pending.Push(new ValueFrame(root));
+
+        while (true)
+        {
+            var frame = pending.Peek();
+
+            if (frame.Index < frame.Arguments.Count)
+            {
+                var argument = frame.Arguments[frame.Index];
+                ArgumentNullException.ThrowIfNull(argument);
+                if (argument is PrologCompound compound)
+                {
+                    pending.Push(new ValueFrame(compound));
+                    continue;
+                }
+
+                frame.Values[frame.Index++] = ConvertNonCompound(argument);
+                continue;
+            }
+
+            pending.Pop();
+            var completed = Compound(frame.Name, frame.Values);
+
+            if (pending.Count == 0)
+            {
+                return completed;
+            }
+
+            var parent = pending.Peek();
+            parent.Values[parent.Index++] = completed;
+        }
+    }
+
+    private static PrologInput ConvertNonCompound(PrologValue value) =>
+        value switch
         {
             PrologAtom atom => Atom(atom.Name),
             PrologString text => String(text.Value),
@@ -110,12 +159,10 @@ public readonly record struct PrologInput
             PrologBigInteger big => Big(big.Value),
             PrologRational rational => Rational(rational.Numerator, rational.Denominator),
             PrologFloat real => Float(real.Value),
-            PrologCompound compound => Compound(compound.Name, [.. compound.Arguments.Select(FromValue)]),
 
             // A variable that was unbound when it was marshalled goes back as a fresh one.
             _ => Output,
         };
-    }
 
     /// <summary>Materialises this argument on <paramref name="machine"/>'s heap.</summary>
     /// <remarks>Only valid between <see cref="Machine.BeginCall"/> and <see cref="Machine.Call"/>.</remarks>
@@ -123,50 +170,79 @@ public readonly record struct PrologInput
     {
         ArgumentNullException.ThrowIfNull(machine);
 
-        switch (_kind)
+        if (_kind is not PrologInputKind.List and not PrologInputKind.Compound)
         {
-            case PrologInputKind.Output:
-                return machine.CreateVariable();
-
-            case PrologInputKind.Atom:
-                return Cell.Atom(machine.Symbols.InternAtom(_text!));
-
-            case PrologInputKind.String:
-                return Cell.String(machine.Symbols.InternAtom(_text!));
-
-            case PrologInputKind.Integer:
-                return Cell.Integer60(_integer);
-
-            case PrologInputKind.BigInteger:
-                return Cell.Big(machine.Symbols.InternBig(_big));
-
-            case PrologInputKind.Rational:
-                return Cell.Rational(machine.Symbols.InternRational(_big, _denominator));
-
-            case PrologInputKind.Float:
-                return Cell.Float(machine.Symbols.InternFloat(_real));
-
-            case PrologInputKind.List:
-            {
-                var items = new Cell[_items!.Length];
-                for (var i = 0; i < items.Length; i++)
-                {
-                    items[i] = _items[i].Build(machine);
-                }
-
-                return machine.CreateList(items, Cell.Atom(machine.Symbols.EmptyList));
-            }
-
-            default:
-            {
-                var arguments = new Cell[_items!.Length];
-                for (var i = 0; i < arguments.Length; i++)
-                {
-                    arguments[i] = _items[i].Build(machine);
-                }
-
-                return machine.CreateStructure(machine.Symbols.InternFunctor(_text!, arguments.Length), arguments);
-            }
+            return BuildLeaf(machine);
         }
+
+        var pending = new Stack<BuildFrame>();
+        pending.Push(new BuildFrame(this));
+
+        while (true)
+        {
+            var frame = pending.Peek();
+
+            if (frame.Index < frame.Items.Length)
+            {
+                var item = frame.Items[frame.Index];
+                if (item._kind is PrologInputKind.List or PrologInputKind.Compound)
+                {
+                    pending.Push(new BuildFrame(item));
+                    continue;
+                }
+
+                frame.Values[frame.Index++] = item.BuildLeaf(machine);
+                continue;
+            }
+
+            pending.Pop();
+            var completed = frame.Build(machine);
+
+            if (pending.Count == 0)
+            {
+                return completed;
+            }
+
+            var parent = pending.Peek();
+            parent.Values[parent.Index++] = completed;
+        }
+    }
+
+    private Cell BuildLeaf(Machine machine) =>
+        _kind switch
+        {
+            PrologInputKind.Output => machine.CreateVariable(),
+            PrologInputKind.Atom => Cell.Atom(machine.Symbols.InternAtom(_text!)),
+            PrologInputKind.String => Cell.String(machine.Symbols.InternAtom(_text!)),
+            PrologInputKind.Integer => Cell.Integer60(_integer),
+            PrologInputKind.BigInteger => Cell.Big(machine.Symbols.InternBig(_big)),
+            PrologInputKind.Rational => Cell.Rational(machine.Symbols.InternRational(_big, _denominator)),
+            PrologInputKind.Float => Cell.Float(machine.Symbols.InternFloat(_real)),
+            _ => throw new InvalidOperationException("A compound input is not a leaf."),
+        };
+
+    private sealed class ValueFrame(PrologCompound compound)
+    {
+        internal string Name { get; } = compound.Name;
+
+        internal IReadOnlyList<PrologValue> Arguments { get; } = compound.Arguments;
+
+        internal PrologInput[] Values { get; } = new PrologInput[compound.Arguments.Count];
+
+        internal int Index { get; set; }
+    }
+
+    private sealed class BuildFrame(PrologInput input)
+    {
+        internal PrologInput[] Items { get; } = input._items!;
+
+        internal Cell[] Values { get; } = new Cell[input._items!.Length];
+
+        internal int Index { get; set; }
+
+        internal Cell Build(Machine machine) =>
+            input._kind == PrologInputKind.List
+                ? machine.CreateList(Values, Cell.Atom(machine.Symbols.EmptyList))
+                : machine.CreateStructure(machine.Symbols.InternFunctor(input._text!, Values.Length), Values);
     }
 }

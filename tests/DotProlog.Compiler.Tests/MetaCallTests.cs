@@ -1,4 +1,5 @@
 using DotProlog.Runtime;
+using DotProlog.Syntax;
 
 namespace DotProlog.Compiler.Tests;
 
@@ -164,7 +165,7 @@ public sealed class MetaCallTests
         using var engine = new PrologEngine { Output = new StringWriter() };
         Assert.True(engine.ConsultText(":- initialization(call(G)).").Success);
 
-        PrologException exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
+        var exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
 
         Assert.Contains("instantiation_error", exception.Message, StringComparison.Ordinal);
     }
@@ -175,7 +176,7 @@ public sealed class MetaCallTests
         using var engine = new PrologEngine { Output = new StringWriter() };
         Assert.True(engine.ConsultText(":- initialization(( G = 42, call(G) )).").Success);
 
-        PrologException exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
+        var exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
 
         Assert.Contains("type_error(callable, 42)", exception.Message, StringComparison.Ordinal);
     }
@@ -212,7 +213,7 @@ public sealed class MetaCallTests
         using var engine = new PrologEngine { Output = new StringWriter() };
         Assert.True(engine.ConsultText(":- initialization(call(nowhere)).").Success);
 
-        PrologException exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
+        var exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
 
         Assert.Contains("existence_error(procedure, nowhere/0)", exception.Message, StringComparison.Ordinal);
     }
@@ -221,17 +222,17 @@ public sealed class MetaCallTests
     public void MetaCallingTheSameControlShapeTwiceReusesTheCompiledClause()
     {
         using var engine = new PrologEngine { Output = new StringWriter() };
-        Machine machine = engine.Machine;
+        var machine = engine.Machine;
         var conjunction = machine.Symbols.InternFunctor(",", 2);
-        Cell yes = Cell.Atom(machine.Symbols.InternAtom("true"));
+        var yes = Cell.Atom(machine.Symbols.InternAtom("true"));
         var registers = new Cell[Machine.ArgumentRegisterCount];
 
-        Cell first = machine.CreateStructure(conjunction, [yes, machine.CreateVariable()]);
+        var first = machine.CreateStructure(conjunction, [yes, machine.CreateVariable()]);
         var address = engine.CompileControlGoal(machine, first, registers, out var arity);
         var size = engine.Program.CodeLength;
 
-        Cell variable = machine.CreateVariable();
-        Cell second = machine.CreateStructure(conjunction, [yes, variable]);
+        var variable = machine.CreateVariable();
+        var second = machine.CreateStructure(conjunction, [yes, variable]);
         var reused = engine.CompileControlGoal(machine, second, registers, out var reusedArity);
 
         Assert.Equal(address, reused);
@@ -261,5 +262,78 @@ public sealed class MetaCallTests
                     + "G2 = (B = 1 ; B = 2), findall(B, call(G2), L2), write(L1), write(L2), nl"
             )
         );
+    }
+
+    [Fact]
+    public void DeepRuntimeBuiltControlIsValidatedWithoutClrRecursion()
+    {
+        var output = PrologTestHost.Run(
+            """
+            deep(0, 4) :- !.
+            deep(N, (true, Goal)) :- M is N - 1, deep(M, Goal).
+
+            :- initialization((
+                deep(20000, Goal),
+                catch(call(Goal), error(type_error(callable, _), _), write(ok))
+            )).
+            """
+        );
+
+        Assert.Equal("ok", output);
+    }
+
+    [Fact]
+    public void DeepRuntimeBuiltControlIsReifiedWithoutClrRecursion()
+    {
+        using var engine = new PrologEngine();
+        var machine = engine.Machine;
+        var conjunction = machine.Symbols.InternFunctor(",", 2);
+        var yes = Cell.Atom(machine.Symbols.InternAtom("true"));
+        var term = yes;
+        for (var i = 0; i < 20_000; i++)
+        {
+            term = machine.CreateStructure(conjunction, [yes, term]);
+        }
+
+        var syntax = TermReifier.ToControlSyntax(machine, term, []);
+        for (var i = 0; i < 20_000; i++)
+        {
+            var compound = Assert.IsType<CompoundTerm>(syntax);
+            Assert.Equal(",", compound.Name);
+            Assert.Equal("true", Assert.IsType<AtomTerm>(compound.Arguments[0]).Name);
+            syntax = compound.Arguments[1];
+        }
+
+        Assert.Equal("true", Assert.IsType<AtomTerm>(syntax).Name);
+    }
+
+    [Fact]
+    public void CyclicCallWrappersRaiseACatchableRepresentationError()
+    {
+        Assert.Equal(
+            "representation_error(cyclic_term)ok",
+            PrologTestHost.RunGoal("G = call(G), catch(call(G), error(E, _), write(E)), write(ok)")
+        );
+    }
+
+    [Fact]
+    public void DeepRuntimeBuiltTermsAreReifiedWithoutClrRecursion()
+    {
+        using var engine = new PrologEngine();
+        var machine = engine.Machine;
+        var functor = machine.Symbols.InternFunctor("f", 1);
+        var term = Cell.Atom(machine.Symbols.InternAtom("a"));
+        for (var i = 0; i < 20_000; i++)
+        {
+            term = machine.CreateStructure(functor, [term]);
+        }
+
+        var syntax = TermReifier.ToSyntax(machine, term);
+        for (var i = 0; i < 20_000; i++)
+        {
+            syntax = Assert.Single(Assert.IsType<CompoundTerm>(syntax).Arguments);
+        }
+
+        Assert.Equal("a", Assert.IsType<AtomTerm>(syntax).Name);
     }
 }
