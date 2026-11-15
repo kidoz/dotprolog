@@ -14,7 +14,7 @@ public sealed class DefinitionTests
     {
         const string head = "'has space'(a). 'has space'(b).";
         const string call = "run :- write('😀'), 'has space'(a).";
-        int column = call.IndexOf("'has space'", StringComparison.Ordinal);
+        var column = call.IndexOf("'has space'", StringComparison.Ordinal);
         var (_, messages) = await ProtocolTests.RunServerAsync(
             new LanguageServer(debounce: TimeSpan.Zero),
             Initialize(links),
@@ -26,7 +26,7 @@ public sealed class DefinitionTests
         Assert.True(messages[0]["result"]!["capabilities"]!["definitionProvider"]!.GetValue<bool>());
         var result = (JsonArray)Reply(messages, 2)["result"]!;
         Assert.Equal(2, result.Count);
-        for (int index = 0; index < 2; index++)
+        for (var index = 0; index < 2; index++)
         {
             var item = result[index]!;
             Assert.Equal(Uri, item[links ? "targetUri" : "uri"]!.GetValue<string>());
@@ -61,9 +61,9 @@ public sealed class DefinitionTests
             """{"jsonrpc":"2.0","id":99,"method":"shutdown"}""",
             """{"jsonrpc":"2.0","method":"exit"}"""
         );
-        foreach (int id in new[] { 2, 3, 7, 8 })
+        foreach (var id in new[] { 2, 3, 7, 8 })
             Assert.Equal(-32602, Reply(messages, id)["error"]!["code"]!.GetValue<int>());
-        foreach (int id in new[] { 4, 5, 6 })
+        foreach (var id in new[] { 4, 5, 6 })
             Assert.Empty((JsonArray)Reply(messages, id)["result"]!);
     }
 
@@ -74,11 +74,11 @@ public sealed class DefinitionTests
     public void UnsavedDefinitionsMoveWithEditsAndCloseRemovesTargets(PrologLanguageMode mode, string newline)
     {
         var workspace = new DocumentWorkspace(mode);
-        workspace.Update(new DocumentSnapshot(Uri, "p(a)." + newline + "run :- p(a).", 1));
+        workspace.Update(new DocumentSnapshot(Uri, "p(a)." + newline + "run :- p(a)." + newline, 1));
         Assert.Equal(0, Assert.Single(workspace.Definition(Uri, 1, 7, false))!["range"]!["start"]!["line"]!.GetValue<int>());
-        workspace.Update(new DocumentSnapshot(Uri, "/* moved */" + newline + "p(a)." + newline + "run :- p(a).", 2));
+        workspace.Update(new DocumentSnapshot(Uri, "/* moved */" + newline + "p(a)." + newline + "run :- p(a)." + newline, 2));
         Assert.Equal(1, Assert.Single(workspace.Definition(Uri, 2, 7, false))!["range"]!["start"]!["line"]!.GetValue<int>());
-        workspace.Update(new DocumentSnapshot(Uri, "p(a)." + newline + "run :- write(p(a)).", 3));
+        workspace.Update(new DocumentSnapshot(Uri, "p(a)." + newline + "run :- write(p(a))." + newline, 3));
         Assert.Empty(workspace.Definition(Uri, 1, 13, false));
         workspace.Close(Uri);
         Assert.Empty(workspace.Definition(Uri, 0, 0, false));
@@ -88,16 +88,16 @@ public sealed class DefinitionTests
     [Fact]
     public void ProjectDefinitionsUseTargetBuffersAndRefreshMembership()
     {
-        string folder = Path.Combine(Path.GetTempPath(), "definition-project-" + Guid.NewGuid().ToString("N"));
+        var folder = Path.Combine(Path.GetTempPath(), "definition-project-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
         try
         {
-            string main = Path.Combine(folder, "main.pl");
-            string library = Path.Combine(folder, "library space.pl");
+            var main = Path.Combine(folder, "main.pl");
+            var library = Path.Combine(folder, "library space.pl");
             File.WriteAllText(main, "run :- item(X).");
             File.WriteAllText(library, "item(one). item(two).");
-            string uri = new System.Uri(main).AbsoluteUri;
-            string libraryUri = new System.Uri(library).AbsoluteUri;
+            var uri = new System.Uri(main).AbsoluteUri;
+            var libraryUri = new System.Uri(library).AbsoluteUri;
             var project = new ProjectConfiguration(
                 Path.Combine(folder, "app.dplproj"),
                 PrologLanguageMode.Modern,
@@ -132,15 +132,15 @@ public sealed class DefinitionTests
     [Fact]
     public void IncludesKeepPhysicalLocationsAndSuppressConflictingParents()
     {
-        string folder = Path.Combine(Path.GetTempPath(), "definition-include-" + Guid.NewGuid().ToString("N"));
+        var folder = Path.Combine(Path.GetTempPath(), "definition-include-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
         try
         {
-            string child = Path.Combine(folder, "child.pl");
+            var child = Path.Combine(folder, "child.pl");
             File.WriteAllText(child, "child. run :- local.");
-            string childUri = new System.Uri(child).AbsoluteUri;
-            string first = new System.Uri(Path.Combine(folder, "first.pl")).AbsoluteUri;
-            string second = new System.Uri(Path.Combine(folder, "second.pl")).AbsoluteUri;
+            var childUri = new System.Uri(child).AbsoluteUri;
+            var first = new System.Uri(Path.Combine(folder, "first.pl")).AbsoluteUri;
+            var second = new System.Uri(Path.Combine(folder, "second.pl")).AbsoluteUri;
             var workspace = new DocumentWorkspace(PrologLanguageMode.Modern);
             workspace.Update(
                 new DocumentSnapshot(first, ":- module(a, []). local. :- include('child.pl'). call_child :- child.", 1)
@@ -168,6 +168,34 @@ public sealed class DefinitionTests
                 )
             );
             Assert.Empty(workspace.Definition(childUri, 0, 12, false));
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
+    }
+
+    [Fact]
+    public void RepeatedIncludeExpansionWithoutOccurrencesSuppressesDefinition()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "definition-repeated-include-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            const string childText = "run :- a member [], target.";
+            var child = Path.Combine(folder, "child.pl");
+            File.WriteAllText(child, childText);
+            var childUri = new System.Uri(child).AbsoluteUri;
+            var root = new System.Uri(Path.Combine(folder, "root.pl")).AbsoluteUri;
+            var workspace = new DocumentWorkspace(PrologLanguageMode.Modern);
+            workspace.Update(
+                new DocumentSnapshot(
+                    root,
+                    "target. :- op(700, xfx, member). :- include('child.pl'). :- op(0, xfx, member). :- include('child.pl').",
+                    1
+                )
+            );
+            Assert.Empty(workspace.Definition(childUri, 0, childText.IndexOf("target", StringComparison.Ordinal), false));
         }
         finally
         {

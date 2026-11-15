@@ -58,12 +58,12 @@ public sealed class DocumentSymbolTests
     [Fact]
     public void IncludedFileUsesInheritedOperatorsAndRetainsOnlyItsOwnDefinitions()
     {
-        string folder = Path.Combine(Path.GetTempPath(), "DotProlog-symbols-" + Guid.NewGuid().ToString("N"));
+        var folder = Path.Combine(Path.GetTempPath(), "DotProlog-symbols-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
         try
         {
-            string child = Path.Combine(folder, "child.pl");
-            string root = Path.Combine(folder, "root.pl");
+            var child = Path.Combine(folder, "child.pl");
+            var root = Path.Combine(folder, "root.pl");
             File.WriteAllText(child, "alice likes bob.");
             var workspace = new DocumentWorkspace(PrologLanguageMode.Modern);
             workspace.Update(
@@ -73,7 +73,7 @@ public sealed class DocumentSymbolTests
                     1
                 )
             );
-            string childUri = new Uri(child).AbsoluteUri;
+            var childUri = new Uri(child).AbsoluteUri;
             var symbols = workspace.Symbols(childUri, true);
             Assert.Equal("m:likes/2", Assert.Single(symbols)!["name"]!.GetValue<string>());
             Assert.Equal(6, symbols[0]!["selectionRange"]!["start"]!["character"]!.GetValue<int>());
@@ -99,12 +99,12 @@ public sealed class DocumentSymbolTests
     [Fact]
     public void ClosedProjectSourcesUseConfiguredModeAndMembership()
     {
-        string folder = Path.Combine(Path.GetTempPath(), "DotProlog-outline-project-" + Guid.NewGuid().ToString("N"));
+        var folder = Path.Combine(Path.GetTempPath(), "DotProlog-outline-project-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
         try
         {
-            string path = Path.Combine(folder, "source.pl");
-            File.WriteAllText(path, "disk. value(`modern`).");
+            var path = Path.Combine(folder, "source.pl");
+            File.WriteAllText(path, "disk. value(`modern`).\n");
             var project = new ProjectConfiguration(
                 Path.Combine(folder, "app.dplproj"),
                 PrologLanguageMode.StrictIso,
@@ -114,9 +114,9 @@ public sealed class DocumentSymbolTests
             );
             var workspace = new DocumentWorkspace(PrologLanguageMode.Modern, project);
             workspace.StartProject();
-            string uri = new Uri(path).AbsoluteUri;
+            var uri = new Uri(path).AbsoluteUri;
             Assert.Equal("disk/0", Assert.Single(workspace.Symbols(uri, true))!["name"]!.GetValue<string>());
-            workspace.Update(new DocumentSnapshot(uri, "unsaved.", 1));
+            workspace.Update(new DocumentSnapshot(uri, "unsaved.\n", 1));
             Assert.Equal("unsaved/0", Assert.Single(workspace.Symbols(uri, true))!["name"]!.GetValue<string>());
             workspace.Close(uri);
             Assert.Equal("disk/0", Assert.Single(workspace.Symbols(uri, true))!["name"]!.GetValue<string>());

@@ -18,11 +18,11 @@ public sealed class RenameTests : IDisposable
     [InlineData(PrologLanguageMode.StrictIso)]
     public void AppliedRenamePreservesSolutionsThroughStaticMetaCalls(PrologLanguageMode mode)
     {
-        const string text = "p(a). p(b). values(X) :- call(p, X).";
+        const string text = "p(a). p(b). values(X) :- call(p, X).\n";
         var workspace = new DocumentWorkspace(mode);
         workspace.Update(new DocumentSnapshot(Uri, text, 1));
         var change = Assert.Single(workspace.Rename(Uri, 0, 0, "renamed")["documentChanges"]!.AsArray())!;
-        string edited = Apply(text, change["edits"]!.AsArray());
+        var edited = Apply(text, change["edits"]!.AsArray());
         using var engine = new PrologEngine(mode);
         Assert.True(engine.ConsultText(edited).Success);
         Assert.Equal(["a", "b"], engine.Query("values(X)").Solutions().Select(solution => solution["X"].ToString()).ToArray());
@@ -43,7 +43,7 @@ public sealed class RenameTests : IDisposable
         Assert.Equal(7, change["textDocument"]!["version"]!.GetValue<int>());
         Assert.Equal(Uri, change["textDocument"]!["uri"]!.GetValue<string>());
         Assert.Equal(4, change["edits"]!.AsArray().Count);
-        string edited = Apply(text, change["edits"]!.AsArray());
+        var edited = Apply(text, change["edits"]!.AsArray());
         Assert.Equal(
             "renamed(a). renamed(b). item(_, _).\r\nrun :- write('😀'), renamed(a), call(renamed, b), write(item(data)), item(a,b).",
             edited
@@ -57,10 +57,10 @@ public sealed class RenameTests : IDisposable
     [Fact]
     public void ProjectRenameEditsExportsSelectiveReexportsImportsAndUnsavedHeads()
     {
-        string library = Source("library.pl", ":- module(library, [item/1]). item(a).");
-        string facade = Source("facade.pl", ":- module(facade, []). :- reexport(library, [item/1]).");
+        var library = Source("library.pl", ":- module(library, [item/1]). item(a).");
+        var facade = Source("facade.pl", ":- module(facade, []). :- reexport(library, [item/1]).");
         const string clientText = ":- module(client, []). :- use_module('facade.pl', [item/1]). run :- item(a), library:item(b).";
-        string client = Source("client.pl", clientText);
+        var client = Source("client.pl", clientText);
         var workspace = Project(client, facade, library);
         const string overlay = ":- module(library, [item/1]). item(a). item(b).";
         workspace.Update(new DocumentSnapshot(library, overlay, 4));
@@ -70,12 +70,12 @@ public sealed class RenameTests : IDisposable
         Assert.Equal(7, changes.Sum(change => change!["edits"]!.AsArray().Count));
         foreach (var change in changes)
         {
-            string uri = change!["textDocument"]!["uri"]!.GetValue<string>();
+            var uri = change!["textDocument"]!["uri"]!.GetValue<string>();
             if (uri == library)
                 Assert.Equal(4, change["textDocument"]!["version"]!.GetValue<int>());
             else
                 Assert.Null(change["textDocument"]!["version"]);
-            string before = uri == library ? overlay : File.ReadAllText(new System.Uri(uri).LocalPath);
+            var before = uri == library ? overlay : File.ReadAllText(new System.Uri(uri).LocalPath);
             workspace.Update(new DocumentSnapshot(uri, Apply(before, change["edits"]!.AsArray()), 5));
         }
         Assert.Equal(
@@ -96,7 +96,7 @@ public sealed class RenameTests : IDisposable
             workspace.Rename(Uri, 0, text.IndexOf("word//1", StringComparison.Ordinal), "token")["documentChanges"]!.AsArray()
         )!;
         Assert.Equal(7, change["edits"]!.AsArray().Count);
-        string edited = Apply(text, change["edits"]!.AsArray());
+        var edited = Apply(text, change["edits"]!.AsArray());
         Assert.DoesNotContain("word", edited, StringComparison.Ordinal);
         workspace.Update(new DocumentSnapshot(Uri, edited, 2));
         Assert.NotNull(workspace.PrepareRename(Uri, 0, edited.IndexOf("token//1", StringComparison.Ordinal)));
@@ -140,11 +140,11 @@ public sealed class RenameTests : IDisposable
     [Fact]
     public void MissingProjectSourcesAndAmbiguousIncludesAreRejected()
     {
-        string library = Source("library.pl", "p.");
-        string missing = new System.Uri(Path.Combine(_folder, "missing.pl")).AbsoluteUri;
+        var library = Source("library.pl", "p.");
+        var missing = new System.Uri(Path.Combine(_folder, "missing.pl")).AbsoluteUri;
         Assert.Null(Project(library, missing).PrepareRename(library, 0, 0));
-        string child = Source("child.pl", "p. run :- p.");
-        string root = Source("root.pl", ":- module(a, []). :- include('child.pl'). :- module(b, []). :- include('child.pl').");
+        var child = Source("child.pl", "p. run :- p.");
+        var root = Source("root.pl", ":- module(a, []). :- include('child.pl'). :- module(b, []). :- include('child.pl').");
         var workspace = new DocumentWorkspace(PrologLanguageMode.Modern);
         workspace.Update(new DocumentSnapshot(root, File.ReadAllText(new System.Uri(root).LocalPath), 1));
         Assert.Null(workspace.PrepareRename(child, 0, 0));
@@ -158,8 +158,8 @@ public sealed class RenameTests : IDisposable
     [Fact]
     public void RepeatedIncludesDeduplicatePhysicalEditsAndHonorUnsavedBuffers()
     {
-        string child = Source("child.pl", "p. run :- p.");
-        string root = Source("root.pl", ":- include('child.pl'). :- include('child.pl').");
+        var child = Source("child.pl", "p. run :- p.");
+        var root = Source("root.pl", ":- include('child.pl'). :- include('child.pl').");
         var workspace = new DocumentWorkspace(PrologLanguageMode.Modern);
         workspace.Update(new DocumentSnapshot(root, File.ReadAllText(new System.Uri(root).LocalPath), 1));
         workspace.Update(new DocumentSnapshot(child, "p. p. run :- p.", 3));
@@ -170,6 +170,28 @@ public sealed class RenameTests : IDisposable
         change = Assert.Single(workspace.Rename(child, 0, 0, "renamed")["documentChanges"]!.AsArray())!;
         Assert.Null(change["textDocument"]!["version"]);
         Assert.Equal(2, change["edits"]!.AsArray().Count);
+    }
+
+    [Fact]
+    public async Task EmptyDidChangeBatchesAdvanceOnlyTheVersion()
+    {
+        var (_, messages) = await ProtocolTests.RunServerAsync(
+            new LanguageServer(debounce: TimeSpan.Zero),
+            Initialize,
+            Open("p. run :- p."),
+            EmptyChange(2),
+            Request(2, "rename", "renamed"),
+            EmptyChange(1),
+            Request(3, "rename", "renamed"),
+            """{"jsonrpc":"2.0","id":99,"method":"shutdown"}""",
+            """{"jsonrpc":"2.0","method":"exit"}"""
+        );
+        foreach (var id in new[] { 2, 3 })
+        {
+            var change = Assert.Single(Reply(messages, id)["result"]!["documentChanges"]!.AsArray())!;
+            Assert.Equal(2, change["textDocument"]!["version"]!.GetValue<int>());
+            Assert.Equal(2, change["edits"]!.AsArray().Count);
+        }
     }
 
     [Fact]
@@ -220,7 +242,7 @@ public sealed class RenameTests : IDisposable
     [Fact]
     public async Task FailedProjectReevaluationDisablesRenameUntilRecovery()
     {
-        string source = Source("source.pl", "p. run :- p.");
+        var source = Source("source.pl", "p. run :- p.");
         var configuration = new ProjectConfiguration(
             Path.Combine(_folder, "app.dplproj"),
             PrologLanguageMode.Modern,
@@ -228,7 +250,7 @@ public sealed class RenameTests : IDisposable
             [new System.Uri(source).LocalPath],
             []
         );
-        int reloads = 0;
+        var reloads = 0;
         var server = new LanguageServer(
             PrologLanguageMode.Modern,
             configuration,
@@ -238,7 +260,7 @@ public sealed class RenameTests : IDisposable
                     : Task.FromResult(configuration),
             TimeSpan.Zero
         );
-        string changed = new JsonObject
+        var changed = new JsonObject
         {
             ["jsonrpc"] = "2.0",
             ["method"] = "workspace/didChangeWatchedFiles",
@@ -317,8 +339,8 @@ public sealed class RenameTests : IDisposable
         {
             var start = edit!["range"]!["start"]!;
             var end = edit["range"]!["end"]!;
-            int from = positions.Offset(start["line"]!.GetValue<int>(), start["character"]!.GetValue<int>())!.Value;
-            int to = positions.Offset(end["line"]!.GetValue<int>(), end["character"]!.GetValue<int>())!.Value;
+            var from = positions.Offset(start["line"]!.GetValue<int>(), start["character"]!.GetValue<int>())!.Value;
+            var to = positions.Offset(end["line"]!.GetValue<int>(), end["character"]!.GetValue<int>())!.Value;
             text = text[..from] + edit["newText"]!.GetValue<string>() + text[to..];
         }
         return text;
@@ -326,7 +348,7 @@ public sealed class RenameTests : IDisposable
 
     private string Source(string name, string text)
     {
-        string path = Path.Combine(_folder, name);
+        var path = Path.Combine(_folder, name);
         File.WriteAllText(path, text);
         return new System.Uri(path).AbsoluteUri;
     }
@@ -358,6 +380,18 @@ public sealed class RenameTests : IDisposable
                     ["text"] = text,
                     ["version"] = 1,
                 },
+            },
+        }.ToJsonString();
+
+    private static string EmptyChange(int version) =>
+        new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["method"] = "textDocument/didChange",
+            ["params"] = new JsonObject
+            {
+                ["textDocument"] = new JsonObject { ["uri"] = Uri, ["version"] = version },
+                ["contentChanges"] = new JsonArray(),
             },
         }.ToJsonString();
 

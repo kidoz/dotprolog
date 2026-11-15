@@ -178,6 +178,53 @@ public sealed class AnalysisSchedulerTests
     }
 
     [Fact]
+    public async Task VersionOnlyUpdateInvalidatesPendingRenameAndPreservesText()
+    {
+        await using var scheduler = new AnalysisScheduler(
+            PrologLanguageMode.Modern,
+            null,
+            null,
+            (_, _, _) => Task.CompletedTask,
+            TimeSpan.FromMilliseconds(150)
+        );
+        var invalidated = new TaskCompletionSource<int?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await scheduler.UpdateAsync(new DocumentSnapshot("untitled:versioned", "p. run :- p.", 1), false);
+        await scheduler.RequestAsync(
+            new PendingAnalysisRequest(
+                "versioned",
+                workspace => workspace.Rename("untitled:versioned", 0, 0, "renamed"),
+                (result, error) =>
+                {
+                    Assert.Null(result);
+                    invalidated.SetResult(error);
+                    return Task.CompletedTask;
+                },
+                InvalidateOnChange: true
+            )
+        );
+        await scheduler.UpdateVersionAsync("untitled:versioned", 2);
+        Assert.Equal(-32801, await invalidated.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        await scheduler.WaitForIdleAsync().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var retried = new TaskCompletionSource<JsonNode?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await scheduler.RequestAsync(
+            new PendingAnalysisRequest(
+                "retry",
+                workspace => workspace.Rename("untitled:versioned", 0, 0, "renamed"),
+                (result, error) =>
+                {
+                    Assert.Null(error);
+                    retried.SetResult(result);
+                    return Task.CompletedTask;
+                }
+            )
+        );
+        var result = await retried.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var change = Assert.Single(result!["documentChanges"]!.AsArray())!;
+        Assert.Equal(2, change["textDocument"]!["version"]!.GetValue<int>());
+        Assert.Equal(2, change["edits"]!.AsArray().Count);
+    }
+
+    [Fact]
     public async Task CloseDiscardsPendingEditAndClearsPreviouslyPublishedDiagnostics()
     {
         ConcurrentQueue<DiagnosticPublication> published = new();
@@ -305,7 +352,7 @@ public sealed class AnalysisSchedulerTests
         using var clientRead = outgoing.Reader.AsStream();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(10));
-        Task exchange = ExchangeAsync();
+        var exchange = ExchangeAsync();
         try
         {
             Assert.Equal(0, await server.RunAsync(input, output, timeout.Token));
@@ -337,8 +384,8 @@ public sealed class AnalysisSchedulerTests
             };
             await SendAsync(clientWrite, changed.ToJsonString(), timeout.Token);
             await entered.Task.WaitAsync(TimeSpan.FromSeconds(2), timeout.Token);
-            bool positional = requestMethod != "documentSymbol";
-            string outline = positional
+            var positional = requestMethod != "documentSymbol";
+            var outline = positional
                 ? """{"jsonrpc":"2.0","id":40,"method":"textDocument/hover","params":{"textDocument":{"uri":"untitled:pending"},"position":{"line":0,"character":0}}}"""
                 : """{"jsonrpc":"2.0","id":40,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":"untitled:pending"}}}""";
             outline = outline.Replace("textDocument/hover", "textDocument/" + requestMethod, StringComparison.Ordinal);
@@ -396,8 +443,8 @@ public sealed class AnalysisSchedulerTests
 
     private static async Task SendAsync(Stream stream, string text, CancellationToken token)
     {
-        byte[] body = Encoding.UTF8.GetBytes(text);
-        byte[] header = Encoding.ASCII.GetBytes(FormattableString.Invariant($"Content-Length: {body.Length}\r\n\r\n"));
+        var body = Encoding.UTF8.GetBytes(text);
+        var header = Encoding.ASCII.GetBytes(FormattableString.Invariant($"Content-Length: {body.Length}\r\n\r\n"));
         await stream.WriteAsync(header, token);
         await stream.WriteAsync(body, token);
         await stream.FlushAsync(token);
@@ -406,7 +453,7 @@ public sealed class AnalysisSchedulerTests
     private static async Task<JsonObject> ReadAsync(Stream stream, CancellationToken token)
     {
         List<byte> header = [];
-        byte[] one = new byte[1];
+        var one = new byte[1];
         while (true)
         {
             await stream.ReadExactlyAsync(one, token);
@@ -414,12 +461,12 @@ public sealed class AnalysisSchedulerTests
             if (header.Count >= 4 && header.TakeLast(4).SequenceEqual("\r\n\r\n"u8.ToArray()))
                 break;
         }
-        string length = Encoding
+        var length = Encoding
             .ASCII.GetString([.. header])
             .Split("\r\n")
             .Single(line => line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
             .Split(':')[1];
-        byte[] body = new byte[int.Parse(length, System.Globalization.CultureInfo.InvariantCulture)];
+        var body = new byte[int.Parse(length, System.Globalization.CultureInfo.InvariantCulture)];
         await stream.ReadExactlyAsync(body, token);
         return JsonNode.Parse(body)!.AsObject();
     }

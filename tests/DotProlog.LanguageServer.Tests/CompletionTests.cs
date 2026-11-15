@@ -11,7 +11,7 @@ public sealed class CompletionTests
     public async Task ProtocolAdvertisesCompletionAndReturnsUtf16ReplacementEdits()
     {
         const string line = "run :- write('😀'), memOther";
-        int start = line.IndexOf("memOther", StringComparison.Ordinal);
+        var start = line.IndexOf("memOther", StringComparison.Ordinal);
         var (_, messages) = await ProtocolTests.RunServerAsync(
             new LanguageServer(debounce: TimeSpan.Zero),
             """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}""",
@@ -98,15 +98,15 @@ public sealed class CompletionTests
     [Fact]
     public void ProjectMembershipAndModeRefreshCandidates()
     {
-        string folder = Path.Combine(Path.GetTempPath(), "completion-" + Guid.NewGuid().ToString("N"));
+        var folder = Path.Combine(Path.GetTempPath(), "completion-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
         try
         {
-            string source = Path.Combine(folder, "main.pl");
-            string library = Path.Combine(folder, "library.pl");
+            var source = Path.Combine(folder, "main.pl");
+            var library = Path.Combine(folder, "library.pl");
             File.WriteAllText(source, "run :- mem");
-            File.WriteAllText(library, "member(_, _).");
-            string uri = new System.Uri(source).AbsoluteUri;
+            File.WriteAllText(library, "member(_, _).\n");
+            var uri = new System.Uri(source).AbsoluteUri;
             var project = new ProjectConfiguration(
                 Path.Combine(folder, "app.dplproj"),
                 PrologLanguageMode.StrictIso,
@@ -131,15 +131,15 @@ public sealed class CompletionTests
     [Fact]
     public void SharedIncludeIntersectsConflictingContextsAndHonorsBufferOverlay()
     {
-        string folder = Path.Combine(Path.GetTempPath(), "completion-include-" + Guid.NewGuid().ToString("N"));
+        var folder = Path.Combine(Path.GetTempPath(), "completion-include-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
         try
         {
-            string child = Path.Combine(folder, "child.pl");
+            var child = Path.Combine(folder, "child.pl");
             File.WriteAllText(child, "run :- mem.");
-            string childUri = new System.Uri(child).AbsoluteUri;
-            string first = new System.Uri(Path.Combine(folder, "first.pl")).AbsoluteUri;
-            string second = new System.Uri(Path.Combine(folder, "second.pl")).AbsoluteUri;
+            var childUri = new System.Uri(child).AbsoluteUri;
+            var first = new System.Uri(Path.Combine(folder, "first.pl")).AbsoluteUri;
+            var second = new System.Uri(Path.Combine(folder, "second.pl")).AbsoluteUri;
             var workspace = new DocumentWorkspace(PrologLanguageMode.Modern);
             workspace.Update(new DocumentSnapshot(first, ":- module(a, []). local. :- include('child.pl').", 1));
             Assert.Contains(workspace.Completion(childUri, 0, 10), item => item!["label"]!.GetValue<string>() == "member/2");

@@ -17,7 +17,7 @@ public sealed class ProtocolTests
     {
         for (var iteration = 0; iteration < 100; iteration++)
         {
-            (int code, List<JsonObject> messages) = await RunAsync(Initialize, Open("value(X)."), Shutdown, Exit);
+            (var code, var messages) = await RunAsync(Initialize, Open("value(X)."), Shutdown, Exit);
             Assert.Equal(0, code);
             Assert.Equal(3, messages.Count);
             Assert.Equal(2, messages[^1]["id"]!.GetValue<int>());
@@ -27,7 +27,7 @@ public sealed class ProtocolTests
     [Fact]
     public async Task InitializesAndShutsDownThroughFramedProtocol()
     {
-        (int code, List<JsonObject> messages) = await RunAsync(Initialize, Shutdown, Exit);
+        (var code, var messages) = await RunAsync(Initialize, Shutdown, Exit);
         Assert.Equal(0, code);
         Assert.Equal(2, messages.Count);
         Assert.Equal("utf-16", messages[0]["result"]!["capabilities"]!["positionEncoding"]!.GetValue<string>());
@@ -39,7 +39,7 @@ public sealed class ProtocolTests
     [Fact]
     public async Task PublishesUnsavedDiagnosticsAndClearsOnChangeAndClose()
     {
-        (int code, List<JsonObject> messages) = await RunAsync(
+        (var code, var messages) = await RunAsync(
             Initialize,
             Open("value(X)."),
             Change(2, "value(ok)."),
@@ -59,7 +59,7 @@ public sealed class ProtocolTests
     [Fact]
     public async Task IgnoresOldVersionsAndUnopenedChanges()
     {
-        (_, List<JsonObject> messages) = await RunAsync(
+        (_, var messages) = await RunAsync(
             Initialize,
             Change(1, "old(X)."),
             Open("ok."),
@@ -76,7 +76,7 @@ public sealed class ProtocolTests
     [Fact]
     public async Task InvalidNotificationsDoNotBreakSubsequentEdits()
     {
-        (_, List<JsonObject> messages) = await RunAsync(
+        (_, var messages) = await RunAsync(
             Initialize,
             """{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{}}""",
             Open("broken(X"),
@@ -97,8 +97,8 @@ public sealed class ProtocolTests
     [InlineData("\r")]
     public async Task DiagnosticRangesUseUtf16Offsets(string newline)
     {
-        (_, List<JsonObject> messages) = await RunAsync(Initialize, Open("ok." + newline + "value('😀', X)."), Shutdown, Exit);
-        JsonNode diagnostic = messages[1]["params"]!["diagnostics"]!
+        (_, var messages) = await RunAsync(Initialize, Open("ok." + newline + "value('😀', X)."), Shutdown, Exit);
+        var diagnostic = messages[1]["params"]!["diagnostics"]!
             .AsArray()
             .Single(item => item!["code"]!.GetValue<string>() == "DPL3001")!;
         Assert.Equal(1, diagnostic["range"]!["start"]!["line"]!.GetValue<int>());
@@ -109,7 +109,7 @@ public sealed class ProtocolTests
     [Fact]
     public async Task EnforcesLifecycleAndPreservesStringRequestIds()
     {
-        (_, List<JsonObject> messages) = await RunAsync(
+        (_, var messages) = await RunAsync(
             """{"jsonrpc":"2.0","id":"before","method":"hover"}""",
             Initialize,
             Initialize,
@@ -128,7 +128,7 @@ public sealed class ProtocolTests
     [Fact]
     public async Task RecoversAfterMalformedJsonAndInvalidEnvelope()
     {
-        (_, List<JsonObject> messages) = await RunAsync("{", "[]", Initialize, Shutdown, Exit);
+        (_, var messages) = await RunAsync("{", "[]", Initialize, Shutdown, Exit);
         Assert.Equal(-32700, messages[0]["error"]!["code"]!.GetValue<int>());
         Assert.Equal(-32600, messages[1]["error"]!["code"]!.GetValue<int>());
         Assert.Equal(4, messages.Count);
@@ -137,7 +137,7 @@ public sealed class ProtocolTests
     [Fact]
     public async Task RejectsInvalidInitializeParametersWithoutChangingState()
     {
-        (_, List<JsonObject> messages) = await RunAsync(
+        (_, var messages) = await RunAsync(
             """{"jsonrpc":"2.0","id":9,"method":"initialize","params":{}}""",
             Initialize,
             Shutdown,
@@ -150,7 +150,7 @@ public sealed class ProtocolTests
     [Fact]
     public async Task RejectsTrailingJsonAndStillAcceptsNextFrame()
     {
-        (_, List<JsonObject> messages) = await RunAsync(Initialize + " {}", Initialize, Shutdown, Exit);
+        (_, var messages) = await RunAsync(Initialize + " {}", Initialize, Shutdown, Exit);
         Assert.Equal(-32700, messages[0]["error"]!["code"]!.GetValue<int>());
         Assert.NotNull(messages[1]["result"]);
     }
@@ -158,14 +158,14 @@ public sealed class ProtocolTests
     [Fact]
     public async Task ExitBeforeShutdownIsUnsuccessful()
     {
-        (int code, _) = await RunAsync(Exit);
+        (var code, _) = await RunAsync(Exit);
         Assert.Equal(1, code);
     }
 
     [Fact]
     public async Task DoesNotExecuteInitializationOrIncludeSource()
     {
-        (_, List<JsonObject> messages) = await RunAsync(
+        (_, var messages) = await RunAsync(
             Initialize,
             Open(":- initialization(halt(42)).\n:- include('nonexistent-lsp-test.pl').\nvalue(X)."),
             Shutdown,
@@ -178,13 +178,13 @@ public sealed class ProtocolTests
     [Fact]
     public void ModesArePassedToTheReader()
     {
-        JsonArray modern = DocumentDiagnostics.Analyze(
+        var modern = DocumentDiagnostics.Analyze(
             "value(`hello`).",
             DocumentUri,
             PrologLanguageMode.Modern,
             TestContext.Current.CancellationToken
         );
-        JsonArray strict = DocumentDiagnostics.Analyze(
+        var strict = DocumentDiagnostics.Analyze(
             "value(`hello`).",
             DocumentUri,
             PrologLanguageMode.StrictIso,
@@ -200,7 +200,7 @@ public sealed class ProtocolTests
         const string supportsWatching =
             """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{"workspace":{"didChangeWatchedFiles":{"dynamicRegistration":true}}}}}""";
         const string initialized = """{"jsonrpc":"2.0","method":"initialized","params":{}}""";
-        (_, List<JsonObject> messages) = await RunAsync(
+        (_, var messages) = await RunAsync(
             supportsWatching,
             initialized,
             """{"jsonrpc":"2.0","id":"dotprolog/watch-files","result":null}""",
@@ -211,7 +211,7 @@ public sealed class ProtocolTests
         Assert.Equal(3, messages.Count);
         Assert.NotNull(messages[0]["result"]);
         Assert.Equal("client/registerCapability", messages[1]["method"]!.GetValue<string>());
-        JsonNode registration = messages[1]["params"]!["registrations"]![0]!;
+        var registration = messages[1]["params"]!["registrations"]![0]!;
         Assert.Equal("workspace/didChangeWatchedFiles", registration["method"]!.GetValue<string>());
         Assert.Equal("**/*", registration["registerOptions"]!["watchers"]![0]!["globPattern"]!.GetValue<string>());
         Assert.Equal(7, registration["registerOptions"]!["watchers"]![0]!["kind"]!.GetValue<int>());
@@ -221,7 +221,7 @@ public sealed class ProtocolTests
     [Fact]
     public async Task WatchingIsNotRequestedWithoutClientSupport()
     {
-        (_, List<JsonObject> messages) = await RunAsync(
+        (_, var messages) = await RunAsync(
             Initialize,
             """{"jsonrpc":"2.0","method":"initialized","params":{}}""",
             Shutdown,
@@ -237,7 +237,7 @@ public sealed class ProtocolTests
             """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{"workspace":{"didChangeWatchedFiles":{"dynamicRegistration":true}}}}}""";
         const string rejected =
             """{"jsonrpc":"2.0","id":"dotprolog/watch-files","error":{"code":-32601,"message":"unsupported"}}""";
-        (_, List<JsonObject> messages) = await RunAsync(
+        (_, var messages) = await RunAsync(
             supportsWatching,
             """{"jsonrpc":"2.0","method":"initialized","params":{}}""",
             rejected,
@@ -254,7 +254,7 @@ public sealed class ProtocolTests
     [Fact]
     public async Task InvalidWatchNotificationsAndUnknownResponsesDoNotDisruptEditing()
     {
-        (_, List<JsonObject> messages) = await RunAsync(
+        (_, var messages) = await RunAsync(
             Initialize,
             """{"jsonrpc":"2.0","method":"workspace/didChangeWatchedFiles","params":{"changes":[{"uri":"file:///tmp/test.pl","type":4}]}}""",
             """{"jsonrpc":"2.0","method":"workspace/didChangeWatchedFiles","params":{"changes":[{"uri":"not a URI","type":1}]}}""",
@@ -306,10 +306,10 @@ public sealed class ProtocolTests
     )
     {
         List<byte[]> frames = [];
-        foreach (string body in bodies)
+        foreach (var body in bodies)
         {
-            byte[] bytes = Encoding.UTF8.GetBytes(body);
-            byte[] header = Encoding.ASCII.GetBytes(
+            var bytes = Encoding.UTF8.GetBytes(body);
+            var header = Encoding.ASCII.GetBytes(
                 $"Content-Length: {bytes.Length.ToString(CultureInfo.InvariantCulture)}\r\n\r\n"
             );
             frames.Add([.. header, .. bytes]);
@@ -317,19 +317,19 @@ public sealed class ProtocolTests
         using var input = new AnalysisInputStream(frames, server.WaitForAnalysisAsync);
         using var output = new MemoryStream();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        int code = await server.RunAsync(input, output, timeout.Token);
-        byte[] wire = output.ToArray();
+        var code = await server.RunAsync(input, output, timeout.Token);
+        var wire = output.ToArray();
         List<JsonObject> messages = [];
         var position = 0;
         while (position < wire.Length)
         {
-            int end = wire.AsSpan(position).IndexOf("\r\n\r\n"u8) + position;
+            var end = wire.AsSpan(position).IndexOf("\r\n\r\n"u8) + position;
             Assert.True(end >= position);
-            string header = Encoding.ASCII.GetString(wire, position, end - position);
-            string lengthHeader = header
+            var header = Encoding.ASCII.GetString(wire, position, end - position);
+            var lengthHeader = header
                 .Split("\r\n")
                 .Single(line => line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase));
-            int length = int.Parse(lengthHeader.Split(':')[1], CultureInfo.InvariantCulture);
+            var length = int.Parse(lengthHeader.Split(':')[1], CultureInfo.InvariantCulture);
             position = end + 4;
             messages.Add(JsonNode.Parse(wire.AsSpan(position, length))!.AsObject());
             position += length;

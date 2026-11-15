@@ -45,10 +45,20 @@ internal sealed class AnalysisScheduler : IAsyncDisposable
     internal Task UpdateAsync(DocumentSnapshot document, bool isChange) =>
         ChangeAsync(() =>
         {
-            string key = DocumentSnapshot.Key(document.Uri);
+            var key = DocumentSnapshot.Key(document.Uri);
             if (isChange && (!_documents.TryGetValue(key, out var previous) || previous.Version >= document.Version))
                 return false;
             _documents[key] = document;
+            return true;
+        });
+
+    internal Task UpdateVersionAsync(string uri, int version) =>
+        ChangeAsync(() =>
+        {
+            var key = DocumentSnapshot.Key(uri);
+            if (!_documents.TryGetValue(key, out var previous) || previous.Version >= version)
+                return false;
+            _documents[key] = previous with { Version = version };
             return true;
         });
 
@@ -57,7 +67,7 @@ internal sealed class AnalysisScheduler : IAsyncDisposable
     internal Task DiskChangedAsync(IReadOnlyList<string> uris) =>
         ChangeAsync(() =>
         {
-            foreach (string uri in uris)
+            foreach (var uri in uris)
                 if (new Uri(uri).IsFile)
                     _diskChanges.Add(uri);
             return _diskChanges.Count > 0;
@@ -198,14 +208,14 @@ internal sealed class AnalysisScheduler : IAsyncDisposable
                 try
                 {
                     await Task.Delay(_debounce, active.Token).ConfigureAwait(false);
-                    string? error = previousError;
+                    var error = previousError;
                     string? log = null;
                     var logType = 3;
                     if (disk.Length > 0 && project is not null && _reload is not null)
                     {
                         try
                         {
-                            ProjectConfiguration updated = await _reload(active.Token).ConfigureAwait(false);
+                            var updated = await _reload(active.Token).ConfigureAwait(false);
                             active.Token.ThrowIfCancellationRequested();
                             if (!DocumentSnapshot.KeyComparer.Equals(updated.ProjectPath, project.ProjectPath))
                                 throw new InvalidDataException("Reevaluation returned a different project.");

@@ -9,8 +9,8 @@ internal static class DocumentHover
         if (outline is null)
             return null;
         var positions = new SourcePositions(outline.Text);
-        int? offset = positions.Offset(line, character);
-        if (offset is null)
+        var offset = positions.Offset(line, character);
+        if (offset is null || !NavigationSites.ContainsInEveryContext(outline, offset.Value))
             return null;
         var matches = outline
             .Hovers.Where(site => offset >= site.Range.Start && offset < site.Range.Start + site.Range.Length)
@@ -21,7 +21,7 @@ internal static class DocumentHover
         if (matches.Any(site => site.Documentation != first.Documentation || site.Range != first.Range))
             return null;
         var help = first.Documentation!;
-        string text = markdown ? "```prolog\n" + help.Signature + "\n```\n\n" : help.Signature + "\n\n";
+        var text = markdown ? "```prolog\n" + help.Signature + "\n```\n\n" : help.Signature + "\n\n";
         text += help.Description;
         if (help.Availability is not null)
             text += "\n\n" + help.Availability;

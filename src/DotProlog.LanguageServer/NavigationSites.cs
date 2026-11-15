@@ -20,6 +20,42 @@ internal static class NavigationSites
         return Agree(matches);
     }
 
+    internal static bool ContainsInEveryContext(SourceOutline outline, int offset)
+    {
+        foreach (var context in Contexts(outline))
+            if (!context.Any(site => offset >= site.Range.Start && offset < site.Range.Start + site.Range.Length))
+                return false;
+        return true;
+    }
+
+    internal static IReadOnlyList<IReadOnlyList<PrologDefinitionSite>> PhysicalContexts(
+        string fileName,
+        IReadOnlyList<PrologDefinitionSite> sites,
+        PrologRenameAnalysis analysis
+    )
+    {
+        int[] contexts =
+        [
+            .. analysis
+                .Contexts.Where(context => DocumentSnapshot.KeyComparer.Equals(context.FileName, fileName))
+                .Select(context => context.Context)
+                .Distinct(),
+        ];
+        if (contexts.Length == 0)
+            return
+            [
+                [],
+            ];
+        return contexts
+            .Select(context =>
+                (IReadOnlyList<PrologDefinitionSite>)
+                    sites
+                        .Where(site => site.Context == context && DocumentSnapshot.KeyComparer.Equals(site.FileName, fileName))
+                        .ToArray()
+            )
+            .ToArray();
+    }
+
     internal static IEnumerable<PrologDefinitionSite> All(SourceOutline outline, CancellationToken cancellationToken)
     {
         var contexts = Contexts(outline).Select(context => context.ToLookup(site => site.Range)).ToArray();
@@ -75,6 +111,8 @@ internal static class NavigationSites
 
     private static IEnumerable<IReadOnlyList<PrologDefinitionSite>> Contexts(SourceOutline outline)
     {
+        if (outline.Definitions.Count == 0)
+            yield return Array.Empty<PrologDefinitionSite>();
         foreach (var analysis in outline.Definitions)
         {
             if (analysis.Count == 0)

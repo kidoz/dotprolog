@@ -16,14 +16,14 @@ public sealed class HoverTests
     [InlineData("[\"unsupported\",\"markdown\"]", "markdown")]
     public async Task ProtocolNegotiatesFormatAndReturnsExactUtf16NameRange(string formats, string kind)
     {
-        string initialize =
+        var initialize =
             """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{"textDocument":{"hover":{"contentFormat":FORMATS}}}}}""".Replace(
                 "FORMATS",
                 formats,
                 StringComparison.Ordinal
             );
         const string line = "run :- write('😀'), 'member'(a, []).";
-        int start = line.IndexOf("'member'", StringComparison.Ordinal);
+        var start = line.IndexOf("'member'", StringComparison.Ordinal);
         var (_, messages) = await ProtocolTests.RunServerAsync(
             new LanguageServer(debounce: TimeSpan.Zero),
             initialize,
@@ -60,9 +60,9 @@ public sealed class HoverTests
             Shutdown,
             Exit
         );
-        foreach (int id in new[] { 2, 3, 8, 9 })
+        foreach (var id in new[] { 2, 3, 8, 9 })
             Assert.Equal(-32602, Reply(messages, id)["error"]!["code"]!.GetValue<int>());
-        foreach (int id in new[] { 4, 5, 6, 7 })
+        foreach (var id in new[] { 4, 5, 6, 7 })
             Assert.Null(Reply(messages, id)["result"]);
     }
 
@@ -87,15 +87,15 @@ public sealed class HoverTests
     [Fact]
     public void IncludesUseParentOperatorsAndSuppressConflictingModuleResolutions()
     {
-        string folder = Path.Combine(Path.GetTempPath(), "hover-" + Guid.NewGuid().ToString("N"));
+        var folder = Path.Combine(Path.GetTempPath(), "hover-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
         try
         {
-            string child = Path.Combine(folder, "child.pl");
+            var child = Path.Combine(folder, "child.pl");
             File.WriteAllText(child, "run :- a member [].");
-            string childUri = new System.Uri(child).AbsoluteUri;
-            string first = new System.Uri(Path.Combine(folder, "first.pl")).AbsoluteUri;
-            string second = new System.Uri(Path.Combine(folder, "second.pl")).AbsoluteUri;
+            var childUri = new System.Uri(child).AbsoluteUri;
+            var first = new System.Uri(Path.Combine(folder, "first.pl")).AbsoluteUri;
+            var second = new System.Uri(Path.Combine(folder, "second.pl")).AbsoluteUri;
             var workspace = new DocumentWorkspace(PrologLanguageMode.Modern);
             const string includes = ":- op(700, xfx, member). :- include('child.pl').";
             workspace.Update(new DocumentSnapshot(first, ":- module(a, []). " + includes, 1));
@@ -120,17 +120,72 @@ public sealed class HoverTests
     }
 
     [Fact]
-    public void ProjectModeAndCrossFileOverridesRefreshHover()
+    public void RepeatedIncludeExpansionWithoutOccurrencesSuppressesHover()
     {
-        string folder = Path.Combine(Path.GetTempPath(), "hover-project-" + Guid.NewGuid().ToString("N"));
+        var folder = Path.Combine(Path.GetTempPath(), "hover-repeated-include-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
         try
         {
-            string source = Path.Combine(folder, "main.pl");
-            string library = Path.Combine(folder, "library.pl");
-            File.WriteAllText(source, "run :- member(a, []).");
-            File.WriteAllText(library, "member(_, _).");
-            string uri = new System.Uri(source).AbsoluteUri;
+            var child = Path.Combine(folder, "child.pl");
+            File.WriteAllText(child, "run :- a member [].");
+            var childUri = new System.Uri(child).AbsoluteUri;
+            var root = new System.Uri(Path.Combine(folder, "root.pl")).AbsoluteUri;
+            var workspace = new DocumentWorkspace(PrologLanguageMode.Modern);
+            workspace.Update(
+                new DocumentSnapshot(
+                    root,
+                    ":- op(700, xfx, member). :- include('child.pl'). :- op(0, xfx, member). :- include('child.pl').",
+                    1
+                )
+            );
+            Assert.Null(workspace.Hover(childUri, 0, 9, false));
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
+    }
+
+    [Fact]
+    public void RepeatedIncludeTokenUsedAsDataAndGoalSuppressesHover()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "hover-repeated-data-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            const string childText = "run :- hold(write(ok)).";
+            var child = Path.Combine(folder, "child.pl");
+            File.WriteAllText(child, childText);
+            var childUri = new System.Uri(child).AbsoluteUri;
+            var root = new System.Uri(Path.Combine(folder, "root.pl")).AbsoluteUri;
+            var workspace = new DocumentWorkspace(PrologLanguageMode.Modern);
+            workspace.Update(
+                new DocumentSnapshot(
+                    root,
+                    ":- module(a, []). hold(_). :- include('child.pl'). :- module(b, []). :- meta_predicate(hold(0)). hold(G) :- call(G). :- include('child.pl').",
+                    1
+                )
+            );
+            Assert.Null(workspace.Hover(childUri, 0, childText.IndexOf("write", StringComparison.Ordinal), false));
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
+    }
+
+    [Fact]
+    public void ProjectModeAndCrossFileOverridesRefreshHover()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "hover-project-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var source = Path.Combine(folder, "main.pl");
+            var library = Path.Combine(folder, "library.pl");
+            File.WriteAllText(source, "run :- member(a, []).\n");
+            File.WriteAllText(library, "member(_, _).\n");
+            var uri = new System.Uri(source).AbsoluteUri;
             var project = new ProjectConfiguration(
                 Path.Combine(folder, "app.dplproj"),
                 PrologLanguageMode.StrictIso,

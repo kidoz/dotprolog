@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Smoke-test a managed or native language server with asynchronous stdio diagnostics."""
 import json
+import os
 from pathlib import Path
 import queue
 import subprocess
@@ -157,6 +158,27 @@ def workspace_smoke(command):
     print("PASS: include overlays, watch registration, disk create/change/delete, close recovery and cleanup")
 
 
+def feature_wire(command):
+    if os.environ.get("DOTPROLOG_RUN_LSP_FEATURE_TESTS") != "1":
+        print("SKIP: feature wire scripts; set DOTPROLOG_RUN_LSP_FEATURE_TESTS=1 to run them")
+        return
+    features = [
+        "hover",
+        "completion",
+        "definition",
+        "references",
+        "rename",
+        "symbols",
+        "reload",
+        "project",
+    ]
+    if os.name == "posix":
+        features.append("cancellation")
+    for feature in features:
+        script = Path(__file__).with_name(f"verify-language-server-{feature}.py")
+        subprocess.run([sys.executable, str(script), *command], check=True, timeout=120)
+
+
 def main(command):
     if not command:
         raise SystemExit("Usage: verify-language-server.py <executable> [arguments...]")
@@ -184,6 +206,7 @@ def main(command):
     assert early_exit.returncode == 1 and not early_exit.stdout
     print("PASS: initialize, Unicode diagnostics, debounced edit burst, close, shutdown and early exit")
     workspace_smoke(command)
+    feature_wire(command)
 
 
 if __name__ == "__main__":

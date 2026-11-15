@@ -22,7 +22,7 @@ internal static class DocumentDiagnostics
     )
     {
         var program = new BytecodeProgram(mode);
-        ParseResult parsed = TermReader.ReadProgram(
+        var parsed = TermReader.ReadProgram(
             text,
             uri,
             program.Operators,
@@ -30,7 +30,7 @@ internal static class DocumentDiagnostics
             program.Flags,
             clauseBoundary: _ => cancellationToken.ThrowIfCancellationRequested()
         );
-        IReadOnlyList<Diagnostic> warnings = PrologLinter.AnalyzeSource(
+        var warnings = PrologLinter.AnalyzeSource(
             text,
             parsed.Clauses,
             uri,
@@ -45,6 +45,8 @@ internal static class DocumentDiagnostics
             program.InitialDoubleQuotes,
             program.Flags.CodePointCharacters
         );
+        var definitions = PrologSourceDefinitions.Analyze([source], cancellationToken);
+        var rename = PrologRenameAnalysis.Create([source], parsed.Diagnostics.Count > 0, cancellationToken);
         return (
             Convert(text, parsed.Diagnostics.Concat(warnings)),
             new SourceOutline(
@@ -53,8 +55,8 @@ internal static class DocumentDiagnostics
                 PrologBuiltinHovers.Analyze([source], mode, cancellationToken),
                 PrologCompletionText.Create(text, cancellationToken),
                 [PrologCompletionIndex.Create([source], mode, cancellationToken)],
-                [PrologSourceDefinitions.Analyze([source], cancellationToken)],
-                [PrologRenameAnalysis.Create([source], parsed.Diagnostics.Count > 0, cancellationToken)]
+                NavigationSites.PhysicalContexts(uri, definitions, rename),
+                [rename]
             )
         );
     }
@@ -64,7 +66,7 @@ internal static class DocumentDiagnostics
         var positions = new SourcePositions(text);
         JsonArray result = [];
         foreach (
-            Diagnostic diagnostic in diagnostics.OrderBy(item => item.Span.Start).ThenBy(item => item.Id, StringComparer.Ordinal)
+            var diagnostic in diagnostics.OrderBy(item => item.Span.Start).ThenBy(item => item.Id, StringComparer.Ordinal)
         )
         {
             result.Add(

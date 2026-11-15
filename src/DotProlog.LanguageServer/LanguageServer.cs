@@ -74,7 +74,7 @@ internal sealed class LanguageServer(
                 && (response.ContainsKey("result") ^ response.ContainsKey("error"))
             )
             {
-                JsonObject? log = _fileWatchRegistration.Complete(response);
+                var log = _fileWatchRegistration.Complete(response);
                 if (log is not null && !_shutdown)
                     await SendAsync(log).ConfigureAwait(false);
                 continue;
@@ -91,7 +91,7 @@ internal sealed class LanguageServer(
                 continue;
             }
             var request = body.ContainsKey("id");
-            JsonNode? id = body["id"];
+            var id = body["id"];
             if (method == "exit" && !request)
                 return _shutdown ? 0 : 1;
             if (_shutdown)
@@ -124,7 +124,7 @@ internal sealed class LanguageServer(
                             && editCapabilities["documentChanges"] is JsonValue documentChanges
                             && documentChanges.TryGetValue<bool>(out var supportsChanges)
                             && supportsChanges;
-                        bool prepareRename =
+                        var prepareRename =
                             capabilities["textDocument"] is JsonObject renameText
                             && renameText["rename"] is JsonObject renameCapabilities
                             && renameCapabilities["prepareSupport"] is JsonValue prepareSupport
@@ -150,7 +150,7 @@ internal sealed class LanguageServer(
                         {
                             foreach (var format in formats)
                             {
-                                if (TryString(format, out string kind) && kind is "markdown" or "plaintext")
+                                if (TryString(format, out var kind) && kind is "markdown" or "plaintext")
                                 {
                                     _markdownHover = kind == "markdown";
                                     break;
@@ -189,7 +189,7 @@ internal sealed class LanguageServer(
                         break;
                     case "initialized" when !request:
                         await analysis.StartProjectAsync().ConfigureAwait(false);
-                        JsonObject? registration = _fileWatchRegistration.CreateRequest();
+                        var registration = _fileWatchRegistration.CreateRequest();
                         if (registration is not null)
                             await SendAsync(registration).ConfigureAwait(false);
                         break;
@@ -198,10 +198,10 @@ internal sealed class LanguageServer(
                             RequireObject(body["params"])["changes"] as JsonArray ?? throw new InvalidParametersException();
                         List<string> changedUris = [];
                         // Validate the entire batch before applying any changes.
-                        foreach (JsonNode? change in fileChanges)
+                        foreach (var change in fileChanges)
                         {
-                            JsonObject item = RequireObject(change);
-                            string changedUri = RequireString(item["uri"]);
+                            var item = RequireObject(change);
+                            var changedUri = RequireString(item["uri"]);
                             DocumentSnapshot.Key(changedUri);
                             if (RequireInteger(item["type"]) is < 1 or > 3)
                                 throw new InvalidParametersException();
@@ -210,7 +210,7 @@ internal sealed class LanguageServer(
                         await analysis.DiskChangedAsync(changedUris).ConfigureAwait(false);
                         break;
                     case "textDocument/documentSymbol" when request:
-                        string symbolUri = RequireString(RequireObject(RequireObject(body["params"])["textDocument"])["uri"]);
+                        var symbolUri = RequireString(RequireObject(RequireObject(body["params"])["textDocument"])["uri"]);
                         DocumentSnapshot.Key(symbolUri);
                         await analysis
                             .RequestAsync(
@@ -228,25 +228,25 @@ internal sealed class LanguageServer(
                     case "textDocument/definition" when request:
                     case "textDocument/completion" when request:
                     case "textDocument/hover" when request:
-                        JsonObject positionParameters = RequireObject(body["params"]);
-                        string positionUri = RequireString(RequireObject(positionParameters["textDocument"])["uri"]);
+                        var positionParameters = RequireObject(body["params"]);
+                        var positionUri = RequireString(RequireObject(positionParameters["textDocument"])["uri"]);
                         DocumentSnapshot.Key(positionUri);
-                        JsonObject position = RequireObject(positionParameters["position"]);
-                        int line = RequireInteger(position["line"]);
-                        int character = RequireInteger(position["character"]);
+                        var position = RequireObject(positionParameters["position"]);
+                        var line = RequireInteger(position["line"]);
+                        var character = RequireInteger(position["character"]);
                         if (line < 0 || character < 0)
                             throw new InvalidParametersException();
-                        string? newName = method == "textDocument/rename" ? RequireString(positionParameters["newName"]) : null;
+                        var newName = method == "textDocument/rename" ? RequireString(positionParameters["newName"]) : null;
                         if (method is "textDocument/rename" or "textDocument/prepareRename" && !_versionedEdits)
                         {
                             await SendAsync(Error(id, -32803, "Rename requires workspace.workspaceEdit.documentChanges support."))
                                 .ConfigureAwait(false);
                             break;
                         }
-                        bool includeDeclaration = false;
+                        var includeDeclaration = false;
                         if (method == "textDocument/references")
                         {
-                            JsonNode? declaration = RequireObject(positionParameters["context"])["includeDeclaration"];
+                            var declaration = RequireObject(positionParameters["context"])["includeDeclaration"];
                             if (declaration is not JsonValue value || !value.TryGetValue(out includeDeclaration))
                                 throw new InvalidParametersException();
                         }
@@ -282,7 +282,7 @@ internal sealed class LanguageServer(
                             .ConfigureAwait(false);
                         break;
                     case "$/cancelRequest" when !request:
-                        JsonNode? cancelledId = RequireObject(body["params"])["id"];
+                        var cancelledId = RequireObject(body["params"])["id"];
                         if (!ValidId(cancelledId))
                             throw new InvalidParametersException();
                         await analysis.CancelRequestAsync(cancelledId!.ToJsonString()).ConfigureAwait(false);
@@ -313,7 +313,10 @@ internal sealed class LanguageServer(
                         {
                             var changes = parameters["contentChanges"] as JsonArray ?? throw new InvalidParametersException();
                             if (changes.Count == 0)
+                            {
+                                await analysis.UpdateVersionAsync(uri, documentVersion).ConfigureAwait(false);
                                 break;
+                            }
                             if (changes.Any(change => change is not JsonObject item || item.ContainsKey("range")))
                                 throw new InvalidParametersException();
                             text = RequireString(changes[^1]!["text"]);

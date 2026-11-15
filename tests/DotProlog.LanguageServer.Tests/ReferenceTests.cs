@@ -31,7 +31,7 @@ public sealed class ReferenceTests : IDisposable
         Assert.True(JsonNode.DeepEquals(result, Reply(messages, 3)["result"]));
         var calls = result.Where(item => item!["range"]!["start"]!["line"]!.GetValue<int>() == 1).ToArray();
         Assert.Equal(2, calls.Length);
-        string line = text.Split('\n')[1];
+        var line = text.Split('\n')[1];
         Assert.Equal(
             line.IndexOf("'has space'", StringComparison.Ordinal),
             calls[0]!["range"]!["start"]!["character"]!.GetValue<int>()
@@ -61,19 +61,19 @@ public sealed class ReferenceTests : IDisposable
             """{"jsonrpc":"2.0","id":99,"method":"shutdown"}""",
             """{"jsonrpc":"2.0","method":"exit"}"""
         );
-        foreach (int id in new[] { 2, 3, 4 })
+        foreach (var id in new[] { 2, 3, 4 })
             Assert.Equal(-32602, Reply(messages, id)["error"]!["code"]!.GetValue<int>());
     }
 
     [Fact]
     public void ModulesReexportsAndAritiesMatchSourceIdentity()
     {
-        string library = Source("library.pl", ":- module(library, [item/1]). item(a). item(b). item(_, _).");
-        string facade = Source("facade.pl", ":- module(facade, []). :- reexport(library, [item/1]).");
+        var library = Source("library.pl", ":- module(library, [item/1]). item(a). item(b). item(_, _).");
+        var facade = Source("facade.pl", ":- module(facade, []). :- reexport(library, [item/1]).");
         const string clientText =
             ":- module(client, []). :- use_module('facade.pl'). run :- item(a), library:item(a,b), library:item(b), write(item(data)).";
-        string client = Source("client.pl", clientText);
-        string unrelated = Source("unrelated.pl", ":- module(other, []). item(a). run :- item(a).");
+        var client = Source("client.pl", clientText);
+        var unrelated = Source("unrelated.pl", ":- module(other, []). item(a). run :- item(a).");
         var workspace = Project(client, facade, unrelated, library);
         var references = workspace.References(library, 0, 30, false);
         Assert.Equal(2, references.Count);
@@ -99,11 +99,11 @@ public sealed class ReferenceTests : IDisposable
     [Fact]
     public void DeclaredMetaGoalsAndMultifileHeadsShareOnePredicate()
     {
-        string first = Source(
+        var first = Source(
             "one.pl",
             ":- multifile(p/1). p(one). :- meta_predicate(invoke(0)). invoke(G) :- call(G). run :- invoke(p(one))."
         );
-        string second = Source("two.pl", ":- multifile(p/1). p(two). run2 :- p(two).");
+        var second = Source("two.pl", ":- multifile(p/1). p(two). run2 :- p(two).");
         var workspace = Project(first, second);
         Assert.Equal(2, workspace.References(first, 0, 19, false).Count);
         Assert.Equal(4, workspace.References(second, 0, 19, true).Count);
@@ -116,13 +116,13 @@ public sealed class ReferenceTests : IDisposable
     public void UnsavedEditsCloseAndUnknownDocumentsRefreshIndex(PrologLanguageMode mode, string newline)
     {
         var workspace = new DocumentWorkspace(mode);
-        workspace.Update(new DocumentSnapshot(Uri, "p." + newline + "run :- p.", 1));
+        workspace.Update(new DocumentSnapshot(Uri, "p." + newline + "run :- p." + newline, 1));
         Assert.Equal(1, Assert.Single(workspace.References(Uri, 0, 0, false))!["range"]!["start"]!["line"]!.GetValue<int>());
-        workspace.Update(new DocumentSnapshot(Uri, "p." + newline + "/* moved */" + newline + "run :- p, p.", 2));
+        workspace.Update(new DocumentSnapshot(Uri, "p." + newline + "/* moved */" + newline + "run :- p, p." + newline, 2));
         var references = workspace.References(Uri, 0, 0, false);
         Assert.Equal(2, references.Count);
         Assert.All(references, item => Assert.Equal(2, item!["range"]!["start"]!["line"]!.GetValue<int>()));
-        workspace.Update(new DocumentSnapshot(Uri, "p. run :- write(p).", 3));
+        workspace.Update(new DocumentSnapshot(Uri, "p. run :- write(p)." + newline, 3));
         Assert.Empty(workspace.References(Uri, 0, 0, false));
         Assert.Single(workspace.References(Uri, 0, 0, true));
         Assert.Empty(workspace.References(Uri, 99, 0, true));
@@ -145,8 +145,8 @@ public sealed class ReferenceTests : IDisposable
     [Fact]
     public void DiskChangesBufferOverlaysAndMembershipRefreshReferences()
     {
-        string definition = Source("definition.pl", "p.");
-        string caller = Source("caller.pl", "run :- p.");
+        var definition = Source("definition.pl", "p.");
+        var caller = Source("caller.pl", "run :- p.");
         var workspace = Project(definition, caller);
         Assert.Single(workspace.References(definition, 0, 0, false));
         workspace.Update(new DocumentSnapshot(caller, "run :- p, p.", 1));
@@ -166,9 +166,9 @@ public sealed class ReferenceTests : IDisposable
     [Fact]
     public void SharedAndRepeatedIncludesDeduplicateAndOmitAmbiguousLocations()
     {
-        string child = Source("child.pl", "run :- p.");
-        string first = new System.Uri(Path.Combine(_folder, "first.pl")).AbsoluteUri;
-        string second = new System.Uri(Path.Combine(_folder, "second.pl")).AbsoluteUri;
+        var child = Source("child.pl", "run :- p.");
+        var first = new System.Uri(Path.Combine(_folder, "first.pl")).AbsoluteUri;
+        var second = new System.Uri(Path.Combine(_folder, "second.pl")).AbsoluteUri;
         const string includes = "p. :- include('child.pl'). :- include('child.pl').";
         var workspace = new DocumentWorkspace(PrologLanguageMode.Modern);
         workspace.Update(new DocumentSnapshot(first, includes, 1));
@@ -184,12 +184,28 @@ public sealed class ReferenceTests : IDisposable
     }
 
     [Fact]
+    public void RepeatedIncludeExpansionWithoutOccurrencesSuppressesReferences()
+    {
+        const string childText = "run :- a member [], target.";
+        var child = Source("child.pl", childText);
+        var root = Source(
+            "root.pl",
+            "target. :- op(700, xfx, member). :- include('child.pl'). :- op(0, xfx, member). :- include('child.pl')."
+        );
+        var workspace = new DocumentWorkspace(PrologLanguageMode.Modern);
+        workspace.Update(new DocumentSnapshot(root, File.ReadAllText(new System.Uri(root).LocalPath), 1));
+        Assert.Empty(workspace.References(child, 0, childText.IndexOf("target", StringComparison.Ordinal), false));
+        var declaration = Assert.Single(workspace.References(root, 0, 0, true));
+        Assert.Equal(root, declaration!["uri"]!.GetValue<string>());
+    }
+
+    [Fact]
     public void SameIncludeTokenAsDataAndGoalIsNotReportedAsReference()
     {
-        string child = Source("child.pl", "run :- hold(local).");
+        var child = Source("child.pl", "run :- hold(local).");
         const string text =
             ":- module(a, []). local. hold(_). :- include('child.pl'). :- module(b, []). local. :- meta_predicate(hold(0)). hold(G) :- call(G). :- include('child.pl').";
-        string root = new System.Uri(Path.Combine(_folder, "root.pl")).AbsoluteUri;
+        var root = new System.Uri(Path.Combine(_folder, "root.pl")).AbsoluteUri;
         var workspace = new DocumentWorkspace(PrologLanguageMode.Modern);
         workspace.Update(new DocumentSnapshot(root, text, 1));
         Assert.Empty(workspace.References(child, 0, 12, true));
@@ -198,7 +214,7 @@ public sealed class ReferenceTests : IDisposable
 
     private string Source(string name, string text)
     {
-        string path = Path.Combine(_folder, name);
+        var path = Path.Combine(_folder, name);
         File.WriteAllText(path, text);
         return new System.Uri(path).AbsoluteUri;
     }

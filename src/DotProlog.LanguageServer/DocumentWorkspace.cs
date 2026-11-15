@@ -81,10 +81,10 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
         foreach (var item in next)
             if (!_documents.TryGetValue(item.Key, out var document) || document != item.Value)
                 changed.Add(item.Key);
-        foreach (string uri in diskChanges)
+        foreach (var uri in diskChanges)
             if (new Uri(uri).IsFile && !next.ContainsKey(DocumentSnapshot.Key(uri)))
                 changed.Add(DocumentSnapshot.Key(uri));
-        foreach (string key in _documents.Keys)
+        foreach (var key in _documents.Keys)
             if (!next.ContainsKey(key))
                 _analyses.Remove(key);
         _documents.Clear();
@@ -112,8 +112,8 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
     internal IReadOnlyList<DiagnosticPublication> ReplaceProject(ProjectConfiguration configuration)
     {
         // Stage a complete analysis before publishing or discarding the previous configuration.
-        ProjectConfiguration? previousProject = project;
-        Dictionary<string, WorkspaceAnalysis> previousAnalyses = _analyses;
+        var previousProject = project;
+        var previousAnalyses = _analyses;
         project = configuration;
         _analyses = new Dictionary<string, WorkspaceAnalysis>(DocumentSnapshot.KeyComparer);
         try
@@ -134,7 +134,7 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
 
     internal IReadOnlyList<DiagnosticPublication> Update(DocumentSnapshot document)
     {
-        string key = DocumentSnapshot.Key(document.Uri);
+        var key = DocumentSnapshot.Key(document.Uri);
         _documents[key] = document;
         Reanalyze(new HashSet<string>(DocumentSnapshot.KeyComparer) { key });
         return Publications();
@@ -142,7 +142,7 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
 
     internal IReadOnlyList<DiagnosticPublication> Close(string uri)
     {
-        string key = DocumentSnapshot.Key(uri);
+        var key = DocumentSnapshot.Key(uri);
         if (!_documents.Remove(key))
             return [];
         _analyses.Remove(key);
@@ -153,9 +153,9 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
     internal IReadOnlyList<DiagnosticPublication> DiskChanged(IEnumerable<string> uris)
     {
         HashSet<string> changed = new(DocumentSnapshot.KeyComparer);
-        foreach (string uri in uris)
+        foreach (var uri in uris)
         {
-            string key = DocumentSnapshot.Key(uri);
+            var key = DocumentSnapshot.Key(uri);
             // An open document is authoritative even when its on-disk file changes or disappears.
             if (new Uri(uri).IsFile && !_documents.ContainsKey(key))
                 changed.Add(key);
@@ -176,7 +176,7 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
         ];
         // Cache disk reads within this update so shared includes have the same source text.
         Dictionary<string, string> disk = new(DocumentSnapshot.KeyComparer);
-        foreach (string key in affected)
+        foreach (var key in affected)
         {
             _analysisCancellation.ThrowIfCancellationRequested();
             _analyses[key] = Analyze(key, _documents[key], disk);
@@ -206,7 +206,7 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
         }
 
         Dictionary<string, string> sources = new(DocumentSnapshot.KeyComparer) { [key] = document.Text };
-        PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+        var loaded = PrologLintSourceLoader.Load(
             key,
             document.Text,
             new BytecodeProgram(mode),
@@ -215,7 +215,7 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
         );
         _analysisCancellation.ThrowIfCancellationRequested();
         Diagnostic[] findings = [.. loaded.Diagnostics.Concat(PrologLinter.AnalyzeProgram([loaded.Source]))];
-        foreach ((string path, string text) in sources)
+        foreach ((var path, var text) in sources)
         {
             diagnostics[path] = DocumentDiagnostics.Convert(
                 text,
@@ -248,7 +248,7 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
         Dictionary<string, string> sources = new(DocumentSnapshot.KeyComparer);
         List<PrologLintSource> units = [];
         List<Diagnostic> findings = [];
-        foreach (string path in configuration.Sources)
+        foreach (var path in configuration.Sources)
         {
             _analysisCancellation.ThrowIfCancellationRequested();
             try
@@ -280,7 +280,7 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
         _analysisCancellation.ThrowIfCancellationRequested();
         findings.AddRange(PrologLinter.AnalyzeProgram(units));
         Dictionary<string, JsonArray> diagnostics = new(DocumentSnapshot.KeyComparer);
-        foreach ((string path, string text) in sources)
+        foreach ((var path, var text) in sources)
             diagnostics[path] = DocumentDiagnostics.Convert(
                 text,
                 findings.Where(item => DocumentSnapshot.KeyComparer.Equals(item.FileName, path))
@@ -333,7 +333,7 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
                 hovers.Where(hover => DocumentSnapshot.KeyComparer.Equals(hover.FileName, item.Key)).ToArray(),
                 PrologCompletionText.Create(item.Value, _analysisCancellation),
                 [completions],
-                [definitions.Where(site => DocumentSnapshot.KeyComparer.Equals(site.FileName, item.Key)).ToArray()],
+                NavigationSites.PhysicalContexts(item.Key, definitions, rename),
                 [rename]
             ),
             DocumentSnapshot.KeyComparer
@@ -348,7 +348,7 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
         string[] keys = [.. _analyses.Keys.Order(StringComparer.Ordinal)];
         // Analyze included buffers in their including context, not again with default operators.
         foreach (
-            string key in keys.Where(key =>
+            var key in keys.Where(key =>
                 !_analyses.Any(other =>
                     !DocumentSnapshot.KeyComparer.Equals(other.Key, key) && other.Value.Dependencies.Contains(key)
                 )
@@ -356,19 +356,19 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
         )
             AddRoot(key);
         // A cycle has no parentless root. Choose a deterministic representative for each remaining component.
-        foreach (string key in keys)
+        foreach (var key in keys)
             if (!covered.Contains(key))
                 AddRoot(key);
 
         _references = ReferenceIndex.Create(_outlines, _analysisCancellation);
         Dictionary<string, DiagnosticPublication> next = new(DocumentSnapshot.KeyComparer);
-        foreach ((string key, JsonArray diagnostics) in merged)
+        foreach ((var key, var diagnostics) in merged)
         {
             _documents.TryGetValue(key, out var document);
             next[key] = new DiagnosticPublication(document?.Uri ?? new Uri(key).AbsoluteUri, document?.Version, diagnostics);
         }
         List<DiagnosticPublication> changes = [];
-        foreach ((string key, DiagnosticPublication publication) in next)
+        foreach ((var key, var publication) in next)
         {
             if (
                 !_published.TryGetValue(key, out var previous)
@@ -378,7 +378,7 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
             )
                 changes.Add(publication);
         }
-        foreach ((string key, DiagnosticPublication previous) in _published)
+        foreach ((var key, var previous) in _published)
             if (!next.ContainsKey(key))
                 changes.Add(new DiagnosticPublication(previous.Uri, null, []));
         _published = next;
@@ -387,7 +387,7 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
         void AddRoot(string key)
         {
             covered.Add(key);
-            WorkspaceAnalysis analysis = _analyses[key];
+            var analysis = _analyses[key];
             covered.UnionWith(analysis.Dependencies);
             foreach (var (path, outline) in analysis.Outlines)
             {
@@ -403,14 +403,14 @@ internal sealed class DocumentWorkspace(PrologLanguageMode mode, ProjectConfigur
                     )
                     : outline;
             }
-            foreach ((string path, JsonArray diagnostics) in analysis.Diagnostics)
+            foreach ((var path, var diagnostics) in analysis.Diagnostics)
             {
                 if (!merged.TryGetValue(path, out var combined))
                 {
                     combined = [];
                     merged[path] = combined;
                 }
-                foreach (JsonNode? diagnostic in diagnostics)
+                foreach (var diagnostic in diagnostics)
                     if (!combined.Any(existing => JsonNode.DeepEquals(existing, diagnostic)))
                         combined.Add(diagnostic?.DeepClone());
             }
