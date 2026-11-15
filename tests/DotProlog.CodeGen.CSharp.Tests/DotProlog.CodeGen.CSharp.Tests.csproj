@@ -12,6 +12,7 @@
     <ItemGroup>
         <ProjectReference Include="..\..\src\DotProlog.Testing\DotProlog.Testing.csproj" />
         <ProjectReference Include="..\..\src\DotProlog.CodeGen.CSharp\DotProlog.CodeGen.CSharp.csproj" />
+        <ProjectReference Include="..\..\src\DotProlog.Foreign.SourceGenerator\DotProlog.Foreign.SourceGenerator.csproj" />
         <None Include="..\conformance\strict_iso_review.pl" Link="strict_iso_review.pl" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 </Project>

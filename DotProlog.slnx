@@ -6,6 +6,7 @@
         <Project Path="src/DotProlog.Sdk/DotProlog.Sdk.csproj" />
         <Project Path="src/DotProlog.Build.Tasks/DotProlog.Build.Tasks.csproj" />
         <Project Path="src/DotProlog.CodeGen.CSharp/DotProlog.CodeGen.CSharp.csproj" />
+        <Project Path="src/DotProlog.Foreign.SourceGenerator/DotProlog.Foreign.SourceGenerator.csproj" />
         <Project Path="src/DotProlog.Compiler/DotProlog.Compiler.csproj" />
         <Project Path="src/DotProlog.Tool/DotProlog.Tool.csproj" />
         <Project Path="src/DotProlog.Packages.Cli/DotProlog.Packages.Cli.csproj" />
@@ -20,6 +21,7 @@
         <Project Path="tests/DotProlog.CodeGen.IL.Tests/DotProlog.CodeGen.IL.Tests.csproj" />
         <Project Path="tests/Integration/Integration.Tests.csproj" />
         <Project Path="tests/DotProlog.CodeGen.CSharp.Tests/DotProlog.CodeGen.CSharp.Tests.csproj" />
+        <Project Path="tests/DotProlog.Foreign.SourceGenerator.Tests/DotProlog.Foreign.SourceGenerator.Tests.csproj" />
         <Project Path="tests/DotProlog.Compiler.Tests/DotProlog.Compiler.Tests.csproj" />
         <Project Path="tests/DotProlog.Packages.Tests/DotProlog.Packages.Tests.csproj" />
         <Project Path="tests/DotProlog.Runtime.Tests/DotProlog.Runtime.Tests.csproj" />

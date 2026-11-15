@@ -30,7 +30,7 @@
           BaseIntermediateOutputPath rather than IntermediateOutputPath: the latter is not defined
           until Microsoft.Common.CurrentVersion.targets runs, which is after this file is imported,
           and reading it too early silently writes the facade into the project directory. The
-          generated text depends only on the .pl and .dpli, so one copy under obj/ serves every
+          generated text is configuration-independent, so one copy under obj/ serves every
           configuration.
         -->
         <DotPrologGeneratedPath Condition="'$(DotPrologGeneratedPath)' == ''"
@@ -49,7 +49,16 @@
         -->
         <DotPrologTasksAssembly Condition="'$(DotPrologTasksAssembly)' == ''"
             >$(MSBuildThisFileDirectory)..\tasks\net10.0\DotProlog.Build.Tasks.dll</DotPrologTasksAssembly>
+        <DotPrologForeignSourceGeneratorAssembly Condition="'$(DotPrologForeignSourceGeneratorAssembly)' == ''"
+            >$(MSBuildThisFileDirectory)..\analyzers\dotnet\cs\DotProlog.Foreign.SourceGenerator.dll</DotPrologForeignSourceGeneratorAssembly>
+        <DotPrologForeignSourceGeneratorAssembly
+            Condition="!Exists('$(DotPrologForeignSourceGeneratorAssembly)') and Exists('$(RepositoryRoot)src/DotProlog.Foreign.SourceGenerator/bin/$(Configuration)/netstandard2.0/DotProlog.Foreign.SourceGenerator.dll')"
+            >$(RepositoryRoot)src/DotProlog.Foreign.SourceGenerator/bin/$(Configuration)/netstandard2.0/DotProlog.Foreign.SourceGenerator.dll</DotPrologForeignSourceGeneratorAssembly>
     </PropertyGroup>
+
+    <ItemGroup Condition="Exists('$(DotPrologForeignSourceGeneratorAssembly)')">
+        <Analyzer Include="$(DotPrologForeignSourceGeneratorAssembly)" />
+    </ItemGroup>
 
     <!--
       Visual Studio and msbuild.exe host .NET tasks out of process. The dotnet CLI can load the same
@@ -101,7 +110,7 @@
       when it differs — turns a changed file list into a fresh timestamp the generation target's
       Inputs comparison does see.
     -->
-    <Target Name="_DotPrologRecordInputs" BeforeTargets="GeneratePrologFacade">
+    <Target Name="_DotPrologRecordInputs" BeforeTargets="GeneratePrologFacade" Condition="'$(DesignTimeBuild)' != 'true'">
         <MakeDir Directories="$(DotPrologGeneratedPath)" />
 
         <ItemGroup Condition="'$(DotPrologPackageDirectory)' != ''">
@@ -109,9 +118,21 @@
         </ItemGroup>
         <WriteLinesToFile
             File="$(DotPrologGeneratedPath).inputs"
-            Lines="package-directory=$(DotPrologPackageDirectory);language-mode=$(DotPrologLanguageMode);flags=$(DotPrologFlags);@(PrologCompile->'%(FullPath)');@(PrologContract->'%(FullPath)')"
+            Lines="package-directory=$(DotPrologPackageDirectory);language-mode=$(DotPrologLanguageMode);flags=$(DotPrologFlags);root-namespace=$(RootNamespace);output-type=$(OutputType);test-project=$(DotPrologTestProject);@(PrologCompile->'%(FullPath)');@(PrologContract->'%(FullPath)')"
             Overwrite="true"
             WriteOnlyWhenDifferent="true"
+        />
+
+        <!-- The stamp lists every output. A deleted output must invalidate an otherwise up-to-date target. -->
+        <ReadLinesFromFile File="$(DotPrologGeneratedPath).generated" Condition="Exists('$(DotPrologGeneratedPath).generated')">
+            <Output TaskParameter="Lines" ItemName="_DotPrologExpectedGeneratedFile" />
+        </ReadLinesFromFile>
+        <ItemGroup>
+            <_DotPrologMissingGeneratedFile Include="@(_DotPrologExpectedGeneratedFile)" Condition="!Exists('%(Identity)')" />
+        </ItemGroup>
+        <Delete
+            Files="$(DotPrologGeneratedPath).generated"
+            Condition="Exists('$(DotPrologGeneratedPath).generated') and ('@(_DotPrologExpectedGeneratedFile)' == '' or '@(_DotPrologMissingGeneratedFile)' != '')"
         />
     </Target>
 
@@ -125,10 +146,15 @@
         BeforeTargets="BeforeCompile;CoreCompile"
         Inputs="@(_DotPrologPackageInput);@(PrologCompile);@(PrologContract);$(DotPrologTasksAssembly);$(MSBuildProjectFullPath);$(DotPrologGeneratedPath).inputs"
         Outputs="$(DotPrologGeneratedPath).generated"
+        Condition="'$(DesignTimeBuild)' != 'true'"
     >
         <Error
             Condition="!Exists('$(DotPrologTasksAssembly)')"
             Text="The facade generator was not found at $(DotPrologTasksAssembly)."
+        />
+        <Error
+            Condition="!Exists('$(DotPrologForeignSourceGeneratorAssembly)')"
+            Text="The foreign predicate source generator was not found at $(DotPrologForeignSourceGeneratorAssembly). Build DotProlog.Foreign.SourceGenerator or restore the SDK package."
         />
 
         <MakeDir Directories="$(DotPrologGeneratedPath)" />
@@ -136,6 +162,7 @@
         <GeneratePrologFacade
             Sources="@(PrologCompile)"
             Contracts="@(PrologContract)"
+            ProjectDirectory="$(MSBuildProjectDirectory)"
             OutputPath="$(DotPrologGeneratedPath)"
             RootNamespace="$(RootNamespace)"
             GenerateEntryPoint="$(_DotPrologGenerateEntryPoint)"
@@ -156,7 +183,12 @@
           Stamped only after the task succeeds. Writing it first would leave a stamp behind when
           generation failed, and the next build would skip generation and fail on missing code.
         -->
-        <Touch Files="$(DotPrologGeneratedPath).generated" AlwaysCreate="true" />
+        <WriteLinesToFile
+            File="$(DotPrologGeneratedPath).generated"
+            Lines="@(DotPrologGeneratedCompile->'%(FullPath)')"
+            Overwrite="true"
+            WriteOnlyWhenDifferent="false"
+        />
         <ItemGroup>
             <FileWrites Include="$(DotPrologGeneratedPath).generated" />
         </ItemGroup>
