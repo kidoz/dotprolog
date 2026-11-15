@@ -292,11 +292,7 @@ public sealed class ProgramLoader
                 var sourceIndicator = SourceIndicatorOf(unit.Module, functorId);
                 if (_modules.IsMultifile(unit.Module, sourceIndicator))
                 {
-                    var multifileClauses = _modules.AppendMultifileClauses(
-                        unit.Module,
-                        sourceIndicator,
-                        pending[functorId]
-                    );
+                    var multifileClauses = _modules.AppendMultifileClauses(unit.Module, sourceIndicator, pending[functorId]);
                     EmitPredicate(functorId, multifileClauses, diagnostics, fileName, unitDefinitions);
                     continue;
                 }
@@ -371,9 +367,7 @@ public sealed class ProgramLoader
 
         var separator = compiledName.LastIndexOf(':');
         var name = separator >= 0 ? compiledName[(separator + 1)..] : compiledName;
-        var metadata = _modules
-            .Catalog.Declare(module)
-            .Predicate(new ModulePredicateIndicator(name, arity));
+        var metadata = _modules.Catalog.Declare(module).Predicate(new ModulePredicateIndicator(name, arity));
         metadata.AddStaticClause(term.Cells, root);
     }
 
@@ -482,10 +476,7 @@ public sealed class ProgramLoader
 
                     if (
                         name.Name != ModuleTable.UserModule
-                        && (
-                            !_modules.Catalog.TryGet(name.Name, out var definition)
-                            || !definition!.InterfacePrepared
-                        )
+                        && (!_modules.Catalog.TryGet(name.Name, out var definition) || !definition!.InterfacePrepared)
                     )
                     {
                         ReportInvalidIsoModuleText(
@@ -1237,13 +1228,7 @@ public sealed class ProgramLoader
                         break;
                 }
 
-                if (
-                    TryDoubleQuotesDirective(
-                        goal,
-                        _program.LanguageMode != PrologLanguageMode.StrictIso,
-                        out var selected
-                    )
-                )
+                if (TryDoubleQuotesDirective(goal, _program.LanguageMode != PrologLanguageMode.StrictIso, out var selected))
                 {
                     doubleQuotes = selected;
                     _program.Flags.DoubleQuotes = selected;

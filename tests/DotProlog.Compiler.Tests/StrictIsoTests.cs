@@ -28,10 +28,7 @@ public sealed class StrictIsoTests
         );
 
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
-        Assert.Equal(
-            RunResult.Success,
-            engine.RunGoal("values([1, 2])", out var diagnostics)
-        );
+        Assert.Equal(RunResult.Success, engine.RunGoal("values([1, 2])", out var diagnostics));
         Assert.Empty(diagnostics);
     }
 

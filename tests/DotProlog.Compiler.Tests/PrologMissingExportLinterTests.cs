@@ -42,11 +42,7 @@ public sealed class PrologMissingExportLinterTests : IDisposable
     public void DistinctIdentitiesAndSourcesProduceSeparateFindings()
     {
         const string main = ":- module(m, []). :- import(a,[p/0,q/0]). :- import(b,[p/0]).";
-        var diagnostics = Lint(
-            ("a.pl", ":- module(a, [])."),
-            ("b.pl", ":- module(b, [])."),
-            ("main.pl", main)
-        );
+        var diagnostics = Lint(("a.pl", ":- module(a, [])."), ("b.pl", ":- module(b, [])."), ("main.pl", main));
 
         var warnings = Warnings(diagnostics);
         Assert.Equal(3, warnings.Length);
@@ -258,11 +254,7 @@ public sealed class PrologMissingExportLinterTests : IDisposable
     [InlineData(PrologLanguageMode.StrictIso)]
     public void BothLanguageModesUseTheSameRule(PrologLanguageMode mode)
     {
-        var diagnostics = Lint(
-            mode,
-            ("a.pl", ":- module(a, [])."),
-            ("main.pl", ":- module(m, []). :- import(a,[p/0]).")
-        );
+        var diagnostics = Lint(mode, ("a.pl", ":- module(a, [])."), ("main.pl", ":- module(m, []). :- import(a,[p/0])."));
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.MissingExport));
     }
@@ -292,11 +284,7 @@ public sealed class PrologMissingExportLinterTests : IDisposable
     public void SingleFileEntryPointDoesNotInventExportKnowledge()
     {
         const string text = ":- module(m, []). :- import(a,[p/0]).";
-        var loaded = PrologLintSourceLoader.Load(
-            Path.Combine(_directory, "single.pl"),
-            text,
-            new BytecodeProgram()
-        );
+        var loaded = PrologLintSourceLoader.Load(Path.Combine(_directory, "single.pl"), text, new BytecodeProgram());
 
         var diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl");
 

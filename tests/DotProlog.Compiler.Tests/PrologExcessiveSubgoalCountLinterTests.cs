@@ -236,18 +236,9 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     public void ReusableSingleFileApiHonorsCustomLimit()
     {
         const string text = "p :- a,b.";
-        var loaded = PrologLintSourceLoader.Load(
-            Path.Combine(_directory, "single.pl"),
-            text,
-            new BytecodeProgram()
-        );
+        var loaded = PrologLintSourceLoader.Load(Path.Combine(_directory, "single.pl"), text, new BytecodeProgram());
 
-        var diagnostics = PrologLinter.AnalyzeSource(
-            text,
-            loaded.Source.Clauses,
-            "single.pl",
-            EnabledWithMaximum(1)
-        );
+        var diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl", EnabledWithMaximum(1));
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
     }

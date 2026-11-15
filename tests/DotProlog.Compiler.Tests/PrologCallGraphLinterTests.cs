@@ -279,11 +279,7 @@ public sealed class PrologCallGraphLinterTests : IDisposable
         List<Diagnostic> readerDiagnostics = [];
         foreach ((var name, var text) in inputs)
         {
-            var loaded = PrologLintSourceLoader.Load(
-                Path.Combine(_directory, name),
-                text,
-                new BytecodeProgram()
-            );
+            var loaded = PrologLintSourceLoader.Load(Path.Combine(_directory, name), text, new BytecodeProgram());
             sources.Add(loaded.Source);
             readerDiagnostics.AddRange(loaded.Diagnostics);
         }

@@ -51,9 +51,7 @@ public sealed class PrologReachabilityLinterTests : IDisposable
     [Fact]
     public void InitializationGoalsRootTheirCallTreesWithoutExecuting()
     {
-        var diagnostics = Lint(
-            ":- module(m, []). :- initialization((go, halt(9))). go :- helper. helper. unused."
-        );
+        var diagnostics = Lint(":- module(m, []). :- initialization((go, halt(9))). go :- helper. helper. unused.");
 
         AssertUnreferenced(diagnostics, "unused/0");
     }
@@ -323,9 +321,7 @@ public sealed class PrologReachabilityLinterTests : IDisposable
     [Fact]
     public void QualifiedClauseHeadsSuppressReachabilityFindings()
     {
-        var diagnostics = Lint(
-            ":- module(m, []). :- multifile(host:hook/0). host:hook :- helper. helper. dead."
-        );
+        var diagnostics = Lint(":- module(m, []). :- multifile(host:hook/0). host:hook :- helper. helper. dead.");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleUnreferencedPredicate));
     }
@@ -400,11 +396,7 @@ public sealed class PrologReachabilityLinterTests : IDisposable
 
     private IReadOnlyList<Diagnostic> Lint(PrologLanguageMode mode, string source)
     {
-        var loaded = PrologLintSourceLoader.Load(
-            Path.Combine(_directory, "main.pl"),
-            source + "\n",
-            new BytecodeProgram(mode)
-        );
+        var loaded = PrologLintSourceLoader.Load(Path.Combine(_directory, "main.pl"), source + "\n", new BytecodeProgram(mode));
         return [.. loaded.Diagnostics, .. PrologLinter.AnalyzeProgram([loaded.Source])];
     }
 

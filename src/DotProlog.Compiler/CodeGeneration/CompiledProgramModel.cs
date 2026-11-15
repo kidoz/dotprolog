@@ -212,8 +212,7 @@ internal sealed class CompiledProgramModel
             List<CompiledModulePredicate> predicates = [];
             foreach (var predicate in module.Predicates)
             {
-                var compiledName =
-                    module.Name == "user" ? predicate.Indicator.Name : $"{module.Name}:{predicate.Indicator.Name}";
+                var compiledName = module.Name == "user" ? predicate.Indicator.Name : $"{module.Name}:{predicate.Indicator.Name}";
                 var functor = program.Symbols.InternFunctor(compiledName, predicate.Indicator.Arity);
                 if (predicate.Defined && !program.IsUserPredicate(functor))
                 {

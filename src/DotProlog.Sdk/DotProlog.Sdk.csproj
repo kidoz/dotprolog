@@ -33,7 +33,10 @@
     <ItemGroup>
         <!-- Builds the generator before this package needs its output; not referenced as an assembly. -->
         <ProjectReference Include="..\DotProlog.Build.Tasks\DotProlog.Build.Tasks.csproj" ReferenceOutputAssembly="false" />
-        <ProjectReference Include="..\DotProlog.Foreign.SourceGenerator\DotProlog.Foreign.SourceGenerator.csproj" ReferenceOutputAssembly="false" />
+        <ProjectReference
+            Include="..\DotProlog.Foreign.SourceGenerator\DotProlog.Foreign.SourceGenerator.csproj"
+            ReferenceOutputAssembly="false"
+        />
     </ItemGroup>
 
     <ItemGroup>
@@ -51,7 +54,10 @@
             <!-- The generator and everything it needs, loaded by Sdk.targets through a UsingTask. -->
             <_PrologTaskAssembly Include="$(PrologTasksOutput)*.dll" />
             <TfmSpecificPackageFile Include="@(_PrologTaskAssembly)" PackagePath="tasks\net10.0\%(Filename)%(Extension)" />
-            <TfmSpecificPackageFile Include="$(PrologForeignSourceGeneratorOutput)" PackagePath="analyzers\dotnet\cs\DotProlog.Foreign.SourceGenerator.dll" />
+            <TfmSpecificPackageFile
+                Include="$(PrologForeignSourceGeneratorOutput)"
+                PackagePath="analyzers\dotnet\cs\DotProlog.Foreign.SourceGenerator.dll"
+            />
         </ItemGroup>
 
         <Error

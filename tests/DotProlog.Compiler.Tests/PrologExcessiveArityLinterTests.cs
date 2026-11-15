@@ -184,10 +184,7 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     [Fact]
     public void ExplicitFilesUseFirstSuppliedDefinition()
     {
-        var diagnostics = Lint(
-            [("first.pl", "p(A, B, C, D, E)."), ("second.pl", "p(A, B, C, D, E) :- true.")],
-            Enabled
-        );
+        var diagnostics = Lint([("first.pl", "p(A, B, C, D, E)."), ("second.pl", "p(A, B, C, D, E) :- true.")], Enabled);
 
         var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
         Assert.EndsWith("first.pl", warning.FileName, StringComparison.Ordinal);
@@ -229,18 +226,9 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     public void ReusableSingleFileApiHonorsCustomLimit()
     {
         const string text = "p(A, B).";
-        var loaded = PrologLintSourceLoader.Load(
-            Path.Combine(_directory, "single.pl"),
-            text,
-            new BytecodeProgram()
-        );
+        var loaded = PrologLintSourceLoader.Load(Path.Combine(_directory, "single.pl"), text, new BytecodeProgram());
 
-        var diagnostics = PrologLinter.AnalyzeSource(
-            text,
-            loaded.Source.Clauses,
-            "single.pl",
-            EnabledWithMaximum(1)
-        );
+        var diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl", EnabledWithMaximum(1));
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
     }

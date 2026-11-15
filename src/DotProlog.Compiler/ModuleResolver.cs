@@ -46,8 +46,7 @@ internal sealed class ModuleResolver
         _module = module;
         _local = local;
         _program = program;
-        _isoContext =
-            isoContext || (modules.Catalog.TryGet(module, out var definition) && definition!.InterfacePrepared);
+        _isoContext = isoContext || (modules.Catalog.TryGet(module, out var definition) && definition!.InterfacePrepared);
     }
 
     /// <summary>Whether this resolver has anything to do.</summary>

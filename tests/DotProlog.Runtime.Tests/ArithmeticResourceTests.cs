@@ -31,9 +31,7 @@ public sealed class ArithmeticResourceTests
         using var machine = new Machine(new BytecodeProgram());
         var expression = BinaryExpression(machine, operation, operation == "^" ? 2 : 1, BudgetBytes * 8);
 
-        var error = Assert.Throws<PrologException>(() =>
-            ArithmeticEvaluator.Evaluate(machine, expression, BudgetBytes)
-        );
+        var error = Assert.Throws<PrologException>(() => ArithmeticEvaluator.Evaluate(machine, expression, BudgetBytes));
 
         Assert.Contains("resource_error(memory)", error.Message, StringComparison.Ordinal);
     }

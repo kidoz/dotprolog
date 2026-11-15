@@ -170,11 +170,7 @@ public sealed class PrologNonTailRecursionLinterTests : IDisposable
     public void ReusableSingleFileApiHonorsEnabledRules()
     {
         const string text = "p :- p, true.";
-        var loaded = PrologLintSourceLoader.Load(
-            Path.Combine(_directory, "single.pl"),
-            text,
-            new BytecodeProgram()
-        );
+        var loaded = PrologLintSourceLoader.Load(Path.Combine(_directory, "single.pl"), text, new BytecodeProgram());
 
         var diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl", Enabled);
 

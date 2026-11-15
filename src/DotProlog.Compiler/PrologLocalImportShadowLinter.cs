@@ -30,8 +30,8 @@ internal static class PrologLocalImportShadowLinter
             }
             else
             {
-                var declaration = model.LocalProcedureDeclarations.FirstOrDefault(
-                    declaration => declaration.Module == shadow.Importer && declaration.Indicator == shadow.Indicator
+                var declaration = model.LocalProcedureDeclarations.FirstOrDefault(declaration =>
+                    declaration.Module == shadow.Importer && declaration.Indicator == shadow.Indicator
                 );
                 if (declaration is null)
                 {

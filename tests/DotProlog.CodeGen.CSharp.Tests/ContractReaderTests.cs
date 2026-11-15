@@ -336,9 +336,7 @@ public sealed class ContractReaderTests
     [Fact]
     public void UnderscoredNamesStillMapToIdentifiers()
     {
-        var contract = ReadValid(
-            ":- clr_module('M').\n:- clr_export('_private_pred'/1, nondet, [out('_v_1', atom)])."
-        );
+        var contract = ReadValid(":- clr_module('M').\n:- clr_export('_private_pred'/1, nondet, [out('_v_1', atom)]).");
 
         Assert.Equal("_private_pred", contract.Exports[0].PredicateName);
     }

@@ -86,10 +86,7 @@ public sealed class PrologMultifileCutLinterTests : IDisposable
     [Fact]
     public void PhysicalSeparationWithoutDeclarationIsNotEnough()
     {
-        var diagnostics = Lint(
-            [("first.pl", ":- module(m, []). p :- !."), ("second.pl", ":- module(m, []). p :- !.")],
-            Enabled
-        );
+        var diagnostics = Lint([("first.pl", ":- module(m, []). p :- !."), ("second.pl", ":- module(m, []). p :- !.")], Enabled);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleMultifileCut));
     }
@@ -155,11 +152,7 @@ public sealed class PrologMultifileCutLinterTests : IDisposable
     public void ReusableSingleFileApiHonorsEnabledRules()
     {
         const string text = ":- multifile(p/0). p :- !.";
-        var loaded = PrologLintSourceLoader.Load(
-            Path.Combine(_directory, "single.pl"),
-            text,
-            new BytecodeProgram()
-        );
+        var loaded = PrologLintSourceLoader.Load(Path.Combine(_directory, "single.pl"), text, new BytecodeProgram());
 
         var diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl", Enabled);
 

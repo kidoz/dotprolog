@@ -74,12 +74,7 @@ public class GroundRuleContractOutputLintBenchmarks
         [
             PrologLintSourceLoader.Load(SourceName, validationText, new BytecodeProgram()).Source,
         ];
-        var validation = PrologContractLinter.Analyze(
-            validationSources,
-            _contract,
-            ContractName,
-            GroundRulesEnabled
-        );
+        var validation = PrologContractLinter.Analyze(validationSources, _contract, ContractName, GroundRulesEnabled);
         if (
             validation.Count != 2
             || validation.Any(diagnostic => diagnostic.Id != LintDiagnosticIds.GroundRuleContractOutputTypeMismatch)

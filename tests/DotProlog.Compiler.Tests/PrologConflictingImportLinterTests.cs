@@ -16,11 +16,7 @@ public sealed class PrologConflictingImportLinterTests : IDisposable
     public void ReportsSelectiveConflictAtLaterBindingByDefault()
     {
         const string main = ":- module(m, []). :- import(a,[p/0]). :- import(b,[p/0]).";
-        var diagnostics = Lint(
-            ("a.pl", ":- module(a,[p/0]). p."),
-            ("b.pl", ":- module(b,[p/0]). p."),
-            ("main.pl", main)
-        );
+        var diagnostics = Lint(("a.pl", ":- module(a,[p/0]). p."), ("b.pl", ":- module(b,[p/0]). p."), ("main.pl", main));
 
         var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ConflictingImport));
         Assert.Equal(main.LastIndexOf("p/0", StringComparison.Ordinal), warning.Span.Start);
@@ -135,11 +131,7 @@ public sealed class PrologConflictingImportLinterTests : IDisposable
     public void FileImportsProduceWholeModuleConflict()
     {
         const string main = ":- module(m, []). :- use_module('a.pl'). :- use_module('b.pl').";
-        var diagnostics = Lint(
-            ("a.pl", ":- module(a,[p/0]). p."),
-            ("b.pl", ":- module(b,[p/0]). p."),
-            ("main.pl", main)
-        );
+        var diagnostics = Lint(("a.pl", ":- module(a,[p/0]). p."), ("b.pl", ":- module(b,[p/0]). p."), ("main.pl", main));
 
         var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ConflictingImport));
         Assert.Equal(main.LastIndexOf("'b.pl'", StringComparison.Ordinal), warning.Span.Start);
@@ -175,10 +167,7 @@ public sealed class PrologConflictingImportLinterTests : IDisposable
     [Fact]
     public void LocalDefinitionOverrideIsNotImportConflict()
     {
-        var diagnostics = Lint(
-            ("a.pl", ":- module(a,[p/0]). p."),
-            ("main.pl", ":- module(m, []). :- import(a,[p/0]). p.")
-        );
+        var diagnostics = Lint(("a.pl", ":- module(a,[p/0]). p."), ("main.pl", ":- module(m, []). :- import(a,[p/0]). p."));
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.ConflictingImport));
     }
@@ -277,11 +266,7 @@ public sealed class PrologConflictingImportLinterTests : IDisposable
     public void SingleFileEntryPointDoesNotInventCrossFileConflict()
     {
         const string text = ":- module(m, []). :- import(a,[p/0]). :- import(b,[p/0]).";
-        var loaded = PrologLintSourceLoader.Load(
-            Path.Combine(_directory, "single.pl"),
-            text,
-            new BytecodeProgram()
-        );
+        var loaded = PrologLintSourceLoader.Load(Path.Combine(_directory, "single.pl"), text, new BytecodeProgram());
 
         var diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl");
 

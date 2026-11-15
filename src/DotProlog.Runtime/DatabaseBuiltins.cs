@@ -382,9 +382,7 @@ internal static class DatabaseBuiltins
         var separator = compiledName.LastIndexOf(':');
         var module = separator > 0 ? compiledName[..separator] : "user";
         var name = separator > 0 ? compiledName[(separator + 1)..] : compiledName;
-        var metadata = machine
-            .Program.Modules.Declare(module)
-            .Predicate(new ModulePredicateIndicator(name, functor.Arity));
+        var metadata = machine.Program.Modules.Declare(module).Predicate(new ModulePredicateIndicator(name, functor.Arity));
         metadata.Defined = true;
         metadata.Dynamic = true;
     }

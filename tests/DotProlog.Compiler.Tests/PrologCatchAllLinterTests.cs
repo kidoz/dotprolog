@@ -154,9 +154,7 @@ public sealed class PrologCatchAllLinterTests : IDisposable
     [Fact]
     public void MultipleMatchingClausesProduceSeparateFindings()
     {
-        var diagnostics = Lint(
-            "p :- catch(true, _, true). p :- catch(true, Error, true). q :- catch(true, expected, true)."
-        );
+        var diagnostics = Lint("p :- catch(true, _, true). p :- catch(true, Error, true). q :- catch(true, expected, true).");
 
         Assert.Equal(2, diagnostics.Count(diagnostic => diagnostic.Id == LintDiagnosticIds.PossibleCatchAll));
     }
@@ -196,11 +194,7 @@ public sealed class PrologCatchAllLinterTests : IDisposable
     public void ReusableSingleFileApiHonorsEnabledRules()
     {
         const string text = "p :- catch(true, _, true).";
-        var loaded = PrologLintSourceLoader.Load(
-            Path.Combine(_directory, "single.pl"),
-            text,
-            new BytecodeProgram()
-        );
+        var loaded = PrologLintSourceLoader.Load(Path.Combine(_directory, "single.pl"), text, new BytecodeProgram());
 
         var diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl", Enabled);
 

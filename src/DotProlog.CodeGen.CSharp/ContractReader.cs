@@ -162,8 +162,7 @@ public static class ContractReader
             }
 
             var methodName = export.ClrName ?? SyntaxFacts.Pascal(export.PredicateName);
-            var emittedName =
-                export.Determinism == Determinism.Semidet && export.Outputs.Any() ? $"Try{methodName}" : methodName;
+            var emittedName = export.Determinism == Determinism.Semidet && export.Outputs.Any() ? $"Try{methodName}" : methodName;
             var parameterTypes = export.Inputs.Select(input => input.Type.ClrTypeName).ToList();
             if (export.IsStreaming)
             {
@@ -289,10 +288,7 @@ public static class ContractReader
             return null;
         }
 
-        if (
-            export.Arguments[1] is not AtomTerm determinismTerm
-            || !TryReadDeterminism(determinismTerm.Name, out var determinism)
-        )
+        if (export.Arguments[1] is not AtomTerm determinismTerm || !TryReadDeterminism(determinismTerm.Name, out var determinism))
         {
             Report(
                 diagnostics,

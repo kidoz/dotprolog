@@ -218,9 +218,7 @@ public static class TermWriter
 
             case CellTag.Rational:
             {
-                (var numerator, var denominator) = machine.Symbols.GetRational(
-                    cell.Index
-                );
+                (var numerator, var denominator) = machine.Symbols.GetRational(cell.Index);
                 output.Write(string.Create(CultureInfo.InvariantCulture, $"{numerator}r{denominator}"));
                 return;
             }
@@ -507,9 +505,7 @@ public static class TermWriter
             return prefix;
         }
 
-        return functor.Arity == 1 && operators.TryGetInfixOrPostfix(name, out var postfix) && postfix.IsPostfix
-            ? postfix
-            : null;
+        return functor.Arity == 1 && operators.TryGetInfixOrPostfix(name, out var postfix) && postfix.IsPostfix ? postfix : null;
     }
 
     private static void AddBracketed(Cell operand, List<Item> work)

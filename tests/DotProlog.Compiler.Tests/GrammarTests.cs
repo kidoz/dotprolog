@@ -169,9 +169,7 @@ public sealed class GrammarTests
     [Fact]
     public void ANonListSemicontextIsReported()
     {
-        (var result, _, var diagnostics) = PrologTestHost.Execute(
-            "invalid, not_a_list --> [].\n"
-        );
+        (var result, _, var diagnostics) = PrologTestHost.Execute("invalid, not_a_list --> [].\n");
 
         Assert.NotEqual(RunResult.Success, result);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidGrammarRule);
@@ -180,9 +178,7 @@ public sealed class GrammarTests
     [Fact]
     public void AnImproperSemicontextIsReported()
     {
-        (var result, _, var diagnostics) = PrologTestHost.Execute(
-            "invalid, [a|tail] --> [].\n"
-        );
+        (var result, _, var diagnostics) = PrologTestHost.Execute("invalid, [a|tail] --> [].\n");
 
         Assert.NotEqual(RunResult.Success, result);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidGrammarRule);

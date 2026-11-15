@@ -185,11 +185,7 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
     public void ReusableSingleFileApiHonorsEnabledRules()
     {
         const string text = "max(X, Y, X) :- X >= Y, !.";
-        var loaded = PrologLintSourceLoader.Load(
-            Path.Combine(_directory, "single.pl"),
-            text,
-            new BytecodeProgram()
-        );
+        var loaded = PrologLintSourceLoader.Load(Path.Combine(_directory, "single.pl"), text, new BytecodeProgram());
 
         var diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl", Enabled);
 

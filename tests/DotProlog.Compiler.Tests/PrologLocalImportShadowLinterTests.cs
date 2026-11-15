@@ -156,11 +156,7 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     [InlineData(":- module(a,[p/2]). p(_, _).", "p --> [].", "p/2")]
     public void OrdinaryAndGrammarDefinitionsShareLoweredIdentity(string source, string local, string display)
     {
-        var diagnostics = Lint(
-            Enabled,
-            ("a.pl", source),
-            ("main.pl", $":- module(m, []). :- import(a). {local}")
-        );
+        var diagnostics = Lint(Enabled, ("a.pl", source), ("main.pl", $":- module(m, []). :- import(a). {local}"));
 
         var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
         Assert.Contains(display, warning.Message, StringComparison.Ordinal);
@@ -172,11 +168,7 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     [InlineData(":- reexport(a).")]
     public void WholeImportFormsReportLocalShadow(string directive)
     {
-        var diagnostics = Lint(
-            Enabled,
-            ("a.pl", ":- module(a,[p/0]). p."),
-            ("main.pl", $":- module(m, []). {directive} p.")
-        );
+        var diagnostics = Lint(Enabled, ("a.pl", ":- module(a,[p/0]). p."), ("main.pl", $":- module(m, []). {directive} p."));
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
     }
@@ -329,11 +321,7 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     public void SingleFileEntryPointDoesNotInventCrossFileShadowing()
     {
         const string text = ":- module(m, []). :- import(a,[p/0]). p.";
-        var loaded = PrologLintSourceLoader.Load(
-            Path.Combine(_directory, "single.pl"),
-            text,
-            new BytecodeProgram()
-        );
+        var loaded = PrologLintSourceLoader.Load(Path.Combine(_directory, "single.pl"), text, new BytecodeProgram());
 
         var diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl", Enabled);
 

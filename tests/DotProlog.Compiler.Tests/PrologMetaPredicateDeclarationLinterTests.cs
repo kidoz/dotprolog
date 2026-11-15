@@ -31,9 +31,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     [Fact]
     public void EquivalentOrdinaryModesDoNotConflict()
     {
-        var diagnostics = LintSource(
-            ":- meta_predicate(p(?)). :- meta_predicate(p(+)). :- meta_predicate(p(-))."
-        );
+        var diagnostics = LintSource(":- meta_predicate(p(?)). :- meta_predicate(p(+)). :- meta_predicate(p(-)).");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
     }
@@ -108,9 +106,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     [Fact]
     public void ReturningToFirstSignatureDoesNotCreateAnotherFinding()
     {
-        var diagnostics = LintSource(
-            ":- meta_predicate(p(0)). :- meta_predicate(p(1)). :- meta_predicate(p(0))."
-        );
+        var diagnostics = LintSource(":- meta_predicate(p(0)). :- meta_predicate(p(1)). :- meta_predicate(p(0)).");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
     }
@@ -229,9 +225,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     [Fact]
     public void InitializationDirectivesAreNotExecuted()
     {
-        var diagnostics = LintSource(
-            ":- initialization(halt(9)). :- meta_predicate(p(0)). :- meta_predicate(p(1))."
-        );
+        var diagnostics = LintSource(":- initialization(halt(9)). :- meta_predicate(p(0)). :- meta_predicate(p(1)).");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
     }
@@ -281,11 +275,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
         List<Diagnostic> diagnostics = [];
         foreach ((var name, var text) in inputs)
         {
-            var loaded = PrologLintSourceLoader.Load(
-                Path.Combine(Path.GetTempPath(), name),
-                text,
-                new BytecodeProgram()
-            );
+            var loaded = PrologLintSourceLoader.Load(Path.Combine(Path.GetTempPath(), name), text, new BytecodeProgram());
             sources.Add(loaded.Source);
             diagnostics.AddRange(loaded.Diagnostics);
         }

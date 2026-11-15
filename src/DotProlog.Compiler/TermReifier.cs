@@ -149,9 +149,7 @@ internal static class TermReifier
 
                 case CellTag.Rational:
                 {
-                    (var numerator, var denominator) = machine.Symbols.GetRational(
-                        cell.Index
-                    );
+                    (var numerator, var denominator) = machine.Symbols.GetRational(cell.Index);
                     results.Add(new RationalTerm(numerator, denominator, SourceSpan.None));
                     break;
                 }

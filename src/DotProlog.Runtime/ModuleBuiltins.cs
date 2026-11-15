@@ -353,8 +353,7 @@ internal static class ModuleBuiltins
         List<Cell> properties = [];
         properties.Add(Atom(machine, machine.Program.IsDynamic(procedure.FunctorId) ? "dynamic" : "static"));
         var isoModule =
-            machine.Program.Modules.TryGet(procedure.DefiningModule, out var definition)
-            && definition!.InterfacePrepared;
+            machine.Program.Modules.TryGet(procedure.DefiningModule, out var definition) && definition!.InterfacePrepared;
         properties.Add(
             Atom(machine, procedure.Metadata is { Exported: false } && !procedure.Builtin && !isoModule ? "private" : "public")
         );

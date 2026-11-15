@@ -74,11 +74,7 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     [Fact]
     public void DistinctModulesReceiveSeparateFindings()
     {
-        var diagnostics = Lint(
-            Enabled,
-            ("a.pl", ":- module(a, []). member(_, _)."),
-            ("b.pl", ":- module(b, []). member(_, _).")
-        );
+        var diagnostics = Lint(Enabled, ("a.pl", ":- module(a, []). member(_, _)."), ("b.pl", ":- module(b, []). member(_, _)."));
 
         Diagnostic[] warnings = [.. diagnostics.Where(diagnostic => diagnostic.Id == LintDiagnosticIds.BuiltinShadow)];
         Assert.Equal(2, warnings.Length);
@@ -174,10 +170,7 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     [Fact]
     public void UnresolvedImportsDoNotSuppressIndependentCollision()
     {
-        var diagnostics = Lint(
-            Enabled,
-            ("main.pl", ":- module(m, []). :- import(missing, [x/0]). member(_, _).")
-        );
+        var diagnostics = Lint(Enabled, ("main.pl", ":- module(m, []). :- import(missing, [x/0]). member(_, _)."));
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
     }
@@ -213,10 +206,7 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     [Fact]
     public void LocalImportAndBuiltinShadowRulesCompose()
     {
-        var options = Enabled with
-        {
-            EnabledRules = [LintDiagnosticIds.BuiltinShadow, LintDiagnosticIds.LocalImportShadow],
-        };
+        var options = Enabled with { EnabledRules = [LintDiagnosticIds.BuiltinShadow, LintDiagnosticIds.LocalImportShadow] };
         var diagnostics = Lint(
             options,
             ("a.pl", ":- module(a, [member/2]). member(_, _)."),
@@ -297,11 +287,7 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
         List<Diagnostic> diagnostics = [];
         foreach ((var name, var text) in inputs)
         {
-            var loaded = PrologLintSourceLoader.Load(
-                Path.Combine(Path.GetTempPath(), name),
-                text,
-                new BytecodeProgram()
-            );
+            var loaded = PrologLintSourceLoader.Load(Path.Combine(Path.GetTempPath(), name), text, new BytecodeProgram());
             sources.Add(loaded.Source);
             diagnostics.AddRange(loaded.Diagnostics);
         }

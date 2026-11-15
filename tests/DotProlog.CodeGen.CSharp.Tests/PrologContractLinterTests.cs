@@ -34,10 +34,7 @@ public sealed class PrologContractLinterTests : IDisposable
     public void ReportsExactOutputSpanAndMessage()
     {
         const string source = ":- module(m, [p/1]). p(wrong).";
-        var diagnostics = Lint(
-            source,
-            ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)])."
-        );
+        var diagnostics = Lint(source, ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)]).");
 
         var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ContractOutputTypeMismatch));
         Assert.Equal(source.LastIndexOf("wrong", StringComparison.Ordinal), warning.Span.Start);
@@ -216,10 +213,7 @@ public sealed class PrologContractLinterTests : IDisposable
         var imported = Source("a.pl", ":- module(a, [p/1]). p(wrong).", PrologLanguageMode.Modern);
         var main = Source("rules.pl", ":- module(m, [p/1]). :- reexport(a).", PrologLanguageMode.Modern);
 
-        var diagnostics = Lint(
-            [imported, main],
-            ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)])."
-        );
+        var diagnostics = Lint([imported, main], ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)]).");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.ContractOutputTypeMismatch));
     }
@@ -230,10 +224,7 @@ public sealed class PrologContractLinterTests : IDisposable
         var a = Source("a.pl", ":- module(a, [p/1]). p(wrong).", PrologLanguageMode.Modern);
         var b = Source("b.pl", ":- module(b, [p/1]). p(wrong).", PrologLanguageMode.Modern);
 
-        var diagnostics = Lint(
-            [a, b],
-            ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)])."
-        );
+        var diagnostics = Lint([a, b], ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)]).");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.ContractOutputTypeMismatch));
     }
@@ -245,16 +236,9 @@ public sealed class PrologContractLinterTests : IDisposable
         var factPath = Path.Combine(_directory, "fact.pl");
         File.WriteAllText(mainPath, ":- module(m, [p/1]). :- include('fact.pl').\n");
         File.WriteAllText(factPath, "p(wrong).\n");
-        var loaded = PrologLintSourceLoader.Load(
-            mainPath,
-            File.ReadAllText(mainPath),
-            new BytecodeProgram()
-        );
+        var loaded = PrologLintSourceLoader.Load(mainPath, File.ReadAllText(mainPath), new BytecodeProgram());
 
-        var diagnostics = Lint(
-            [loaded.Source],
-            ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)])."
-        );
+        var diagnostics = Lint([loaded.Source], ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)]).");
 
         var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ContractOutputTypeMismatch));
         Assert.Equal(factPath, warning.FileName);

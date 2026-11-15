@@ -67,10 +67,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
     /// <summary>Compiles one of the built-in libraries, which must not fail.</summary>
     private void LoadLibrary(string source, string name)
     {
-        var loaded = new ProgramLoader(Program, Machine, _modules, userPredicates: false).Load(
-            ReadOrThrow(source, name),
-            name
-        );
+        var loaded = new ProgramLoader(Program, Machine, _modules, userPredicates: false).Load(ReadOrThrow(source, name), name);
 
         if (!loaded.Success)
         {
@@ -80,13 +77,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
 
     private IReadOnlyList<SyntaxTerm> ReadOrThrow(string source, string fileName)
     {
-        var parsed = TermReader.ReadProgram(
-            source,
-            fileName,
-            Program.Operators,
-            Program.CharacterConversions,
-            Program.Flags
-        );
+        var parsed = TermReader.ReadProgram(source, fileName, Program.Operators, Program.CharacterConversions, Program.Flags);
         if (!parsed.Success)
         {
             throw new PrologException($"The {fileName} library failed to parse: {string.Join("; ", parsed.Diagnostics)}");
@@ -1351,16 +1342,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
         // assertz((greeting --> [hello])) defines greeting//0 rather than a clause of -->/2.
         if (term is CompoundTerm { Name: "-->", Arity: 2 } grammarRule)
         {
-            if (
-                !DcgTranslator.TryTranslate(
-                    grammarRule,
-                    diagnostics,
-                    null,
-                    Program.LanguageMode,
-                    out head,
-                    out var translated
-                )
-            )
+            if (!DcgTranslator.TryTranslate(grammarRule, diagnostics, null, Program.LanguageMode, out head, out var translated))
             {
                 throw PrologErrors.Type(machine, "callable", whole);
             }
@@ -1590,12 +1572,7 @@ public sealed class PrologEngine : IRuntimeCompiler, IReclaimableClauseCompiler,
         out Cell singletons
     )
     {
-        var parsed = TermReader.ReadTerm(
-            text,
-            operators: operators,
-            characterConversions: characterConversions,
-            flags: flags
-        );
+        var parsed = TermReader.ReadTerm(text, operators: operators, characterConversions: characterConversions, flags: flags);
         if (!parsed.Success || parsed.Clauses.Count == 0)
         {
             var error = parsed.Diagnostics.Count > 0 ? parsed.Diagnostics[0].Id : "cannot_start_term";

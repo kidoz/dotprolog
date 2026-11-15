@@ -179,10 +179,7 @@ public sealed class PrologNamingLinterTests : IDisposable
     [Fact]
     public void SameNameInDistinctModulesProducesSeparateFindings()
     {
-        var diagnostics = Lint(
-            [("one.pl", ":- module(one, []). badName."), ("two.pl", ":- module(two, []). badName.")],
-            Enabled
-        );
+        var diagnostics = Lint([("one.pl", ":- module(one, []). badName."), ("two.pl", ":- module(two, []). badName.")], Enabled);
 
         Assert.Equal(2, diagnostics.Count(diagnostic => diagnostic.Id == LintDiagnosticIds.NonSnakeCasePredicate));
     }
@@ -254,11 +251,7 @@ public sealed class PrologNamingLinterTests : IDisposable
     public void ReusableSingleFileApiHonorsEnabledRules()
     {
         const string text = "badName.";
-        var loaded = PrologLintSourceLoader.Load(
-            Path.Combine(_directory, "single.pl"),
-            text,
-            new BytecodeProgram()
-        );
+        var loaded = PrologLintSourceLoader.Load(Path.Combine(_directory, "single.pl"), text, new BytecodeProgram());
 
         var diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl", Enabled);
 

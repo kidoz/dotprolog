@@ -206,10 +206,7 @@ public static class TermOrder
         // Cross-multiplying compares exactly; denominators are positive by canonical form, and
         // equal values always share one representation, so ties cannot cross representations.
         (var leftNumerator, var leftDenominator) = NumeratorDenominator(machine, a);
-        (var rightNumerator, var rightDenominator) = NumeratorDenominator(
-            machine,
-            b
-        );
+        (var rightNumerator, var rightDenominator) = NumeratorDenominator(machine, b);
         return (leftNumerator * rightDenominator).CompareTo(rightNumerator * leftDenominator);
     }
 

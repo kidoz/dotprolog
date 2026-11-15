@@ -65,9 +65,7 @@ internal static class DocumentDiagnostics
     {
         var positions = new SourcePositions(text);
         JsonArray result = [];
-        foreach (
-            var diagnostic in diagnostics.OrderBy(item => item.Span.Start).ThenBy(item => item.Id, StringComparer.Ordinal)
-        )
+        foreach (var diagnostic in diagnostics.OrderBy(item => item.Span.Start).ThenBy(item => item.Id, StringComparer.Ordinal))
         {
             result.Add(
                 (JsonNode)

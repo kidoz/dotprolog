@@ -196,10 +196,7 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     [Fact]
     public void ModulesHaveIndependentLastClauses()
     {
-        var diagnostics = Lint(
-            [("m.pl", ":- module(m, []). p :- !."), ("n.pl", ":- module(n, []). p :- !.")],
-            Enabled
-        );
+        var diagnostics = Lint([("m.pl", ":- module(m, []). p :- !."), ("n.pl", ":- module(n, []). p :- !.")], Enabled);
 
         Assert.Equal(2, diagnostics.Count(diagnostic => diagnostic.Id == LintDiagnosticIds.PossibleFinalCut));
     }
@@ -250,11 +247,7 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     public void ReusableSingleFileApiHonorsEnabledRulesAndLaterFacts()
     {
         const string text = "p :- !. p. q :- !.";
-        var loaded = PrologLintSourceLoader.Load(
-            Path.Combine(_directory, "single.pl"),
-            text,
-            new BytecodeProgram()
-        );
+        var loaded = PrologLintSourceLoader.Load(Path.Combine(_directory, "single.pl"), text, new BytecodeProgram());
 
         var diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl", Enabled);
 

@@ -20,10 +20,8 @@ internal sealed record ProjectConfiguration(
 
     internal static ProjectConfiguration Parse(string json)
     {
-        var root =
-            JsonNode.Parse(json)?.AsObject() ?? throw new InvalidDataException("MSBuild returned no project description.");
-        var properties =
-            root["Properties"]?.AsObject() ?? throw new InvalidDataException("MSBuild properties are missing.");
+        var root = JsonNode.Parse(json)?.AsObject() ?? throw new InvalidDataException("MSBuild returned no project description.");
+        var properties = root["Properties"]?.AsObject() ?? throw new InvalidDataException("MSBuild properties are missing.");
         string Property(string name) => properties[name]?.GetValue<string>() ?? string.Empty;
         if (!PrologLanguageModes.TryParse(Property("DotPrologLanguageMode"), out var mode))
             throw new InvalidDataException("The project must import DotProlog.Sdk and specify a valid DotPrologLanguageMode.");

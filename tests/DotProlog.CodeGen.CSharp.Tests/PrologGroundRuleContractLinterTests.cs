@@ -307,11 +307,7 @@ public sealed class PrologGroundRuleContractLinterTests : IDisposable
         var a = Source("a.pl", ":- module(a, [p/1]). p(wrong) :- true.", PrologLanguageMode.Modern);
         var b = Source("b.pl", ":- module(b, [p/1]). p(wrong) :- true.", PrologLanguageMode.Modern);
 
-        var diagnostics = Lint(
-            [a, b],
-            ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, integer)]).",
-            GroundRules
-        );
+        var diagnostics = Lint([a, b], ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, integer)]).", GroundRules);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.GroundRuleContractOutputTypeMismatch));
     }
@@ -340,11 +336,7 @@ public sealed class PrologGroundRuleContractLinterTests : IDisposable
         File.WriteAllText(rulePath, rules);
         var loaded = PrologLintSourceLoader.Load(mainPath, File.ReadAllText(mainPath), new BytecodeProgram()).Source;
 
-        var diagnostics = Lint(
-            [loaded],
-            ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, integer)]).",
-            GroundRules
-        );
+        var diagnostics = Lint([loaded], ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, integer)]).", GroundRules);
 
         var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.GroundRuleContractOutputTypeMismatch));
         Assert.Equal(rulePath, warning.FileName);

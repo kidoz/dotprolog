@@ -19,10 +19,7 @@ public sealed class StreamSystemErrorTests
     {
         using var engine = new PrologEngine { Input = new FailingReader() };
 
-        Assert.Equal(
-            RunResult.Success,
-            engine.RunGoal($"catch({operation}, error(system_error, _), true)", out var diagnostics)
-        );
+        Assert.Equal(RunResult.Success, engine.RunGoal($"catch({operation}, error(system_error, _), true)", out var diagnostics));
         Assert.Empty(diagnostics);
     }
 
@@ -45,10 +42,7 @@ public sealed class StreamSystemErrorTests
     {
         using var engine = new PrologEngine { Output = new FailingWriter() };
 
-        Assert.Equal(
-            RunResult.Success,
-            engine.RunGoal($"catch({operation}, error(system_error, _), true)", out var diagnostics)
-        );
+        Assert.Equal(RunResult.Success, engine.RunGoal($"catch({operation}, error(system_error, _), true)", out var diagnostics));
         Assert.Empty(diagnostics);
     }
 
@@ -57,10 +51,7 @@ public sealed class StreamSystemErrorTests
     {
         using var engine = new PrologEngine { Output = new FailingWriter() };
 
-        Assert.Equal(
-            RunResult.Success,
-            engine.RunGoal("close(user_output, [force(true)])", out var diagnostics)
-        );
+        Assert.Equal(RunResult.Success, engine.RunGoal("close(user_output, [force(true)])", out var diagnostics));
         Assert.Empty(diagnostics);
     }
 

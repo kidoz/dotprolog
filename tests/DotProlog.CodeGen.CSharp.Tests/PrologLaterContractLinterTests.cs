@@ -212,11 +212,7 @@ public sealed class PrologLaterContractLinterTests : IDisposable
         var imported = Source("a.pl", ":- module(a, [p/1]). p(1). p(wrong).", PrologLanguageMode.Modern);
         var main = Source("rules.pl", ":- module(m, [p/1]). :- reexport(a).", PrologLanguageMode.Modern);
 
-        var diagnostics = Lint(
-            [imported, main],
-            ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, integer)]).",
-            Later
-        );
+        var diagnostics = Lint([imported, main], ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, integer)]).", Later);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.LaterContractOutputTypeMismatch));
     }
@@ -227,11 +223,7 @@ public sealed class PrologLaterContractLinterTests : IDisposable
         var a = Source("a.pl", ":- module(a, [p/1]). p(1). p(wrong).", PrologLanguageMode.Modern);
         var b = Source("b.pl", ":- module(b, [p/1]). p(1). p(wrong).", PrologLanguageMode.Modern);
 
-        var diagnostics = Lint(
-            [a, b],
-            ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, integer)]).",
-            Later
-        );
+        var diagnostics = Lint([a, b], ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, integer)]).", Later);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.LaterContractOutputTypeMismatch));
     }
@@ -260,11 +252,7 @@ public sealed class PrologLaterContractLinterTests : IDisposable
         File.WriteAllText(factPath, facts);
         var loaded = PrologLintSourceLoader.Load(mainPath, File.ReadAllText(mainPath), new BytecodeProgram()).Source;
 
-        var diagnostics = Lint(
-            [loaded],
-            ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, integer)]).",
-            Later
-        );
+        var diagnostics = Lint([loaded], ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, integer)]).", Later);
 
         var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LaterContractOutputTypeMismatch));
         Assert.Equal(factPath, warning.FileName);

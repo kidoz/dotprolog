@@ -259,11 +259,7 @@ public sealed class TermReaderTests
         ArgumentNullException.ThrowIfNull(broken);
         foreach (var mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
         {
-            var result = TermReader.ReadProgram(
-                $"{broken}\ngood(z).\n",
-                "arguments.pl",
-                flags: new BytecodeProgram(mode).Flags
-            );
+            var result = TermReader.ReadProgram($"{broken}\ngood(z).\n", "arguments.pl", flags: new BytecodeProgram(mode).Flags);
 
             var diagnostic = Assert.Single(result.Diagnostics);
             Assert.Equal(DiagnosticIds.UnexpectedToken, diagnostic.Id);
@@ -415,10 +411,7 @@ public sealed class TermReaderTests
     [InlineData(PrologLanguageMode.StrictIso)]
     public void RedefinedBarKeepsItsOwnFunctor(PrologLanguageMode mode)
     {
-        var result = TermReader.ReadProgram(
-            ":- op(1100, xfy, '|').\nX = (a|b).\n",
-            flags: new BytecodeProgram(mode).Flags
-        );
+        var result = TermReader.ReadProgram(":- op(1100, xfy, '|').\nX = (a|b).\n", flags: new BytecodeProgram(mode).Flags);
 
         Assert.True(result.Success, string.Join("; ", result.Diagnostics));
         Assert.Equal("=(X,|(a,b))", Canonical(result.Clauses[^1]));
@@ -452,10 +445,7 @@ public sealed class TermReaderTests
     public void PublicReaderDefaultsFollowTheSuppliedReadingFlags()
     {
         var strictAtom = TermReader.ReadTerm("X = xor", flags: new BytecodeProgram(PrologLanguageMode.StrictIso).Flags);
-        var strictInfix = TermReader.ReadTerm(
-            "module - 1",
-            flags: new BytecodeProgram(PrologLanguageMode.StrictIso).Flags
-        );
+        var strictInfix = TermReader.ReadTerm("module - 1", flags: new BytecodeProgram(PrologLanguageMode.StrictIso).Flags);
         var modernAtom = TermReader.ReadTerm("X = xor", flags: new BytecodeProgram(PrologLanguageMode.Modern).Flags);
         var modernPrefix = TermReader.ReadTerm("module - 1", flags: new BytecodeProgram(PrologLanguageMode.Modern).Flags);
 

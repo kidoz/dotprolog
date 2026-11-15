@@ -132,9 +132,7 @@ public sealed class ModuleTable
     /// <summary>What <paramref name="module"/> exports, or nothing if it declared no module.</summary>
     public IReadOnlyCollection<PredicateIndicator> ExportsOf(string module)
     {
-        HashSet<PredicateIndicator> exports = _exports.TryGetValue(module, out var declared)
-            ? [.. declared]
-            : [];
+        HashSet<PredicateIndicator> exports = _exports.TryGetValue(module, out var declared) ? [.. declared] : [];
         if (Catalog.TryGet(module, out var definition))
         {
             exports.UnionWith(
@@ -180,9 +178,7 @@ public sealed class ModuleTable
 
     /// <summary>The module <paramref name="importer"/> imported <paramref name="predicate"/> from, if any.</summary>
     public string? ImportedFrom(string importer, PredicateIndicator predicate) =>
-        _imports.TryGetValue(importer, out var map)
-        && map.TryGetValue(predicate, out var from)
-            ? from
+        _imports.TryGetValue(importer, out var map) && map.TryGetValue(predicate, out var from) ? from
         : Catalog.TryGet(importer, out var definition)
         && definition!.Imports.TryGetValue(ToRuntime(predicate), out var catalogFrom)
             ? catalogFrom

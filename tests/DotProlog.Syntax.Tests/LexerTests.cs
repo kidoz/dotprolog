@@ -314,11 +314,7 @@ public sealed class LexerTests
     {
         foreach (var mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
         {
-            var tokens = Tokenize(
-                $"{quote}a\nb{quote}{quote}c{quote}next",
-                new BytecodeProgram(mode).Flags,
-                out var diagnostics
-            );
+            var tokens = Tokenize($"{quote}a\nb{quote}{quote}c{quote}next", new BytecodeProgram(mode).Flags, out var diagnostics);
 
             Assert.Equal($"ab{quote}c", tokens[0].Text);
             var diagnostic = Assert.Single(diagnostics);
@@ -362,11 +358,7 @@ public sealed class LexerTests
     {
         foreach (var mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
         {
-            var tokens = Tokenize(
-                $"{quote}prefix\\\nsuffix{quote} next",
-                new BytecodeProgram(mode).Flags,
-                out var diagnostics
-            );
+            var tokens = Tokenize($"{quote}prefix\\\nsuffix{quote} next", new BytecodeProgram(mode).Flags, out var diagnostics);
 
             Assert.Empty(diagnostics);
             Assert.Equal("prefixsuffix", tokens[0].Text);
@@ -401,11 +393,7 @@ public sealed class LexerTests
     [InlineData(@"0'\e")]
     public void ReadsTheEscapeCharacterOnlyInModern(string text)
     {
-        var tokens = Tokenize(
-            text,
-            new BytecodeProgram(PrologLanguageMode.Modern).Flags,
-            out var diagnostics
-        );
+        var tokens = Tokenize(text, new BytecodeProgram(PrologLanguageMode.Modern).Flags, out var diagnostics);
         Assert.Empty(diagnostics);
         var token = tokens[0];
         Assert.Equal(27L, token.Kind == TokenKind.Integer ? token.Integer : token.Text.Single());

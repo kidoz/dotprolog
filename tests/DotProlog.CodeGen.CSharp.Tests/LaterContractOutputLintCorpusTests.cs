@@ -242,17 +242,8 @@ public sealed class LaterContractOutputLintCorpusTests
 
             var contract = ContractReader.Read(File.ReadAllText(contractPath), "Corpus", contractPath);
             Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
-            var loaded = PrologLintSourceLoader.Load(
-                sourcePath,
-                File.ReadAllText(sourcePath),
-                new BytecodeProgram()
-            );
-            var diagnostics = PrologContractLinter.Analyze(
-                [loaded.Source],
-                contract.Contract!,
-                contractPath,
-                Enabled
-            );
+            var loaded = PrologLintSourceLoader.Load(sourcePath, File.ReadAllText(sourcePath), new BytecodeProgram());
+            var diagnostics = PrologContractLinter.Analyze([loaded.Source], contract.Contract!, contractPath, Enabled);
             Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == LintDiagnosticIds.LaterContractOutputTypeMismatch);
         }
     }
@@ -309,11 +300,7 @@ public sealed class LaterContractOutputLintCorpusTests
                     .Source
             ),
         ];
-        var contract = ContractReader.Read(
-            $":- clr_module('M'). :- clr_export({test.Export}).",
-            "Corpus",
-            "corpus.dpli"
-        );
+        var contract = ContractReader.Read($":- clr_module('M'). :- clr_export({test.Export}).", "Corpus", "corpus.dpli");
         Assert.True(contract.Success, $"{test.Name}: {string.Join("; ", contract.Diagnostics)}");
         return PrologContractLinter.Analyze(sources, contract.Contract!, "corpus.dpli", Enabled);
     }

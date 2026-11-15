@@ -386,11 +386,7 @@ public sealed class PrologUnusedImportLinterTests : IDisposable
         List<Diagnostic> diagnostics = [];
         foreach ((var name, var text) in inputs)
         {
-            var loaded = PrologLintSourceLoader.Load(
-                Path.Combine(_directory, name),
-                text + "\n",
-                new BytecodeProgram(mode)
-            );
+            var loaded = PrologLintSourceLoader.Load(Path.Combine(_directory, name), text + "\n", new BytecodeProgram(mode));
             sources.Add(loaded.Source);
             diagnostics.AddRange(loaded.Diagnostics);
         }

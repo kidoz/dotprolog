@@ -1603,19 +1603,19 @@ public sealed class ModuleTests : IDisposable
     public void RuntimeBuiltDatabaseGoalsRejectQualifiedStaticProcedures(PrologLanguageMode mode, string operation)
     {
         var source = $"""
-                      :- module(fixed).
-                      :- export(p/1).
-                      :- end_module(fixed).
-                      :- body(fixed).
-                      p(one).
-                      :- end_body(fixed).
+            :- module(fixed).
+            :- export(p/1).
+            :- end_module(fixed).
+            :- body(fixed).
+            p(one).
+            :- end_body(fixed).
 
-                      :- initialization((
-                          Goal = {operation},
-                          catch(call(Goal), error(permission_error(modify, static_procedure, _), _), write(ok)),
-                          fixed:p(one)
-                      )).
-                      """;
+            :- initialization((
+                Goal = {operation},
+                catch(call(Goal), error(permission_error(modify, static_procedure, _), _), write(ok)),
+                fixed:p(one)
+            )).
+            """;
 
         var output = new StringWriter();
         using var engine = new PrologEngine(mode) { Output = output, Input = TextReader.Null };
