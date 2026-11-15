@@ -23,14 +23,16 @@ public readonly struct PrologNumber : IEquatable<PrologNumber>
     private readonly double _real;
     private readonly BigInteger _big;
     private readonly BigInteger _denominator;
+    private readonly Machine? _owner;
 
-    private PrologNumber(Kind kind, long integer, double real, BigInteger big, BigInteger denominator)
+    private PrologNumber(Kind kind, long integer, double real, BigInteger big, BigInteger denominator, Machine? owner = null)
     {
         _kind = kind;
         _integer = integer;
         _real = real;
         _big = big;
         _denominator = denominator;
+        _owner = owner;
     }
 
     /// <summary>Whether the value is a float rather than an integer or rational.</summary>
@@ -60,15 +62,23 @@ public readonly struct PrologNumber : IEquatable<PrologNumber>
     /// <summary>The denominator: 1 for integers, or the rational's denominator.</summary>
     public BigInteger Denominator => _kind == Kind.Rational ? _denominator : BigInteger.One;
 
-    /// <summary>The value widened to a double, whichever kind it is. A big value may widen to infinity.</summary>
+    /// <summary>The value rounded to the nearest binary64 float, with ties to even. Overflow gives infinity.</summary>
     public double AsDouble =>
         _kind switch
         {
             Kind.Float => _real,
-            Kind.Big => (double)_big,
-            Kind.Rational => (double)_big / (double)_denominator,
+            Kind.Big => IntegerToDouble(_big),
+            Kind.Rational => RationalToDouble(_big, _denominator),
             _ => _integer,
         };
+
+    internal Machine? Owner => _owner;
+
+    internal PrologNumber WithOwner(Machine machine)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+        return new PrologNumber(_kind, _integer, _real, _big, _denominator, machine);
+    }
 
     /// <summary>Creates an integer value, widening to the big kind when it is outside the fixnum range.</summary>
     public static PrologNumber FromInteger(long value) =>
@@ -76,8 +86,17 @@ public readonly struct PrologNumber : IEquatable<PrologNumber>
             ? new PrologNumber(Kind.Integer, value, 0, default, default)
             : new PrologNumber(Kind.Big, 0, 0, value, default);
 
-    /// <summary>Creates a float value.</summary>
-    public static PrologNumber FromReal(double value) => new(Kind.Float, 0, value, default, default);
+    /// <summary>Creates a finite float value.</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> is NaN or infinite.</exception>
+    public static PrologNumber FromReal(double value)
+    {
+        if (!double.IsFinite(value))
+        {
+            throw new ArgumentOutOfRangeException(nameof(value), value, "Prolog floats must be finite.");
+        }
+
+        return new PrologNumber(Kind.Float, 0, value, default, default);
+    }
 
     /// <summary>Creates an integer value from a full-width integer, normalizing to the plain kind when it fits.</summary>
     public static PrologNumber FromBig(BigInteger value) =>
@@ -92,13 +111,18 @@ public readonly struct PrologNumber : IEquatable<PrologNumber>
     /// </summary>
     public static PrologNumber FromRational(BigInteger numerator, BigInteger denominator)
     {
+        if (denominator.IsZero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(denominator), "A rational denominator must not be zero.");
+        }
+
         if (denominator.Sign < 0)
         {
             numerator = -numerator;
             denominator = -denominator;
         }
 
-        BigInteger divisor = BigInteger.GreatestCommonDivisor(numerator, denominator);
+        var divisor = BigInteger.GreatestCommonDivisor(numerator, denominator);
         if (!divisor.IsOne)
         {
             numerator /= divisor;
@@ -106,6 +130,114 @@ public readonly struct PrologNumber : IEquatable<PrologNumber>
         }
 
         return denominator.IsOne ? FromBig(numerator) : new PrologNumber(Kind.Rational, 0, 0, numerator, denominator);
+    }
+
+    private static double IntegerToDouble(BigInteger value)
+    {
+        if (value.IsZero)
+        {
+            return 0;
+        }
+
+        var negative = value.Sign < 0;
+        var magnitude = BigInteger.Abs(value);
+        var bitLength = magnitude.GetBitLength();
+        if (bitLength <= 53)
+        {
+            return negative ? -(double)magnitude : (double)magnitude;
+        }
+
+        if (bitLength > int.MaxValue + 53L)
+        {
+            return negative ? double.NegativeInfinity : double.PositiveInfinity;
+        }
+
+        var shift = (int)(bitLength - 53);
+        var significand = magnitude >> shift;
+        var remainder = magnitude - (significand << shift);
+        var halfway = BigInteger.One << (shift - 1);
+        if (remainder > halfway || (remainder == halfway && !significand.IsEven))
+        {
+            significand++;
+        }
+
+        if (significand.GetBitLength() > 53)
+        {
+            significand >>= 1;
+            shift++;
+        }
+
+        var result = Math.ScaleB((double)significand, shift);
+        return negative ? -result : result;
+    }
+
+    private static double RationalToDouble(BigInteger numerator, BigInteger denominator)
+    {
+        if (numerator.IsZero)
+        {
+            return 0;
+        }
+
+        var negative = numerator.Sign < 0;
+        numerator = BigInteger.Abs(numerator);
+        var exponent = numerator.GetBitLength() - denominator.GetBitLength();
+        if (exponent > 1024)
+        {
+            return negative ? double.NegativeInfinity : double.PositiveInfinity;
+        }
+
+        if (exponent < -1076)
+        {
+            return negative ? -0.0 : 0.0;
+        }
+
+        var below = exponent >= 0 ? numerator < (denominator << (int)exponent) : (numerator << (int)-exponent) < denominator;
+        if (below)
+        {
+            exponent--;
+        }
+
+        if (exponent > 1023)
+        {
+            return negative ? double.NegativeInfinity : double.PositiveInfinity;
+        }
+
+        if (exponent < -1075)
+        {
+            return negative ? -0.0 : 0.0;
+        }
+
+        BigInteger significand;
+        int resultExponent;
+        if (exponent < -1022)
+        {
+            var quotient = BigInteger.DivRem(numerator << 1074, denominator, out var remainder);
+            significand = RoundQuotient(quotient, remainder, denominator);
+            resultExponent = -1074;
+        }
+        else
+        {
+            var scale = 52 - (int)exponent;
+            var scaledNumerator = scale >= 0 ? numerator << scale : numerator;
+            var scaledDenominator = scale < 0 ? denominator << -scale : denominator;
+            var quotient = BigInteger.DivRem(scaledNumerator, scaledDenominator, out var remainder);
+            significand = RoundQuotient(quotient, remainder, scaledDenominator);
+            resultExponent = (int)exponent - 52;
+            if (significand.GetBitLength() > 53)
+            {
+                significand >>= 1;
+                resultExponent++;
+            }
+        }
+
+        var result = Math.ScaleB((double)significand, resultExponent);
+        return negative ? -result : result;
+    }
+
+    private static BigInteger RoundQuotient(BigInteger quotient, BigInteger remainder, BigInteger denominator)
+    {
+        var comparison = (remainder << 1).CompareTo(denominator);
+        return comparison > 0 || (comparison == 0 && !quotient.IsEven) ? quotient + 1 : quotient;
     }
 
     /// <inheritdoc />

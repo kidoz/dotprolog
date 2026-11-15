@@ -68,4 +68,29 @@ public sealed class SymbolTableTests
         Assert.NotEqual(symbols.InternFloat(1.5), symbols.InternFloat(2.5));
         Assert.Equal(1.5, symbols.GetFloat(symbols.InternFloat(1.5)));
     }
+
+    [Fact]
+    public void SignedZerosShareOnePositiveZeroEntry()
+    {
+        var symbols = new SymbolTable();
+
+        var positive = symbols.InternFloat(0.0);
+        var negative = symbols.InternFloat(-0.0);
+
+        Assert.Equal(positive, negative);
+        Assert.False(double.IsNegative(symbols.GetFloat(negative)));
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void NonFiniteFloatsAreRejectedAtNumericBoundaries(double value)
+    {
+        var symbols = new SymbolTable();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => symbols.InternFloat(value));
+        Assert.Throws<ArgumentOutOfRangeException>(() => PrologNumber.FromReal(value));
+        Assert.Throws<ArgumentOutOfRangeException>(() => PrologInput.Float(value));
+    }
 }

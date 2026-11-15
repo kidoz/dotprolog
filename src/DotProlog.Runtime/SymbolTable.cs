@@ -144,16 +144,27 @@ public sealed class SymbolTable
     /// <summary>Returns a display form of a functor, such as <c>append/3</c>.</summary>
     public string DescribeFunctor(int functorId)
     {
-        Functor functor = _functors[functorId];
+        var functor = _functors[functorId];
         return $"{_atomNames[functor.NameAtom]}/{functor.Arity}";
     }
 
     /// <summary>
     /// Returns the identifier for <paramref name="value"/>, interning it if necessary. Interning by
-    /// value keeps cell equality usable as float identity.
+    /// value keeps cell equality usable as float identity. Both signed zeros canonicalize to positive zero.
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> is NaN or infinite.</exception>
     public int InternFloat(double value)
     {
+        if (!double.IsFinite(value))
+        {
+            throw new ArgumentOutOfRangeException(nameof(value), value, "Prolog floats must be finite.");
+        }
+
+        if (value == 0)
+        {
+            value = 0.0;
+        }
+
         if (_floatIds.TryGetValue(value, out var id))
         {
             return id;

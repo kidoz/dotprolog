@@ -74,7 +74,6 @@ public sealed class UnboundedIntegerTests
     [InlineData("10 ^ 30 =:= 10 ^ 30", "yes")]
     [InlineData("-(10 ^ 30) < 3", "yes")]
     [InlineData("10 ^ 30 > 1.0e25", "yes")]
-    [InlineData("10 ^ 30 < inf", "yes")]
     public void ComparesAcrossRepresentations(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal($"( {goal} -> write(yes) ; write(no) )"));
 
@@ -121,10 +120,12 @@ public sealed class UnboundedIntegerTests
     [Theory]
     [InlineData("catch(X is 2 ^ (2 ^ 40), error(E, _), true)", "resource_error(memory)")]
     [InlineData("catch(X is 1 << (2 ^ 40), error(E, _), true)", "resource_error(memory)")]
+    [InlineData("catch(X is 2 ^ 536870912, error(E, _), true)", "resource_error(memory)")]
+    [InlineData("catch(X is 1 << 536870912, error(E, _), true)", "resource_error(memory)")]
     [InlineData("catch(X is float(10 ^ 400), error(E, _), true)", "evaluation_error(float_overflow)")]
     [InlineData("catch(X is floor(10 ^ 30), error(E, _), true)", "type_error(float,1000000000000000000000000000000)")]
     [InlineData("catch(X is (10 ^ 30) ^ (-1), error(E, _), true)", "type_error(float,1000000000000000000000000000000)")]
-    [InlineData("catch(X is integer(inf), error(E, _), true)", "evaluation_error(undefined)")]
+    [InlineData("catch(X is integer(inf), error(E, _), true)", "evaluation_error(float_overflow)")]
     public void GuardsTheImpossibleResults(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal($"{goal}, ( var(E) -> write(no_error) ; write(E) )"));
 
@@ -175,10 +176,10 @@ public sealed class UnboundedIntegerTests
         Assert.True(engine.ConsultText("double(X, Y) :- Y is X * 2.").Success);
 
         var host = new PrologHost(engine.Machine);
-        PrologPredicate doubling = host.Bind("double", 2);
+        var doubling = host.Bind("double", 2);
 
         var big = System.Numerics.BigInteger.Parse("123456789012345678901234567890");
-        PrologValue[]? outputs = host.CallOnce(doubling, PrologInput.Big(big), PrologInput.Output);
+        var outputs = host.CallOnce(doubling, PrologInput.Big(big), PrologInput.Output);
 
         Assert.NotNull(outputs);
         Assert.Equal(big * 2, PrologMarshal.ToBigInteger(outputs[0]));

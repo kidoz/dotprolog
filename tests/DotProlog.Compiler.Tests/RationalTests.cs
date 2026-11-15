@@ -110,15 +110,29 @@ public sealed class RationalTests
     public void AtomNumberReadsTheRationalSpelling() =>
         Assert.Equal("22r7-23r7", PrologTestHost.RunGoal("atom_number('22r7', X), Y is X + 1r7, write(X-Y)"));
 
+    [Theory]
+    [InlineData("X is float((10 ^ 400) rdiv (10 ^ 400))", "1.0")]
+    [InlineData("X is float((10 ^ 400) rdiv (2 * (10 ^ 400)))", "0.5")]
+    [InlineData("X is (10 ^ 400) rdiv (10 ^ 400) + 0.0", "1.0")]
+    [InlineData("X is float(1 rdiv (10 ^ 400))", "0.0")]
+    [InlineData("X is float(1 rdiv (2 ^ 1075))", "0.0")]
+    [InlineData("X is float(3 rdiv (2 ^ 1076))", "5.0E-324")]
+    public void ConvertsHugeRationalsWithoutOverflowingTheirComponents(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal($"{goal}, write(X)"));
+
     [Fact]
     public void StrictModeKeepsIsoLexing()
     {
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
 
-        LoadResult loaded = engine.ConsultText("p(1r3).", "strict.pl");
+        var loaded = engine.ConsultText("p(1r3).", "strict.pl");
 
         Assert.False(loaded.Success);
     }
+
+    [Fact]
+    public void HostRationalInputRejectsAZeroDenominator() =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => PrologInput.Rational(1, 0));
 
     [Fact]
     public void TheEmbeddingSurfaceMarshalsRationals()
@@ -127,12 +141,12 @@ public sealed class RationalTests
         Assert.True(engine.ConsultText("half(X, Y) :- Y is X / 2.").Success);
 
         var host = new PrologHost(engine.Machine);
-        PrologPredicate halving = host.Bind("half", 2);
+        var halving = host.Bind("half", 2);
 
-        PrologValue[]? outputs = host.CallOnce(halving, PrologInput.Rational(1, 3), PrologInput.Output);
+        var outputs = host.CallOnce(halving, PrologInput.Rational(1, 3), PrologInput.Output);
 
         Assert.NotNull(outputs);
-        PrologRational result = Assert.IsType<PrologRational>(outputs[0]);
+        var result = Assert.IsType<PrologRational>(outputs[0]);
         Assert.Equal(new System.Numerics.BigInteger(1), result.Numerator);
         Assert.Equal(new System.Numerics.BigInteger(6), result.Denominator);
     }

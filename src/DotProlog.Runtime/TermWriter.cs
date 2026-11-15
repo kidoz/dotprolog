@@ -118,7 +118,7 @@ public static class TermWriter
 
         while (work.Count > 0)
         {
-            Item item = work[^1];
+            var item = work[^1];
             work.RemoveAt(work.Count - 1);
 
             switch (item.Kind)
@@ -191,7 +191,7 @@ public static class TermWriter
         string argumentComma = ","
     )
     {
-        Cell cell = machine.Dereference(item.Cell);
+        var cell = machine.Dereference(item.Cell);
 
         switch (cell.Tag)
         {
@@ -218,7 +218,7 @@ public static class TermWriter
 
             case CellTag.Rational:
             {
-                (System.Numerics.BigInteger numerator, System.Numerics.BigInteger denominator) = machine.Symbols.GetRational(
+                (var numerator, var denominator) = machine.Symbols.GetRational(
                     cell.Index
                 );
                 output.Write(string.Create(CultureInfo.InvariantCulture, $"{numerator}r{denominator}"));
@@ -242,7 +242,7 @@ public static class TermWriter
         }
 
         var functorId = machine.HeapAt(cell.Index).Index;
-        Functor functor = machine.Symbols.GetFunctor(functorId);
+        var functor = machine.Symbols.GetFunctor(functorId);
 
         if (numberVariables && TryWriteNumberVariable(machine, cell, functor, output))
         {
@@ -314,7 +314,7 @@ public static class TermWriter
             return false;
         }
 
-        foreach (NamedVariable named in variableNames)
+        foreach (var named in variableNames)
         {
             if (TermOrder.AreIdentical(machine, variable, named.Term))
             {
@@ -333,7 +333,7 @@ public static class TermWriter
             return false;
         }
 
-        Cell number = machine.Dereference(machine.HeapAt(cell.Index + 1));
+        var number = machine.Dereference(machine.HeapAt(cell.Index + 1));
         return number.Tag == CellTag.Integer && number.Integer >= 0;
     }
 
@@ -376,7 +376,7 @@ public static class TermWriter
         List<Item> work
     )
     {
-        if (functor.Arity == 2 && operators.TryGetInfixOrPostfix(name, out PrologOperator infix) && infix.IsInfix)
+        if (functor.Arity == 2 && operators.TryGetInfixOrPostfix(name, out var infix) && infix.IsInfix)
         {
             var bracket = infix.Priority > maxPriority;
             if (bracket)
@@ -392,7 +392,7 @@ public static class TermWriter
             return true;
         }
 
-        if (functor.Arity == 1 && operators.TryGetPrefix(name, out PrologOperator prefix))
+        if (functor.Arity == 1 && operators.TryGetPrefix(name, out var prefix))
         {
             var bracket = prefix.Priority > maxPriority;
             if (bracket)
@@ -401,7 +401,7 @@ public static class TermWriter
                 work.Add(Item.OfText(")"));
             }
 
-            Cell operand = machine.HeapAt(cell.Index + 1);
+            var operand = machine.HeapAt(cell.Index + 1);
             if (name == "-" && MinusMustBracket(machine, operators, operand, numberVariables))
             {
                 AddBracketed(operand, work);
@@ -416,7 +416,7 @@ public static class TermWriter
             return true;
         }
 
-        if (functor.Arity == 1 && operators.TryGetInfixOrPostfix(name, out PrologOperator postfix) && postfix.IsPostfix)
+        if (functor.Arity == 1 && operators.TryGetInfixOrPostfix(name, out var postfix) && postfix.IsPostfix)
         {
             var bracket = postfix.Priority > maxPriority;
             if (bracket)
@@ -448,7 +448,7 @@ public static class TermWriter
         List<Item> work
     )
     {
-        PrologOperator? inner = WrittenOperator(machine, operators, operand, numberVariables);
+        var inner = WrittenOperator(machine, operators, operand, numberVariables);
         if (inner is { IsPostfix: false } written && written.Priority <= op.LeftPriority && written.RightPriority >= op.Priority)
         {
             AddBracketed(operand, work);
@@ -460,7 +460,7 @@ public static class TermWriter
 
     private static bool MinusMustBracket(Machine machine, OperatorTable operators, Cell operand, bool numberVariables)
     {
-        Cell value = machine.Dereference(operand);
+        var value = machine.Dereference(operand);
         switch (value.Tag)
         {
             case CellTag.Integer:
@@ -479,14 +479,14 @@ public static class TermWriter
     /// <summary>The operator a term is written with, or <see langword="null"/> when it is written otherwise.</summary>
     private static PrologOperator? WrittenOperator(Machine machine, OperatorTable operators, Cell term, bool numberVariables)
     {
-        Cell value = machine.Dereference(term);
+        var value = machine.Dereference(term);
         if (value.Tag != CellTag.Structure)
         {
             return null;
         }
 
         var functorId = machine.HeapAt(value.Index).Index;
-        Functor functor = machine.Symbols.GetFunctor(functorId);
+        var functor = machine.Symbols.GetFunctor(functorId);
         if (
             functorId == machine.Symbols.ListFunctor
             || (functor.Arity == 1 && functor.NameAtom == machine.Symbols.Curly)
@@ -497,17 +497,17 @@ public static class TermWriter
         }
 
         var name = machine.Symbols.AtomName(functor.NameAtom);
-        if (functor.Arity == 2 && operators.TryGetInfixOrPostfix(name, out PrologOperator infix) && infix.IsInfix)
+        if (functor.Arity == 2 && operators.TryGetInfixOrPostfix(name, out var infix) && infix.IsInfix)
         {
             return infix;
         }
 
-        if (functor.Arity == 1 && operators.TryGetPrefix(name, out PrologOperator prefix))
+        if (functor.Arity == 1 && operators.TryGetPrefix(name, out var prefix))
         {
             return prefix;
         }
 
-        return functor.Arity == 1 && operators.TryGetInfixOrPostfix(name, out PrologOperator postfix) && postfix.IsPostfix
+        return functor.Arity == 1 && operators.TryGetInfixOrPostfix(name, out var postfix) && postfix.IsPostfix
             ? postfix
             : null;
     }
@@ -586,6 +586,11 @@ public static class TermWriter
 
     private static string FloatText(double value)
     {
+        if (value == 0)
+        {
+            return "0.0";
+        }
+
         var text = value.ToString("R", CultureInfo.InvariantCulture);
 
         // A Prolog float must be readable back as a float, so it always carries a decimal point.

@@ -46,6 +46,12 @@ Runtime term input reports the same rejection through its syntax-error channel. 
 protect the reader and subsequent compiler passes. A thread with insufficient remaining stack
 may report the diagnostic sooner. Terms built by a running Prolog program have no such depth limit.
 
+One acyclic source dependency chain may contain at most 64 edges across `include/1`,
+`use_module/1,2`, and `ensure_loaded/1`; the root source has depth zero. Crossing that limit produces
+positioned diagnostic `DPL1020` at the dependency directive. The same budget applies during ordinary
+consultation and generated compilation. It limits chain depth, not the total number of files in the
+source graph, and existing cycle detection remains separate.
+
 ## Representation limits
 
 | Characteristic | DotProlog value or behavior |
@@ -67,7 +73,9 @@ value. The `max_tagged_integer` and `min_tagged_integer` evaluables name the fix
 thresholds, 576460752303423487 and −576460752303423488. Interned big integers live for the
 program's lifetime, an embedding consideration beside atom growth. Converting a big integer to a
 float that overflows binary64 raises `evaluation_error(float_overflow)`; a shift count or exponent
-whose result would exceed the big-integer representation raises `resource_error(memory)`. Float
+whose estimated result payload would exceed 64 MiB raises `resource_error(memory)` before the CLR
+attempts the allocation. The budget applies independently to each integer power or left-shift result,
+including rational numerators and denominators; it is not a cumulative expression-memory limit. Float
 arithmetic rejects NaN and infinity with the applicable ISO evaluation error. A decimal float
 literal that overflows binary64 is a `syntax_error(float_overflow)`, in source text and in
 `number_chars/2` and `number_codes/2` input alike; underflow rounds to signed
@@ -287,8 +295,10 @@ by the opaque ground term `'$stream'(N)`; identifiers are monotonically allocate
 Closing a current stream restores the corresponding permanent standard stream. The standard
 streams have the aliases `user_input`, `user_output`, and `user_error`.
 
-Text files are read through the .NET Unicode file reader and written as UTF-8 without a byte-order
-mark. DotProlog does not append a newline when a text sink is closed, does not treat text files as
+Text files are read incrementally as UTF-8; an initial UTF-8 byte-order mark is skipped, while a
+U+FEFF elsewhere is an ordinary character. Malformed UTF-8 raises `representation_error(character)`;
+UTF-16 and UTF-32 byte-order marks do not select another encoding. Text output is UTF-8 without a
+byte-order mark. DotProlog does not append a newline when a text sink is closed, does not treat text files as
 record-based streams, and outputs control characters unchanged. Binary output writes exactly the
 requested bytes and appends no padding bytes.
 
