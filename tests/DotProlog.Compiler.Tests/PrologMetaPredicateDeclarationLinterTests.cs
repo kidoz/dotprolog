@@ -16,9 +16,9 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     public void ModernConflictIsReportedByDefaultAtLaterTemplate()
     {
         const string text = ":- meta_predicate(p(0)). :- meta_predicate(p(1)). p(_).";
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(text);
+        var diagnostics = LintSource(text);
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
         Assert.Equal(text.LastIndexOf("p(1)", StringComparison.Ordinal), warning.Span.Start);
         Assert.Equal("p(1)".Length, warning.Span.Length);
         Assert.Equal("single.pl", warning.FileName);
@@ -31,7 +31,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     [Fact]
     public void EquivalentOrdinaryModesDoNotConflict()
     {
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(
+        var diagnostics = LintSource(
             ":- meta_predicate(p(?)). :- meta_predicate(p(+)). :- meta_predicate(p(-))."
         );
 
@@ -41,7 +41,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     [Fact]
     public void GoalZeroAndModuleSensitiveModesConflict()
     {
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(":- meta_predicate(p(:)). :- meta_predicate(p(0)).");
+        var diagnostics = LintSource(":- meta_predicate(p(:)). :- meta_predicate(p(0)).");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
     }
@@ -49,7 +49,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     [Fact]
     public void DifferentPositiveClosureCountsConflict()
     {
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(":- meta_predicate(p(1)). :- meta_predicate(p(2)).");
+        var diagnostics = LintSource(":- meta_predicate(p(1)). :- meta_predicate(p(2)).");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
     }
@@ -57,7 +57,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     [Fact]
     public void ExactDuplicatesKeepExistingDiagnosticWithoutConsistencyWarning()
     {
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(":- meta_predicate(p(0)). :- meta_predicate(p(0)).");
+        var diagnostics = LintSource(":- meta_predicate(p(0)). :- meta_predicate(p(0)).");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
         Assert.Single(diagnostics, Id(LintDiagnosticIds.DuplicateDirective));
@@ -67,9 +67,9 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     public void IsoConflictUsesModuleIdentityAndLaterTemplateSpan()
     {
         const string text = ":- module(m). :- metapredicate(p(:)). :- metapredicate(p(*)).";
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(text, PrologLanguageMode.StrictIso);
+        var diagnostics = LintSource(text, PrologLanguageMode.StrictIso);
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
         Assert.Equal(text.LastIndexOf("p(*)", StringComparison.Ordinal), warning.Span.Start);
         Assert.Equal("p(*)".Length, warning.Span.Length);
         Assert.Contains("for m:p/1", warning.Message, StringComparison.Ordinal);
@@ -79,7 +79,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     [Fact]
     public void InvalidIsoModesDoNotCreateConsistencyFinding()
     {
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(
+        var diagnostics = LintSource(
             ":- module(m). :- metapredicate(p(0)). :- metapredicate(p(:)).",
             PrologLanguageMode.StrictIso
         );
@@ -90,7 +90,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     [Fact]
     public void NonCompoundModernTemplateIsSkipped()
     {
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(":- meta_predicate(p). :- meta_predicate(p(0)).");
+        var diagnostics = LintSource(":- meta_predicate(p). :- meta_predicate(p(0)).");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
     }
@@ -99,16 +99,16 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     public void OnlyFirstDifferingLaterDeclarationIsReported()
     {
         const string text = ":- meta_predicate(p(0)). :- meta_predicate(p(1)). :- meta_predicate(p(2)).";
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(text);
+        var diagnostics = LintSource(text);
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
         Assert.Equal(text.IndexOf("p(1)", StringComparison.Ordinal), warning.Span.Start);
     }
 
     [Fact]
     public void ReturningToFirstSignatureDoesNotCreateAnotherFinding()
     {
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(
+        var diagnostics = LintSource(
             ":- meta_predicate(p(0)). :- meta_predicate(p(1)). :- meta_predicate(p(0))."
         );
 
@@ -118,7 +118,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     [Fact]
     public void SeparateModulesDoNotShareDeclarationHistory()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ("a.pl", ":- module(a, []). :- meta_predicate(p(0))."),
             ("b.pl", ":- module(b, []). :- meta_predicate(p(1)).")
         );
@@ -129,7 +129,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     [Fact]
     public void SeparateAritiesDoNotShareDeclarationHistory()
     {
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(":- meta_predicate(p(0)). :- meta_predicate(p(0, ?)).");
+        var diagnostics = LintSource(":- meta_predicate(p(0)). :- meta_predicate(p(0, ?)).");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
     }
@@ -137,12 +137,12 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     [Fact]
     public void SameModuleConflictAcrossNamedFilesUsesLaterPhysicalSource()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ("a.pl", ":- module(m, []). :- meta_predicate(p(0))."),
             ("b.pl", ":- module(m, []). :- meta_predicate(p(1)).")
         );
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
         Assert.EndsWith("b.pl", warning.FileName, StringComparison.Ordinal);
     }
 
@@ -152,9 +152,9 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
         Source("declarations.pl", ":- meta_predicate(p(1)).\n");
         Source("main.pl", ":- module(m, []). :- meta_predicate(p(0)). :- include('declarations.pl').\n");
 
-        IReadOnlyList<Diagnostic> diagnostics = Load("main.pl");
+        var diagnostics = Load("main.pl");
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
         Assert.Equal(Path.Combine(_directory, "declarations.pl"), warning.FileName);
         Assert.Equal(18, warning.Span.Start);
     }
@@ -162,7 +162,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     [Fact]
     public void ImportsAndReexportsDoNotMergeDeclarationHistories()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ("a.pl", ":- module(a, [p/1]). :- meta_predicate(p(0)). p(_)."),
             ("r.pl", ":- module(r, []). :- reexport(a, [p/1]). :- meta_predicate(p(1))."),
             ("main.pl", ":- module(m, []). :- import(r, [p/1]). :- meta_predicate(p(2)).")
@@ -174,7 +174,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     [Fact]
     public void PredefinedTemplateAloneDoesNotCreateConflict()
     {
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(":- meta_predicate(maplist(0, ?)).");
+        var diagnostics = LintSource(":- meta_predicate(maplist(0, ?)).");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
     }
@@ -182,7 +182,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     [Fact]
     public void DynamicMultifileAndUnresolvedImportsDoNotSuppressConflict()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             (
                 "main.pl",
                 ":- module(m, []). :- dynamic(p/1). :- multifile(p/1). :- import(missing, [x/0]). :- meta_predicate(p(0)). :- meta_predicate(p(1))."
@@ -197,7 +197,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     [InlineData(PrologLanguageMode.StrictIso)]
     public void ModernConflictUsesSameDefaultRuleInBothModes(PrologLanguageMode mode)
     {
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(":- meta_predicate(p(0)). :- meta_predicate(p(1)).", mode);
+        var diagnostics = LintSource(":- meta_predicate(p(0)). :- meta_predicate(p(1)).", mode);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
     }
@@ -205,7 +205,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     [Fact]
     public void WholeProgramDoesNotDuplicateFileLocalFinding()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(("main.pl", ":- meta_predicate(p(0)). :- meta_predicate(p(1))."));
+        var diagnostics = Lint(("main.pl", ":- meta_predicate(p(0)). :- meta_predicate(p(1))."));
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.InconsistentMetaPredicate));
     }
@@ -214,7 +214,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     public void FindingsUseSourceOrder()
     {
         const string text = ":- meta_predicate(p(0)). :- meta_predicate(q(0)). :- meta_predicate(p(1)). :- meta_predicate(q(1)).";
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(text);
+        var diagnostics = LintSource(text);
 
         Diagnostic[] warnings =
         [
@@ -229,7 +229,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     [Fact]
     public void InitializationDirectivesAreNotExecuted()
     {
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(
+        var diagnostics = LintSource(
             ":- initialization(halt(9)). :- meta_predicate(p(0)). :- meta_predicate(p(1))."
         );
 
@@ -248,10 +248,10 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     {
         List<PrologLintSource> sources = [];
         List<Diagnostic> diagnostics = [];
-        foreach (string name in names)
+        foreach (var name in names)
         {
             var path = Path.Combine(_directory, name);
-            PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
+            var loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
             sources.Add(loaded.Source);
             diagnostics.AddRange(loaded.Diagnostics);
         }
@@ -261,7 +261,7 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
 
     private static IReadOnlyList<Diagnostic> LintSource(string text, PrologLanguageMode mode = PrologLanguageMode.Modern)
     {
-        PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load("single.pl", text, new BytecodeProgram(mode));
+        var loaded = PrologLintSourceLoader.Load("single.pl", text + "\n", new BytecodeProgram(mode));
         return
         [
             .. loaded.Diagnostics,
@@ -279,9 +279,9 @@ public sealed class PrologMetaPredicateDeclarationLinterTests : IDisposable
     {
         List<PrologLintSource> sources = [];
         List<Diagnostic> diagnostics = [];
-        foreach ((string name, string text) in inputs)
+        foreach ((var name, var text) in inputs)
         {
-            PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+            var loaded = PrologLintSourceLoader.Load(
                 Path.Combine(Path.GetTempPath(), name),
                 text,
                 new BytecodeProgram()

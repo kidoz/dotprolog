@@ -15,7 +15,7 @@ public sealed class PrologMissingElseLinterTests : IDisposable
     [Fact]
     public void RuleIsDisabledByDefault()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- (true -> true).", PrologLintOptions.SemanticOnly);
+        var diagnostics = Lint("p :- (true -> true).", PrologLintOptions.SemanticOnly);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleMissingElse));
     }
@@ -24,9 +24,9 @@ public sealed class PrologMissingElseLinterTests : IDisposable
     public void ReportsConditionalWithIdentityAndPosition()
     {
         const string source = "p :- (true -> true).\n";
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleMissingElse));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleMissingElse));
         Assert.Equal(source.IndexOf("true -> true", StringComparison.Ordinal), warning.Span.Start);
         Assert.Contains("predicate p/0", warning.Message, StringComparison.Ordinal);
         Assert.Contains("no explicit else branch", warning.Message, StringComparison.Ordinal);
@@ -39,7 +39,7 @@ public sealed class PrologMissingElseLinterTests : IDisposable
     [InlineData("*->")]
     public void BareHardAndSoftConditionalsAreReported(string conditionalOperator)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint($"p :- (a {conditionalOperator} b).");
+        var diagnostics = Lint($"p :- (a {conditionalOperator} b).");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleMissingElse));
     }
@@ -53,7 +53,7 @@ public sealed class PrologMissingElseLinterTests : IDisposable
     [InlineData("p :- (a *-> b ; writeln(no)).")]
     public void AnyExplicitElseBranchSuppressesTheOuterFinding(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleMissingElse));
     }
@@ -69,7 +69,7 @@ public sealed class PrologMissingElseLinterTests : IDisposable
     [InlineData("p :- (a *-> b ; (c *-> d)).")]
     public void DirectControlFlowAndNestedConditionalsAreInspected(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleMissingElse));
     }
@@ -77,7 +77,7 @@ public sealed class PrologMissingElseLinterTests : IDisposable
     [Fact]
     public void NestedBareConditionalsProduceSeparateFindings()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- ((a -> b) -> (c -> d)).");
+        var diagnostics = Lint("p :- ((a -> b) -> (c -> d)).");
 
         Assert.Equal(3, diagnostics.Count(diagnostic => diagnostic.Id == LintDiagnosticIds.PossibleMissingElse));
     }
@@ -94,7 +94,7 @@ public sealed class PrologMissingElseLinterTests : IDisposable
     [InlineData("p :- X = f(a -> b).")]
     public void OpaqueMetaCalledQualifiedAndDataGoalsAreNotInspected(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleMissingElse));
     }
@@ -102,16 +102,16 @@ public sealed class PrologMissingElseLinterTests : IDisposable
     [Fact]
     public void ReportsBareConditionalInNonterminal()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("nt --> (a -> b).");
+        var diagnostics = Lint("nt --> (a -> b).");
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleMissingElse));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleMissingElse));
         Assert.Contains("nonterminal nt//0", warning.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void ReportsBareConditionalInsideDcgOrdinaryGoal()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("nt --> { (a -> b) }.");
+        var diagnostics = Lint("nt --> { (a -> b) }.");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleMissingElse));
     }
@@ -123,7 +123,7 @@ public sealed class PrologMissingElseLinterTests : IDisposable
     [InlineData("nt --> { X = f(a -> b) }.")]
     public void DcgMetaCallsAndTermDataAreNotInspected(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleMissingElse));
     }
@@ -133,7 +133,7 @@ public sealed class PrologMissingElseLinterTests : IDisposable
     [InlineData(":- multifile(p/0). p :- (a -> b).")]
     public void DynamicAndMultifileClausesAreEligible(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleMissingElse));
     }
@@ -141,7 +141,7 @@ public sealed class PrologMissingElseLinterTests : IDisposable
     [Fact]
     public void MultipleMatchingClausesProduceSeparateFindings()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- (a -> b). p :- (a *-> b). q :- (a -> b ; true).");
+        var diagnostics = Lint("p :- (a -> b). p :- (a *-> b). q :- (a -> b ; true).");
 
         Assert.Equal(2, diagnostics.Count(diagnostic => diagnostic.Id == LintDiagnosticIds.PossibleMissingElse));
     }
@@ -152,9 +152,9 @@ public sealed class PrologMissingElseLinterTests : IDisposable
         Source("parts.pl", "p :- (a -> b).\n");
         Source("main.pl", ":- include('parts.pl').\n");
 
-        IReadOnlyList<Diagnostic> diagnostics = Load("main.pl");
+        var diagnostics = Load("main.pl");
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleMissingElse));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleMissingElse));
         Assert.Equal(Path.Combine(_directory, "parts.pl"), warning.FileName);
     }
 
@@ -163,7 +163,7 @@ public sealed class PrologMissingElseLinterTests : IDisposable
     [InlineData(PrologLanguageMode.StrictIso)]
     public void BothLanguageModesUseTheSameRule(PrologLanguageMode mode)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- (a *-> b).", Enabled, mode);
+        var diagnostics = Lint("p :- '*->'(a, b).", Enabled, mode);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleMissingElse));
     }
@@ -171,7 +171,7 @@ public sealed class PrologMissingElseLinterTests : IDisposable
     [Fact]
     public void UnrelatedUndefinedCallsDoNotSuppressTheRule()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- missing, (a -> b).");
+        var diagnostics = Lint("p :- missing, (a -> b).");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleMissingElse));
         Assert.Contains(diagnostics, Id(LintDiagnosticIds.UndefinedPredicate));
@@ -180,12 +180,12 @@ public sealed class PrologMissingElseLinterTests : IDisposable
     [Fact]
     public void DuplicateEnabledRulesDoNotDuplicateFindings()
     {
-        PrologLintOptions options = PrologLintOptions.SemanticOnly with
+        var options = PrologLintOptions.SemanticOnly with
         {
             EnabledRules = [LintDiagnosticIds.PossibleMissingElse, LintDiagnosticIds.PossibleMissingElse],
         };
 
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- (a -> b).", options);
+        var diagnostics = Lint("p :- (a -> b).", options);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleMissingElse));
     }
@@ -194,13 +194,13 @@ public sealed class PrologMissingElseLinterTests : IDisposable
     public void ReusableSingleFileApiHonorsEnabledRules()
     {
         const string text = "p :- (a -> b).";
-        PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+        var loaded = PrologLintSourceLoader.Load(
             Path.Combine(_directory, "single.pl"),
             text,
             new BytecodeProgram()
         );
 
-        IReadOnlyList<Diagnostic> diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl", Enabled);
+        var diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl", Enabled);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleMissingElse));
     }
@@ -208,7 +208,7 @@ public sealed class PrologMissingElseLinterTests : IDisposable
     [Fact]
     public void InitializationDirectivesAreNotExecuted()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(":- initialization(halt(9)). p :- (a -> b).");
+        var diagnostics = Lint(":- initialization(halt(9)). p :- (a -> b).");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleMissingElse));
     }
@@ -230,7 +230,7 @@ public sealed class PrologMissingElseLinterTests : IDisposable
     private IReadOnlyList<Diagnostic> Load(string name)
     {
         var path = Path.Combine(_directory, name);
-        PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
+        var loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
         return [.. loaded.Diagnostics, .. PrologLinter.AnalyzeProgram([loaded.Source], Enabled)];
     }
 
@@ -248,11 +248,11 @@ public sealed class PrologMissingElseLinterTests : IDisposable
     {
         List<PrologLintSource> sources = [];
         List<Diagnostic> diagnostics = [];
-        foreach ((string name, string text) in inputs)
+        foreach ((var name, var text) in inputs)
         {
-            PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+            var loaded = PrologLintSourceLoader.Load(
                 Path.Combine(Path.GetTempPath(), name),
-                text,
+                text + "\n",
                 new BytecodeProgram(mode)
             );
             sources.Add(loaded.Source);

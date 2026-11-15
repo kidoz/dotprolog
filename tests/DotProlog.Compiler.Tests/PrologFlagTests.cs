@@ -22,12 +22,12 @@ public sealed class PrologFlagTests
                 Before == After, current_prolog_flag(debug,on), current_prolog_flag(unknown,fail).
             """;
         using var engine = new PrologEngine(mode);
-        string source = inModule
+        var source = inModule
             ? ":- module(flags). :- export(snapshot/0). :- end_module(flags). :- body(flags).\n"
                 + clause
                 + "\n:- end_body(flags)."
             : clause;
-        LoadResult loaded = engine.ConsultText(source);
+        var loaded = engine.ConsultText(source + "\n");
         Assert.Empty(loaded.Diagnostics);
         Assert.Single(engine.Query(inModule ? "flags:snapshot" : "snapshot").Solutions());
     }
@@ -182,7 +182,7 @@ public sealed class PrologFlagTests
         Assert.Equal(RunResult.Failure, engine.RunGoal("call(not_defined_through_meta)", out _));
 
         var host = new PrologHost(engine.Machine);
-        PrologPredicate predicate = host.Bind("not_defined_through_host", 0);
+        var predicate = host.Bind("not_defined_through_host", 0);
         Assert.False(host.Prove(predicate));
     }
 

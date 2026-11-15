@@ -91,7 +91,7 @@ public sealed class ModernModeTests
                     """
                     :- set_prolog_flag(double_quotes, chars).
                     declared("ab").
-                    """
+                    """ + "\n"
                 )
                 .Success
         );
@@ -101,7 +101,7 @@ public sealed class ModernModeTests
 
         // ...but the entering value came back, so the next unit reads under the mode's convention.
         Assert.Equal(RunResult.Success, engine.RunGoal("current_prolog_flag(double_quotes, codes)", out _));
-        Assert.True(engine.ConsultText("later(\"ab\").").Success);
+        Assert.True(engine.ConsultText("later(\"ab\").\n").Success);
         Assert.Equal(RunResult.Success, engine.RunGoal("later([0'a, 0'b])", out _));
     }
 
@@ -132,7 +132,7 @@ public sealed class ModernModeTests
     [InlineData("  Modern  ", PrologLanguageMode.Modern)]
     public void ModeNamesParseCaseInsensitively(string text, PrologLanguageMode expected)
     {
-        Assert.True(PrologLanguageModes.TryParse(text, out PrologLanguageMode parsed));
+        Assert.True(PrologLanguageModes.TryParse(text, out var parsed));
         Assert.Equal(expected, parsed);
     }
 

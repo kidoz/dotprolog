@@ -119,9 +119,9 @@ public sealed class GlobalVariableTests
     {
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
 
-        LoadResult loaded = engine.ConsultText("p :- nb_setval(k, 1).", "strict.pl");
+        var loaded = engine.ConsultText("p :- nb_setval(k, 1).\n", "strict.pl");
 
-        DotProlog.Syntax.Diagnostic diagnostic = Assert.Single(loaded.Diagnostics);
+        var diagnostic = Assert.Single(loaded.Diagnostics);
         Assert.Equal(CompilerDiagnosticIds.StrictIsoViolation, diagnostic.Id);
         Assert.Contains("nb_setval/2", diagnostic.Message, StringComparison.Ordinal);
     }
@@ -137,6 +137,19 @@ public sealed class GlobalVariableTests
     [InlineData("findall(K, nb_current(K, _), L), write(L)", "[]")]
     public void NbCurrentTestsAndEnumeratesTheStore(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Theory]
+    [InlineData("nb_getval")]
+    [InlineData("nb_current")]
+    public void DetachedCopiesPreserveNestedFrozenGoals(string getter) =>
+        Assert.Equal("x", PrologTestHost.RunGoal($"freeze(X, write(x)), nb_setval(k, f(g(X))), {getter}(k, f(g(Y))), Y = bound"));
+
+    [Fact]
+    public void StoredFrozenGoalsSurviveBacktrackingPastTheOriginal() =>
+        Assert.Equal(
+            "x",
+            PrologTestHost.RunGoal("freeze(X, write(x)), ( nb_setval(k, f(X)), fail ; true ), nb_getval(k, f(Y)), Y = bound")
+        );
 
     [Fact]
     public void NbCurrentRaisesForANonAtomName() =>

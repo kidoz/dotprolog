@@ -15,7 +15,7 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     [Fact]
     public void RuleIsDisabledByDefault()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- a,b,c,d,e,f,g,h,i.", PrologLintOptions.SemanticOnly);
+        var diagnostics = Lint("p :- a,b,c,d,e,f,g,h,i.", PrologLintOptions.SemanticOnly);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
     }
@@ -24,9 +24,9 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     public void ReportsDefaultExcessWithIdentityAndExactSpan()
     {
         const string source = "p :- a,b,c,d,e,f,g,h,i.\n";
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
         Assert.Equal(0, warning.Span.Start);
         Assert.Equal(1, warning.Span.Length);
         Assert.Contains("Rule for predicate user:p/0", warning.Message, StringComparison.Ordinal);
@@ -38,7 +38,7 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     [Fact]
     public void CountEqualToDefaultLimitIsNotReported()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- a,b,c,d,e,f,g,h.");
+        var diagnostics = Lint("p :- a,b,c,d,e,f,g,h.");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
     }
@@ -46,9 +46,9 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     [Fact]
     public void CustomLimitUsesStrictlyGreaterComparison()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- a,b. q :- a,b,c.", EnabledWithMaximum(2));
+        var diagnostics = Lint("p :- a,b. q :- a,b,c.", EnabledWithMaximum(2));
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
         Assert.Contains("user:q/0", warning.Message, StringComparison.Ordinal);
         Assert.Contains("has 3 direct subgoals", warning.Message, StringComparison.Ordinal);
         Assert.Contains("maximum of 2", warning.Message, StringComparison.Ordinal);
@@ -57,7 +57,7 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     [Fact]
     public void FactsProduceNoCountEvenAtMinimumLimit()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p. p(A, B, C).", EnabledWithMaximum(1));
+        var diagnostics = Lint("p. p(A, B, C).", EnabledWithMaximum(1));
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
     }
@@ -73,9 +73,9 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     [Fact]
     public void InvalidLimitIsInertWhenRuleIsDisabled()
     {
-        PrologLintOptions options = PrologLintOptions.SemanticOnly with { MaxClauseSubgoals = 0 };
+        var options = PrologLintOptions.SemanticOnly with { MaxClauseSubgoals = 0 };
 
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- a,b,c,d,e,f,g,h,i.", options);
+        var diagnostics = Lint("p :- a,b,c,d,e,f,g,h,i.", options);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
     }
@@ -88,9 +88,9 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     [InlineData("p :- a,(b->c).")]
     public void TransparentControlFlowCountsLeavesWithoutCountingControlNodes(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source, EnabledWithMaximum(2));
+        var diagnostics = Lint(source, EnabledWithMaximum(2));
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
         Assert.Contains("has 3 direct subgoals", warning.Message, StringComparison.Ordinal);
     }
 
@@ -107,7 +107,7 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     [InlineData("p :- X.")]
     public void OpaqueGoalsAndTermDataAreNotTraversed(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source, EnabledWithMaximum(1));
+        var diagnostics = Lint(source, EnabledWithMaximum(1));
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
     }
@@ -115,9 +115,9 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     [Fact]
     public void OpaqueGoalContributesOneToOuterCount()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- findall(X,(a,b,c),X),d.", EnabledWithMaximum(1));
+        var diagnostics = Lint("p :- findall(X,(a,b,c),X),d.", EnabledWithMaximum(1));
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
         Assert.Contains("has 2 direct subgoals", warning.Message, StringComparison.Ordinal);
     }
 
@@ -126,9 +126,9 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     [InlineData("nt --> [a],b,[c].")]
     public void DcgOrdinaryGoalsAndTerminalsFollowTheSameCount(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source, EnabledWithMaximum(2));
+        var diagnostics = Lint(source, EnabledWithMaximum(2));
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
         Assert.Contains("Grammar rule for nonterminal user:nt//0", warning.Message, StringComparison.Ordinal);
         Assert.Contains("has 3 direct subgoals", warning.Message, StringComparison.Ordinal);
     }
@@ -138,7 +138,7 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     [InlineData("nt --> {call((a,b,c))}.")]
     public void DcgMetaCallsRemainOpaque(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source, EnabledWithMaximum(1));
+        var diagnostics = Lint(source, EnabledWithMaximum(1));
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
     }
@@ -146,9 +146,9 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     [Fact]
     public void DcgSemicontextIsNotCounted()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("nt, [X] --> {a,b}.", EnabledWithMaximum(1));
+        var diagnostics = Lint("nt, [X] --> {a,b}.", EnabledWithMaximum(1));
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
         Assert.Contains("user:nt//0", warning.Message, StringComparison.Ordinal);
         Assert.Contains("has 2 direct subgoals", warning.Message, StringComparison.Ordinal);
     }
@@ -156,7 +156,7 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     [Fact]
     public void MultipleAndDuplicateClausesProduceIndependentFindings()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- a,b. p :- a,b.", EnabledWithMaximum(1));
+        var diagnostics = Lint("p :- a,b. p :- a,b.", EnabledWithMaximum(1));
 
         Assert.Equal(2, diagnostics.Count(diagnostic => diagnostic.Id == LintDiagnosticIds.ExcessiveSubgoalCount));
     }
@@ -166,7 +166,7 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     [InlineData(":- multifile(p/0). p :- a,b.")]
     public void DynamicAndMultifileRulesAreEligible(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source, EnabledWithMaximum(1));
+        var diagnostics = Lint(source, EnabledWithMaximum(1));
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
     }
@@ -174,9 +174,9 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     [Fact]
     public void ModuleDirectiveContributesToIdentity()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(":- module(m, []). p :- a,b,c,d,e,f,g,h,i.");
+        var diagnostics = Lint(":- module(m, []). p :- a,b,c,d,e,f,g,h,i.");
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
         Assert.Contains("predicate m:p/0", warning.Message, StringComparison.Ordinal);
     }
 
@@ -186,16 +186,16 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
         Source("parts.pl", "p :- a,b,c,d,e,f,g,h,i.\n");
         Source("main.pl", ":- include('parts.pl').\n");
 
-        IReadOnlyList<Diagnostic> diagnostics = Load("main.pl");
+        var diagnostics = Load("main.pl");
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
         Assert.Equal(Path.Combine(_directory, "parts.pl"), warning.FileName);
     }
 
     [Fact]
     public void UnrecognizedHeadIsNotReported()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("X :- a,b.", EnabledWithMaximum(1));
+        var diagnostics = Lint("X :- a,b.", EnabledWithMaximum(1));
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
     }
@@ -205,7 +205,7 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     [InlineData(PrologLanguageMode.StrictIso)]
     public void BothLanguageModesUseTheSameRule(PrologLanguageMode mode)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- a,b,c,d,e,f,g,h,i.", Enabled, mode);
+        var diagnostics = Lint("p :- a,b,c,d,e,f,g,h,i.", Enabled, mode);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
     }
@@ -213,7 +213,7 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     [Fact]
     public void UnrelatedUndefinedCallsDoNotSuppressTheRule()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- missing,a,b,c,d,e,f,g,h,i.");
+        var diagnostics = Lint("p :- missing,a,b,c,d,e,f,g,h,i.");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
         Assert.Contains(diagnostics, Id(LintDiagnosticIds.UndefinedPredicate));
@@ -222,12 +222,12 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     [Fact]
     public void DuplicateEnabledRulesDoNotDuplicateFindings()
     {
-        PrologLintOptions options = Enabled with
+        var options = Enabled with
         {
             EnabledRules = [LintDiagnosticIds.ExcessiveSubgoalCount, LintDiagnosticIds.ExcessiveSubgoalCount],
         };
 
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- a,b,c,d,e,f,g,h,i.", options);
+        var diagnostics = Lint("p :- a,b,c,d,e,f,g,h,i.", options);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
     }
@@ -236,13 +236,13 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     public void ReusableSingleFileApiHonorsCustomLimit()
     {
         const string text = "p :- a,b.";
-        PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+        var loaded = PrologLintSourceLoader.Load(
             Path.Combine(_directory, "single.pl"),
             text,
             new BytecodeProgram()
         );
 
-        IReadOnlyList<Diagnostic> diagnostics = PrologLinter.AnalyzeSource(
+        var diagnostics = PrologLinter.AnalyzeSource(
             text,
             loaded.Source.Clauses,
             "single.pl",
@@ -255,7 +255,7 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     [Fact]
     public void InitializationDirectivesAreNotExecutedOrCounted()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(":- initialization(halt(9)). p :- a,b,c,d,e,f,g,h,i.");
+        var diagnostics = Lint(":- initialization(halt(9)). p :- a,b,c,d,e,f,g,h,i.");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessiveSubgoalCount));
     }
@@ -279,7 +279,7 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     private IReadOnlyList<Diagnostic> Load(string name)
     {
         var path = Path.Combine(_directory, name);
-        PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
+        var loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
         return [.. loaded.Diagnostics, .. PrologLinter.AnalyzeProgram([loaded.Source], Enabled)];
     }
 
@@ -297,11 +297,11 @@ public sealed class PrologExcessiveSubgoalCountLinterTests : IDisposable
     {
         List<PrologLintSource> sources = [];
         List<Diagnostic> diagnostics = [];
-        foreach ((string name, string text) in inputs)
+        foreach ((var name, var text) in inputs)
         {
-            PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+            var loaded = PrologLintSourceLoader.Load(
                 Path.Combine(Path.GetTempPath(), name),
-                text,
+                text + "\n",
                 new BytecodeProgram(mode)
             );
             sources.Add(loaded.Source);

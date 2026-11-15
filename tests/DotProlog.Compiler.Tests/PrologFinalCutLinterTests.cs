@@ -15,7 +15,7 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     [Fact]
     public void RuleIsDisabledByDefault()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- !.", PrologLintOptions.SemanticOnly);
+        var diagnostics = Lint("p :- !.", PrologLintOptions.SemanticOnly);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
     }
@@ -24,9 +24,9 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     public void ReportsFinalCutWithIdentityAndPosition()
     {
         const string source = "p :- true, !.\n";
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
         Assert.Equal(source.IndexOf('!'), warning.Span.Start);
         Assert.Contains("predicate p/0", warning.Message, StringComparison.Ordinal);
         Assert.Contains("last supplied clause", warning.Message, StringComparison.Ordinal);
@@ -36,7 +36,7 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     [Fact]
     public void OnlyTheLastRuleIsEligible()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- !. p :- true. p :- !.");
+        var diagnostics = Lint("p :- !. p :- true. p :- !.");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
     }
@@ -44,7 +44,7 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     [Fact]
     public void LaterRuleWithoutFinalCutSuppressesAnEarlierFinalCut()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- !. p :- true.");
+        var diagnostics = Lint("p :- !. p :- true.");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
     }
@@ -52,7 +52,7 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     [Fact]
     public void LaterFactSuppressesAnEarlierFinalCut()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- !. p.");
+        var diagnostics = Lint("p :- !. p.");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
     }
@@ -70,7 +70,7 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     [InlineData("p :- (! *-> true).", false)]
     public void FinalControlFlowPositionDeterminesEligibility(string source, bool expected)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
         Assert.Equal(expected, diagnostics.Any(diagnostic => diagnostic.Id == LintDiagnosticIds.PossibleFinalCut));
     }
@@ -78,7 +78,7 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     [Fact]
     public void IndependentFinalBranchCutsProduceSeparateFindings()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- (! ; !).");
+        var diagnostics = Lint("p :- (! ; !).");
 
         Assert.Equal(2, diagnostics.Count(diagnostic => diagnostic.Id == LintDiagnosticIds.PossibleFinalCut));
     }
@@ -93,7 +93,7 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     [InlineData("p :- X = f(!).")]
     public void OpaqueMetaCalledAndDataCutsAreNotInspected(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
     }
@@ -101,16 +101,16 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     [Fact]
     public void ReportsFinalCutInNonterminal()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("nt --> !.");
+        var diagnostics = Lint("nt --> !.");
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
         Assert.Contains("nonterminal nt//0", warning.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void ReportsFinalCutInsideDcgOrdinaryGoal()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("nt --> { ! }.");
+        var diagnostics = Lint("nt --> { ! }.");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
     }
@@ -121,7 +121,7 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     [InlineData("nt --> { call(!) }.")]
     public void NonfinalAndMetaCalledDcgCutsAreNotInspected(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
     }
@@ -131,7 +131,7 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     [InlineData("p(_, _) :- !. p --> true.")]
     public void MixedDefinitionsUseTheirSharedLoweredIdentity(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
     }
@@ -141,9 +141,9 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     [InlineData("p(_, _) :- true. p --> !.", "nonterminal p//0")]
     public void LastMixedClauseDeterminesTheReportedSourceKind(string source, string identity)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
         Assert.Contains(identity, warning.Message, StringComparison.Ordinal);
     }
 
@@ -152,7 +152,7 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     [InlineData(":- multifile(p/0). p :- !.")]
     public void DynamicAndMultifileProceduresAreExcluded(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
     }
@@ -160,7 +160,7 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     [Fact]
     public void DeclarationInAnotherNamedFileExcludesTheProcedure()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             [("declarations.pl", ":- module(m, []). :- multifile(p/0)."), ("definitions.pl", ":- module(m, []). p :- !.")],
             Enabled
         );
@@ -171,7 +171,7 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     [Fact]
     public void StaticDiscontiguousProcedureRemainsEligible()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(":- discontiguous(p/0). p :- !. q. p :- !.");
+        var diagnostics = Lint(":- discontiguous(p/0). p :- !. q. p :- !.");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
     }
@@ -179,7 +179,7 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     [Fact]
     public void LastClauseIsSelectedAcrossNamedFiles()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint([("first.pl", "p :- !."), ("second.pl", "p :- true.")], Enabled);
+        var diagnostics = Lint([("first.pl", "p :- !."), ("second.pl", "p :- true.")], Enabled);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
     }
@@ -187,16 +187,16 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     [Fact]
     public void FinalCutInLastNamedFileRetainsItsSource()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint([("first.pl", "p :- true."), ("second.pl", "p :- !.")], Enabled);
+        var diagnostics = Lint([("first.pl", "p :- true."), ("second.pl", "p :- !.")], Enabled);
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
         Assert.EndsWith("second.pl", warning.FileName, StringComparison.Ordinal);
     }
 
     [Fact]
     public void ModulesHaveIndependentLastClauses()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             [("m.pl", ":- module(m, []). p :- !."), ("n.pl", ":- module(n, []). p :- !.")],
             Enabled
         );
@@ -210,9 +210,9 @@ public sealed class PrologFinalCutLinterTests : IDisposable
         Source("parts.pl", "p :- !.\n");
         Source("main.pl", ":- include('parts.pl').\n");
 
-        IReadOnlyList<Diagnostic> diagnostics = Load("main.pl");
+        var diagnostics = Load("main.pl");
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
         Assert.Equal(Path.Combine(_directory, "parts.pl"), warning.FileName);
     }
 
@@ -222,7 +222,7 @@ public sealed class PrologFinalCutLinterTests : IDisposable
         Source("parts.pl", "p :- true.\n");
         Source("main.pl", "p :- !.\n:- include('parts.pl').\n");
 
-        IReadOnlyList<Diagnostic> diagnostics = Load("main.pl");
+        var diagnostics = Load("main.pl");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
     }
@@ -232,7 +232,7 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     [InlineData(PrologLanguageMode.StrictIso)]
     public void BothLanguageModesUseTheSameRule(PrologLanguageMode mode)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- !.", Enabled, mode);
+        var diagnostics = Lint("p :- !.", Enabled, mode);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
     }
@@ -240,7 +240,7 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     [Fact]
     public void UnrelatedUndefinedCallsDoNotSuppressTheRule()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- missing, !.");
+        var diagnostics = Lint("p :- missing, !.");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
         Assert.Contains(diagnostics, Id(LintDiagnosticIds.UndefinedPredicate));
@@ -250,15 +250,15 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     public void ReusableSingleFileApiHonorsEnabledRulesAndLaterFacts()
     {
         const string text = "p :- !. p. q :- !.";
-        PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+        var loaded = PrologLintSourceLoader.Load(
             Path.Combine(_directory, "single.pl"),
             text,
             new BytecodeProgram()
         );
 
-        IReadOnlyList<Diagnostic> diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl", Enabled);
+        var diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl", Enabled);
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleFinalCut));
         Assert.Contains("q/0", warning.Message, StringComparison.Ordinal);
     }
 
@@ -279,7 +279,7 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     private IReadOnlyList<Diagnostic> Load(string name)
     {
         var path = Path.Combine(_directory, name);
-        PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
+        var loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
         return [.. loaded.Diagnostics, .. PrologLinter.AnalyzeProgram([loaded.Source], Enabled)];
     }
 
@@ -297,11 +297,11 @@ public sealed class PrologFinalCutLinterTests : IDisposable
     {
         List<PrologLintSource> sources = [];
         List<Diagnostic> diagnostics = [];
-        foreach ((string name, string text) in inputs)
+        foreach ((var name, var text) in inputs)
         {
-            PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+            var loaded = PrologLintSourceLoader.Load(
                 Path.Combine(Path.GetTempPath(), name),
-                text,
+                text + "\n",
                 new BytecodeProgram(mode)
             );
             sources.Add(loaded.Source);

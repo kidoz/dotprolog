@@ -15,7 +15,7 @@ public sealed class PrologCatchAllLinterTests : IDisposable
     [Fact]
     public void RuleIsDisabledByDefault()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- catch(true, _, true).", PrologLintOptions.SemanticOnly);
+        var diagnostics = Lint("p :- catch(true, _, true).", PrologLintOptions.SemanticOnly);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
     }
@@ -24,9 +24,9 @@ public sealed class PrologCatchAllLinterTests : IDisposable
     public void ReportsAnonymousCatcherWithIdentityAndPosition()
     {
         const string source = "p :- catch(true, _, true).\n";
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
         Assert.Equal(source.IndexOf('_'), warning.Span.Start);
         Assert.Contains("predicate p/0", warning.Message, StringComparison.Ordinal);
         Assert.Contains("may match every thrown term", warning.Message, StringComparison.Ordinal);
@@ -39,16 +39,16 @@ public sealed class PrologCatchAllLinterTests : IDisposable
     [InlineData("p :- catch(Error, Error, Error).")]
     public void NamedAndSharedCatchersAreEligible(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
         Assert.Equal(1, warning.Span.Line);
     }
 
     [Fact]
     public void PreviouslyAssignedCatcherRemainsAnAdvisoryFinding()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- Error = expected, catch(true, Error, true).");
+        var diagnostics = Lint("p :- Error = expected, catch(true, Error, true).");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
     }
@@ -59,7 +59,7 @@ public sealed class PrologCatchAllLinterTests : IDisposable
     [InlineData("p :- catch(true, error(_, _), true).")]
     public void NonVariableCatcherPatternsAreNotReported(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
     }
@@ -74,7 +74,7 @@ public sealed class PrologCatchAllLinterTests : IDisposable
     [InlineData("p :- (true *-> catch(true, _, true)).")]
     public void DirectControlFlowIsInspected(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
     }
@@ -84,7 +84,7 @@ public sealed class PrologCatchAllLinterTests : IDisposable
     [InlineData("p :- catch(true, error(_), catch(true, _, true)).")]
     public void NestedCatchGoalAndRecoveryAreInspected(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
     }
@@ -92,7 +92,7 @@ public sealed class PrologCatchAllLinterTests : IDisposable
     [Fact]
     public void NestedVariableCatchersProduceSeparateFindings()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- catch(catch(true, Inner, true), Outer, catch(true, Recovery, true)).");
+        var diagnostics = Lint("p :- catch(catch(true, Inner, true), Outer, catch(true, Recovery, true)).");
 
         Assert.Equal(3, diagnostics.Count(diagnostic => diagnostic.Id == LintDiagnosticIds.PossibleCatchAll));
     }
@@ -108,7 +108,7 @@ public sealed class PrologCatchAllLinterTests : IDisposable
     [InlineData("p :- X = f(catch(true, _, true)).")]
     public void OpaqueMetaCalledQualifiedAndDataGoalsAreNotInspected(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
     }
@@ -116,16 +116,16 @@ public sealed class PrologCatchAllLinterTests : IDisposable
     [Fact]
     public void ReportsVariableCatcherInNonterminal()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("nt --> catch(true, _, true).");
+        var diagnostics = Lint("nt --> catch(true, _, true).");
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
         Assert.Contains("nonterminal nt//0", warning.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void ReportsVariableCatcherInsideDcgOrdinaryGoal()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("nt --> { catch(true, _, true) }.");
+        var diagnostics = Lint("nt --> { catch(true, _, true) }.");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
     }
@@ -136,7 +136,7 @@ public sealed class PrologCatchAllLinterTests : IDisposable
     [InlineData("nt --> [catch(true, _, true)].")]
     public void DcgMetaCallsAndTerminalsAreNotInspected(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
     }
@@ -146,7 +146,7 @@ public sealed class PrologCatchAllLinterTests : IDisposable
     [InlineData(":- multifile(p/0). p :- catch(true, _, true).")]
     public void DynamicAndMultifileClausesAreEligible(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
     }
@@ -154,7 +154,7 @@ public sealed class PrologCatchAllLinterTests : IDisposable
     [Fact]
     public void MultipleMatchingClausesProduceSeparateFindings()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             "p :- catch(true, _, true). p :- catch(true, Error, true). q :- catch(true, expected, true)."
         );
 
@@ -167,9 +167,9 @@ public sealed class PrologCatchAllLinterTests : IDisposable
         Source("parts.pl", "p :- catch(true, _, true).\n");
         Source("main.pl", ":- include('parts.pl').\n");
 
-        IReadOnlyList<Diagnostic> diagnostics = Load("main.pl");
+        var diagnostics = Load("main.pl");
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
         Assert.Equal(Path.Combine(_directory, "parts.pl"), warning.FileName);
     }
 
@@ -178,7 +178,7 @@ public sealed class PrologCatchAllLinterTests : IDisposable
     [InlineData(PrologLanguageMode.StrictIso)]
     public void BothLanguageModesUseTheSameRule(PrologLanguageMode mode)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- catch(true, _, true).", Enabled, mode);
+        var diagnostics = Lint("p :- catch(true, _, true).", Enabled, mode);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
     }
@@ -186,7 +186,7 @@ public sealed class PrologCatchAllLinterTests : IDisposable
     [Fact]
     public void UnrelatedUndefinedCallsDoNotSuppressTheRule()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- missing, catch(true, _, true).");
+        var diagnostics = Lint("p :- missing, catch(true, _, true).");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
         Assert.Contains(diagnostics, Id(LintDiagnosticIds.UndefinedPredicate));
@@ -196,13 +196,13 @@ public sealed class PrologCatchAllLinterTests : IDisposable
     public void ReusableSingleFileApiHonorsEnabledRules()
     {
         const string text = "p :- catch(true, _, true).";
-        PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+        var loaded = PrologLintSourceLoader.Load(
             Path.Combine(_directory, "single.pl"),
             text,
             new BytecodeProgram()
         );
 
-        IReadOnlyList<Diagnostic> diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl", Enabled);
+        var diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl", Enabled);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleCatchAll));
     }
@@ -224,7 +224,7 @@ public sealed class PrologCatchAllLinterTests : IDisposable
     private IReadOnlyList<Diagnostic> Load(string name)
     {
         var path = Path.Combine(_directory, name);
-        PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
+        var loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
         return [.. loaded.Diagnostics, .. PrologLinter.AnalyzeProgram([loaded.Source], Enabled)];
     }
 
@@ -242,11 +242,11 @@ public sealed class PrologCatchAllLinterTests : IDisposable
     {
         List<PrologLintSource> sources = [];
         List<Diagnostic> diagnostics = [];
-        foreach ((string name, string text) in inputs)
+        foreach ((var name, var text) in inputs)
         {
-            PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+            var loaded = PrologLintSourceLoader.Load(
                 Path.Combine(Path.GetTempPath(), name),
-                text,
+                text + "\n",
                 new BytecodeProgram(mode)
             );
             sources.Add(loaded.Source);

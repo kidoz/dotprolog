@@ -1,3 +1,5 @@
+using DotProlog.Runtime;
+
 namespace DotProlog.Compiler.Tests;
 
 /// <summary><c>op/3</c> and <c>current_op/3</c>, and when a declaration takes effect.</summary>
@@ -135,6 +137,25 @@ public sealed class OperatorDeclarationTests
         // The ISO table this engine starts with; the count is asserted so that adding an operator to
         // the defaults has to be a deliberate edit here as well.
         Assert.Equal("58", PrologTestHost.RunGoal("findall(N, current_op(_, _, N), L), length(L, C), write(C)"));
+    }
+
+    [Theory]
+    [InlineData(PrologLanguageMode.Modern, 58)]
+    [InlineData(PrologLanguageMode.StrictIso, 43)]
+    public void InitialOperatorInventoryExcludesExtensionsFromStrictIso(PrologLanguageMode mode, int expected)
+    {
+        using var engine = new PrologEngine(mode);
+        Assert.Equal(expected, engine.Program.Operators.All().Length);
+        var extensionsAbsent =
+            mode == PrologLanguageMode.StrictIso
+                ? "(current_op(_, _, xor) -> fail ; true), "
+                    + "(current_op(_, _, '*->') -> fail ; true), "
+                    + "(current_op(_, _, module) -> fail ; true), "
+                    + "(current_op(_, _, use_module) -> fail ; true), "
+                    + "(current_op(_, _, meta_predicate) -> fail ; true)"
+                : "true";
+
+        Assert.Equal(RunResult.Success, engine.RunGoal(extensionsAbsent, out _));
     }
 
     [Theory]

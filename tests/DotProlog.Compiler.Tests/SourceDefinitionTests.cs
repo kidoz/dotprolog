@@ -66,7 +66,7 @@ public sealed class SourceDefinitionTests
             "word(X) --> [X]. plain. start --> word(a), {plain}, [word(data)]. run :- phrase(word(a), []), call(word(a), [], []).";
         var sites = Analyze(Source("dcg.pl", text));
         foreach (
-            int offset in new[]
+            var offset in new[]
             {
                 text.IndexOf("word(a)", StringComparison.Ordinal),
                 text.IndexOf("word(a), []", StringComparison.Ordinal),

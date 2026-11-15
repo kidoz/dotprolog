@@ -21,11 +21,11 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     public void SingleFileRuleIsOptInAndReportsNativeIdentityAtName()
     {
         const string text = "writeln(Value).";
-        IReadOnlyList<Diagnostic> defaultDiagnostics = LintSource(text, options: null);
-        IReadOnlyList<Diagnostic> enabledDiagnostics = LintSource(text, Enabled);
+        var defaultDiagnostics = LintSource(text, options: null);
+        var enabledDiagnostics = LintSource(text, Enabled);
 
         Assert.DoesNotContain(defaultDiagnostics, Id(LintDiagnosticIds.BuiltinShadow));
-        Diagnostic warning = Assert.Single(enabledDiagnostics, Id(LintDiagnosticIds.BuiltinShadow));
+        var warning = Assert.Single(enabledDiagnostics, Id(LintDiagnosticIds.BuiltinShadow));
         Assert.Equal(0, warning.Span.Start);
         Assert.Equal("writeln".Length, warning.Span.Length);
         Assert.Equal("single.pl", warning.FileName);
@@ -38,16 +38,16 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     [Fact]
     public void BundledLibraryIdentityIsReported()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(Enabled, ("main.pl", "member(X, X)."));
+        var diagnostics = Lint(Enabled, ("main.pl", "member(X, X)."));
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
         Assert.Contains("predefined predicate member/2", warning.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void DifferentArityDoesNotCollide()
     {
-        IReadOnlyList<Diagnostic> diagnostics = LintSource("member(X, X, X).", Enabled);
+        var diagnostics = LintSource("member(X, X, X).", Enabled);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
     }
@@ -55,7 +55,7 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     [Fact]
     public void RepeatedClausesProduceOneFinding()
     {
-        IReadOnlyList<Diagnostic> diagnostics = LintSource("member(X, [X|_]). member(X, [_|T]) :- member(X, T).", Enabled);
+        var diagnostics = LintSource("member(X, [X|_]). member(X, [_|T]) :- member(X, T).", Enabled);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
     }
@@ -65,16 +65,16 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     [InlineData(":- module(m).")]
     public void ModuleFormsUseModuleQualifiedIdentity(string directive)
     {
-        IReadOnlyList<Diagnostic> diagnostics = LintSource($"{directive} member(_, _).", Enabled);
+        var diagnostics = LintSource($"{directive} member(_, _).", Enabled);
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
         Assert.Contains("in module m", warning.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void DistinctModulesReceiveSeparateFindings()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             Enabled,
             ("a.pl", ":- module(a, []). member(_, _)."),
             ("b.pl", ":- module(b, []). member(_, _).")
@@ -91,10 +91,10 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     [InlineData("multifile")]
     public void DeclarationOnlyProcedureUsesIndicatorSpan(string declaration)
     {
-        string text = $":- {declaration}(member/2).";
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(text, Enabled);
+        var text = $":- {declaration}(member/2).";
+        var diagnostics = LintSource(text, Enabled);
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
         Assert.Equal(text.IndexOf("member/2", StringComparison.Ordinal), warning.Span.Start);
         Assert.Equal("member/2".Length, warning.Span.Length);
     }
@@ -103,9 +103,9 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     public void FirstClauseTakesPrecedenceOverEarlierDeclarationForLocation()
     {
         const string text = ":- dynamic(member/2). member(a, b).";
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(text, Enabled);
+        var diagnostics = LintSource(text, Enabled);
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
         Assert.Equal(text.LastIndexOf("member(a, b)", StringComparison.Ordinal), warning.Span.Start);
         Assert.Equal("member".Length, warning.Span.Length);
     }
@@ -114,9 +114,9 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     public void GrammarCollisionUsesBothSourceAndLoweredIndicators()
     {
         const string text = "member --> [a].";
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(text, Enabled);
+        var diagnostics = LintSource(text, Enabled);
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
         Assert.Equal(0, warning.Span.Start);
         Assert.Equal("member".Length, warning.Span.Length);
         Assert.Contains("Local procedure member//0", warning.Message, StringComparison.Ordinal);
@@ -126,9 +126,9 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     [Fact]
     public void OrdinaryAndGrammarDefinitionsSharingIdentityProduceOneFinding()
     {
-        IReadOnlyList<Diagnostic> diagnostics = LintSource("member --> [a]. member(_, _).", Enabled);
+        var diagnostics = LintSource("member --> [a]. member(_, _).", Enabled);
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
         Assert.Contains("member//0", warning.Message, StringComparison.Ordinal);
     }
 
@@ -138,9 +138,9 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
         Source("local.pl", "member(_, _).\n");
         Source("main.pl", ":- module(m, []). :- include('local.pl').\n");
 
-        IReadOnlyList<Diagnostic> diagnostics = Load("main.pl");
+        var diagnostics = Load("main.pl");
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
         Assert.Equal(Path.Combine(_directory, "local.pl"), warning.FileName);
         Assert.Equal(0, warning.Span.Start);
     }
@@ -148,14 +148,14 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     [Fact]
     public void ImportsAndReexportsDoNotDuplicateSourceDefinitionFinding()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             Enabled,
             ("a.pl", ":- module(a, [member/2]). member(_, _)."),
             ("r.pl", ":- module(r, []). :- reexport(a, [member/2])."),
             ("main.pl", ":- module(m, []). :- import(r, [member/2]).")
         );
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
         Assert.EndsWith("a.pl", warning.FileName, StringComparison.Ordinal);
         Assert.Contains("in module a", warning.Message, StringComparison.Ordinal);
     }
@@ -163,7 +163,7 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     [Fact]
     public void NonDefiningDeclarationsDoNotCollide()
     {
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(
+        var diagnostics = LintSource(
             ":- module(m, [member/2]). :- discontiguous(member/2). :- meta_predicate(member(?, ?)).",
             Enabled
         );
@@ -174,7 +174,7 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     [Fact]
     public void UnresolvedImportsDoNotSuppressIndependentCollision()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             Enabled,
             ("main.pl", ":- module(m, []). :- import(missing, [x/0]). member(_, _).")
         );
@@ -187,7 +187,7 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     [InlineData(PrologLanguageMode.StrictIso)]
     public void BothLanguageModesUseTheSameCatalog(PrologLanguageMode mode)
     {
-        IReadOnlyList<Diagnostic> diagnostics = LintSource("member(_, _).", Enabled, mode);
+        var diagnostics = LintSource("member(_, _).", Enabled, mode);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
     }
@@ -195,7 +195,7 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     [Fact]
     public void WholeProgramDoesNotDuplicateExplicitSourceFinding()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(Enabled, ("main.pl", "member(_, _)."));
+        var diagnostics = Lint(Enabled, ("main.pl", "member(_, _)."));
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
     }
@@ -203,9 +203,9 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     [Fact]
     public void DuplicateEnabledRulesDoNotDuplicateFindings()
     {
-        PrologLintOptions options = Enabled with { EnabledRules = [LintDiagnosticIds.BuiltinShadow, "dpl3049"] };
+        var options = Enabled with { EnabledRules = [LintDiagnosticIds.BuiltinShadow, "dpl3049"] };
 
-        IReadOnlyList<Diagnostic> diagnostics = LintSource("member(_, _).", options);
+        var diagnostics = LintSource("member(_, _).", options);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
     }
@@ -213,11 +213,11 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     [Fact]
     public void LocalImportAndBuiltinShadowRulesCompose()
     {
-        PrologLintOptions options = Enabled with
+        var options = Enabled with
         {
             EnabledRules = [LintDiagnosticIds.BuiltinShadow, LintDiagnosticIds.LocalImportShadow],
         };
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             options,
             ("a.pl", ":- module(a, [member/2]). member(_, _)."),
             ("main.pl", ":- module(m, []). :- import(a, [member/2]). member(_, _).")
@@ -230,7 +230,7 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     [Fact]
     public void FindingsUseSourceOrder()
     {
-        IReadOnlyList<Diagnostic> diagnostics = LintSource("writeln(_). member(_, _).", Enabled);
+        var diagnostics = LintSource("writeln(_). member(_, _).", Enabled);
 
         Diagnostic[] warnings = [.. diagnostics.Where(diagnostic => diagnostic.Id == LintDiagnosticIds.BuiltinShadow)];
         Assert.Equal(2, warnings.Length);
@@ -242,7 +242,7 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     [Fact]
     public void InitializationDirectivesAreNotExecuted()
     {
-        IReadOnlyList<Diagnostic> diagnostics = LintSource(":- initialization(halt(9)). member(_, _).", Enabled);
+        var diagnostics = LintSource(":- initialization(halt(9)). member(_, _).", Enabled);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.BuiltinShadow));
     }
@@ -259,10 +259,10 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     {
         List<PrologLintSource> sources = [];
         List<Diagnostic> diagnostics = [];
-        foreach (string name in names)
+        foreach (var name in names)
         {
             var path = Path.Combine(_directory, name);
-            PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
+            var loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
             sources.Add(loaded.Source);
             diagnostics.AddRange(loaded.Diagnostics);
         }
@@ -276,7 +276,7 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
         PrologLanguageMode mode = PrologLanguageMode.Modern
     )
     {
-        PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load("single.pl", text, new BytecodeProgram(mode));
+        var loaded = PrologLintSourceLoader.Load("single.pl", text + "\n", new BytecodeProgram(mode));
         return
         [
             .. loaded.Diagnostics,
@@ -295,9 +295,9 @@ public sealed class PrologBuiltinShadowLinterTests : IDisposable
     {
         List<PrologLintSource> sources = [];
         List<Diagnostic> diagnostics = [];
-        foreach ((string name, string text) in inputs)
+        foreach ((var name, var text) in inputs)
         {
-            PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+            var loaded = PrologLintSourceLoader.Load(
                 Path.Combine(Path.GetTempPath(), name),
                 text,
                 new BytecodeProgram()

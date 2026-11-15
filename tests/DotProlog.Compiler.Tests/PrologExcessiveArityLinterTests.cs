@@ -15,7 +15,7 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     [Fact]
     public void RuleIsDisabledByDefault()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p(A, B, C, D, E).", PrologLintOptions.SemanticOnly);
+        var diagnostics = Lint("p(A, B, C, D, E).", PrologLintOptions.SemanticOnly);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
     }
@@ -24,9 +24,9 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     public void ReportsDefaultExcessWithIdentityAndExactSpan()
     {
         const string source = "p(A, B, C, D, E) :- true.\n";
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
         Assert.Equal(0, warning.Span.Start);
         Assert.Equal(1, warning.Span.Length);
         Assert.Contains("Predicate user:p/5", warning.Message, StringComparison.Ordinal);
@@ -41,7 +41,7 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     [InlineData("p(A, B, C, D).")]
     public void DefinitionsAtOrBelowDefaultLimitAreNotReported(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
     }
@@ -49,9 +49,9 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     [Fact]
     public void CustomLimitUsesStrictlyGreaterComparison()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p(A, B). p(A, B, C).", EnabledWithMaximum(2));
+        var diagnostics = Lint("p(A, B). p(A, B, C).", EnabledWithMaximum(2));
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
         Assert.Contains("user:p/3", warning.Message, StringComparison.Ordinal);
         Assert.Contains("maximum of 2", warning.Message, StringComparison.Ordinal);
     }
@@ -59,7 +59,7 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     [Fact]
     public void MinimumLimitAllowsFactsAndUnaryPredicates()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p. p(A). p(A, B).", EnabledWithMaximum(1));
+        var diagnostics = Lint("p. p(A). p(A, B).", EnabledWithMaximum(1));
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
     }
@@ -75,9 +75,9 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     [Fact]
     public void InvalidLimitIsInertWhenRuleIsDisabled()
     {
-        PrologLintOptions options = PrologLintOptions.SemanticOnly with { MaxPredicateArity = 0 };
+        var options = PrologLintOptions.SemanticOnly with { MaxPredicateArity = 0 };
 
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p(A, B, C, D, E).", options);
+        var diagnostics = Lint("p(A, B, C, D, E).", options);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
     }
@@ -85,9 +85,9 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     [Fact]
     public void NonterminalUsesSourceRatherThanLoweredArity()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("nt(A, B, C, D) --> []. nt(A, B, C, D, E) --> [].");
+        var diagnostics = Lint("nt(A, B, C, D) --> []. nt(A, B, C, D, E) --> [].");
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
         Assert.Contains("Nonterminal user:nt//5", warning.Message, StringComparison.Ordinal);
         Assert.Contains("has 5 arguments", warning.Message, StringComparison.Ordinal);
         Assert.Equal("nt(A, B, C, D) --> []. ".Length, warning.Span.Start);
@@ -96,9 +96,9 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     [Fact]
     public void ModuleDirectiveContributesToIdentity()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(":- module(m, []). p(A, B, C, D, E).");
+        var diagnostics = Lint(":- module(m, []). p(A, B, C, D, E).");
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
         Assert.Contains("Predicate m:p/5", warning.Message, StringComparison.Ordinal);
     }
 
@@ -108,7 +108,7 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     [InlineData(":- module(m, [p/5]).")]
     public void DeclarationOnlyProceduresAreNotReported(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
     }
@@ -118,7 +118,7 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     [InlineData(":- multifile(p/5). p(A, B, C, D, E).")]
     public void DynamicAndMultifileDefinitionsAreEligible(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source);
+        var diagnostics = Lint(source);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
     }
@@ -126,7 +126,7 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     [Fact]
     public void CallsDoNotProduceArityFindings()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- q(A, B, C, D, E).");
+        var diagnostics = Lint("p :- q(A, B, C, D, E).");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
     }
@@ -134,16 +134,16 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     [Fact]
     public void OnlyFirstClauseOfProcedureProducesFinding()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p(A, B, C, D, E). p(A, B, C, D, E) :- true.");
+        var diagnostics = Lint("p(A, B, C, D, E). p(A, B, C, D, E) :- true.");
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
         Assert.Equal(0, warning.Span.Start);
     }
 
     [Fact]
     public void DistinctAritiesProduceSeparateFindings()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p(A, B, C, D, E). p(A, B, C, D, E, F).");
+        var diagnostics = Lint("p(A, B, C, D, E). p(A, B, C, D, E, F).");
 
         Assert.Equal(2, diagnostics.Count(diagnostic => diagnostic.Id == LintDiagnosticIds.ExcessivePredicateArity));
     }
@@ -151,7 +151,7 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     [Fact]
     public void SameProcedureInDistinctModulesProducesSeparateFindings()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             [("one.pl", ":- module(one, []). p(A, B, C, D, E)."), ("two.pl", ":- module(two, []). p(A, B, C, D, E).")],
             Enabled
         );
@@ -164,7 +164,7 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     [InlineData("p(X) --> [X]. p(A, B, C) :- true.", 0)]
     public void MixedDefinitionsUseOnlyFirstSuppliedDefinition(string source, int expected)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source, EnabledWithMaximum(1));
+        var diagnostics = Lint(source, EnabledWithMaximum(1));
 
         Assert.Equal(expected, diagnostics.Count(diagnostic => diagnostic.Id == LintDiagnosticIds.ExcessivePredicateArity));
     }
@@ -175,21 +175,21 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
         Source("parts.pl", "p(A, B, C, D, E).\n");
         Source("main.pl", ":- include('parts.pl').\np(A, B, C, D, E) :- true.\n");
 
-        IReadOnlyList<Diagnostic> diagnostics = Load("main.pl");
+        var diagnostics = Load("main.pl");
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
         Assert.Equal(Path.Combine(_directory, "parts.pl"), warning.FileName);
     }
 
     [Fact]
     public void ExplicitFilesUseFirstSuppliedDefinition()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             [("first.pl", "p(A, B, C, D, E)."), ("second.pl", "p(A, B, C, D, E) :- true.")],
             Enabled
         );
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
         Assert.EndsWith("first.pl", warning.FileName, StringComparison.Ordinal);
     }
 
@@ -198,7 +198,7 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     [InlineData(PrologLanguageMode.StrictIso)]
     public void BothLanguageModesUseTheSameRule(PrologLanguageMode mode)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p(A, B, C, D, E).", Enabled, mode);
+        var diagnostics = Lint("p(A, B, C, D, E).", Enabled, mode);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
     }
@@ -206,7 +206,7 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     [Fact]
     public void UnrelatedUndefinedCallsDoNotSuppressTheRule()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p(A, B, C, D, E) :- missing.");
+        var diagnostics = Lint("p(A, B, C, D, E) :- missing.");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
         Assert.Contains(diagnostics, Id(LintDiagnosticIds.UndefinedPredicate));
@@ -215,12 +215,12 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     [Fact]
     public void DuplicateEnabledRulesDoNotDuplicateFindings()
     {
-        PrologLintOptions options = Enabled with
+        var options = Enabled with
         {
             EnabledRules = [LintDiagnosticIds.ExcessivePredicateArity, LintDiagnosticIds.ExcessivePredicateArity],
         };
 
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p(A, B, C, D, E).", options);
+        var diagnostics = Lint("p(A, B, C, D, E).", options);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
     }
@@ -229,13 +229,13 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     public void ReusableSingleFileApiHonorsCustomLimit()
     {
         const string text = "p(A, B).";
-        PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+        var loaded = PrologLintSourceLoader.Load(
             Path.Combine(_directory, "single.pl"),
             text,
             new BytecodeProgram()
         );
 
-        IReadOnlyList<Diagnostic> diagnostics = PrologLinter.AnalyzeSource(
+        var diagnostics = PrologLinter.AnalyzeSource(
             text,
             loaded.Source.Clauses,
             "single.pl",
@@ -248,7 +248,7 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     [Fact]
     public void InitializationDirectivesAreNotExecuted()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(":- initialization(halt(9)). p(A, B, C, D, E).");
+        var diagnostics = Lint(":- initialization(halt(9)). p(A, B, C, D, E).");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.ExcessivePredicateArity));
     }
@@ -272,7 +272,7 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     private IReadOnlyList<Diagnostic> Load(string name)
     {
         var path = Path.Combine(_directory, name);
-        PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
+        var loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
         return [.. loaded.Diagnostics, .. PrologLinter.AnalyzeProgram([loaded.Source], Enabled)];
     }
 
@@ -290,11 +290,11 @@ public sealed class PrologExcessiveArityLinterTests : IDisposable
     {
         List<PrologLintSource> sources = [];
         List<Diagnostic> diagnostics = [];
-        foreach ((string name, string text) in inputs)
+        foreach ((var name, var text) in inputs)
         {
-            PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+            var loaded = PrologLintSourceLoader.Load(
                 Path.Combine(Path.GetTempPath(), name),
-                text,
+                text + "\n",
                 new BytecodeProgram(mode)
             );
             sources.Add(loaded.Source);

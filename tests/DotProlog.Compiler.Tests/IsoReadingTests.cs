@@ -73,11 +73,11 @@ public sealed class IsoReadingTests
 
         foreach (var text in new[] { "f f .", "1 p p p 2 ." })
         {
-            engine.Input = new StringReader(text);
+            engine.Input = new StringReader(text + "\n");
             Assert.True(engine.Query("catch((read(_), fail), error(syntax_error(_), _), true)").Prove(), text);
         }
 
-        engine.Input = new StringReader("f f 0 .");
+        engine.Input = new StringReader("f f 0 .\n");
         Assert.True(engine.Query("read(T), T == f(f(0))").Prove());
     }
 
@@ -104,7 +104,7 @@ public sealed class IsoReadingTests
 
     private static string ReadOutcome(PrologLanguageMode mode, string text)
     {
-        using var engine = new PrologEngine(mode) { Output = new StringWriter(), Input = new StringReader(text) };
+        using var engine = new PrologEngine(mode) { Output = new StringWriter(), Input = new StringReader(text + "\n") };
         return engine
             .Query("catch((read(_), Outcome = read), error(syntax_error(_), _), Outcome = syntax_error), write(Outcome)")
             .Prove()

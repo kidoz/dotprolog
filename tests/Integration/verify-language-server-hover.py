@@ -48,7 +48,7 @@ def main(command):
     session = smoke.Session(command + ["--mode", "strict-iso"])
     try:
         session.initialize()
-        session.open("untitled:hover", "run :- member(a, []).")
+        session.open("untitled:hover", "run :- member(a, []).\n")
         assert "unavailable" in hover(session, "strict", 7)["contents"]["value"]
         session.finish()
     finally:

@@ -19,6 +19,7 @@ internal sealed class Lexer
     private readonly List<Diagnostic> _diagnostics;
     private readonly CharacterConversionTable? _conversions;
     private readonly PrologFlags? _flags;
+    private readonly bool _allowEndAtEof;
     private int _position;
     private int _line = 1;
     private int _lineStart;
@@ -30,7 +31,8 @@ internal sealed class Lexer
         string? fileName,
         List<Diagnostic> diagnostics,
         CharacterConversionTable? conversions = null,
-        PrologFlags? flags = null
+        PrologFlags? flags = null,
+        bool allowEndAtEof = false
     )
     {
         _text = text;
@@ -38,6 +40,7 @@ internal sealed class Lexer
         _diagnostics = diagnostics;
         _conversions = conversions;
         _flags = flags;
+        _allowEndAtEof = allowEndAtEof;
     }
 
     /// <summary>Reads the next token, or an <see cref="TokenKind.Eof"/> token at end of input.</summary>
@@ -169,8 +172,15 @@ internal sealed class Lexer
 
             var symbol = ConvertedText(start, _position - start);
 
-            // A lone '.' followed by layout or end of input terminates a clause.
-            if (symbol == "." && (_position >= _text.Length || IsLayout(InputAt(_position)) || InputAt(_position) == '%'))
+            // Modern and single-term reads accept a local EOF; programs and clause scanning require layout or a comment.
+            if (
+                symbol == "."
+                && (
+                    (_position >= _text.Length && (!(_flags?.IsoReading ?? false) || _allowEndAtEof))
+                    || IsLayout(InputAt(_position))
+                    || InputAt(_position) == '%'
+                )
+            )
             {
                 return new Token(TokenKind.End, symbol, SpanFrom(start), layout);
             }
@@ -214,7 +224,8 @@ internal sealed class Lexer
     {
         (var code, width) = CharacterAt(position);
         return code == '_'
-            || CharacterClass.IsLetterOrDigit(code)
+            || CharacterClass.IsLetter(code)
+            || code is >= '0' and <= '9'
             || (CodePoints && code >= 0x80 && CharacterClass.IsIdentifierContinue(code));
     }
 
@@ -229,7 +240,7 @@ internal sealed class Lexer
     /// <summary>Whether <paramref name="code"/> is a one-character atom by itself: a symbol outside ASCII in <c>Modern</c>.</summary>
     private bool IsSolo(int code) => CodePoints && CharacterClass.IsSolo(code);
 
-    private static bool IsLayout(char c) => char.IsWhiteSpace(c);
+    private bool IsLayout(char c) => CodePoints ? char.IsWhiteSpace(c) : c is ' ' or '\t' or '\n' or '\v' or '\f' or '\r';
 
     private char Peek(int offset) => InputAt(_position + offset);
 
@@ -321,7 +332,7 @@ internal sealed class Lexer
             }
             else if (c == '%')
             {
-                int commentStart = _position;
+                var commentStart = _position;
                 while (_position < _text.Length && InputAt(_position) != '\n')
                 {
                     Advance();
@@ -476,9 +487,9 @@ internal sealed class Lexer
             Advance();
             var denominatorText = ReadDigits(char.IsAsciiDigit, out _);
 
-            BigInteger numerator = BigInteger.Parse(numeratorText, NumberStyles.None, CultureInfo.InvariantCulture);
-            BigInteger denominator = BigInteger.Parse(denominatorText, NumberStyles.None, CultureInfo.InvariantCulture);
-            SourceSpan rationalSpan = SpanFrom(start);
+            var numerator = BigInteger.Parse(numeratorText, NumberStyles.None, CultureInfo.InvariantCulture);
+            var denominator = BigInteger.Parse(denominatorText, NumberStyles.None, CultureInfo.InvariantCulture);
+            var rationalSpan = SpanFrom(start);
             if (denominator.IsZero)
             {
                 Report(DiagnosticIds.InvalidNumber, "A rational literal cannot have a zero denominator.", rationalSpan);
@@ -496,7 +507,7 @@ internal sealed class Lexer
         }
 
         var literal = separated ? digits : ConvertedText(start, _position - start);
-        SourceSpan span = SpanFrom(start);
+        var span = SpanFrom(start);
 
         if (isFloat)
         {
@@ -506,7 +517,7 @@ internal sealed class Lexer
 
         if (!long.TryParse(literal, NumberStyles.None, CultureInfo.InvariantCulture, out var integer))
         {
-            BigInteger big = BigInteger.Parse(literal, NumberStyles.None, CultureInfo.InvariantCulture);
+            var big = BigInteger.Parse(literal, NumberStyles.None, CultureInfo.InvariantCulture);
             return new Token(TokenKind.Integer, literal, span, layout, IntegerOverflow: true, Big: big);
         }
 

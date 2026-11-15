@@ -261,9 +261,9 @@ public sealed class MessageTests
     {
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
 
-        LoadResult loaded = engine.ConsultText("p :- print_message(error, foo).", "strict.pl");
+        var loaded = engine.ConsultText("p :- print_message(error, foo).\n", "strict.pl");
 
-        DotProlog.Syntax.Diagnostic diagnostic = Assert.Single(loaded.Diagnostics);
+        var diagnostic = Assert.Single(loaded.Diagnostics);
         Assert.Equal(CompilerDiagnosticIds.StrictIsoViolation, diagnostic.Id);
         Assert.Contains("print_message/2", diagnostic.Message, StringComparison.Ordinal);
     }

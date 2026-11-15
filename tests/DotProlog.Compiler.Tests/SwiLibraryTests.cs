@@ -245,9 +245,9 @@ public sealed class SwiLibraryTests
     {
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
 
-        LoadResult loaded = engine.ConsultText("p :- must_be(integer, 1).", "strict.pl");
+        var loaded = engine.ConsultText("p :- must_be(integer, 1).\n", "strict.pl");
 
-        DotProlog.Syntax.Diagnostic diagnostic = Assert.Single(loaded.Diagnostics);
+        var diagnostic = Assert.Single(loaded.Diagnostics);
         Assert.Equal(CompilerDiagnosticIds.StrictIsoViolation, diagnostic.Id);
         Assert.Contains("must_be/2", diagnostic.Message, StringComparison.Ordinal);
     }
@@ -319,6 +319,31 @@ public sealed class SwiLibraryTests
     [InlineData("aggregate_all(bag(S), D, member(D-S, [b-2, a-1, b-2]), Bag), write(Bag)", "[1,2]")]
     public void AggregateFamiliesGroupAndDeduplicate(string goal, string expected) =>
         Assert.Equal(expected, PrologTestHost.RunGoal(goal));
+
+    [Fact]
+    public void AggregateFamiliesDoNotCallReplacementListOrBagofPredicates() =>
+        Assert.Equal(
+            "[a-[1,2],b-[3]]/[a-[1,2],b-[3]]/6/[a-2,b-1]/3",
+            PrologTestHost.Run(
+                """
+                member(_, _) :- fail.
+                reverse(_, _) :- fail.
+                append(_, _, _) :- fail.
+                bagof(_, _, _) :- fail.
+                p(a, 1).
+                p(a, 2).
+                p(b, 3).
+                :- initialization((
+                    findall(K-B, aggregate(bag(V), p(K, V), B), Bags),
+                    findall(K-S, aggregate(set(V), p(K, V), S), Sets),
+                    aggregate_all(sum(V), p(_, V), Total),
+                    findall(K-N, aggregate(count, V, p(K, V), N), Counts),
+                    aggregate(count, K^V^p(K, V), ExistentialCount),
+                    write(Bags/Sets/Total/Counts/ExistentialCount)
+                )).
+                """
+            )
+        );
 
     [Fact]
     public void AggregateWithNoSolutionsFails() =>

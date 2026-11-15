@@ -12,11 +12,11 @@ public sealed class StrictIsoReviewTests
     {
         using var engine = new PrologEngine(mode);
         Assert.True(engine.Query($"current_prolog_flag(char_conversion, {flag})").Prove());
-        LoadResult loaded = engine.ConsultText(
+        var loaded = engine.ConsultText(
             """
             :- char_conversion(a, b).
             a.
-            """,
+            """ + "\n",
             "default-conversion.pl"
         );
         Assert.Empty(loaded.Diagnostics);
@@ -30,8 +30,8 @@ public sealed class StrictIsoReviewTests
     [InlineData("\"+\"(4,5)", "+(4,5)")]
     public void AtomValuedDoubleQuotesParticipateInParsing(string text, string expected)
     {
-        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Input = new StringReader(text + ".") };
-        LoadResult loaded = engine.ConsultText($":- set_prolog_flag(double_quotes, atom).\nquoted_term({text}).");
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Input = new StringReader(text + ".\n") };
+        var loaded = engine.ConsultText($":- set_prolog_flag(double_quotes, atom).\nquoted_term({text}).\n");
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
         Assert.Single(engine.Query($"quoted_term(T), T == ({expected})").Solutions());
         Assert.Single(engine.Query("set_prolog_flag(double_quotes, atom)").Solutions());
@@ -44,7 +44,7 @@ public sealed class StrictIsoReviewTests
     public void ListValuedDoubleQuotesKeepTheirRepresentation(string mode, string expected)
     {
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
-        LoadResult loaded = engine.ConsultText($":- set_prolog_flag(double_quotes, {mode}).\nquoted_term(\"ab\").");
+        var loaded = engine.ConsultText($":- set_prolog_flag(double_quotes, {mode}).\nquoted_term(\"ab\").\n");
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
         Assert.Single(engine.Query($"quoted_term(T), T == {expected}").Solutions());
     }
@@ -64,13 +64,25 @@ public sealed class StrictIsoReviewTests
     [Fact]
     public void InvalidReadOptionsDoNotConsumeTheNextTerm()
     {
-        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Input = new StringReader("kept.") };
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Input = new StringReader("kept.\n") };
 
         Assert.Single(
             engine
                 .Query("catch(read_term(_, [bad]), error(E,_), true), E == domain_error(read_option,bad), read(kept)")
                 .Solutions()
         );
+    }
+
+    [Fact]
+    public void RuntimeReadRequiresLayoutAfterTheEndCharAtActualEof()
+    {
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
+
+        engine.Input = new StringReader("kept.");
+        Assert.Single(engine.Query("catch(read(_), error(syntax_error(_), _), true)").Solutions());
+
+        engine.Input = new StringReader("kept.\n");
+        Assert.Single(engine.Query("read(kept)").Solutions());
     }
 
     [Fact]
@@ -102,7 +114,7 @@ public sealed class StrictIsoReviewTests
     public void StandardReviewCasesPass(PrologLanguageMode mode)
     {
         using var engine = new PrologEngine(mode);
-        LoadResult loaded = engine.ConsultFile(Path.Combine(AppContext.BaseDirectory, "strict_iso_review.pl"));
+        var loaded = engine.ConsultFile(Path.Combine(AppContext.BaseDirectory, "strict_iso_review.pl"));
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
         string[] names = [.. engine.Query("iso_review_case(Name, _)").Solutions().Select(s => s["Name"].ToString())];
         Assert.Equal(125, names.Length);

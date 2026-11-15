@@ -142,11 +142,52 @@ public sealed class OccursCheckFlagTests
                         write(ReadError),
                         ( (current_prolog_flag(F, _), F == occurs_check) -> write(enumerated) ; write(absent) )
                     )).
-                    """
+                    """ + "\n"
                 )
                 .Success
         );
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
         Assert.Equal("domain_error(prolog_flag,occurs_check)domain_error(prolog_flag,occurs_check)absent", output.ToString());
+    }
+
+    [Fact]
+    public void CaughtOccursCheckErrorsRestoreForcedTrailing()
+    {
+        using var engine = new PrologEngine { Output = TextWriter.Null };
+        Assert.True(
+            engine
+                .ConsultText(":- initialization((set_prolog_flag(occurs_check, error), catch(X \\= f(X), error(_, _), true))).")
+                .Success
+        );
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        AssertForcedTrailingRestored(engine);
+    }
+
+    [Fact]
+    public void OccursErrorsDuringCatcherMatchingRestoreForcedTrailing()
+    {
+        using var engine = new PrologEngine { Output = TextWriter.Null };
+        Assert.True(
+            engine
+                .ConsultText(
+                    ":- initialization((set_prolog_flag(occurs_check, error), "
+                        + "catch(catch(throw(f(Y, f(Y))), f(X, X), true), _, true)))."
+                )
+                .Success
+        );
+        Assert.Throws<PrologException>(() => engine.RunPendingGoals());
+        Assert.False(engine.Machine.IsRunning);
+        AssertForcedTrailingRestored(engine);
+    }
+
+    private static void AssertForcedTrailingRestored(PrologEngine engine)
+    {
+        var trailMark = engine.Machine.TrailMark;
+        var variable = engine.Machine.CreateVariable();
+        var value = Cell.Atom(engine.Machine.Symbols.InternAtom("after_catch"));
+        Assert.True(engine.Machine.Unify(variable, value));
+        Assert.Equal(value, engine.Machine.Dereference(variable));
+        Assert.Equal(trailMark, engine.Machine.TrailMark);
+        Assert.True(engine.Query("true").Prove());
     }
 }

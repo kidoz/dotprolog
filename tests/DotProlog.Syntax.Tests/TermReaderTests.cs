@@ -32,8 +32,8 @@ public sealed class TermReaderTests
             _ => "\"" + new string('a', depth) + "\"",
         };
 
-        ParseResult parsed = TermReader.ReadProgram("\n" + source + ". recovered.", "deep.pl");
-        Diagnostic diagnostic = Assert.Single(parsed.Diagnostics);
+        var parsed = TermReader.ReadProgram("\n" + source + ". recovered.", "deep.pl");
+        var diagnostic = Assert.Single(parsed.Diagnostics);
         Assert.False(parsed.Success);
         Assert.Equal(DiagnosticIds.NestingLimitExceeded, diagnostic.Id);
         Assert.Equal("deep.pl", diagnostic.FileName);
@@ -41,7 +41,7 @@ public sealed class TermReaderTests
         Assert.True(diagnostic.Span.Column > 0);
         Assert.Equal("recovered", Assert.IsType<AtomTerm>(Assert.Single(parsed.Clauses)).Name);
 
-        ParseResult single = TermReader.ReadTerm(source, "deep.pl");
+        var single = TermReader.ReadTerm(source, "deep.pl");
         Assert.Empty(single.Clauses);
         Assert.Equal(DiagnosticIds.NestingLimitExceeded, Assert.Single(single.Diagnostics).Id);
     }
@@ -53,7 +53,7 @@ public sealed class TermReaderTests
     {
         var flags = new PrologFlags();
         flags.SetDoubleQuotes(mode);
-        ParseResult parsed = TermReader.ReadTerm("\"" + new string('a', 20_000) + "\"", flags: flags);
+        var parsed = TermReader.ReadTerm("\"" + new string('a', 20_000) + "\"", flags: flags);
         Assert.True(parsed.Success, string.Join("; ", parsed.Diagnostics));
         Assert.Single(parsed.Clauses);
     }
@@ -101,7 +101,7 @@ public sealed class TermReaderTests
 
     private static string ReadSingle(string text)
     {
-        ParseResult result = TermReader.ReadProgram(text);
+        var result = TermReader.ReadProgram(text);
         Assert.True(result.Success, string.Join("; ", result.Diagnostics));
         return Canonical(Assert.Single(result.Clauses));
     }
@@ -121,10 +121,10 @@ public sealed class TermReaderTests
         ArgumentNullException.ThrowIfNull(source);
         var flags = new PrologFlags();
         flags.SetDoubleQuotes(DoubleQuotesMode.Atom);
-        ParseResult parsed = TermReader.ReadTerm(source, flags: flags);
+        var parsed = TermReader.ReadTerm(source, flags: flags);
 
         Assert.Empty(parsed.Diagnostics);
-        SyntaxTerm term = Assert.Single(parsed.Clauses);
+        var term = Assert.Single(parsed.Clauses);
         Assert.Equal(expected, Canonical(term));
         Assert.Equal(0, term.Span.Start);
         Assert.Equal(source.Length, term.Span.Length);
@@ -135,9 +135,9 @@ public sealed class TermReaderTests
     {
         var flags = new PrologFlags();
         flags.SetDoubleQuotes(DoubleQuotesMode.Atom);
-        ParseResult parsed = TermReader.ReadTerm("a \"=\" b \"=\" c", "quoted.pl", flags: flags);
+        var parsed = TermReader.ReadTerm("a \"=\" b \"=\" c", "quoted.pl", flags: flags);
 
-        Diagnostic diagnostic = Assert.Single(parsed.Diagnostics);
+        var diagnostic = Assert.Single(parsed.Diagnostics);
         Assert.Equal(DiagnosticIds.UnexpectedToken, diagnostic.Id);
         Assert.Equal("quoted.pl", diagnostic.FileName);
         Assert.Equal(8, diagnostic.Span.Start);
@@ -182,7 +182,7 @@ public sealed class TermReaderTests
     public void RejectsChainedNonAssociativeOperator()
     {
         // '**' is xfx, so neither argument may itself be a '**' term.
-        ParseResult result = TermReader.ReadProgram("X is 2 ** 3 ** 2.");
+        var result = TermReader.ReadProgram("X is 2 ** 3 ** 2.");
 
         Assert.False(result.Success);
     }
@@ -222,15 +222,15 @@ public sealed class TermReaderTests
     [InlineData(256)]
     public void CompoundArgumentsKeepTheirOrderAndSpansAcrossNestedTerms(int arity)
     {
-        string[] arguments = Enumerable.Range(0, arity).Select(i => $"pair({i},X)").ToArray();
-        string termText = $"outer({string.Join(',', arguments)})";
-        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        var arguments = Enumerable.Range(0, arity).Select(i => $"pair({i},X)").ToArray();
+        var termText = $"outer({string.Join(',', arguments)})";
+        foreach (var mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
         {
-            ParseResult result = TermReader.ReadProgram($"{termText}.\nnext(ok).", flags: new BytecodeProgram(mode).Flags);
+            var result = TermReader.ReadProgram($"{termText}.\nnext(ok).\n", flags: new BytecodeProgram(mode).Flags);
 
             Assert.Empty(result.Diagnostics);
             Assert.Equal(2, result.Clauses.Count);
-            CompoundTerm term = Assert.IsType<CompoundTerm>(result.Clauses[0]);
+            var term = Assert.IsType<CompoundTerm>(result.Clauses[0]);
             Assert.Equal("outer", term.Name);
             Assert.Equal(arity, term.Arity);
             Assert.Equal(new SourceSpan(0, termText.Length, 1, 1), term.Span);
@@ -257,19 +257,19 @@ public sealed class TermReaderTests
     public void MalformedArgumentsKeepTheDiagnosticAndFollowingClause(string broken, int errorStart)
     {
         ArgumentNullException.ThrowIfNull(broken);
-        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        foreach (var mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
         {
-            ParseResult result = TermReader.ReadProgram(
-                $"{broken}\ngood(z).",
+            var result = TermReader.ReadProgram(
+                $"{broken}\ngood(z).\n",
                 "arguments.pl",
                 flags: new BytecodeProgram(mode).Flags
             );
 
-            Diagnostic diagnostic = Assert.Single(result.Diagnostics);
+            var diagnostic = Assert.Single(result.Diagnostics);
             Assert.Equal(DiagnosticIds.UnexpectedToken, diagnostic.Id);
             Assert.Equal(new SourceSpan(errorStart, 1, 1, errorStart + 1), diagnostic.Span);
             Assert.Equal("arguments.pl", diagnostic.FileName);
-            SyntaxTerm following = Assert.Single(result.Clauses);
+            var following = Assert.Single(result.Clauses);
             Assert.Equal("good(z)", Canonical(following));
             Assert.Equal(new SourceSpan(broken.Length + 1, 7, 2, 1), following.Span);
         }
@@ -288,7 +288,7 @@ public sealed class TermReaderTests
     [Fact]
     public void RecoversAtTheNextClauseAfterAnError()
     {
-        ParseResult result = TermReader.ReadProgram("broken(a b).\ngood(c).");
+        var result = TermReader.ReadProgram("broken(a b).\ngood(c).");
 
         Assert.False(result.Success);
         Assert.Equal(DiagnosticIds.UnexpectedToken, result.Diagnostics[0].Id);
@@ -298,7 +298,7 @@ public sealed class TermReaderTests
     [Fact]
     public void ReportsAMissingClauseTerminator()
     {
-        ParseResult result = TermReader.ReadProgram("a\nb.");
+        var result = TermReader.ReadProgram("a\nb.");
 
         Assert.Equal(DiagnosticIds.MissingEndToken, Assert.Single(result.Diagnostics).Id);
     }
@@ -306,9 +306,9 @@ public sealed class TermReaderTests
     [Fact]
     public void DiagnosticCarriesLineAndColumn()
     {
-        ParseResult result = TermReader.ReadProgram("p(a).\nq(b c).", "test.pl");
+        var result = TermReader.ReadProgram("p(a).\nq(b c).", "test.pl");
 
-        Diagnostic diagnostic = Assert.Single(result.Diagnostics);
+        var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(2, diagnostic.Span.Line);
         Assert.Equal("test.pl", diagnostic.FileName);
         Assert.StartsWith("test.pl(2,", diagnostic.ToString(), StringComparison.Ordinal);
@@ -317,7 +317,7 @@ public sealed class TermReaderTests
     [Fact]
     public void ReadTermAcceptsAGoalWithoutATerminator()
     {
-        ParseResult result = TermReader.ReadTerm("write(hi), nl");
+        var result = TermReader.ReadTerm("write(hi), nl");
 
         Assert.True(result.Success);
         Assert.Equal(",(write(hi),nl)", Canonical(Assert.Single(result.Clauses)));
@@ -328,7 +328,7 @@ public sealed class TermReaderTests
     [InlineData("1e2")]
     public void ReadTermRejectsTrailingTokens(string source)
     {
-        ParseResult result = TermReader.ReadTerm(source);
+        var result = TermReader.ReadTerm(source);
 
         Assert.False(result.Success);
         Assert.Equal(DiagnosticIds.UnexpectedToken, Assert.Single(result.Diagnostics).Id);
@@ -345,10 +345,10 @@ public sealed class TermReaderTests
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        ParseResult result = TermReader.ReadTerm(source, "limit.pl");
+        var result = TermReader.ReadTerm(source, "limit.pl");
 
         Assert.Empty(result.Diagnostics);
-        BigIntegerTerm big = Assert.IsType<BigIntegerTerm>(Assert.Single(result.Clauses));
+        var big = Assert.IsType<BigIntegerTerm>(Assert.Single(result.Clauses));
         Assert.Equal(System.Numerics.BigInteger.Parse(expected, CultureInfo.InvariantCulture), big.Value);
     }
 
@@ -359,12 +359,12 @@ public sealed class TermReaderTests
     [InlineData("+1.5", "+", 1.5)]
     public void ReadsAPlusBeforeANumberAsAPrefixOperator(string source, string name, double operand)
     {
-        ParseResult result = TermReader.ReadTerm(source);
+        var result = TermReader.ReadTerm(source);
 
         Assert.Empty(result.Diagnostics);
-        CompoundTerm term = Assert.IsType<CompoundTerm>(Assert.Single(result.Clauses));
+        var term = Assert.IsType<CompoundTerm>(Assert.Single(result.Clauses));
         Assert.Equal(name, term.Name);
-        double value = Assert.Single(term.Arguments) switch
+        var value = Assert.Single(term.Arguments) switch
         {
             IntegerTerm integer => integer.Value,
             FloatTerm number => number.Value,
@@ -379,23 +379,120 @@ public sealed class TermReaderTests
     [InlineData("- /**/ 1", -1)]
     public void ReadsAMinusBeforeANumberAsANegativeNumber(string source, long expected)
     {
-        ParseResult result = TermReader.ReadTerm(source);
+        var result = TermReader.ReadTerm(source);
 
         Assert.Empty(result.Diagnostics);
-        IntegerTerm term = Assert.IsType<IntegerTerm>(Assert.Single(result.Clauses));
+        var term = Assert.IsType<IntegerTerm>(Assert.Single(result.Clauses));
         Assert.Equal(expected, term.Value);
     }
 
     [Fact]
     public void ReadsTheEmptyListNameWithASpaceAsAFunctor()
     {
-        ParseResult result = TermReader.ReadTerm("[ ](1)");
+        var result = TermReader.ReadTerm("[ ](1)");
         Assert.Empty(result.Diagnostics);
-        CompoundTerm term = Assert.IsType<CompoundTerm>(Assert.Single(result.Clauses));
+        var term = Assert.IsType<CompoundTerm>(Assert.Single(result.Clauses));
         Assert.Equal("[]", term.Name);
         Assert.Equal(1, term.Arity);
 
         Assert.NotEmpty(TermReader.ReadTerm("[ ] (1)").Diagnostics);
+    }
+
+    [Theory]
+    [InlineData(PrologLanguageMode.Modern)]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    public void ReadsTheEmptyBraceNameWithASpaceAsAFunctor(PrologLanguageMode mode)
+    {
+        var result = TermReader.ReadTerm("{ }(a)", flags: new BytecodeProgram(mode).Flags);
+
+        Assert.True(result.Success, string.Join("; ", result.Diagnostics));
+        Assert.Equal("{}(a)", Canonical(Assert.Single(result.Clauses)));
+        Assert.NotEmpty(TermReader.ReadTerm("{ } (a)", flags: new BytecodeProgram(mode).Flags).Diagnostics);
+    }
+
+    [Theory]
+    [InlineData(PrologLanguageMode.Modern)]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    public void RedefinedBarKeepsItsOwnFunctor(PrologLanguageMode mode)
+    {
+        var result = TermReader.ReadProgram(
+            ":- op(1100, xfy, '|').\nX = (a|b).\n",
+            flags: new BytecodeProgram(mode).Flags
+        );
+
+        Assert.True(result.Success, string.Join("; ", result.Diagnostics));
+        Assert.Equal("=(X,|(a,b))", Canonical(result.Clauses[^1]));
+    }
+
+    [Theory]
+    [InlineData(PrologLanguageMode.Modern, "- '->'(a,b)", "-(->(a,b))")]
+    [InlineData(PrologLanguageMode.StrictIso, "- '->'(a,b)", "-(->(a,b))")]
+    [InlineData(PrologLanguageMode.Modern, "- ;(a,b)", "-(;(a,b))")]
+    [InlineData(PrologLanguageMode.StrictIso, "- ;(a,b)", "-(;(a,b))")]
+    [InlineData(PrologLanguageMode.Modern, "- ','(a,b)", "-(,(a,b))")]
+    [InlineData(PrologLanguageMode.StrictIso, "- ','(a,b)", "-(,(a,b))")]
+    [InlineData(PrologLanguageMode.Modern, "- '|'(a,b)", "-(|(a,b))")]
+    [InlineData(PrologLanguageMode.StrictIso, "- '|'(a,b)", "-(|(a,b))")]
+    [InlineData(PrologLanguageMode.Modern, "- mod(a,b)", "-(mod(a,b))")]
+    [InlineData(PrologLanguageMode.StrictIso, "- mod(a,b)", "-(mod(a,b))")]
+    [InlineData(PrologLanguageMode.Modern, "\\+ =(a,b)", "\\+(=(a,b))")]
+    [InlineData(PrologLanguageMode.StrictIso, "\\+ =(a,b)", "\\+(=(a,b))")]
+    public void PrefixOperatorsAcceptOperatorFunctorsAsOperands(PrologLanguageMode mode, string source, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var result = TermReader.ReadTerm(source, "operators.pl", flags: new BytecodeProgram(mode).Flags);
+
+        Assert.True(result.Success, string.Join("; ", result.Diagnostics));
+        var term = Assert.Single(result.Clauses);
+        Assert.Equal(expected, Canonical(term));
+        Assert.Equal(new SourceSpan(0, source.Length, 1, 1), term.Span);
+    }
+
+    [Fact]
+    public void PublicReaderDefaultsFollowTheSuppliedReadingFlags()
+    {
+        var strictAtom = TermReader.ReadTerm("X = xor", flags: new BytecodeProgram(PrologLanguageMode.StrictIso).Flags);
+        var strictInfix = TermReader.ReadTerm(
+            "module - 1",
+            flags: new BytecodeProgram(PrologLanguageMode.StrictIso).Flags
+        );
+        var modernAtom = TermReader.ReadTerm("X = xor", flags: new BytecodeProgram(PrologLanguageMode.Modern).Flags);
+        var modernPrefix = TermReader.ReadTerm("module - 1", flags: new BytecodeProgram(PrologLanguageMode.Modern).Flags);
+
+        Assert.Equal("=(X,xor)", Canonical(Assert.Single(strictAtom.Clauses)));
+        Assert.Equal("-(module,1)", Canonical(Assert.Single(strictInfix.Clauses)));
+        Assert.Equal("=(X,xor)", Canonical(Assert.Single(modernAtom.Clauses)));
+        Assert.Equal("module(-1)", Canonical(Assert.Single(modernPrefix.Clauses)));
+    }
+
+    [Fact]
+    public void StrictIsoRejectsAnAdjacentNumberAfterADoubleQuotedMinusAtom()
+    {
+        var strict = new BytecodeProgram(PrologLanguageMode.StrictIso).Flags;
+        strict.SetDoubleQuotes(DoubleQuotesMode.Atom);
+        var rejected = TermReader.ReadTerm("\"-\"1", "quoted.pl", flags: strict);
+
+        Assert.False(rejected.Success);
+        var diagnostic = Assert.Single(rejected.Diagnostics);
+        Assert.Equal(DiagnosticIds.UnexpectedToken, diagnostic.Id);
+        Assert.Equal(new SourceSpan(3, 1, 1, 4), diagnostic.Span);
+
+        var modern = new BytecodeProgram(PrologLanguageMode.Modern).Flags;
+        modern.SetDoubleQuotes(DoubleQuotesMode.Atom);
+        var accepted = TermReader.ReadTerm("\"-\"1", flags: modern);
+        Assert.Equal("-(1)", Canonical(Assert.Single(accepted.Clauses)));
+    }
+
+    [Fact]
+    public void StrictIsoRequiresLayoutOrACommentAfterTheEndChar()
+    {
+        var strict = TermReader.ReadProgram("a.", flags: new BytecodeProgram(PrologLanguageMode.StrictIso).Flags);
+        var modern = TermReader.ReadProgram("a.", flags: new BytecodeProgram(PrologLanguageMode.Modern).Flags);
+
+        Assert.Equal(DiagnosticIds.MissingEndToken, Assert.Single(strict.Diagnostics).Id);
+        Assert.True(modern.Success, string.Join("; ", modern.Diagnostics));
+        Assert.Equal("a", Canonical(Assert.Single(modern.Clauses)));
+        Assert.True(TermReader.ReadProgram("a.%", flags: new BytecodeProgram(PrologLanguageMode.StrictIso).Flags).Success);
     }
 
     [Theory]
@@ -407,9 +504,9 @@ public sealed class TermReaderTests
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        ParseResult result = TermReader.ReadTerm(source, "limit.pl");
+        var result = TermReader.ReadTerm(source, "limit.pl");
 
-        Diagnostic diagnostic = Assert.Single(result.Diagnostics);
+        var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(DiagnosticIds.FloatOverflow, diagnostic.Id);
         Assert.Equal(new SourceSpan(start, length, 1, start + 1), diagnostic.Span);
         Assert.Equal("limit.pl", diagnostic.FileName);
@@ -423,7 +520,7 @@ public sealed class TermReaderTests
         conversions.Set('z', 'x');
         flags.SetCharConversion(enabled: true);
 
-        ParseResult result = TermReader.ReadTerm("fizz('fizz', \"fizz\")", characterConversions: conversions, flags: flags);
+        var result = TermReader.ReadTerm("fizz('fizz', \"fizz\")", characterConversions: conversions, flags: flags);
 
         Assert.True(result.Success);
         Assert.Equal("fixx(fizz,\"fizz\")", Canonical(Assert.Single(result.Clauses)));
@@ -435,7 +532,7 @@ public sealed class TermReaderTests
         var conversions = new CharacterConversionTable();
         var flags = new PrologFlags();
 
-        ParseResult result = TermReader.ReadProgram(
+        var result = TermReader.ReadProgram(
             """
             :- char_conversion(z, x).
             :- set_prolog_flag(char_conversion, on).
@@ -454,7 +551,7 @@ public sealed class TermReaderTests
     {
         var operators = new OperatorTable();
 
-        ParseResult result = TermReader.ReadProgram(":- op(100, xfx, [temporary_operator, ',']).", operators: operators);
+        var result = TermReader.ReadProgram(":- op(100, xfx, [temporary_operator, ',']).", operators: operators);
 
         Assert.True(result.Success);
         Assert.False(operators.IsOperator("temporary_operator"));
@@ -466,8 +563,8 @@ public sealed class TermReaderTests
     public void PunctuationConversionChangesAtClauseBoundaries(PrologLanguageMode mode)
     {
         var conversions = new CharacterConversionTable();
-        PrologFlags flags = new BytecodeProgram(mode).Flags;
-        ParseResult result = TermReader.ReadProgram(
+        var flags = new BytecodeProgram(mode).Flags;
+        var result = TermReader.ReadProgram(
             """
             :- char_conversion('#', ',').
             :- set_prolog_flag(char_conversion, on).
@@ -476,7 +573,7 @@ public sealed class TermReaderTests
             list([a#Tail]).
             :- set_prolog_flag(char_conversion, off).
             atom(#).
-            """,
+            """ + "\n",
             characterConversions: conversions,
             flags: flags
         );

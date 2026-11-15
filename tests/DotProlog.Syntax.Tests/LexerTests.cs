@@ -19,7 +19,7 @@ public sealed class LexerTests
         List<Token> tokens = [];
         while (true)
         {
-            Token token = lexer.Next();
+            var token = lexer.Next();
             tokens.Add(token);
             if (token.Kind == TokenKind.Eof)
             {
@@ -31,7 +31,7 @@ public sealed class LexerTests
     [Fact]
     public void SeparatesAtomsVariablesAndPunctuation()
     {
-        List<Token> tokens = Tokenize("foo(Bar, baz).", out List<Diagnostic> diagnostics);
+        var tokens = Tokenize("foo(Bar, baz).", out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(
@@ -52,7 +52,7 @@ public sealed class LexerTests
     [Fact]
     public void TreatsExtendedTitlecaseLettersAsAtomStarts()
     {
-        List<Token> tokens = Tokenize("ǅelta.", out List<Diagnostic> diagnostics);
+        var tokens = Tokenize("ǅelta.", out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(TokenKind.Atom, tokens[0].Kind);
@@ -62,7 +62,7 @@ public sealed class LexerTests
     [Fact]
     public void RejectsNonAsciiDigitsAsNumericStartsWithoutThrowing()
     {
-        List<Token> tokens = Tokenize("١ next.", out List<Diagnostic> diagnostics);
+        var tokens = Tokenize("١ next.", out var diagnostics);
 
         Assert.Equal(DiagnosticIds.UnexpectedCharacter, Assert.Single(diagnostics).Id);
         Assert.Equal(["next", ".", string.Empty], tokens.Select(token => token.Text));
@@ -71,8 +71,8 @@ public sealed class LexerTests
     [Fact]
     public void MarksLayoutBeforeOpeningParenthesis()
     {
-        List<Token> attached = Tokenize("foo(a)", out _);
-        List<Token> detached = Tokenize("foo (a)", out _);
+        var attached = Tokenize("foo(a)", out _);
+        var detached = Tokenize("foo (a)", out _);
 
         Assert.False(attached[1].PrecededByLayout);
         Assert.True(detached[1].PrecededByLayout);
@@ -89,12 +89,12 @@ public sealed class LexerTests
     [InlineData('|')]
     public void ConvertedPunctuationKeepsSourcePositionAndQuotedText(char punctuation)
     {
-        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        foreach (var mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
         {
             var conversions = new CharacterConversionTable();
             conversions.Set('#', punctuation);
             conversions.Set(punctuation, 'z');
-            PrologFlags flags = new BytecodeProgram(mode).Flags;
+            var flags = new BytecodeProgram(mode).Flags;
             flags.SetCharConversion(true);
             List<Diagnostic> diagnostics = [];
             var lexer = new Lexer(
@@ -105,7 +105,7 @@ public sealed class LexerTests
                 flags
             );
 
-            Token token = lexer.Next();
+            var token = lexer.Next();
             Assert.Equal(TokenKind.Punctuation, token.Kind);
             Assert.Equal(punctuation.ToString(), token.Text);
             Assert.Equal(new SourceSpan(2, 1, 2, 1), token.Span);
@@ -140,7 +140,7 @@ public sealed class LexerTests
         List<Diagnostic> diagnostics = [];
         var lexer = new Lexer("ab a b", null, diagnostics, conversions, flags);
 
-        Token token = lexer.Next();
+        var token = lexer.Next();
         Assert.Equal(TokenKind.Atom, token.Kind);
         Assert.Equal(empty, token.Text);
         Assert.Equal(new SourceSpan(0, 2, 1, 1), token.Span);
@@ -157,7 +157,7 @@ public sealed class LexerTests
     [Fact]
     public void ReadsQuotedAtomWithEscapesAndDoubledQuote()
     {
-        List<Token> tokens = Tokenize(@"'Hello!\nIt''s here'", out List<Diagnostic> diagnostics);
+        var tokens = Tokenize(@"'Hello!\nIt''s here'", out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(TokenKind.Atom, tokens[0].Kind);
@@ -168,7 +168,7 @@ public sealed class LexerTests
     [Fact]
     public void ReadsBackquotedAtomWithEscapesAndDoubledQuote()
     {
-        List<Token> tokens = Tokenize(@"`Hello\n``world`", out List<Diagnostic> diagnostics);
+        var tokens = Tokenize(@"`Hello\n``world`", out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(TokenKind.Atom, tokens[0].Kind);
@@ -182,18 +182,18 @@ public sealed class LexerTests
     [InlineData('`')]
     public void PlainQuotedTextKeepsContentAndSourceSpan(char quote)
     {
-        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        foreach (var mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
         {
-            foreach (string value in new[] { string.Empty, "plain", "two words", "λ😀" + new string('a', 128) })
+            foreach (var value in new[] { string.Empty, "plain", "two words", "λ😀" + new string('a', 128) })
             {
                 var conversions = new CharacterConversionTable();
                 conversions.Set('a', 'z');
-                PrologFlags flags = new BytecodeProgram(mode).Flags;
+                var flags = new BytecodeProgram(mode).Flags;
                 flags.SetCharConversion(true);
                 List<Diagnostic> diagnostics = [];
                 var lexer = new Lexer($"\n {quote}{value}{quote} next", "quoted.pl", diagnostics, conversions, flags);
 
-                Token token = lexer.Next();
+                var token = lexer.Next();
                 Assert.Equal(quote == '"' ? TokenKind.String : TokenKind.Atom, token.Kind);
                 Assert.Equal(value, token.Text);
                 Assert.Equal(quote != '"', token.Quoted);
@@ -215,10 +215,10 @@ public sealed class LexerTests
     public void QuotedTextKeepsPrefixWhenDecodingStartsLate(char quote)
     {
         string prefix = new('p', 80);
-        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        foreach (var mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
         {
-            string source = $"{quote}{prefix}\\nq{quote}{quote}r\\x41\\s{quote} next";
-            List<Token> tokens = Tokenize(source, new BytecodeProgram(mode).Flags, out List<Diagnostic> diagnostics);
+            var source = $"{quote}{prefix}\\nq{quote}{quote}r\\x41\\s{quote} next";
+            var tokens = Tokenize(source, new BytecodeProgram(mode).Flags, out var diagnostics);
 
             Assert.Empty(diagnostics);
             Assert.Equal($"{prefix}\nq{quote}rAs", tokens[0].Text);
@@ -252,7 +252,7 @@ public sealed class LexerTests
     [InlineData("'prefix''", "prefix'", DiagnosticIds.UnterminatedQuoted)]
     public void UnterminatedQuotedTextRetainsItsDecodedPrefix(string source, string expected, string firstDiagnostic)
     {
-        List<Token> tokens = Tokenize(source, out List<Diagnostic> diagnostics);
+        var tokens = Tokenize(source, out var diagnostics);
 
         Assert.Equal(expected, tokens[0].Text);
         Assert.Equal(TokenKind.Eof, tokens[1].Kind);
@@ -268,7 +268,7 @@ public sealed class LexerTests
     {
         for (var length = 2; length <= 8; length++)
         {
-            List<Token> tokens = Tokenize(new string(quote, length), out List<Diagnostic> diagnostics);
+            var tokens = Tokenize(new string(quote, length), out var diagnostics);
 
             Assert.Equal(new string(quote, (length - 1) / 2), tokens[0].Text);
             Assert.Equal(new SourceSpan(0, length, 1, 1), tokens[0].Span);
@@ -290,11 +290,11 @@ public sealed class LexerTests
     [InlineData('`')]
     public void ClosingQuoteDoesNotConsumeTheAdjacentToken(char quote)
     {
-        foreach (bool doubled in new[] { false, true })
+        foreach (var doubled in new[] { false, true })
         {
-            string content = doubled ? $"head{quote}{quote}tail" : "head";
-            string expected = doubled ? $"head{quote}tail" : "head";
-            List<Token> tokens = Tokenize($"{quote}{content}{quote}next", out List<Diagnostic> diagnostics);
+            var content = doubled ? $"head{quote}{quote}tail" : "head";
+            var expected = doubled ? $"head{quote}tail" : "head";
+            var tokens = Tokenize($"{quote}{content}{quote}next", out var diagnostics);
 
             Assert.Empty(diagnostics);
             Assert.Equal(expected, tokens[0].Text);
@@ -312,16 +312,16 @@ public sealed class LexerTests
     [InlineData('`')]
     public void QuotedNewlineRecoveryKeepsTheFollowingTokenPosition(char quote)
     {
-        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        foreach (var mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
         {
-            List<Token> tokens = Tokenize(
+            var tokens = Tokenize(
                 $"{quote}a\nb{quote}{quote}c{quote}next",
                 new BytecodeProgram(mode).Flags,
-                out List<Diagnostic> diagnostics
+                out var diagnostics
             );
 
             Assert.Equal($"ab{quote}c", tokens[0].Text);
-            Diagnostic diagnostic = Assert.Single(diagnostics);
+            var diagnostic = Assert.Single(diagnostics);
             Assert.Equal(DiagnosticIds.InvalidQuotedCharacter, diagnostic.Id);
             Assert.Equal(new SourceSpan(2, 1, 1, 3), diagnostic.Span);
             Assert.Equal("next", tokens[1].Text);
@@ -336,17 +336,17 @@ public sealed class LexerTests
     [InlineData('`')]
     public void NewlineConvertedToOpeningQuoteStillAdvancesTheSourceLine(char quote)
     {
-        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        foreach (var mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
         {
             var conversions = new CharacterConversionTable();
             conversions.Set('\n', quote);
-            PrologFlags flags = new BytecodeProgram(mode).Flags;
+            var flags = new BytecodeProgram(mode).Flags;
             flags.SetCharConversion(true);
             List<Diagnostic> diagnostics = [];
             var lexer = new Lexer($"\nhead{quote} next", null, diagnostics, conversions, flags);
 
             Assert.Equal("head", lexer.Next().Text);
-            Token next = lexer.Next();
+            var next = lexer.Next();
             Assert.Equal("next", next.Text);
             Assert.Equal(new SourceSpan(7, 4, 2, 7), next.Span);
             Assert.Equal(TokenKind.Eof, lexer.Next().Kind);
@@ -360,12 +360,12 @@ public sealed class LexerTests
     [InlineData('`')]
     public void QuotedLineContinuationKeepsPrefixAndFollowingPosition(char quote)
     {
-        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        foreach (var mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
         {
-            List<Token> tokens = Tokenize(
+            var tokens = Tokenize(
                 $"{quote}prefix\\\nsuffix{quote} next",
                 new BytecodeProgram(mode).Flags,
-                out List<Diagnostic> diagnostics
+                out var diagnostics
             );
 
             Assert.Empty(diagnostics);
@@ -387,9 +387,9 @@ public sealed class LexerTests
     [InlineData(@"0'\o0\")]
     public void RejectsDeleteAndOctalLetterEscapesInBothModes(string text)
     {
-        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        foreach (var mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
         {
-            Tokenize(text, new BytecodeProgram(mode).Flags, out List<Diagnostic> diagnostics);
+            Tokenize(text, new BytecodeProgram(mode).Flags, out var diagnostics);
 
             Assert.Equal(DiagnosticIds.InvalidEscape, Assert.Single(diagnostics).Id);
         }
@@ -401,13 +401,13 @@ public sealed class LexerTests
     [InlineData(@"0'\e")]
     public void ReadsTheEscapeCharacterOnlyInModern(string text)
     {
-        List<Token> tokens = Tokenize(
+        var tokens = Tokenize(
             text,
             new BytecodeProgram(PrologLanguageMode.Modern).Flags,
-            out List<Diagnostic> diagnostics
+            out var diagnostics
         );
         Assert.Empty(diagnostics);
-        Token token = tokens[0];
+        var token = tokens[0];
         Assert.Equal(27L, token.Kind == TokenKind.Integer ? token.Integer : token.Text.Single());
 
         Tokenize(text, new BytecodeProgram(PrologLanguageMode.StrictIso).Flags, out diagnostics);
@@ -420,7 +420,7 @@ public sealed class LexerTests
     [InlineData("`raw\u0001control`")]
     public void RejectsUnescapedControlAndLayoutCharactersInsideQuotes(string text)
     {
-        Tokenize(text, out List<Diagnostic> diagnostics);
+        Tokenize(text, out var diagnostics);
 
         Assert.Equal(DiagnosticIds.InvalidQuotedCharacter, Assert.Single(diagnostics).Id);
     }
@@ -431,7 +431,7 @@ public sealed class LexerTests
     [InlineData(@"'\101\'", false)]
     public void ReadsIsoNumericEscapes(string text, bool stringToken)
     {
-        List<Token> tokens = Tokenize(text, out List<Diagnostic> diagnostics);
+        var tokens = Tokenize(text, out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(stringToken ? TokenKind.String : TokenKind.Atom, tokens[0].Kind);
@@ -445,10 +445,10 @@ public sealed class LexerTests
     [InlineData(@"`\0`", DiagnosticIds.InvalidEscape, 1, 2)]
     public void RejectsUndoubledCharacterCodeQuotesAndUnterminatedZeroEscapes(string text, string id, int start, int length)
     {
-        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        foreach (var mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
         {
-            Tokenize(text, new BytecodeProgram(mode).Flags, out List<Diagnostic> diagnostics);
-            Diagnostic diagnostic = Assert.Single(diagnostics);
+            Tokenize(text, new BytecodeProgram(mode).Flags, out var diagnostics);
+            var diagnostic = Assert.Single(diagnostics);
             Assert.Equal(id, diagnostic.Id);
             Assert.Equal(new SourceSpan(start, length, 1, start + 1), diagnostic.Span);
         }
@@ -459,7 +459,7 @@ public sealed class LexerTests
     [InlineData(@"0'\101\")]
     public void ReadsIsoNumericEscapesInCharacterCodeLiterals(string text)
     {
-        List<Token> tokens = Tokenize(text, out List<Diagnostic> diagnostics);
+        var tokens = Tokenize(text, out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(TokenKind.Integer, tokens[0].Kind);
@@ -472,7 +472,7 @@ public sealed class LexerTests
     [InlineData(@"'\101'")]
     public void RejectsMalformedIsoNumericEscapes(string text)
     {
-        Tokenize(text, out List<Diagnostic> diagnostics);
+        Tokenize(text, out var diagnostics);
 
         Assert.Equal(DiagnosticIds.InvalidEscape, Assert.Single(diagnostics).Id);
     }
@@ -485,7 +485,7 @@ public sealed class LexerTests
     [InlineData("'😀'", "😀")]
     public void ReadsSupplementaryCharactersAndUnicodeEscapes(string text, string expected)
     {
-        List<Token> tokens = Tokenize(text, out List<Diagnostic> diagnostics);
+        var tokens = Tokenize(text, out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(expected, tokens[0].Text);
@@ -499,7 +499,7 @@ public sealed class LexerTests
     [InlineData(@"'\U00110000'")]
     public void RejectsEscapesThatNameNoCharacter(string text)
     {
-        Tokenize(text, out List<Diagnostic> diagnostics);
+        Tokenize(text, out var diagnostics);
 
         Assert.All(diagnostics, diagnostic => Assert.Equal(DiagnosticIds.InvalidEscape, diagnostic.Id));
         Assert.NotEmpty(diagnostics);
@@ -508,7 +508,7 @@ public sealed class LexerTests
     [Fact]
     public void NeverJoinsTwoSurrogateEscapes()
     {
-        List<Token> tokens = Tokenize(@"'\uD83D\uDE00'", out List<Diagnostic> diagnostics);
+        var tokens = Tokenize(@"'\uD83D\uDE00'", out var diagnostics);
 
         Assert.Equal(2, diagnostics.Count(diagnostic => diagnostic.Id == DiagnosticIds.InvalidEscape));
         Assert.Equal(string.Empty, tokens[0].Text);
@@ -517,7 +517,7 @@ public sealed class LexerTests
     [Fact]
     public void ReadsACharacterCodeLiteralAsOneCodePoint()
     {
-        List<Token> tokens = Tokenize("0'😀", out List<Diagnostic> diagnostics);
+        var tokens = Tokenize("0'😀", out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(128512, tokens[0].Integer);
@@ -529,7 +529,7 @@ public sealed class LexerTests
     [InlineData("𐐀x", true)]
     public void ClassifiesSupplementaryLettersLikeOtherLetters(string text, bool variable)
     {
-        List<Token> tokens = Tokenize(text, out List<Diagnostic> diagnostics);
+        var tokens = Tokenize(text, out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(variable ? TokenKind.Variable : TokenKind.Atom, tokens[0].Kind);
@@ -539,7 +539,7 @@ public sealed class LexerTests
     [Fact]
     public void ReportsAnUnexpectedSupplementaryCharacterOnce()
     {
-        Tokenize("\U000F0000.", out List<Diagnostic> diagnostics);
+        Tokenize("\U000F0000.", out var diagnostics);
 
         Assert.Equal(DiagnosticIds.UnexpectedCharacter, Assert.Single(diagnostics).Id);
     }
@@ -549,7 +549,7 @@ public sealed class LexerTests
     [InlineData(@"'\u00e9'")]
     public void StrictModeKeepsItsCodeUnitEscapes(string text)
     {
-        TokenizeStrict(text, out List<Diagnostic> diagnostics);
+        TokenizeStrict(text, out var diagnostics);
 
         Assert.Equal(DiagnosticIds.InvalidEscape, Assert.Single(diagnostics).Id);
     }
@@ -561,7 +561,7 @@ public sealed class LexerTests
     [InlineData("Ⅰ", "Ⅰ")]
     public void ReadsUnicodeSymbolsAndIdentifiersAsAtoms(string text, string atom)
     {
-        List<Token> tokens = Tokenize(text, out List<Diagnostic> diagnostics);
+        var tokens = Tokenize(text, out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(TokenKind.Atom, tokens[0].Kind);
@@ -574,7 +574,7 @@ public sealed class LexerTests
     [InlineData("0'\u0007")]
     public void RejectsARawControlOrLayoutCharacterAfterACharacterCodeQuote(string text)
     {
-        Tokenize(text, out List<Diagnostic> diagnostics);
+        Tokenize(text, out var diagnostics);
 
         Assert.Equal(DiagnosticIds.InvalidQuotedCharacter, Assert.Single(diagnostics).Id);
     }
@@ -590,7 +590,7 @@ public sealed class LexerTests
     [InlineData("0b2", "0", "b2", null)]
     public void EndsTheIntegerZeroWhereNoCharacterCodeOrRadixDigitFollows(string text, string zero, string name, string? last)
     {
-        List<Token> tokens = Tokenize(text, out List<Diagnostic> diagnostics);
+        var tokens = Tokenize(text, out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(TokenKind.Integer, tokens[0].Kind);
@@ -606,7 +606,7 @@ public sealed class LexerTests
     [Fact]
     public void ReadsASpaceAfterACharacterCodeQuote()
     {
-        List<Token> tokens = Tokenize("0' ", out List<Diagnostic> diagnostics);
+        var tokens = Tokenize("0' ", out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(32, tokens[0].Integer);
@@ -615,7 +615,7 @@ public sealed class LexerTests
     [Fact]
     public void StrictModeRejectsSymbolsOutsideAscii()
     {
-        TokenizeStrict("a § b", out List<Diagnostic> diagnostics);
+        TokenizeStrict("a § b", out var diagnostics);
 
         Assert.Equal(DiagnosticIds.UnexpectedCharacter, Assert.Single(diagnostics).Id);
     }
@@ -623,15 +623,40 @@ public sealed class LexerTests
     [Fact]
     public void StrictModeReadsASupplementaryLetterAsTwoCodeUnits()
     {
-        TokenizeStrict("𝑎bc.", out List<Diagnostic> diagnostics);
+        TokenizeStrict("𝑎bc.", out var diagnostics);
 
         Assert.Equal(2, diagnostics.Count(diagnostic => diagnostic.Id == DiagnosticIds.UnexpectedCharacter));
+    }
+
+    [Theory]
+    [InlineData("\u00a0")]
+    [InlineData("\u2003")]
+    [InlineData("\u0085")]
+    public void StrictModeRejectsNonAsciiLayout(string layout)
+    {
+        TokenizeStrict($"a{layout}b", out var strictDiagnostics);
+        Tokenize($"a{layout}b", out var modernDiagnostics);
+
+        Assert.Equal(DiagnosticIds.UnexpectedCharacter, Assert.Single(strictDiagnostics).Id);
+        Assert.Empty(modernDiagnostics);
+    }
+
+    [Fact]
+    public void StrictModeRejectsNonAsciiDecimalDigitsAsIdentifierContinuations()
+    {
+        var strict = TokenizeStrict("a١", out var strictDiagnostics);
+        var modern = Tokenize("a١", out var modernDiagnostics);
+
+        Assert.Equal(DiagnosticIds.UnexpectedCharacter, Assert.Single(strictDiagnostics).Id);
+        Assert.Equal("a", strict[0].Text);
+        Assert.Empty(modernDiagnostics);
+        Assert.Equal("a١", modern[0].Text);
     }
 
     [Fact]
     public void RejectsNonOctalDigitsInDelimitedOctalEscape()
     {
-        Tokenize(@"'\128\'", out List<Diagnostic> diagnostics);
+        Tokenize(@"'\128\'", out var diagnostics);
 
         Assert.Contains(diagnostics, diagnostic => diagnostic.Id == DiagnosticIds.InvalidEscape);
     }
@@ -644,7 +669,7 @@ public sealed class LexerTests
     [InlineData("0'a", 97L)]
     public void ReadsIntegerLiterals(string text, long expected)
     {
-        List<Token> tokens = Tokenize(text, out List<Diagnostic> diagnostics);
+        var tokens = Tokenize(text, out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(TokenKind.Integer, tokens[0].Kind);
@@ -661,7 +686,7 @@ public sealed class LexerTests
     [InlineData("0b1010_1010", 170L)]
     public void ReadsDigitSeparatorsBetweenDigitGroups(string text, long expected)
     {
-        List<Token> tokens = Tokenize(text, out List<Diagnostic> diagnostics);
+        var tokens = Tokenize(text, out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(TokenKind.Integer, tokens[0].Kind);
@@ -672,7 +697,7 @@ public sealed class LexerTests
     [Fact]
     public void AnUnderscoreNoDigitFollowsStartsTheNextToken()
     {
-        List<Token> tokens = Tokenize("1__000", out List<Diagnostic> diagnostics);
+        var tokens = Tokenize("1__000", out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal([TokenKind.Integer, TokenKind.Variable, TokenKind.Eof], tokens.Select(token => token.Kind));
@@ -682,7 +707,7 @@ public sealed class LexerTests
     [Fact]
     public void ASeparatedIntegerDoesNotContinueIntoAFloat()
     {
-        List<Token> tokens = Tokenize("1_5.5", out _);
+        var tokens = Tokenize("1_5.5", out _);
 
         Assert.Equal(TokenKind.Integer, tokens[0].Kind);
         Assert.Equal(15L, tokens[0].Integer);
@@ -691,7 +716,7 @@ public sealed class LexerTests
     [Fact]
     public void ReadsDigitSeparatorsInRationalLiterals()
     {
-        List<Token> tokens = Tokenize("1_0r3", out List<Diagnostic> diagnostics);
+        var tokens = Tokenize("1_0r3", out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(TokenKind.Integer, tokens[0].Kind);
@@ -702,7 +727,7 @@ public sealed class LexerTests
     [Fact]
     public void RejectsDigitSeparatorsInStrictIso()
     {
-        List<Token> tokens = TokenizeStrict("1_000", out _);
+        var tokens = TokenizeStrict("1_000", out _);
 
         Assert.Equal([TokenKind.Integer, TokenKind.Variable, TokenKind.Eof], tokens.Select(token => token.Kind));
         Assert.Equal(1L, tokens[0].Integer);
@@ -711,7 +736,7 @@ public sealed class LexerTests
     [Fact]
     public void ReadsFloatLiteralButNotClauseTerminator()
     {
-        List<Token> tokens = Tokenize("1.5 2.", out List<Diagnostic> diagnostics);
+        var tokens = Tokenize("1.5 2.", out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(TokenKind.Float, tokens[0].Kind);
@@ -723,7 +748,7 @@ public sealed class LexerTests
     [Fact]
     public void ExponentWithoutFractionIsNotAFloatToken()
     {
-        List<Token> tokens = Tokenize("1e2", out List<Diagnostic> diagnostics);
+        var tokens = Tokenize("1e2", out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal([TokenKind.Integer, TokenKind.Atom, TokenKind.Eof], tokens.Select(token => token.Kind));
@@ -733,7 +758,7 @@ public sealed class LexerTests
     [Fact]
     public void RetainsFloatOverflowForReaderDiagnostics()
     {
-        List<Token> tokens = Tokenize("1.0e9999", out List<Diagnostic> diagnostics);
+        var tokens = Tokenize("1.0e9999", out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(TokenKind.Float, tokens[0].Kind);
@@ -744,7 +769,7 @@ public sealed class LexerTests
     [Fact]
     public void SkipsLineAndBlockComments()
     {
-        List<Token> tokens = Tokenize("a % trailing\n/* block\n   comment */ b.", out List<Diagnostic> diagnostics);
+        var tokens = Tokenize("a % trailing\n/* block\n   comment */ b.", out var diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(["a", "b", ".", string.Empty], tokens.Select(t => t.Text));
@@ -753,7 +778,7 @@ public sealed class LexerTests
     [Fact]
     public void LexesEmptyListAndCurlyAsAtoms()
     {
-        List<Token> tokens = Tokenize("[] {}", out _);
+        var tokens = Tokenize("[] {}", out _);
 
         Assert.Equal(TokenKind.Atom, tokens[0].Kind);
         Assert.Equal("[]", tokens[0].Text);
@@ -764,7 +789,7 @@ public sealed class LexerTests
     [Fact]
     public void ReportsUnterminatedQuotedAtom()
     {
-        Tokenize("'oops", out List<Diagnostic> diagnostics);
+        Tokenize("'oops", out var diagnostics);
 
         Assert.Equal(DiagnosticIds.UnterminatedQuoted, Assert.Single(diagnostics).Id);
     }
@@ -772,7 +797,7 @@ public sealed class LexerTests
     [Fact]
     public void ReportsUnexpectedCharacterAndKeepsGoing()
     {
-        List<Token> tokens = Tokenize("a « b", out List<Diagnostic> diagnostics);
+        var tokens = Tokenize("a « b", out var diagnostics);
 
         Assert.Equal(DiagnosticIds.UnexpectedCharacter, Assert.Single(diagnostics).Id);
         Assert.Equal(["a", "b", string.Empty], tokens.Select(t => t.Text));

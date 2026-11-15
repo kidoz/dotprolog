@@ -15,7 +15,7 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
     [Fact]
     public void RuleIsDisabledByDefault()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("max(X, Y, X) :- X >= Y, !.", PrologLintOptions.SemanticOnly);
+        var diagnostics = Lint("max(X, Y, X) :- X >= Y, !.", PrologLintOptions.SemanticOnly);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
     }
@@ -23,9 +23,9 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
     [Fact]
     public void ReportsCrossArgumentAliasingAtTheFirstCut()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("max(X, Y, X) :- X >= Y, !.\nmax(_, Y, Y).");
+        var diagnostics = Lint("max(X, Y, X) :- X >= Y, !.\nmax(_, Y, Y).");
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
         Assert.Equal(1, warning.Span.Line);
         Assert.Contains("predicate max/3", warning.Message, StringComparison.Ordinal);
         Assert.Contains("may be non-steadfast", warning.Message, StringComparison.Ordinal);
@@ -34,7 +34,7 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
     [Fact]
     public void FindsAliasesNestedInDistinctHeadArguments()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p(f(X), g(X)) :- !.");
+        var diagnostics = Lint("p(f(X), g(X)) :- !.");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
     }
@@ -42,7 +42,7 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
     [Fact]
     public void RepetitionWithinOneArgumentIsNotCrossArgumentAliasing()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p(f(X, X)) :- !.");
+        var diagnostics = Lint("p(f(X, X)) :- !.");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
     }
@@ -50,7 +50,7 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
     [Fact]
     public void AnonymousVariablesDoNotEstablishAliasing()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p(_, _) :- !.");
+        var diagnostics = Lint("p(_, _) :- !.");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
     }
@@ -58,7 +58,7 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
     [Fact]
     public void AliasingWithoutACutIsNotReported()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("max(X, Y, X) :- X >= Y.");
+        var diagnostics = Lint("max(X, Y, X) :- X >= Y.");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
     }
@@ -66,7 +66,7 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
     [Fact]
     public void MultipleCutsProduceOneFindingPerClause()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p(X, X) :- !, !.");
+        var diagnostics = Lint("p(X, X) :- !, !.");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
     }
@@ -74,7 +74,7 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
     [Fact]
     public void MultipleMatchingClausesProduceSeparateFindings()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p(X, X) :- !. p(X, X) :- !.");
+        var diagnostics = Lint("p(X, X) :- !. p(X, X) :- !.");
 
         Assert.Equal(2, diagnostics.Count(diagnostic => diagnostic.Id == LintDiagnosticIds.PossibleNonSteadfastClause));
     }
@@ -92,7 +92,7 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
     [InlineData("custom_meta(!)", false)]
     public void CutScopeDeterminesEligibility(string body, bool expected)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint($"p(X, X) :- {body}.");
+        var diagnostics = Lint($"p(X, X) :- {body}.");
 
         Assert.Equal(expected, diagnostics.Any(diagnostic => diagnostic.Id == LintDiagnosticIds.PossibleNonSteadfastClause));
     }
@@ -100,25 +100,25 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
     [Fact]
     public void AnOpaqueConditionCutDoesNotHideALaterClauseCut()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p(X, X) :- ((! -> true ; true), !).");
+        var diagnostics = Lint("p(X, X) :- ((! -> true ; true), !).");
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
         Assert.Equal(1, warning.Span.Line);
     }
 
     [Fact]
     public void ReportsAliasingInAGrammarRule()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("nt(A, A) --> [A], { A >= 65 }, !.");
+        var diagnostics = Lint("nt(A, A) --> [A], { A >= 65 }, !.");
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
         Assert.Contains("nonterminal nt//2", warning.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void OneGrammarArgumentAndDifferenceListsAreNotAliasing()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("nt(A) --> [A], !.");
+        var diagnostics = Lint("nt(A) --> [A], !.");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
     }
@@ -126,7 +126,7 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
     [Fact]
     public void MultifileClausesAreExcluded()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(":- multifile(p/2). p(X, X) :- !.");
+        var diagnostics = Lint(":- multifile(p/2). p(X, X) :- !.");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
     }
@@ -134,7 +134,7 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
     [Fact]
     public void DynamicClausesAreEligible()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(":- dynamic(p/2). p(X, X) :- !.");
+        var diagnostics = Lint(":- dynamic(p/2). p(X, X) :- !.");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
     }
@@ -142,7 +142,7 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
     [Fact]
     public void MultifileDeclarationsApplyAcrossNamedFiles()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             [("declarations.pl", ":- module(m, []). :- multifile(p/2)."), ("definitions.pl", ":- module(m, []). p(X, X) :- !.")],
             Enabled
         );
@@ -156,9 +156,9 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
         Source("parts.pl", "p(X, X) :- !.\n");
         Source("main.pl", ":- include('parts.pl').\n");
 
-        IReadOnlyList<Diagnostic> diagnostics = Load("main.pl");
+        var diagnostics = Load("main.pl");
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
         Assert.Equal(Path.Combine(_directory, "parts.pl"), warning.FileName);
     }
 
@@ -167,7 +167,7 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
     [InlineData(PrologLanguageMode.StrictIso)]
     public void BothLanguageModesUseTheSameRule(PrologLanguageMode mode)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("max(X, Y, X) :- X >= Y, !.", Enabled, mode);
+        var diagnostics = Lint("max(X, Y, X) :- X >= Y, !.", Enabled, mode);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
     }
@@ -175,7 +175,7 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
     [Fact]
     public void UnrelatedUndefinedCallsDoNotSuppressTheRule()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p(X, X) :- missing, !.");
+        var diagnostics = Lint("p(X, X) :- missing, !.");
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
         Assert.Contains(diagnostics, Id(LintDiagnosticIds.UndefinedPredicate));
@@ -185,13 +185,13 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
     public void ReusableSingleFileApiHonorsEnabledRules()
     {
         const string text = "max(X, Y, X) :- X >= Y, !.";
-        PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+        var loaded = PrologLintSourceLoader.Load(
             Path.Combine(_directory, "single.pl"),
             text,
             new BytecodeProgram()
         );
 
-        IReadOnlyList<Diagnostic> diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl", Enabled);
+        var diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl", Enabled);
 
         Assert.Single(diagnostics, Id(LintDiagnosticIds.PossibleNonSteadfastClause));
     }
@@ -213,7 +213,7 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
     private IReadOnlyList<Diagnostic> Load(string name)
     {
         var path = Path.Combine(_directory, name);
-        PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
+        var loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
         return [.. loaded.Diagnostics, .. PrologLinter.AnalyzeProgram([loaded.Source], Enabled)];
     }
 
@@ -231,11 +231,11 @@ public sealed class PrologNonSteadfastLinterTests : IDisposable
     {
         List<PrologLintSource> sources = [];
         List<Diagnostic> diagnostics = [];
-        foreach ((string name, string text) in inputs)
+        foreach ((var name, var text) in inputs)
         {
-            PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+            var loaded = PrologLintSourceLoader.Load(
                 Path.Combine(Path.GetTempPath(), name),
-                text,
+                text + "\n",
                 new BytecodeProgram(mode)
             );
             sources.Add(loaded.Source);

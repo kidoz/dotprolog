@@ -40,7 +40,7 @@ public sealed class PrologTrivialFailureLinterTests
     [Fact]
     public void MatchingHeadCountsEvenWhenBodyWouldFailOrHalt()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p(a) :- halt(9). go :- p(a).");
+        var diagnostics = Lint("p(a) :- halt(9). go :- p(a).");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.TrivialCallFailure));
     }
@@ -81,7 +81,7 @@ public sealed class PrologTrivialFailureLinterTests
     private static IReadOnlyList<Diagnostic> Lint(params (string Name, string Text)[] inputs)
     {
         List<PrologLintSource> sources = [];
-        foreach ((string name, string text) in inputs)
+        foreach ((var name, var text) in inputs)
         {
             var path = Path.Combine(Directory.GetCurrentDirectory(), name);
             sources.Add(PrologLintSourceLoader.Load(path, text, new BytecodeProgram()).Source);

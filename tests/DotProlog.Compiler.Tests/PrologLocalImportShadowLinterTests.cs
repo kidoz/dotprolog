@@ -21,11 +21,11 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     public void RuleIsOptInAndReportsSelectiveShadowAtLocalName()
     {
         const string main = ":- module(m, []). :- import(a,[p/0]). p.";
-        IReadOnlyList<Diagnostic> defaultDiagnostics = Lint(options: null, ("a.pl", ":- module(a,[p/0]). p."), ("main.pl", main));
-        IReadOnlyList<Diagnostic> enabledDiagnostics = Lint(Enabled, ("a.pl", ":- module(a,[p/0]). p."), ("main.pl", main));
+        var defaultDiagnostics = Lint(options: null, ("a.pl", ":- module(a,[p/0]). p."), ("main.pl", main));
+        var enabledDiagnostics = Lint(Enabled, ("a.pl", ":- module(a,[p/0]). p."), ("main.pl", main));
 
         Assert.DoesNotContain(defaultDiagnostics, Id(LintDiagnosticIds.LocalImportShadow));
-        Diagnostic warning = Assert.Single(enabledDiagnostics, Id(LintDiagnosticIds.LocalImportShadow));
+        var warning = Assert.Single(enabledDiagnostics, Id(LintDiagnosticIds.LocalImportShadow));
         Assert.Equal(main.LastIndexOf("p.", StringComparison.Ordinal), warning.Span.Start);
         Assert.Equal(1, warning.Span.Length);
         Assert.EndsWith("main.pl", warning.FileName, StringComparison.Ordinal);
@@ -37,7 +37,7 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     [Fact]
     public void LocalDefinitionBeforeImportHasTheSameEffect()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             Enabled,
             ("a.pl", ":- module(a,[p/0]). p."),
             ("main.pl", ":- module(m, []). p. :- import(a,[p/0]).")
@@ -49,8 +49,8 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     [Fact]
     public void RepeatedDirectivesFromOneSourceProduceOneFinding()
     {
-        PrologLintOptions duplicateOptions = Enabled with { EnabledRules = [LintDiagnosticIds.LocalImportShadow, "dpl3048"] };
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var duplicateOptions = Enabled with { EnabledRules = [LintDiagnosticIds.LocalImportShadow, "dpl3048"] };
+        var diagnostics = Lint(
             duplicateOptions,
             ("a.pl", ":- module(a,[p/0]). p."),
             ("main.pl", ":- module(m, []). p. :- import(a,[p/0]). :- use_module('a.pl').")
@@ -63,7 +63,7 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     public void DistinctSourcesProduceSeparateFindingsAtTheSameLocalName()
     {
         const string main = ":- module(m, []). :- import(a,[p/0]). :- import(b,[p/0]). p.";
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             Enabled,
             ("a.pl", ":- module(a,[p/0]). p."),
             ("b.pl", ":- module(b,[p/0]). p."),
@@ -80,7 +80,7 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     [Fact]
     public void DistinctAritiesDoNotShadow()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             Enabled,
             ("a.pl", ":- module(a,[p/1]). p(_)."),
             ("main.pl", ":- module(m, []). :- import(a,[p/1]). p.")
@@ -93,7 +93,7 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     public void WholeImportReportsEveryShadowedExport()
     {
         const string main = ":- module(m, []). :- import(a). p. q.";
-        IReadOnlyList<Diagnostic> diagnostics = Lint(Enabled, ("a.pl", ":- module(a,[p/0,q/0]). p. q."), ("main.pl", main));
+        var diagnostics = Lint(Enabled, ("a.pl", ":- module(a,[p/0,q/0]). p. q."), ("main.pl", main));
 
         Diagnostic[] warnings = [.. diagnostics.Where(diagnostic => diagnostic.Id == LintDiagnosticIds.LocalImportShadow)];
         Assert.Equal(2, warnings.Length);
@@ -106,10 +106,10 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     [InlineData("multifile")]
     public void DeclarationOnlyProcedureUsesIndicatorSpan(string declaration)
     {
-        string main = $":- module(m, []). :- import(a,[p/0]). :- {declaration}(p/0).";
-        IReadOnlyList<Diagnostic> diagnostics = Lint(Enabled, ("a.pl", ":- module(a,[p/0]). p."), ("main.pl", main));
+        var main = $":- module(m, []). :- import(a,[p/0]). :- {declaration}(p/0).";
+        var diagnostics = Lint(Enabled, ("a.pl", ":- module(a,[p/0]). p."), ("main.pl", main));
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
         Assert.Equal(main.LastIndexOf("p/0", StringComparison.Ordinal), warning.Span.Start);
         Assert.Equal(3, warning.Span.Length);
     }
@@ -118,9 +118,9 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     public void FirstLocalClauseTakesPrecedenceOverEarlierDeclarationForLocation()
     {
         const string main = ":- module(m, []). :- dynamic(p/0). :- import(a,[p/0]). p.";
-        IReadOnlyList<Diagnostic> diagnostics = Lint(Enabled, ("a.pl", ":- module(a,[p/0]). p."), ("main.pl", main));
+        var diagnostics = Lint(Enabled, ("a.pl", ":- module(a,[p/0]). p."), ("main.pl", main));
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
         Assert.Equal(main.LastIndexOf("p.", StringComparison.Ordinal), warning.Span.Start);
     }
 
@@ -128,13 +128,13 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     public void CompoundHeadUsesOnlyTheFunctorToken()
     {
         const string main = ":- module(m, []). :- import(a,[p/1]). local :- p(value).";
-        IReadOnlyList<Diagnostic> diagnostics = Lint(Enabled, ("a.pl", ":- module(a,[p/1]). p(_)."), ("main.pl", main));
+        var diagnostics = Lint(Enabled, ("a.pl", ":- module(a,[p/1]). p(_)."), ("main.pl", main));
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
 
         const string shadowing = ":- module(m, []). :- import(a,[p/1]). p(value) :- true.";
         diagnostics = Lint(Enabled, ("a.pl", ":- module(a,[p/1]). p(_)."), ("main.pl", shadowing));
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
         Assert.Equal(shadowing.LastIndexOf("p(value)", StringComparison.Ordinal), warning.Span.Start);
         Assert.Equal(1, warning.Span.Length);
     }
@@ -143,9 +143,9 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     public void GrammarShadowUsesSourceNonterminalAndNameSpan()
     {
         const string main = ":- module(m, []). :- import(a,[nt//0]). nt --> [].";
-        IReadOnlyList<Diagnostic> diagnostics = Lint(Enabled, ("a.pl", ":- module(a,[nt//0]). nt --> []."), ("main.pl", main));
+        var diagnostics = Lint(Enabled, ("a.pl", ":- module(a,[nt//0]). nt --> []."), ("main.pl", main));
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
         Assert.Equal(main.LastIndexOf("nt -->", StringComparison.Ordinal), warning.Span.Start);
         Assert.Equal(2, warning.Span.Length);
         Assert.Contains("nt//0", warning.Message, StringComparison.Ordinal);
@@ -156,13 +156,13 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     [InlineData(":- module(a,[p/2]). p(_, _).", "p --> [].", "p/2")]
     public void OrdinaryAndGrammarDefinitionsShareLoweredIdentity(string source, string local, string display)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             Enabled,
             ("a.pl", source),
             ("main.pl", $":- module(m, []). :- import(a). {local}")
         );
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
         Assert.Contains(display, warning.Message, StringComparison.Ordinal);
     }
 
@@ -172,7 +172,7 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     [InlineData(":- reexport(a).")]
     public void WholeImportFormsReportLocalShadow(string directive)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             Enabled,
             ("a.pl", ":- module(a,[p/0]). p."),
             ("main.pl", $":- module(m, []). {directive} p.")
@@ -184,14 +184,14 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     [Fact]
     public void RejectedReexportReportsShadowAndDoesNotExportBinding()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             Enabled,
             ("a.pl", ":- module(a,[p/0]). p."),
             ("r.pl", ":- module(r,[]). :- reexport(a,[p/0]). p."),
             ("main.pl", ":- module(m,[]). :- import(r,[p/0]).")
         );
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
         Assert.Contains("in module r", warning.Message, StringComparison.Ordinal);
         Assert.Contains("from module a", warning.Message, StringComparison.Ordinal);
         Assert.EndsWith("r.pl", warning.FileName, StringComparison.Ordinal);
@@ -200,7 +200,7 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     [Fact]
     public void UserFallbackIsNotLocalImportShadowing()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             Enabled,
             ("user.pl", "p."),
             ("a.pl", ":- module(a,[p/0]). p."),
@@ -213,7 +213,7 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     [Fact]
     public void UnresolvedSourcesAndExportsDoNotSuppressIndependentFinding()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             Enabled,
             ("a.pl", ":- module(a,[p/0,q/0]). p. q."),
             (
@@ -222,14 +222,14 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
             )
         );
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
         Assert.Contains("p/0", warning.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void BuiltinNamesAndQualifiedCallsDoNotCreateFindingsWithoutRejectedImports()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             Enabled,
             ("a.pl", ":- module(a,[p/0]). p."),
             ("main.pl", ":- module(m, []). member(_, _). go :- a:p.")
@@ -246,9 +246,9 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
         Source("imports.pl", ":- import(a,[p/1]).\n");
         Source("main.pl", ":- module(m, []). :- include('local.pl'). :- include('imports.pl').\n");
 
-        IReadOnlyList<Diagnostic> diagnostics = Load(Enabled, "main.pl", "a.pl");
+        var diagnostics = Load(Enabled, "main.pl", "a.pl");
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
         Assert.Equal(Path.Combine(_directory, "local.pl"), warning.FileName);
         Assert.Equal(0, warning.Span.Start);
     }
@@ -258,7 +258,7 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     [InlineData(PrologLanguageMode.StrictIso)]
     public void BothLanguageModesUseTheSameRule(PrologLanguageMode mode)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             mode,
             Enabled,
             ("a.pl", ":- module(a,[p/0]). p."),
@@ -271,7 +271,7 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     [Fact]
     public void LocalRejectionDoesNotAlsoProduceImportConflict()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             Enabled,
             ("a.pl", ":- module(a,[p/0]). p."),
             ("main.pl", ":- module(m, []). :- import(a,[p/0]). p.")
@@ -284,7 +284,7 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     [Fact]
     public void ImportConflictsRemainEnabledAlongsideOptInLocalShadowing()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             Enabled,
             ("a.pl", ":- module(a,[p/0]). p."),
             ("b.pl", ":- module(b,[p/0]). p."),
@@ -298,11 +298,11 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     [Fact]
     public void OtherOptInRulesComposeWithLocalShadowing()
     {
-        PrologLintOptions options = Enabled with
+        var options = Enabled with
         {
             EnabledRules = [LintDiagnosticIds.LocalImportShadow, LintDiagnosticIds.NonSnakeCasePredicate],
         };
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             options,
             ("a.pl", ":- module(a,[badName/0]). badName."),
             ("main.pl", ":- module(m, []). :- import(a,[badName/0]). badName.")
@@ -316,7 +316,7 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     public void FindingsUsePhysicalSourceOrder()
     {
         const string main = ":- module(m, []). :- import(a,[q/0,p/0]). p. q.";
-        IReadOnlyList<Diagnostic> diagnostics = Lint(Enabled, ("a.pl", ":- module(a,[p/0,q/0]). p. q."), ("main.pl", main));
+        var diagnostics = Lint(Enabled, ("a.pl", ":- module(a,[p/0,q/0]). p. q."), ("main.pl", main));
 
         Diagnostic[] warnings = [.. diagnostics.Where(diagnostic => diagnostic.Id == LintDiagnosticIds.LocalImportShadow)];
         Assert.Equal(2, warnings.Length);
@@ -329,13 +329,13 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     public void SingleFileEntryPointDoesNotInventCrossFileShadowing()
     {
         const string text = ":- module(m, []). :- import(a,[p/0]). p.";
-        PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+        var loaded = PrologLintSourceLoader.Load(
             Path.Combine(_directory, "single.pl"),
             text,
             new BytecodeProgram()
         );
 
-        IReadOnlyList<Diagnostic> diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl", Enabled);
+        var diagnostics = PrologLinter.AnalyzeSource(text, loaded.Source.Clauses, "single.pl", Enabled);
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.LocalImportShadow));
     }
@@ -343,7 +343,7 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     [Fact]
     public void InitializationDirectivesAreNotExecuted()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             Enabled,
             ("a.pl", ":- module(a,[p/0]). p."),
             ("main.pl", ":- module(m, []). :- initialization(halt(9)). :- import(a,[p/0]). p.")
@@ -364,10 +364,10 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     {
         List<PrologLintSource> sources = [];
         List<Diagnostic> diagnostics = [];
-        foreach (string name in names)
+        foreach (var name in names)
         {
             var path = Path.Combine(_directory, name);
-            PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
+            var loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
             sources.Add(loaded.Source);
             diagnostics.AddRange(loaded.Diagnostics);
         }
@@ -386,11 +386,11 @@ public sealed class PrologLocalImportShadowLinterTests : IDisposable
     {
         List<PrologLintSource> sources = [];
         List<Diagnostic> diagnostics = [];
-        foreach ((string name, string text) in inputs)
+        foreach ((var name, var text) in inputs)
         {
-            PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+            var loaded = PrologLintSourceLoader.Load(
                 Path.Combine(Path.GetTempPath(), name),
-                text,
+                text + "\n",
                 new BytecodeProgram(mode)
             );
             sources.Add(loaded.Source);

@@ -31,6 +31,7 @@ public sealed class TermReader
     private readonly PrologFlags? _flags;
     private Token _current;
     private Token? _lookahead;
+    private Token? _secondLookahead;
 
     private TermReader(
         string text,
@@ -38,7 +39,8 @@ public sealed class TermReader
         OperatorTable operators,
         List<Diagnostic> diagnostics,
         CharacterConversionTable? conversions,
-        PrologFlags? flags
+        PrologFlags? flags,
+        bool allowEndAtEof = false
     )
     {
         _fileName = fileName;
@@ -46,7 +48,7 @@ public sealed class TermReader
         _diagnostics = diagnostics;
         _conversions = conversions;
         _flags = flags;
-        _lexer = new Lexer(text, fileName, diagnostics, conversions, flags);
+        _lexer = new Lexer(text, fileName, diagnostics, conversions, flags, allowEndAtEof);
         _current = ReadToken();
     }
 
@@ -81,12 +83,19 @@ public sealed class TermReader
         ArgumentNullException.ThrowIfNull(text);
 
         List<Diagnostic> diagnostics = [];
-        var reader = new TermReader(text, fileName, operators ?? new OperatorTable(), diagnostics, characterConversions, flags);
+        var reader = new TermReader(
+            text,
+            fileName,
+            operators ?? new OperatorTable(includeExtensions: flags?.IsoReading != true),
+            diagnostics,
+            characterConversions,
+            flags
+        );
         List<SyntaxTerm> clauses = [];
 
         while (reader._current.Kind != TokenKind.Eof)
         {
-            SyntaxTerm? clause = reader.ReadClause();
+            var clause = reader.ReadClause();
             if (clause is not null)
             {
                 // Reader-state and source-expansion directives take effect while the full stop is
@@ -96,7 +105,7 @@ public sealed class TermReader
                 reader.ApplyOperatorDirective(clause);
                 readerDirectiveApplied?.Invoke(clause);
 
-                ParseResult? expanded = directiveExpansion?.Invoke(clause);
+                var expanded = directiveExpansion?.Invoke(clause);
                 if (expanded is null)
                 {
                     clauses.Add(clause);
@@ -143,8 +152,8 @@ public sealed class TermReader
         diagnostics = found;
         var lexer = new Lexer(text, null, found, conversions: null, flags);
 
-        Token token = lexer.Next();
-        SourceSpan start = token.Span;
+        var token = lexer.Next();
+        var start = token.Span;
 
         // A minus name token forms a negative number in both modes, quoted or before layout too.
         var negate = token is { Kind: TokenKind.Atom, Text: "-" };
@@ -153,7 +162,7 @@ public sealed class TermReader
             token = lexer.Next();
         }
 
-        Token end = lexer.Next();
+        var end = lexer.Next();
         if (token.Kind is not (TokenKind.Integer or TokenKind.Float) || end.Kind != TokenKind.Eof || end.PrecededByLayout)
         {
             found.Add(new Diagnostic(DiagnosticIds.InvalidNumber, DiagnosticSeverity.Error, "The text is not a number.", start));
@@ -165,7 +174,7 @@ public sealed class TermReader
             return null;
         }
 
-        SourceSpan span = start.To(token.Span);
+        var span = start.To(token.Span);
         if (token.Kind == TokenKind.Integer)
         {
             return IntegerLiteral(token, negate, span);
@@ -199,8 +208,16 @@ public sealed class TermReader
         ArgumentNullException.ThrowIfNull(text);
 
         List<Diagnostic> diagnostics = [];
-        var reader = new TermReader(text, fileName, operators ?? new OperatorTable(), diagnostics, characterConversions, flags);
-        SyntaxTerm? term = reader.ParseTerm(MaxTermPriority, out _);
+        var reader = new TermReader(
+            text,
+            fileName,
+            operators ?? new OperatorTable(includeExtensions: flags?.IsoReading != true),
+            diagnostics,
+            characterConversions,
+            flags,
+            allowEndAtEof: true
+        );
+        var term = reader.ParseTerm(MaxTermPriority, out _);
         if (term is not null && !reader.ValidateDepth(term))
         {
             term = null;
@@ -274,7 +291,7 @@ public sealed class TermReader
             return;
         }
 
-        foreach (AtomTerm atom in names.Cast<AtomTerm>())
+        foreach (var atom in names.Cast<AtomTerm>())
         {
             _operators.Define((int)priority.Value, specifier.Value, atom.Name);
         }
@@ -283,7 +300,7 @@ public sealed class TermReader
     /// <summary>The names of an <c>op/3</c> declaration, which may be one atom or a list of them.</summary>
     private static IEnumerable<SyntaxTerm> NamesOf(SyntaxTerm names)
     {
-        SyntaxTerm current = names;
+        var current = names;
 
         while (current is CompoundTerm { Name: ".", Arity: 2 } cons)
         {
@@ -299,7 +316,7 @@ public sealed class TermReader
 
     private SyntaxTerm? ReadClause()
     {
-        SyntaxTerm? term = ParseTerm(MaxTermPriority, out _);
+        var term = ParseTerm(MaxTermPriority, out _);
 
         if (term is null || !ValidateDepth(term))
         {
@@ -331,7 +348,7 @@ public sealed class TermReader
             return;
         }
 
-        SyntaxTerm goal = directive.Arguments[0];
+        var goal = directive.Arguments[0];
         if (
             _conversions is not null
             && goal is CompoundTerm { Name: "char_conversion", Arity: 2, Arguments: [AtomTerm input, AtomTerm output] }
@@ -426,7 +443,7 @@ public sealed class TermReader
 
             if (entry.Term is CompoundTerm compound)
             {
-                foreach (SyntaxTerm argument in compound.Arguments)
+                foreach (var argument in compound.Arguments)
                 {
                     pending.Push((argument, depth + 1));
                 }
@@ -445,7 +462,7 @@ public sealed class TermReader
 
     private SyntaxTerm? ParseTermCore(int maxPriority, out int priority)
     {
-        SyntaxTerm? left = ParsePrimary(maxPriority, out priority);
+        var left = ParsePrimary(maxPriority, out priority);
         if (left is null)
         {
             return null;
@@ -454,7 +471,7 @@ public sealed class TermReader
         while (true)
         {
             var name = InfixName(_current);
-            if (name is null || !_operators.TryGetInfixOrPostfix(name, out PrologOperator op))
+            if (name is null || !_operators.TryGetReadableInfixOrPostfix(name, IsoReading, out var op))
             {
                 return left;
             }
@@ -464,7 +481,7 @@ public sealed class TermReader
                 return left;
             }
 
-            SourceSpan operatorSpan = _current.Span;
+            var operatorSpan = _current.Span;
             Advance();
 
             if (op.IsPostfix)
@@ -474,15 +491,13 @@ public sealed class TermReader
                 continue;
             }
 
-            SyntaxTerm? right = ParseTerm(op.RightPriority, out var rightPriority);
+            var right = ParseTerm(op.RightPriority, out var rightPriority);
             if (right is null || !FitsOperand(right, rightPriority, op.RightPriority))
             {
                 return null;
             }
 
-            // '|' used as an infix operator at priority 1100 denotes disjunction.
-            var functor = name == "|" && op.Priority == 1100 ? ";" : name;
-            left = new CompoundTerm(functor, [left, right], left.Span.To(right.Span)) { NameSpan = operatorSpan };
+            left = new CompoundTerm(name, [left, right], left.Span.To(right.Span)) { NameSpan = operatorSpan };
             priority = op.Priority;
         }
     }
@@ -500,7 +515,7 @@ public sealed class TermReader
     private SyntaxTerm? ParsePrimary(int maxPriority, out int priority)
     {
         priority = 0;
-        Token token = _current;
+        var token = _current;
 
         switch (token.Kind)
         {
@@ -531,7 +546,7 @@ public sealed class TermReader
             case TokenKind.Punctuation when token.Text == "(":
             {
                 Advance();
-                SyntaxTerm? inner = ParseTerm(MaxTermPriority, out _);
+                var inner = ParseTerm(MaxTermPriority, out _);
                 return inner is null || !Expect(")") ? null : inner;
             }
 
@@ -543,18 +558,24 @@ public sealed class TermReader
                 Advance();
                 if (_current.IsPunctuation("}"))
                 {
-                    SourceSpan braceSpan = token.Span.To(_current.Span);
+                    var braceSpan = token.Span.To(_current.Span);
                     Advance();
+                    if (_current.IsPunctuation("(") && !_current.PrecededByLayout)
+                    {
+                        Advance();
+                        return ParseArguments("{}", braceSpan);
+                    }
+
                     return new AtomTerm("{}", braceSpan);
                 }
 
-                SyntaxTerm? inner = ParseTerm(MaxTermPriority, out _);
+                var inner = ParseTerm(MaxTermPriority, out _);
                 if (inner is null)
                 {
                     return null;
                 }
 
-                SourceSpan span = token.Span.To(_current.Span);
+                var span = token.Span.To(_current.Span);
                 return Expect("}") ? new CompoundTerm("{}", [inner], span) { NameSpan = token.Span } : null;
             }
 
@@ -567,16 +588,28 @@ public sealed class TermReader
     private SyntaxTerm? ParseAtomOrOperator(int maxPriority, out int priority)
     {
         priority = 0;
-        Token token = _current;
+        var token = _current;
         var name = token.Text;
 
         // 'foo(' with no intervening layout is a compound term; 'foo (' is not.
-        Token next = Peek();
+        var next = Peek();
         if (next.IsPunctuation("(") && !next.PrecededByLayout)
         {
             Advance();
             Advance();
             return ParseArguments(name, token.Span);
+        }
+
+        if (
+            IsoReading
+            && token.DoubleQuoted
+            && name == "-"
+            && next.Kind is TokenKind.Integer or TokenKind.Float
+            && !next.PrecededByLayout
+        )
+        {
+            Report(DiagnosticIds.UnexpectedToken, "A numeric literal cannot immediately follow a double-quoted atom.", next.Span);
+            return null;
         }
 
         // A minus name before a numeric literal is part of the literal, not a prefix operator, in
@@ -585,18 +618,18 @@ public sealed class TermReader
         if (name == "-" && next.Kind is TokenKind.Integer or TokenKind.Float && !token.DoubleQuoted)
         {
             Advance();
-            Token literal = _current;
+            var literal = _current;
             Advance();
-            SourceSpan span = token.Span.To(literal.Span);
+            var span = token.Span.To(literal.Span);
             return literal.Kind == TokenKind.Integer
                 ? IntegerLiteral(literal, negate: true, span)
                 : FloatLiteral(literal, negate: true, span);
         }
 
-        if (_operators.TryGetPrefix(name, out PrologOperator prefix) && prefix.Priority <= maxPriority && CanStartTerm(next))
+        if (_operators.TryGetPrefix(name, out var prefix) && prefix.Priority <= maxPriority && CanStartTerm(next))
         {
             Advance();
-            SyntaxTerm? operand = ParseTerm(prefix.RightPriority, out var operandPriority);
+            var operand = ParseTerm(prefix.RightPriority, out var operandPriority);
             if (operand is null || !FitsOperand(operand, operandPriority, prefix.RightPriority))
             {
                 return null;
@@ -683,11 +716,12 @@ public sealed class TermReader
         // but in '- - 1' the inner '-' is a prefix operator and may.
         if (
             token.Kind == TokenKind.Atom
-            && _operators.TryGetInfixOrPostfix(token.Text, out _)
+            && _operators.TryGetReadableInfixOrPostfix(token.Text, IsoReading, out _)
             && !_operators.TryGetPrefix(token.Text, out _)
         )
         {
-            return false;
+            var following = PeekAfterNext();
+            return following.IsPunctuation("(") && !following.PrecededByLayout;
         }
 
         return true;
@@ -703,7 +737,7 @@ public sealed class TermReader
         var count = 0;
         while (true)
         {
-            SyntaxTerm? argument = ParseTerm(ArgumentPriority, out _);
+            var argument = ParseTerm(ArgumentPriority, out _);
             if (argument is null)
             {
                 return null;
@@ -729,7 +763,7 @@ public sealed class TermReader
                 continue;
             }
 
-            SourceSpan span = nameSpan.To(_current.Span);
+            var span = nameSpan.To(_current.Span);
             if (!Expect(")"))
             {
                 return null;
@@ -747,15 +781,15 @@ public sealed class TermReader
 
     private SyntaxTerm? ParseList()
     {
-        SourceSpan openSpan = _current.Span;
+        var openSpan = _current.Span;
         Advance();
 
         // '[]' is lexed as a single atom, so a ']' here means the source wrote '[ ]', which is the
         // same name: directly followed by '(' it is a functor, as in '[ ](X)'.
         if (_current.IsPunctuation("]"))
         {
-            SourceSpan emptySpan = openSpan.To(_current.Span);
-            Token next = Peek();
+            var emptySpan = openSpan.To(_current.Span);
+            var next = Peek();
             Advance();
             if (next.IsPunctuation("(") && !next.PrecededByLayout)
             {
@@ -771,7 +805,7 @@ public sealed class TermReader
 
         while (true)
         {
-            SyntaxTerm? element = ParseTerm(ArgumentPriority, out _);
+            var element = ParseTerm(ArgumentPriority, out _);
             if (element is null)
             {
                 return null;
@@ -788,7 +822,7 @@ public sealed class TermReader
             if (_current.IsPunctuation("|"))
             {
                 Advance();
-                SyntaxTerm? rest = ParseTerm(ArgumentPriority, out _);
+                var rest = ParseTerm(ArgumentPriority, out _);
                 if (rest is null)
                 {
                     return null;
@@ -800,13 +834,13 @@ public sealed class TermReader
             break;
         }
 
-        SourceSpan listSpan = openSpan.To(_current.Span);
+        var listSpan = openSpan.To(_current.Span);
         if (!Expect("]"))
         {
             return null;
         }
 
-        SyntaxTerm result = tail;
+        var result = tail;
         for (var i = elements.Count - 1; i >= 0; i--)
         {
             result = new CompoundTerm(ListFunctor, [elements[i], result], listSpan);
@@ -847,12 +881,19 @@ public sealed class TermReader
         return _lookahead.Value;
     }
 
+    private Token PeekAfterNext()
+    {
+        _secondLookahead ??= ReadToken();
+        return _secondLookahead.Value;
+    }
+
     private void Advance()
     {
         if (_lookahead is { } pending)
         {
             _current = pending;
-            _lookahead = null;
+            _lookahead = _secondLookahead;
+            _secondLookahead = null;
             return;
         }
 
@@ -861,7 +902,7 @@ public sealed class TermReader
 
     private Token ReadToken()
     {
-        Token token = _lexer.Next();
+        var token = _lexer.Next();
         // Atom-valued double quotes have the same grammatical role and operator priority
         // as other quoted atoms. Normalizing them after parsing is too late (Cor.1 6.3.7).
         return token.Kind == TokenKind.String && _flags?.DoubleQuotes == DoubleQuotesMode.Atom

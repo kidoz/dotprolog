@@ -18,19 +18,19 @@ public sealed class StrictIsoTests
     public void StrictModeAcceptsStandardPredicatesAndControls()
     {
         using var engine = StrictEngine();
-        LoadResult loaded = engine.ConsultText(
+        var loaded = engine.ConsultText(
             """
             values(L) :-
                 findall(X, (X = 2 ; X = 1), Unsorted),
                 once(sort(Unsorted, L)),
                 atom_concat(dot, prolog, dotprolog).
-            """
+            """ + "\n"
         );
 
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
         Assert.Equal(
             RunResult.Success,
-            engine.RunGoal("values([1, 2])", out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics)
+            engine.RunGoal("values([1, 2])", out var diagnostics)
         );
         Assert.Empty(diagnostics);
     }
@@ -46,9 +46,9 @@ public sealed class StrictIsoTests
     {
         using var engine = StrictEngine();
 
-        LoadResult loaded = engine.ConsultText("p :- member(a, [a]).", "strict.pl");
+        var loaded = engine.ConsultText("p :- member(a, [a]).\n", "strict.pl");
 
-        DotProlog.Syntax.Diagnostic diagnostic = Assert.Single(loaded.Diagnostics);
+        var diagnostic = Assert.Single(loaded.Diagnostics);
         Assert.Equal(CompilerDiagnosticIds.StrictIsoViolation, diagnostic.Id);
         Assert.Contains("member/2", diagnostic.Message, StringComparison.Ordinal);
         Assert.Equal("strict.pl", diagnostic.FileName);
@@ -58,12 +58,12 @@ public sealed class StrictIsoTests
     public void StrictModeAllowsAUserDefinitionWithAnExtensionLibraryName()
     {
         using var engine = StrictEngine();
-        LoadResult loaded = engine.ConsultText(
+        var loaded = engine.ConsultText(
             """
             answer :- member(a, [a]).
             member(X, [X|_]).
             member(X, [_|Xs]) :- member(X, Xs).
-            """
+            """ + "\n"
         );
 
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
@@ -75,22 +75,22 @@ public sealed class StrictIsoTests
     {
         using var engine = StrictEngine();
 
-        LoadResult loaded = engine.ConsultText("p :- (true *-> true ; fail).");
+        var loaded = engine.ConsultText("p :- '*->'(true, true).\n");
 
-        DotProlog.Syntax.Diagnostic diagnostic = Assert.Single(loaded.Diagnostics);
+        var diagnostic = Assert.Single(loaded.Diagnostics);
         Assert.Equal(CompilerDiagnosticIds.StrictIsoViolation, diagnostic.Id);
         Assert.Contains("*->/2", diagnostic.Message, StringComparison.Ordinal);
     }
 
     [Theory]
-    [InlineData("p :- a := b.")]
-    [InlineData("p :- $ true.")]
-    [InlineData("p(X) :- X = (a '.' b).")]
+    [InlineData("p :- a := b.\n")]
+    [InlineData("p :- $ true.\n")]
+    [InlineData("p(X) :- X = (a '.' b).\n")]
     public void StrictModeDoesNotPredefineExtendedOperators(string source)
     {
         using var engine = StrictEngine();
 
-        LoadResult loaded = engine.ConsultText(source, "strict.pl");
+        var loaded = engine.ConsultText(source, "strict.pl");
 
         Assert.False(loaded.Success);
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.FileName == "strict.pl");
@@ -104,7 +104,7 @@ public sealed class StrictIsoTests
     {
         using var engine = new PrologEngine();
 
-        LoadResult loaded = engine.ConsultText(source, "modern.pl");
+        var loaded = engine.ConsultText(source, "modern.pl");
 
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
     }
@@ -114,7 +114,7 @@ public sealed class StrictIsoTests
     {
         using var engine = StrictEngine();
 
-        LoadResult loaded = engine.ConsultText(
+        var loaded = engine.ConsultText(
             """
             :- module(meta_example).
             :- export(answer/0).
@@ -125,7 +125,7 @@ public sealed class StrictIsoTests
             twice(Goal) :- call(Goal), call(Goal).
             answer :- twice(true).
             :- end_body(meta_example).
-            """
+            """ + "\n"
         );
 
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
@@ -153,8 +153,8 @@ public sealed class StrictIsoTests
             );
 
             using var engine = StrictEngine();
-            LoadResult libraryLoaded = engine.ConsultFile(library);
-            LoadResult loaded = engine.ConsultFile(main);
+            var libraryLoaded = engine.ConsultFile(library);
+            var loaded = engine.ConsultFile(main);
 
             Assert.True(libraryLoaded.Success, string.Join("; ", libraryLoaded.Diagnostics));
             Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
@@ -171,7 +171,7 @@ public sealed class StrictIsoTests
     {
         using var engine = StrictEngine();
 
-        LoadResult loaded = engine.ConsultText(
+        var loaded = engine.ConsultText(
             """
             :- module(example).
             :- export(answer/1).
@@ -180,7 +180,7 @@ public sealed class StrictIsoTests
             :- body(example).
             answer(42).
             :- end_body(example).
-            """
+            """ + "\n"
         );
 
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
@@ -193,7 +193,7 @@ public sealed class StrictIsoTests
     {
         using var engine = StrictEngine();
 
-        PrologException exception = Assert.Throws<PrologException>(() => engine.Query("member(a, [a])"));
+        var exception = Assert.Throws<PrologException>(() => engine.Query("member(a, [a])"));
 
         Assert.Contains(CompilerDiagnosticIds.StrictIsoViolation, exception.Message, StringComparison.Ordinal);
     }
@@ -202,9 +202,9 @@ public sealed class StrictIsoTests
     public void StrictModeRejectsARuntimeConstructedExtensionGoal()
     {
         using var engine = StrictEngine();
-        Assert.True(engine.ConsultText("invoke(Goal) :- call(Goal).").Success);
+        Assert.True(engine.ConsultText("invoke(Goal) :- call(Goal).\n").Success);
 
-        PrologException exception = Assert.Throws<PrologException>(() => engine.RunGoal("invoke(member(a, [a]))", out _));
+        var exception = Assert.Throws<PrologException>(() => engine.RunGoal("invoke(member(a, [a]))", out _));
 
         Assert.Contains(
             "permission_error(access, implementation_specific_feature, member/2)",
@@ -223,7 +223,7 @@ public sealed class StrictIsoTests
             engine.RunGoal(
                 "catch((_ is e), error(type_error(evaluable, e/0), _), true), "
                     + "catch((_ is integer(1.0)), error(type_error(evaluable, integer/1), _), true)",
-                out IReadOnlyList<DotProlog.Syntax.Diagnostic> diagnostics
+                out var diagnostics
             )
         );
         Assert.Empty(diagnostics);
@@ -233,11 +233,11 @@ public sealed class StrictIsoTests
     public void StrictPartThreeTreatsSoftCutAsANonTerminal()
     {
         using var engine = StrictEngine();
-        LoadResult loaded = engine.ConsultText(
+        var loaded = engine.ConsultText(
             """
             '*->'(_, _) --> [].
-            rule --> ({true} *-> {true}).
-            """
+            rule --> '*->'({true}, {true}).
+            """ + "\n"
         );
 
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
@@ -249,11 +249,11 @@ public sealed class StrictIsoTests
     {
         var output = new StringWriter();
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output };
-        LoadResult loaded = engine.ConsultText(
+        var loaded = engine.ConsultText(
             """
             '*->'(_, _, S, S).
-            :- initialization(( Body = (left *-> right), phrase(Body, []), write(yes) )).
-            """
+            :- initialization(( Body = '*->'(left, right), phrase(Body, []), write(yes) )).
+            """ + "\n"
         );
 
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
@@ -267,7 +267,7 @@ public sealed class StrictIsoTests
         using var engine = StrictEngine();
         Assert.Equal(DoubleQuotesMode.Codes, engine.Program.InitialDoubleQuotes);
 
-        LoadResult loaded = engine.ConsultText(
+        var loaded = engine.ConsultText(
             """
             entering("ab").
             :- set_prolog_flag(double_quotes, chars).
@@ -276,7 +276,7 @@ public sealed class StrictIsoTests
             :- set_prolog_flag(double_quotes, atom).
             text("ab").
             no_text("").
-            """
+            """ + "\n"
         );
 
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
@@ -319,13 +319,36 @@ public sealed class StrictIsoTests
         using var engine = StrictEngine();
         var host = new PrologHost(engine.Machine);
 
-        PrologException exception = Assert.Throws<PrologException>(() => host.Bind("member", 2));
+        var exception = Assert.Throws<PrologException>(() => host.Bind("member", 2));
 
         Assert.Contains(
             "permission_error(access, implementation_specific_feature, member/2)",
             exception.Message,
             StringComparison.Ordinal
         );
+    }
+
+    [Theory]
+    [InlineData(
+        "catch(call((fail, msort([b,a], _))), "
+            + "error(permission_error(access,implementation_specific_feature,msort/2), _), true)"
+    )]
+    [InlineData(
+        "G =.. ['*->', true, true], catch(call(G), "
+            + "error(permission_error(access,implementation_specific_feature,'*->'/2), _), true)"
+    )]
+    [InlineData(
+        "catch(call((write(unexpected), length(_, _))), "
+            + "error(permission_error(access,implementation_specific_feature,length/2), _), true)"
+    )]
+    public void StrictMetaControlCompilationErrorsAreCatchableWithoutRunningSubgoals(string goal)
+    {
+        var output = new StringWriter();
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output };
+
+        Assert.Equal(RunResult.Success, engine.RunGoal(goal, out var diagnostics));
+        Assert.Empty(diagnostics);
+        Assert.Equal("", output.ToString());
     }
 
     private static PrologEngine StrictEngine() => new(PrologLanguageMode.StrictIso);

@@ -6,6 +6,7 @@ namespace DotProlog.Runtime;
 /// </summary>
 public sealed class OperatorTable
 {
+    private bool _includeExtensions;
     private readonly Dictionary<string, PrologOperator> _prefix = [];
     private readonly Dictionary<string, PrologOperator> _infixOrPostfix = [];
     private readonly List<PrologOperator[]> _versions =
@@ -20,6 +21,7 @@ public sealed class OperatorTable
     /// <summary>Creates the ISO table and optionally adds DotProlog's predefined extensions.</summary>
     internal OperatorTable(bool includeExtensions)
     {
+        _includeExtensions = includeExtensions;
         DefineDefaults(includeExtensions);
     }
 
@@ -36,7 +38,7 @@ public sealed class OperatorTable
         ArgumentOutOfRangeException.ThrowIfNegative(priority);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(priority, 1200);
 
-        Dictionary<string, PrologOperator> target = type is OperatorType.Fx or OperatorType.Fy ? _prefix : _infixOrPostfix;
+        var target = type is OperatorType.Fx or OperatorType.Fy ? _prefix : _infixOrPostfix;
         if (priority == 0)
         {
             if (!target.Remove(name))
@@ -49,7 +51,7 @@ public sealed class OperatorTable
         }
 
         var definition = new PrologOperator(priority, type, name);
-        if (target.TryGetValue(name, out PrologOperator previous) && previous == definition)
+        if (target.TryGetValue(name, out var previous) && previous == definition)
         {
             return;
         }
@@ -64,6 +66,23 @@ public sealed class OperatorTable
     /// <summary>Looks up an infix or postfix definition for <paramref name="name"/>.</summary>
     public bool TryGetInfixOrPostfix(string name, out PrologOperator op) => _infixOrPostfix.TryGetValue(name, out op);
 
+    /// <summary>Reads trusted processor library soft cut without predefining it for strict user text.</summary>
+    internal bool TryGetReadableInfixOrPostfix(string name, bool isoReading, out PrologOperator op)
+    {
+        if (TryGetInfixOrPostfix(name, out op))
+        {
+            return true;
+        }
+
+        if (isoReading || _includeExtensions || name != "*->")
+        {
+            return false;
+        }
+
+        op = new PrologOperator(1050, OperatorType.Xfy, name);
+        return true;
+    }
+
     /// <summary>Whether <paramref name="name"/> has any operator definition.</summary>
     public bool IsOperator(string name) => _prefix.ContainsKey(name) || _infixOrPostfix.ContainsKey(name);
 
@@ -77,6 +96,7 @@ public sealed class OperatorTable
     public OperatorTable Copy()
     {
         var copy = new OperatorTable(includeExtensions: false);
+        copy._includeExtensions = _includeExtensions;
         copy.ReplaceWith(this);
         return copy;
     }
@@ -89,7 +109,7 @@ public sealed class OperatorTable
         _infixOrPostfix.Clear();
         _versions.Clear();
         _versions.Add([]);
-        foreach (PrologOperator definition in source.All())
+        foreach (var definition in source.All())
         {
             Define(definition.Priority, definition.Type, definition.Name);
         }
@@ -111,12 +131,12 @@ public sealed class OperatorTable
     public int MaxPriority(string name)
     {
         var priority = 0;
-        if (_prefix.TryGetValue(name, out PrologOperator prefix))
+        if (_prefix.TryGetValue(name, out var prefix))
         {
             priority = prefix.Priority;
         }
 
-        if (_infixOrPostfix.TryGetValue(name, out PrologOperator other) && other.Priority > priority)
+        if (_infixOrPostfix.TryGetValue(name, out var other) && other.Priority > priority)
         {
             priority = other.Priority;
         }
@@ -150,7 +170,7 @@ public sealed class OperatorTable
         var requestedPostfix = type is OperatorType.Xf or OperatorType.Yf;
         if (
             (requestedInfix || requestedPostfix)
-            && _infixOrPostfix.TryGetValue(name, out PrologOperator existing)
+            && _infixOrPostfix.TryGetValue(name, out var existing)
             && existing.IsInfix != requestedInfix
         )
         {
@@ -166,18 +186,9 @@ public sealed class OperatorTable
         Define(1200, OperatorType.Xfx, "-->");
         Define(1200, OperatorType.Fx, ":-");
         Define(1200, OperatorType.Fx, "?-");
-        foreach (var name in (string[])["meta_predicate", "module", "use_module"])
-        {
-            Define(1150, OperatorType.Fx, name);
-        }
-
         Define(1100, OperatorType.Xfy, ";");
         Define(1105, OperatorType.Xfy, "|");
         Define(1050, OperatorType.Xfy, "->");
-        // Part 3 requires an additional grammar control to remain ordinary nonterminal syntax in a
-        // strict processor. ClauseCompiler and DcgTranslator decide whether this is executable
-        // soft cut or an ordinary nonterminal after the reader has built the term.
-        Define(1050, OperatorType.Xfy, "*->");
         Define(1000, OperatorType.Xfy, ",");
         Define(900, OperatorType.Fy, "\\+");
 
@@ -190,7 +201,7 @@ public sealed class OperatorTable
         }
 
         Define(600, OperatorType.Xfy, ":");
-        foreach (var name in (string[])["+", "-", "/\\", "\\/", "xor"])
+        foreach (var name in (string[])["+", "-", "/\\", "\\/"])
         {
             Define(500, OperatorType.Yfx, name);
         }
@@ -210,6 +221,14 @@ public sealed class OperatorTable
         {
             return;
         }
+
+        foreach (var name in (string[])["meta_predicate", "module", "use_module"])
+        {
+            Define(1150, OperatorType.Fx, name);
+        }
+
+        Define(1050, OperatorType.Xfy, "*->");
+        Define(500, OperatorType.Yfx, "xor");
 
         foreach (var name in (string[])["dynamic", "discontiguous", "ensure_loaded", "include", "initialization", "multifile"])
         {
