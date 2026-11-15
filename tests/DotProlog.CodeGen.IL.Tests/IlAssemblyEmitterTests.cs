@@ -143,8 +143,8 @@ public sealed class IlAssemblyEmitterTests
     {
         using var output = new MemoryStream();
         var source = new string('(', 20_000) + "a" + new string(')', 20_000) + ".";
-        IReadOnlyList<Diagnostic> diagnostics = IlAssemblyEmitter.Emit([("deep.pl", source)], "Deep", output);
-        Diagnostic diagnostic = Assert.Single(diagnostics);
+        var diagnostics = IlAssemblyEmitter.Emit([("deep.pl", source)], "Deep", output);
+        var diagnostic = Assert.Single(diagnostics);
         Assert.Equal("DPL0012", diagnostic.Id);
         Assert.Equal("deep.pl", diagnostic.FileName);
         Assert.Equal(1, diagnostic.Span.Line);
@@ -400,6 +400,42 @@ public sealed class IlAssemblyEmitterTests
         );
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CompiledCutRunsDeferredCleanup(bool fused)
+    {
+        using var compiled = new LoadedProgram(
+            "p(a). p(b). commit :- setup_call_cleanup(true, p(_), nb_setval(cut_done, yes)), !.",
+            fuseBlocks: fused
+        );
+        using var engine = new PrologEngine();
+        compiled.Install(engine);
+
+        Assert.True(engine.Query("nb_setval(cut_done, no), commit, nb_getval(cut_done, yes)").Prove());
+        Assert.True(engine.Query("nb_current(cut_done, yes)").Prove());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CompiledCutCleanupSharesCallerVariables(bool fused)
+    {
+        using var compiled = new LoadedProgram(
+            "p(a). p(b). commit(Y) :- call_cleanup(p(_), Y = done), !. "
+                + "late(Y) :- call_cleanup(p(_), write(Y)), Y = done, !.",
+            fuseBlocks: fused
+        );
+        using var output = new StringWriter();
+        using var engine = new PrologEngine { Output = output };
+        compiled.Install(engine);
+
+        Assert.True(engine.Query("commit(Y), Y == done").Prove());
+        Assert.True(engine.Query("late(done)").Prove());
+        Assert.Equal("done", output.ToString());
+        Assert.True(engine.Query("freeze(Y, Z = woke), call_cleanup(p(_), Y = done), !, Z == woke").Prove());
+    }
+
     [Fact]
     public void IndexedPreparationUsesTheSourcePositionSnapshot()
     {
@@ -443,10 +479,88 @@ public sealed class IlAssemblyEmitterTests
     [InlineData(":- initialization(fail). :- initialization(halt(42)).", 1)]
     [InlineData(":- initialization(halt(7)). :- initialization(fail).", 7)]
     [InlineData(":- initialization(throw(problem)).", 70)]
+    [InlineData(":- throw(problem).", 70)]
     public void EntryPointReturnsInitializationStatus(string source, int expected)
     {
         using var compiled = new LoadedProgram(source);
         Assert.Equal(expected, compiled.Run());
+    }
+
+    [Fact]
+    public void ImmediateDirectiveHaltStopsDirectIlStartup()
+    {
+        using var compiled = new LoadedProgram(":- halt(7). :- initialization(halt(9)).");
+
+        Assert.Equal(7, compiled.Run());
+    }
+
+    [Fact]
+    public void DirectIlStartupDrainsRuntimeConsultGoals()
+    {
+        var directory = Directory.CreateTempSubdirectory("dotprolog-il-consult-").FullName;
+        try
+        {
+            var dependency = Path.Combine(directory, "dependency.pl");
+            File.WriteAllText(dependency, ":- initialization(halt(11)).");
+            using var compiled = new LoadedProgram($":- initialization(consult('{QuotedAtomText(dependency)}')).");
+
+            Assert.Equal(11, compiled.Run());
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void DirectIlRunsMainAfterOtherUnitsInitialize()
+    {
+        using var compiled = new LoadedProgram([
+            ("first.pl", ":- initialization((initialized -> halt(0) ; halt(9)), main)."),
+            ("second.pl", ":- initialization(assertz(initialized))."),
+        ]);
+
+        Assert.Equal(0, compiled.Run());
+    }
+
+    [Fact]
+    public void DirectIlDefersBuildDependencyDirectivesAndInitializers()
+    {
+        var directory = Directory.CreateTempSubdirectory("dotprolog-il-dependency-").FullName;
+        try
+        {
+            var dependency = Path.Combine(directory, "dependency.pl");
+            File.WriteAllText(dependency, ":- assertz(directive_ready).\n:- initialization(assertz(initialization_ready)).");
+            var main = Path.Combine(directory, "main.pl");
+            using var compiled = new LoadedProgram([
+                (main, ":- ensure_loaded(dependency). :- initialization((directive_ready, initialization_ready))."),
+            ]);
+
+            Assert.Equal(0, compiled.Run());
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData("multifile")]
+    [InlineData("discontiguous")]
+    public void DirectIlDeclarationOnlyProceduresAreDefinedEmptyAndStatic(string declaration)
+    {
+        using var compiled = new LoadedProgram($":- {declaration}(value/1).");
+        using var engine = new PrologEngine();
+        compiled.Install(engine);
+
+        Assert.True(
+            engine
+                .Query(
+                    "\\+ value(_), current_predicate(value/1), "
+                        + "catch(assertz(value(now)), error(permission_error(modify,static_procedure,value/1), _), true)"
+                )
+                .Prove()
+        );
     }
 
     [Theory]
@@ -499,6 +613,36 @@ public sealed class IlAssemblyEmitterTests
         Assert.True(engine.Query("findall(X,bridge(X),[a,b])").Prove());
     }
 
+    [Theory]
+    [InlineData(PrologLanguageMode.Modern)]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    public void DirectIlUserDefinitionsReplaceNativeCallsAndMetaCalls(PrologLanguageMode mode)
+    {
+        using var compiled = new LoadedProgram(
+            """
+            msort(_, il_sort).
+            between(0, 0, zero).
+            between(1, 1, one).
+            direct(Sort, Value) :- msort([], Sort), between(1, 1, Value).
+            meta(Sort, Value) :- call(msort([], Sort)), call(between(0, 0, Value)).
+            """ + "\n",
+            mode
+        );
+        using var engine = new PrologEngine(mode);
+        compiled.Install(engine);
+
+        Assert.True(engine.Query("direct(il_sort, one), meta(il_sort, zero)").Prove());
+        Assert.True(
+            engine
+                .ConsultText(
+                    "bytecode(Sort, Value) :- msort([], Sort), between(1, 1, Value).\n"
+                        + "bytecode_meta(Sort, Value) :- call(msort([], Sort)), call(between(0, 0, Value)).\n"
+                )
+                .Success
+        );
+        Assert.True(engine.Query("bytecode(il_sort, one), bytecode_meta(il_sort, zero)").Prove());
+    }
+
     [Fact]
     public void DynamicClausesRetainLogicalUpdateView()
     {
@@ -512,6 +656,24 @@ public sealed class IlAssemblyEmitterTests
         using var engine = new PrologEngine();
         compiled.Install(engine);
         Assert.True(engine.Query("collect([first]), p(later), retract(p(first)), \\+ p(first)").Prove());
+    }
+
+    [Fact]
+    public void InitialDynamicRationalClausesSurviveInstallation()
+    {
+        using var compiled = new LoadedProgram(":- dynamic(p/1). p(1r3). p(6r4).");
+        using var engine = new PrologEngine();
+        compiled.Install(engine);
+
+        PrologRational[] values =
+        [
+            .. engine.Query("p(X)").Solutions().Select(solution => Assert.IsType<PrologRational>(solution["X"])),
+        ];
+        Assert.Equal(2, values.Length);
+        Assert.Equal(1, (int)values[0].Numerator);
+        Assert.Equal(3, (int)values[0].Denominator);
+        Assert.Equal(3, (int)values[1].Numerator);
+        Assert.Equal(2, (int)values[1].Denominator);
     }
 
     [Fact]
@@ -554,12 +716,12 @@ public sealed class IlAssemblyEmitterTests
     [InlineData(PrologLanguageMode.StrictIso)]
     public void DirectIlReadsIsoNegativeNumbersInBothModes(PrologLanguageMode mode)
     {
-        using var compiled = new LoadedProgram("negative(- 1). quoted('-'1). commented(- /**/ 1).", mode);
+        using var compiled = new LoadedProgram("negative(- 1). quoted('-'1). commented(- /**/ 1).\n", mode);
         using var engine = new PrologEngine(mode);
         compiled.Install(engine);
 
         Assert.True(engine.Query("negative(-1), quoted(-1), commented(-1)").Prove());
-        Assert.True(engine.ConsultText("bytecode_negative(X) :- negative(X).").Success);
+        Assert.True(engine.ConsultText("bytecode_negative(X) :- negative(X).\n").Success);
         Assert.Single(engine.Query("bytecode_negative(-1)").Solutions());
     }
 
@@ -569,7 +731,7 @@ public sealed class IlAssemblyEmitterTests
     public void LanguageModeAndInitialFlagsAreValidated(PrologLanguageMode mode)
     {
         var flags = new PrologFlagOverrides { DoubleQuotes = DoubleQuotesMode.Atom };
-        using var compiled = new LoadedProgram("p(\"hello\").", mode, flags);
+        using var compiled = new LoadedProgram("p(\"hello\").\n", mode, flags);
         using var engine = new PrologEngine(mode, flags);
         compiled.Install(engine);
         Assert.True(engine.Query("p(hello)").Prove());
@@ -632,7 +794,9 @@ public sealed class IlAssemblyEmitterTests
         compiled.Install(engine);
         Assert.True(
             engine
-                .ConsultText("bytecode_review(Name) :- run_iso_review_case(Name).\n" + (consultInvoker ? invoker : string.Empty))
+                .ConsultText(
+                    "bytecode_review(Name) :- run_iso_review_case(Name).\n" + (consultInvoker ? invoker + "\n" : string.Empty)
+                )
                 .Success
         );
         var names = engine.Query("iso_review_case(Name,_)").Solutions().Select(solution => solution["Name"].ToString()).ToArray();
@@ -643,4 +807,6 @@ public sealed class IlAssemblyEmitterTests
             Assert.Single(engine.Query($"bytecode_review({name})").Solutions());
         }
     }
+
+    private static string QuotedAtomText(string path) => path.Replace("\\", "\\\\", StringComparison.Ordinal);
 }

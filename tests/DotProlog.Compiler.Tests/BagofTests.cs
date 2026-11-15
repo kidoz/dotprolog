@@ -1,3 +1,5 @@
+using DotProlog.Runtime;
+
 namespace DotProlog.Compiler.Tests;
 
 /// <summary>
@@ -141,4 +143,62 @@ public sealed class BagofTests
     [Fact]
     public void AnUninstantiatedGoalIsReported() =>
         Assert.Equal("instantiation_error", PrologTestHost.RunGoal("catch(bagof(_, _, _), error(E, _), write(E))"));
+
+    [Theory]
+    [InlineData(PrologLanguageMode.Modern, "bagof(N, C^class(N, C), L), write(L)", "[peter,ann,pat]")]
+    [InlineData(PrologLanguageMode.StrictIso, "bagof(N, C^class(N, C), L), write(L)", "[peter,ann,pat]")]
+    [InlineData(PrologLanguageMode.Modern, "setof(N, C^class(N, C), L), write(L)", "[ann,pat,peter]")]
+    [InlineData(PrologLanguageMode.StrictIso, "setof(N, C^class(N, C), L), write(L)", "[ann,pat,peter]")]
+    public void LeadingExistentialGoalsExecuteInBothModes(PrologLanguageMode mode, string goal, string expected) =>
+        Assert.Equal(expected, RunInMode(mode, Facts, goal));
+
+    [Theory]
+    [InlineData(PrologLanguageMode.Modern)]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    public void AnInvalidGoalUnderAnExistentialQualifierRaisesItsCallableError(PrologLanguageMode mode) =>
+        Assert.Equal("type_error(callable,1)", RunInMode(mode, "", "catch(bagof(X, _^1, _), error(E, _), write(E))"));
+
+    [Theory]
+    [InlineData(PrologLanguageMode.Modern)]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    public void PublicListPredicateReplacementsDoNotChangeAllSolutionsGrouping(PrologLanguageMode mode)
+    {
+        const string facts = """
+            p(a, 1).
+            p(b, 2).
+            p(a, 3).
+            """;
+
+        Assert.Equal(
+            "[a-[1,3],b-[2]]/[a-[1,3],b-[2]]",
+            RunInMode(
+                mode,
+                facts + "\nmember(X, [X|_]) :- !.\n",
+                "findall(K-L, bagof(V, p(K, V), L), Bags), " + "findall(K-L, setof(V, p(K, V), L), Sets), write(Bags/Sets)"
+            )
+        );
+        Assert.Equal(
+            "[a-[1,3],b-[2]]",
+            RunInMode(mode, facts + "\nreverse(_, _) :- fail.\n", "findall(K-L, bagof(V, p(K, V), L), R), write(R)")
+        );
+        Assert.Equal("[1,2,3]", RunInMode(mode, facts + "\nappend(_, _, _) :- fail.\n", "bagof(V, K^p(K, V), L), write(L)"));
+    }
+
+    [Theory]
+    [InlineData(PrologLanguageMode.Modern)]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    public void ReplacingPublicBagofDoesNotChangeSetof(PrologLanguageMode mode) =>
+        Assert.Equal("[1,2,3]", RunInMode(mode, "p(1).\np(2).\np(3).\nbagof(_, _, _) :- fail.\n", "setof(X, p(X), L), write(L)"));
+
+    private static string RunInMode(PrologLanguageMode mode, string source, string goal)
+    {
+        var output = new StringWriter();
+        using var engine = new PrologEngine(mode) { Output = output };
+        var loaded = engine.ConsultText(source + "\n", "test.pl");
+        Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
+        var result = engine.RunGoal(goal, out var diagnostics);
+        Assert.Empty(diagnostics);
+        Assert.Equal(RunResult.Success, result);
+        return output.ToString();
+    }
 }

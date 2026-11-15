@@ -85,13 +85,17 @@ public sealed class SetArgTests
         Assert.Equal("f(x)", PrologTestHost.RunGoal("T = f(a), ( nb_setarg(1, T, x), fail ; true ), write(T)"));
 
     [Fact]
+    public void NbSetargAcceptsRationalValuesAcrossBacktracking() =>
+        Assert.Equal("1r3", PrologTestHost.RunGoal("T = f(0), ( nb_setarg(1, T, 1r3), fail ; true ), arg(1, T, R), write(R)"));
+
+    [Fact]
     public void StrictModeRejectsDestructiveAssignment()
     {
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
 
-        LoadResult loaded = engine.ConsultText("p :- setarg(1, f(a), x).", "strict.pl");
+        var loaded = engine.ConsultText("p :- setarg(1, f(a), x).\n", "strict.pl");
 
-        DotProlog.Syntax.Diagnostic diagnostic = Assert.Single(loaded.Diagnostics);
+        var diagnostic = Assert.Single(loaded.Diagnostics);
         Assert.Equal(CompilerDiagnosticIds.StrictIsoViolation, diagnostic.Id);
         Assert.Contains("setarg/3", diagnostic.Message, StringComparison.Ordinal);
     }

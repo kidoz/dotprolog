@@ -132,7 +132,7 @@ public sealed class MachineTests
     [Fact]
     public void ProvesAFactAndReturnsToTheHost()
     {
-        BytecodeProgram program = NewProgram();
+        var program = NewProgram();
         var p = program.Symbols.InternFunctor("p", 0);
 
         program.DefinePredicate(p, program.CodeLength);
@@ -147,7 +147,7 @@ public sealed class MachineTests
     [Fact]
     public void BacktracksFromAFailedClauseIntoTheNextAlternative()
     {
-        BytecodeProgram program = NewProgram();
+        var program = NewProgram();
         var p = program.Symbols.InternFunctor("p", 0);
         var fail = BuiltinId(program, "fail", 0);
 
@@ -171,7 +171,7 @@ public sealed class MachineTests
     [Fact]
     public void FailsWhenEveryAlternativeIsExhausted()
     {
-        BytecodeProgram program = NewProgram();
+        var program = NewProgram();
         var p = program.Symbols.InternFunctor("p", 0);
         var fail = BuiltinId(program, "fail", 0);
 
@@ -196,7 +196,7 @@ public sealed class MachineTests
     [Fact]
     public void CallReturnsToItsContinuation()
     {
-        BytecodeProgram program = NewProgram();
+        var program = NewProgram();
         var p = program.Symbols.InternFunctor("p", 0);
         var q = program.Symbols.InternFunctor("q", 0);
         var write = BuiltinId(program, "write", 1);
@@ -225,7 +225,7 @@ public sealed class MachineTests
     [Fact]
     public void HaltStopsTheRunAndReportsItsExitCode()
     {
-        BytecodeProgram program = NewProgram();
+        var program = NewProgram();
         var p = program.Symbols.InternFunctor("p", 0);
         var halt = BuiltinId(program, "halt", 1);
         var seven = program.AddConstant(Cell.Integer60(7));
@@ -246,10 +246,10 @@ public sealed class MachineTests
     [Fact]
     public void CallingAnUndefinedPredicateRaisesAnExistenceError()
     {
-        BytecodeProgram program = NewProgram();
+        var program = NewProgram();
         var missing = program.Symbols.InternFunctor("missing", 2);
 
-        PrologException exception = Assert.Throws<PrologException>(() => new Machine(program).Solve(missing));
+        var exception = Assert.Throws<PrologException>(() => new Machine(program).Solve(missing));
 
         Assert.Contains("existence_error(procedure, missing/2)", exception.Message, StringComparison.Ordinal);
     }
@@ -257,10 +257,10 @@ public sealed class MachineTests
     [Fact]
     public void OccursCheckRejectsADirectCycleAndRestoresTheVariable()
     {
-        BytecodeProgram program = NewProgram();
+        var program = NewProgram();
         using var machine = new Machine(program);
-        Cell variable = machine.CreateVariable();
-        Cell recursive = machine.CreateStructure(program.Symbols.InternFunctor("f", 1), [variable]);
+        var variable = machine.CreateVariable();
+        var recursive = machine.CreateStructure(program.Symbols.InternFunctor("f", 1), [variable]);
 
         Assert.False(machine.UnifyWithOccursCheck(variable, recursive));
         Assert.Equal(variable, machine.Dereference(variable));
@@ -269,10 +269,10 @@ public sealed class MachineTests
     [Fact]
     public void OccursCheckRetainsFiniteBindings()
     {
-        BytecodeProgram program = NewProgram();
+        var program = NewProgram();
         using var machine = new Machine(program);
-        Cell variable = machine.CreateVariable();
-        Cell value = machine.CreateStructure(program.Symbols.InternFunctor("point", 2), [Cell.Integer60(2), Cell.Integer60(3)]);
+        var variable = machine.CreateVariable();
+        var value = machine.CreateStructure(program.Symbols.InternFunctor("point", 2), [Cell.Integer60(2), Cell.Integer60(3)]);
 
         Assert.True(machine.UnifyWithOccursCheck(variable, value));
         Assert.Equal(value, machine.Dereference(variable));
@@ -283,11 +283,11 @@ public sealed class MachineTests
     [InlineData(true)]
     public void OccursCheckHandlesHeapGrowthBeforeAndAfterItsFirstUse(bool checkBeforeGrowth)
     {
-        BytecodeProgram program = NewProgram();
+        var program = NewProgram();
         using var machine = new Machine(program);
         var functor = program.Symbols.InternFunctor("f", 1);
-        Cell earlyVariable = machine.CreateVariable();
-        Cell earlyTerm = machine.CreateStructure(functor, [earlyVariable]);
+        var earlyVariable = machine.CreateVariable();
+        var earlyTerm = machine.CreateStructure(functor, [earlyVariable]);
         if (checkBeforeGrowth)
         {
             Assert.False(machine.UnifyWithOccursCheck(earlyVariable, earlyTerm));
@@ -299,8 +299,8 @@ public sealed class MachineTests
             machine.CreateVariable();
         }
 
-        Cell variable = machine.CreateVariable();
-        Cell recursive = machine.CreateStructure(functor, [variable]);
+        var variable = machine.CreateVariable();
+        var recursive = machine.CreateStructure(functor, [variable]);
         Assert.False(machine.UnifyWithOccursCheck(variable, recursive));
         Assert.Equal(variable, machine.Dereference(variable));
 
@@ -308,7 +308,7 @@ public sealed class MachineTests
         Assert.False(machine.UnifyWithOccursCheck(earlyVariable, earlyTerm));
         Assert.Equal(earlyVariable, machine.Dereference(earlyVariable));
         Assert.True(machine.Unify(variable, recursive));
-        Cell independent = machine.CreateVariable();
+        var independent = machine.CreateVariable();
         Assert.True(machine.UnifyWithOccursCheck(independent, recursive));
         Assert.Equal(recursive, machine.Dereference(independent));
     }
@@ -326,7 +326,7 @@ public sealed class MachineTests
         var buffer = TermBuffer.FromCells(cells);
         var origin = buffer.Materialize(machine);
         Assert.Equal(0, origin);
-        Cell variable = machine.CreateVariable();
+        var variable = machine.CreateVariable();
         Assert.True(machine.Unify(variable, machine.HeapAt(origin + cells.Length - 1)));
         Assert.Equal(cells[0], machine.HeapAt(origin));
         Assert.Equal(cells[^1], machine.Dereference(variable));
@@ -335,12 +335,12 @@ public sealed class MachineTests
     [Fact]
     public void OccursCheckRestoresBindingsAfterALaterMismatch()
     {
-        BytecodeProgram program = NewProgram();
+        var program = NewProgram();
         using var machine = new Machine(program);
-        Cell variable = machine.CreateVariable();
+        var variable = machine.CreateVariable();
         var pair = program.Symbols.InternFunctor("pair", 2);
-        Cell left = machine.CreateStructure(pair, [variable, variable]);
-        Cell right = machine.CreateStructure(
+        var left = machine.CreateStructure(pair, [variable, variable]);
+        var right = machine.CreateStructure(
             pair,
             [Cell.Atom(program.Symbols.InternAtom("a")), Cell.Atom(program.Symbols.InternAtom("b"))]
         );
@@ -352,14 +352,14 @@ public sealed class MachineTests
     [Fact]
     public void OccursCheckTerminatesWhenTheCandidateContainsAnExistingCycle()
     {
-        BytecodeProgram program = NewProgram();
+        var program = NewProgram();
         using var machine = new Machine(program);
-        Cell cyclicVariable = machine.CreateVariable();
-        Cell cyclicTerm = machine.CreateStructure(program.Symbols.InternFunctor("cycle", 1), [cyclicVariable]);
+        var cyclicVariable = machine.CreateVariable();
+        var cyclicTerm = machine.CreateStructure(program.Symbols.InternFunctor("cycle", 1), [cyclicVariable]);
         Assert.True(machine.Unify(cyclicVariable, cyclicTerm));
 
-        Cell variable = machine.CreateVariable();
-        Cell wrapper = machine.CreateStructure(program.Symbols.InternFunctor("wrapper", 1), [cyclicTerm]);
+        var variable = machine.CreateVariable();
+        var wrapper = machine.CreateStructure(program.Symbols.InternFunctor("wrapper", 1), [cyclicTerm]);
 
         Assert.True(machine.UnifyWithOccursCheck(variable, wrapper));
         Assert.Equal(wrapper, machine.Dereference(variable));
@@ -368,14 +368,14 @@ public sealed class MachineTests
     [Fact]
     public void OrdinaryUnificationTerminatesWhenCyclicIntermediateBindingsPrecedeAMismatch()
     {
-        BytecodeProgram program = NewProgram();
+        var program = NewProgram();
         using var machine = new Machine(program);
         var a = program.Symbols.InternFunctor("a", 1);
         var f = program.Symbols.InternFunctor("f", 4);
-        Cell x = machine.CreateVariable();
-        Cell y = machine.CreateVariable();
-        Cell left = machine.CreateStructure(f, [x, y, x, Cell.Integer60(1)]);
-        Cell right = machine.CreateStructure(
+        var x = machine.CreateVariable();
+        var y = machine.CreateVariable();
+        var left = machine.CreateStructure(f, [x, y, x, Cell.Integer60(1)]);
+        var right = machine.CreateStructure(
             f,
             [machine.CreateStructure(a, [x]), machine.CreateStructure(a, [y]), y, Cell.Integer60(2)]
         );
@@ -386,14 +386,14 @@ public sealed class MachineTests
     [Fact]
     public void TermIdentityTerminatesForEquivalentRationalTreesWithDifferentPeriods()
     {
-        BytecodeProgram program = NewProgram();
+        var program = NewProgram();
         using var machine = new Machine(program);
-        Cell shortTail = machine.CreateVariable();
-        Cell shortCycle = machine.CreateList([Cell.Integer60(1), Cell.Integer60(2), Cell.Integer60(3)], shortTail);
+        var shortTail = machine.CreateVariable();
+        var shortCycle = machine.CreateList([Cell.Integer60(1), Cell.Integer60(2), Cell.Integer60(3)], shortTail);
         Assert.True(machine.Unify(shortTail, shortCycle));
 
-        Cell longTail = machine.CreateVariable();
-        Cell longCycle = machine.CreateList(
+        var longTail = machine.CreateVariable();
+        var longCycle = machine.CreateList(
             [Cell.Integer60(1), Cell.Integer60(2), Cell.Integer60(3), Cell.Integer60(1), Cell.Integer60(2), Cell.Integer60(3)],
             longTail
         );
@@ -405,7 +405,7 @@ public sealed class MachineTests
     [Fact]
     public void ProgramDistinguishesUserPredicatesFromBuiltinsAndInternalBytecode()
     {
-        BytecodeProgram program = NewProgram();
+        var program = NewProgram();
         var user = program.Symbols.InternFunctor("user_predicate", 0);
         var write = program.Symbols.InternFunctor("write", 1);
         var catchFunctor = program.Symbols.InternFunctor("catch", 3);
@@ -420,7 +420,7 @@ public sealed class MachineTests
     [Fact]
     public void AbolishingADynamicPredicateRemovesEveryAlias()
     {
-        BytecodeProgram program = NewProgram();
+        var program = NewProgram();
         var target = program.Symbols.InternFunctor("module:entry", 1);
         var alias = program.Symbols.InternFunctor("entry", 1);
         program.DeclareDynamic(target);
@@ -431,5 +431,99 @@ public sealed class MachineTests
         Assert.False(program.IsDefined(alias));
         Assert.False(program.IsUserPredicate(target));
         Assert.False(program.IsUserPredicate(alias));
+    }
+
+    [Theory]
+    [InlineData("solve")]
+    [InlineData("run")]
+    [InlineData("begin")]
+    [InlineData("call")]
+    [InlineData("redo")]
+    public void PublicExecutionEntriesRejectReentrancyBeforeMutation(string operation)
+    {
+        var program = NewProgram();
+        var predicate = program.Symbols.InternFunctor("outer", 1);
+        var item = program.Symbols.InternFunctor("item", 1);
+        var entry = 0;
+        var builtin = program.Builtins.Register(
+            "reenter",
+            1,
+            machine =>
+            {
+                var before = machine.Argument(0);
+                var header = machine.HeapAt(before.Index);
+
+                Assert.Throws<InvalidOperationException>(() =>
+                {
+                    switch (operation)
+                    {
+                        case "solve":
+                            machine.Solve(predicate);
+                            break;
+                        case "run":
+                            machine.Run(entry);
+                            break;
+                        case "begin":
+                            machine.BeginCall();
+                            break;
+                        case "call":
+                            machine.Call(predicate, [Cell.Atom(program.Symbols.InternAtom("replacement"))]);
+                            break;
+                        case "redo":
+                            machine.Redo();
+                            break;
+                    }
+                });
+
+                Assert.True(machine.IsRunning);
+                Assert.Equal(before, machine.Argument(0));
+                Assert.Equal(header, machine.HeapAt(before.Index));
+                return true;
+            }
+        );
+
+        entry = program.CodeLength;
+        program.DefinePredicate(predicate, entry);
+        program.Emit(OpCode.CallBuiltin, builtin, 1);
+        program.Emit(OpCode.Stop);
+
+        using var machine = new Machine(program);
+        machine.BeginCall();
+        var original = machine.CreateStructure(item, [Cell.Atom(program.Symbols.InternAtom("original"))]);
+        Assert.Equal(RunResult.Success, machine.Call(predicate, [original]));
+    }
+
+    [Theory]
+    [InlineData(UnknownProcedureAction.Fail)]
+    [InlineData(UnknownProcedureAction.Error)]
+    public void FailedSolveLookupDiscardsThePreviousResumableGoal(UnknownProcedureAction unknown)
+    {
+        var program = NewProgram();
+        program.Flags.Unknown = unknown;
+        var predicate = program.Symbols.InternFunctor("choice", 0);
+        var missing = program.Symbols.InternFunctor("missing", 0);
+
+        program.DefinePredicate(predicate, program.CodeLength);
+        var alternative = program.Emit(OpCode.TryMeElse, 0) + 1;
+        program.Emit(OpCode.Stop);
+        program.Patch(alternative, program.CodeLength);
+        program.Emit(OpCode.TrustMe);
+        program.Emit(OpCode.Stop);
+
+        using var machine = new Machine(program);
+        Assert.Equal(RunResult.Success, machine.Solve(predicate));
+        Assert.True(machine.HasAlternatives);
+
+        if (unknown == UnknownProcedureAction.Fail)
+        {
+            Assert.Equal(RunResult.Failure, machine.Solve(missing));
+        }
+        else
+        {
+            Assert.Throws<PrologException>(() => machine.Solve(missing));
+        }
+
+        Assert.False(machine.HasAlternatives);
+        Assert.Equal(RunResult.Failure, machine.Redo());
     }
 }

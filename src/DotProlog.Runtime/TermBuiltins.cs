@@ -62,7 +62,7 @@ internal static class TermBuiltins
     /// which has neither, so <c>length/2</c> fails on one rather than looping.
     /// </summary>
     private static bool SkipList(Machine machine) =>
-        TermList.TrySkip(machine, machine.Argument(1), out var count, out Cell tail)
+        TermList.TrySkip(machine, machine.Argument(1), out var count, out var tail)
         && machine.Unify(machine.Argument(0), Cell.Integer60(count))
         && machine.Unify(machine.Argument(2), tail);
 
@@ -72,7 +72,7 @@ internal static class TermBuiltins
     /// </summary>
     private static bool Freeze(Machine machine)
     {
-        Cell variable = machine.Argument(0);
+        var variable = machine.Argument(0);
         if (variable.Tag != CellTag.Reference)
         {
             throw PrologErrors.Uninstantiation(machine, variable);
@@ -88,9 +88,9 @@ internal static class TermBuiltins
     /// </summary>
     private static bool FrozenGoal(Machine machine)
     {
-        Cell variable = machine.Argument(0);
+        var variable = machine.Argument(0);
         return variable.Tag == CellTag.Reference
-            && machine.TryGetFrozen(variable.Index, out Cell goal)
+            && machine.TryGetFrozen(variable.Index, out var goal)
             && machine.Unify(machine.Argument(1), goal);
     }
 
@@ -123,6 +123,13 @@ internal static class TermBuiltins
         registry.Register("setarg", 3, static machine => SetArg(machine, backtrackable: true));
         registry.Register("nb_setarg", 3, static machine => SetArg(machine, backtrackable: false));
         registry.Register("copy_term", 2, CopyTerm);
+        registry.Register(
+            "$register_cleanup",
+            2,
+            static machine => machine.RegisterCleanup((int)machine.Argument(0).Integer, machine.Argument(1))
+        );
+        registry.Register("$defer_cleanup", 1, static machine => machine.DeferCleanup((int)machine.Argument(0).Integer));
+        registry.Register("$undefer_cleanup", 0, static machine => machine.UndeferCleanup());
         registry.Register("term_size", 2, TermSize);
         registry.Register("term_variables", 2, TermVariables);
 
@@ -140,8 +147,8 @@ internal static class TermBuiltins
     /// </remarks>
     private static bool CopyTerm(Machine machine)
     {
-        Cell original = machine.Argument(0);
-        Cell frozen = machine.HasFrozen ? FrozenPairs(machine, original) : Cell.Atom(machine.Symbols.EmptyList);
+        var original = machine.Argument(0);
+        var frozen = machine.HasFrozen ? FrozenPairs(machine, original) : Cell.Atom(machine.Symbols.EmptyList);
         if (TermList.IsEmpty(machine, frozen))
         {
             var buffer = new TermBuffer();
@@ -156,26 +163,30 @@ internal static class TermBuiltins
         var together = new TermBuffer();
         var joined = together.Copy(machine, machine.CreateStructure(pairFunctor, [original, frozen]));
         var start = together.Materialize(machine);
-        Cell copy = machine.HeapAt(start + joined);
-        List<Cell> pairs = [];
-        TermList.Read(machine, machine.HeapAt(copy.Index + 2), pairs);
-        foreach (Cell pair in pairs)
-        {
-            Cell structure = machine.Dereference(pair);
-            machine.Freeze(machine.Dereference(machine.HeapAt(structure.Index + 1)).Index, machine.HeapAt(structure.Index + 2));
-        }
-
+        var copy = machine.HeapAt(start + joined);
+        RestoreFrozenGoals(machine, machine.HeapAt(copy.Index + 2));
         return machine.Unify(machine.Argument(1), machine.HeapAt(copy.Index + 1));
     }
 
+    internal static void RestoreFrozenGoals(Machine machine, Cell pairs)
+    {
+        List<Cell> copied = [];
+        TermList.Read(machine, pairs, copied);
+        foreach (var pair in copied)
+        {
+            var structure = machine.Dereference(pair);
+            machine.Freeze(machine.Dereference(machine.HeapAt(structure.Index + 1)).Index, machine.HeapAt(structure.Index + 2));
+        }
+    }
+
     /// <summary>The <c>Var-Goal</c> pairs of the frozen variables in <paramref name="term"/>, as a list.</summary>
-    private static Cell FrozenPairs(Machine machine, Cell term)
+    internal static Cell FrozenPairs(Machine machine, Cell term)
     {
         var pairFunctor = machine.Symbols.InternFunctor("-", 2);
         List<Cell> pairs = [];
         foreach (var address in CollectVariables(machine, term))
         {
-            if (machine.TryGetFrozen(address, out Cell goal))
+            if (machine.TryGetFrozen(address, out var goal))
             {
                 pairs.Add(machine.CreateStructure(pairFunctor, [Cell.Reference(address), goal]));
             }
@@ -185,14 +196,14 @@ internal static class TermBuiltins
     }
 
     /// <summary>
-    /// <c>term_size(+Term, -Cells)</c>: the number of cells a detached copy of the term occupies —
-    /// the same copy <c>findall/3</c> and <c>nb_setval/2</c> take, never materialized. A shared
+    /// <c>term_size(+Term, -Cells)</c>: the number of cells a detached copy of the term occupies,
+    /// using the same finite-term copying rules as <c>findall/3</c> and <c>nb_setval/2</c>. A shared
     /// subterm therefore counts once per occurrence, and a cyclic term raises
     /// <c>representation_error(cyclic_term)</c>; both are documented in the SWI ledger.
     /// </summary>
     private static bool TermSize(Machine machine)
     {
-        Cell size = machine.Argument(1);
+        var size = machine.Argument(1);
         if (size.Tag is not (CellTag.Reference or CellTag.Integer or CellTag.BigInteger))
         {
             throw PrologErrors.Type(machine, "integer", size);
@@ -209,9 +220,9 @@ internal static class TermBuiltins
     /// </summary>
     private static bool TermVariables(Machine machine)
     {
-        Cell result = machine.Argument(1);
+        var result = machine.Argument(1);
         List<Cell> existing = [];
-        Cell resultTail = TermList.Read(machine, result, existing);
+        var resultTail = TermList.Read(machine, result, existing);
         if (!TermList.IsEmpty(machine, resultTail) && resultTail.Tag != CellTag.Reference)
         {
             throw PrologErrors.Type(machine, "list", result);
@@ -219,11 +230,12 @@ internal static class TermBuiltins
 
         List<Cell> found = [];
         HashSet<int> seen = [];
+        var visitedStructures = new HashSet<int>();
         List<Cell> work = [machine.Argument(0)];
 
         while (work.Count > 0)
         {
-            Cell cell = machine.Dereference(work[^1]);
+            var cell = machine.Dereference(work[^1]);
             work.RemoveAt(work.Count - 1);
 
             if (cell.Tag == CellTag.Reference)
@@ -236,7 +248,7 @@ internal static class TermBuiltins
                 continue;
             }
 
-            if (cell.Tag != CellTag.Structure)
+            if (cell.Tag != CellTag.Structure || !visitedStructures.Add(cell.Index))
             {
                 continue;
             }
@@ -262,16 +274,16 @@ internal static class TermBuiltins
     /// </summary>
     private static bool SubsumesTerm(Machine machine)
     {
-        Cell general = machine.Argument(0);
-        Cell specific = machine.Argument(1);
-        HashSet<int> rigidVariables = CollectVariables(machine, specific);
+        var general = machine.Argument(0);
+        var specific = machine.Argument(1);
+        var rigidVariables = CollectVariables(machine, specific);
         var substitutions = new Dictionary<int, Cell>();
         var visitedStructures = new HashSet<ulong>();
         List<(Cell General, Cell Specific)> work = [(general, specific)];
 
         while (work.Count > 0)
         {
-            (Cell candidate, Cell instance) = work[^1];
+            (var candidate, var instance) = work[^1];
             work.RemoveAt(work.Count - 1);
             candidate = machine.Dereference(candidate);
             instance = machine.Dereference(instance);
@@ -288,7 +300,7 @@ internal static class TermBuiltins
                     return false;
                 }
 
-                if (substitutions.TryGetValue(candidate.Index, out Cell substitution))
+                if (substitutions.TryGetValue(candidate.Index, out var substitution))
                 {
                     work.Add((substitution, instance));
                 }
@@ -335,7 +347,7 @@ internal static class TermBuiltins
 
         while (work.Count > 0)
         {
-            Cell cell = machine.Dereference(work[^1]);
+            var cell = machine.Dereference(work[^1]);
             work.RemoveAt(work.Count - 1);
 
             if (cell.Tag == CellTag.Reference)
@@ -361,7 +373,7 @@ internal static class TermBuiltins
 
     private static bool Compare(Machine machine, int less, int equal, int greater)
     {
-        Cell requested = machine.Argument(0);
+        var requested = machine.Argument(0);
         if (requested.Tag != CellTag.Reference)
         {
             if (requested.Tag != CellTag.Atom)
@@ -385,13 +397,13 @@ internal static class TermBuiltins
 
     private static bool Functor3(Machine machine)
     {
-        Cell term = machine.Argument(0);
+        var term = machine.Argument(0);
 
         if (term.Tag != CellTag.Reference)
         {
             if (term.Tag == CellTag.Structure)
             {
-                Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(term.Index).Index);
+                var functor = machine.Symbols.GetFunctor(machine.HeapAt(term.Index).Index);
                 return machine.Unify(machine.Argument(1), Cell.Atom(functor.NameAtom))
                     && machine.Unify(machine.Argument(2), Cell.Integer60(functor.Arity));
             }
@@ -399,8 +411,8 @@ internal static class TermBuiltins
             return machine.Unify(machine.Argument(1), term) && machine.Unify(machine.Argument(2), Cell.Integer60(0));
         }
 
-        Cell name = machine.Argument(1);
-        Cell arity = machine.Argument(2);
+        var name = machine.Argument(1);
+        var arity = machine.Argument(2);
 
         if (name.Tag == CellTag.Reference || arity.Tag == CellTag.Reference)
         {
@@ -459,8 +471,8 @@ internal static class TermBuiltins
 
     private static bool Arg3(Machine machine)
     {
-        Cell index = machine.Argument(0);
-        Cell term = machine.Argument(1);
+        var index = machine.Argument(0);
+        var term = machine.Argument(1);
 
         if (index.Tag == CellTag.Reference)
         {
@@ -507,14 +519,14 @@ internal static class TermBuiltins
     /// <summary>
     /// <c>setarg(+Arg, +Term, +Value)</c> and <c>nb_setarg(+Arg, +Term, +Value)</c>: destructive
     /// assignment of a structure argument slot, undone on backtracking for the first form. The
-    /// non-backtrackable form accepts atomic values only — an atom, integer, or float survives
-    /// heap truncation, which is what makes the assignment able to outlive backtracking at all.
+    /// non-backtrackable form accepts atomic values only — immediate and interned atomic cells
+    /// survive heap truncation, which is what makes the assignment able to outlive backtracking.
     /// </summary>
     private static bool SetArg(Machine machine, bool backtrackable)
     {
-        Cell index = machine.Argument(0);
-        Cell term = machine.Argument(1);
-        Cell value = machine.Argument(2);
+        var index = machine.Argument(0);
+        var term = machine.Argument(1);
+        var value = machine.Argument(2);
 
         if (index.Tag == CellTag.Reference || term.Tag == CellTag.Reference)
         {
@@ -538,7 +550,15 @@ internal static class TermBuiltins
 
         if (
             !backtrackable
-            && value.Tag is not (CellTag.Atom or CellTag.Integer or CellTag.BigInteger or CellTag.Float or CellTag.String)
+            && value.Tag
+                is not (
+                    CellTag.Atom
+                    or CellTag.Integer
+                    or CellTag.BigInteger
+                    or CellTag.Rational
+                    or CellTag.Float
+                    or CellTag.String
+                )
         )
         {
             throw PrologErrors.Type(machine, "atomic", value);
@@ -556,13 +576,13 @@ internal static class TermBuiltins
 
     private static bool Univ(Machine machine, int emptyList)
     {
-        Cell term = machine.Argument(0);
+        var term = machine.Argument(0);
 
         if (term.Tag != CellTag.Reference)
         {
             if (term.Tag == CellTag.Structure)
             {
-                Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(term.Index).Index);
+                var functor = machine.Symbols.GetFunctor(machine.HeapAt(term.Index).Index);
                 var items = new Cell[functor.Arity + 1];
                 items[0] = Cell.Atom(functor.NameAtom);
                 for (var i = 0; i < functor.Arity; i++)
@@ -576,9 +596,9 @@ internal static class TermBuiltins
             return machine.Unify(machine.Argument(1), machine.CreateList([term], Cell.Atom(emptyList)));
         }
 
-        Cell list = machine.Argument(1);
+        var list = machine.Argument(1);
         List<Cell> elements = [];
-        Cell tail = TermList.Read(machine, list, elements);
+        var tail = TermList.Read(machine, list, elements);
         if (!TermList.IsEmpty(machine, tail))
         {
             throw tail.Tag == CellTag.Reference ? PrologErrors.Instantiation(machine) : PrologErrors.Type(machine, "list", list);
@@ -589,7 +609,7 @@ internal static class TermBuiltins
             throw PrologErrors.Domain(machine, "non_empty_list", list);
         }
 
-        Cell head = machine.Dereference(elements[0]);
+        var head = machine.Dereference(elements[0]);
         if (head.Tag == CellTag.Reference)
         {
             throw PrologErrors.Instantiation(machine);
@@ -621,11 +641,12 @@ internal static class TermBuiltins
 
     private static bool IsGround(Machine machine, Cell term)
     {
+        var visitedStructures = new HashSet<int>();
         List<Cell> work = [term];
 
         while (work.Count > 0)
         {
-            Cell cell = machine.Dereference(work[^1]);
+            var cell = machine.Dereference(work[^1]);
             work.RemoveAt(work.Count - 1);
 
             if (cell.Tag == CellTag.Reference)
@@ -633,7 +654,7 @@ internal static class TermBuiltins
                 return false;
             }
 
-            if (cell.Tag != CellTag.Structure)
+            if (cell.Tag != CellTag.Structure || !visitedStructures.Add(cell.Index))
             {
                 continue;
             }
@@ -655,7 +676,7 @@ internal static class TermBuiltins
 
         while (work.Count > 0)
         {
-            (Cell cell, var exit) = work[^1];
+            (var cell, var exit) = work[^1];
             work.RemoveAt(work.Count - 1);
             cell = machine.Dereference(cell);
 

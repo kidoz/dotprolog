@@ -33,6 +33,7 @@ public sealed class Machine : IDisposable
     private readonly Dictionary<int, GlobalVariable> _globals = [];
     private GlobalUndo[] _globalUndo = new GlobalUndo[8];
     private int _globalUndoTop;
+    private readonly List<DeferredCleanup> _deferredCleanups = [];
 
     private ValueUndo[] _valueUndo = new ValueUndo[8];
     private int _valueUndoTop;
@@ -66,6 +67,8 @@ public sealed class Machine : IDisposable
     private int _unificationTop;
     private readonly HashSet<ulong> _unificationVisited = [];
     private readonly HashSet<int> _callableVisited = [];
+    private Cell[] _callableStack = new Cell[256];
+    private int _callableTop;
 
     private Cell[] _occursCheckStack = new Cell[256];
     private int _occursCheckTop;
@@ -87,6 +90,7 @@ public sealed class Machine : IDisposable
     private readonly int _wakeupFunctor;
     private readonly int _wakePairFunctor;
     private readonly int _frozenAndFunctor;
+    private readonly int _runCleanupsFunctor;
     private readonly List<Collection> _collections = [];
     private int _collectDepth;
 
@@ -101,6 +105,7 @@ public sealed class Machine : IDisposable
         _wakeupFunctor = _symbols.InternFunctor("$wakeup", 1);
         _wakePairFunctor = _symbols.InternFunctor("-", 2);
         _frozenAndFunctor = _symbols.InternFunctor("$and", 2);
+        _runCleanupsFunctor = _symbols.InternFunctor("$run_cleanups", 1);
     }
 
     /// <summary>Cooperative cancellation checked between bytecode instructions and compiled blocks.</summary>
@@ -118,6 +123,7 @@ public sealed class Machine : IDisposable
         Streams.CloseAll();
         _disposed = true;
         _solutionPending = false;
+        _deferredCleanups.Clear();
         ReleaseDynamicCursors();
         _program.ReclaimDynamicClauses();
     }
@@ -189,6 +195,8 @@ public sealed class Machine : IDisposable
     /// <exception cref="PrologException">The predicate is not defined.</exception>
     public RunResult Solve(int functorId)
     {
+        EnsureNotRunning();
+        _solutionPending = false;
         if (!TryEntryPoint(functorId, out var entry))
         {
             return RunResult.Failure;
@@ -201,6 +209,7 @@ public sealed class Machine : IDisposable
     /// <exception cref="PrologException">A goal threw a ball that no <c>catch/3</c> handles.</exception>
     public RunResult Run(int entryAddress)
     {
+        EnsureNotRunning();
         ResetState();
 
         _pc = entryAddress;
@@ -216,7 +225,11 @@ public sealed class Machine : IDisposable
     /// arguments and then run. Calling a predicate is therefore three steps: reset here, build the
     /// arguments with <see cref="CreateVariable"/> and friends, then <see cref="Call"/>.
     /// </remarks>
-    public void BeginCall() => ResetState();
+    public void BeginCall()
+    {
+        EnsureNotRunning();
+        ResetState();
+    }
 
     /// <summary>
     /// Calls <paramref name="functorId"/> with arguments already built on the heap since
@@ -225,6 +238,7 @@ public sealed class Machine : IDisposable
     /// <exception cref="PrologException">The predicate is not defined, or a ball went uncaught.</exception>
     public RunResult Call(int functorId, ReadOnlySpan<Cell> arguments)
     {
+        EnsureNotRunning();
         if (arguments.Length >= ArgumentRegisterCount)
         {
             throw PrologErrors.Representation(this, "max_arity");
@@ -260,6 +274,7 @@ public sealed class Machine : IDisposable
     /// </returns>
     public RunResult Redo()
     {
+        EnsureNotRunning();
         if (!_solutionPending || !Backtrack())
         {
             _solutionPending = false;
@@ -278,13 +293,18 @@ public sealed class Machine : IDisposable
     /// </summary>
     public Cell QueryBindings { get; set; }
 
-    private RunResult Dispatch()
+    private void EnsureNotRunning()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         if (IsRunning)
         {
             throw new InvalidOperationException("A Prolog machine cannot be entered recursively.");
         }
+    }
+
+    private RunResult Dispatch()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        EnsureNotRunning();
 
         IsRunning = true;
         try
@@ -293,7 +313,7 @@ public sealed class Machine : IDisposable
             {
                 try
                 {
-                    RunResult result = Execute();
+                    var result = Execute();
                     _solutionPending = result == RunResult.Success;
                     return result;
                 }
@@ -321,7 +341,7 @@ public sealed class Machine : IDisposable
         // clause code and constants. Builtins, meta-calls, and compiled predicates can replace the
         // backing arrays and refresh this cache before newly emitted addresses are read.
         var code = _program.Code;
-        Cell[] constants = _program.Constants;
+        var constants = _program.Constants;
 
         while (true)
         {
@@ -415,6 +435,14 @@ public sealed class Machine : IDisposable
 
                     var builtinId = code[_pc++];
                     _argumentCount = code[_pc++];
+                    if (_program.TryGetUserPredicate(builtinId, out var functorId))
+                    {
+                        _continuation = _pc;
+                        _b0 = _b;
+                        proved = TryEntryPoint(functorId, out _pc);
+                        break;
+                    }
+
                     _currentBuiltin = builtinId;
                     proved = _program.Builtins.Implementation(builtinId)(this);
 
@@ -523,8 +551,8 @@ public sealed class Machine : IDisposable
                 case OpCode.NextStaticClause:
                 {
                     // Reached through a choice point's alternative, so that choice point is still on top.
-                    ChoicePoint point = _choicePoints[_b - 1];
-                    BytecodeProgram.StaticClauseIndex table = _program.StaticIndex(point.IndexTable);
+                    var point = _choicePoints[_b - 1];
+                    var table = _program.StaticIndex(point.IndexTable);
                     var current = point.IndexNext;
                     var following = table.NextMatch(current + 1, point.IndexKey);
 
@@ -546,7 +574,7 @@ public sealed class Machine : IDisposable
                 {
                     // The choice point is still on top; pop it, then let the builtin offer another
                     // solution and push a fresh choice point if it has more after that.
-                    ChoicePoint point = _choicePoints[_b - 1];
+                    var point = _choicePoints[_b - 1];
                     _b--;
                     _savedTop = _choicePoints[_b].ArgumentBase;
                     _choicePoints[_b].NextClause = null;
@@ -564,13 +592,9 @@ public sealed class Machine : IDisposable
                 case OpCode.NextClause:
                 {
                     // Reached through a choice point's alternative, so that choice point is still on top.
-                    ChoicePoint point = _choicePoints[_b - 1];
-                    DynamicClause clause = point.NextClause!;
-                    DynamicClause? following = DynamicPredicate.FirstVisibleMatching(
-                        clause.Next,
-                        point.ClauseGeneration,
-                        point.IndexKey
-                    );
+                    var point = _choicePoints[_b - 1];
+                    var clause = point.NextClause!;
+                    var following = DynamicPredicate.FirstVisibleMatching(clause.Next, point.ClauseGeneration, point.IndexKey);
 
                     if (following is null)
                     {
@@ -603,7 +627,7 @@ public sealed class Machine : IDisposable
                     PushChoicePoint(BytecodeProgram.PopAndFailAddress);
                     _argumentCount = savedArity;
 
-                    ref ChoicePoint frame = ref _choicePoints[_b - 1];
+                    ref var frame = ref _choicePoints[_b - 1];
                     frame.CatchRecovery = recovery;
                     frame.CatcherSlot = catcherSlot;
                     frame.CatchActive = true;
@@ -682,7 +706,7 @@ public sealed class Machine : IDisposable
 
                 case OpCode.GetConstant:
                 {
-                    Cell constant = constants[code[_pc++]];
+                    var constant = constants[code[_pc++]];
                     proved = UnifyConstantWith(_x[code[_pc++]], constant);
                     break;
                 }
@@ -734,7 +758,7 @@ public sealed class Machine : IDisposable
 
                 case OpCode.UnifyConstant:
                 {
-                    Cell constant = constants[code[_pc++]];
+                    var constant = constants[code[_pc++]];
                     if (_writeMode)
                     {
                         EnsureHeap(1);
@@ -751,7 +775,7 @@ public sealed class Machine : IDisposable
                 case OpCode.PutVariable:
                 {
                     var slot = code[_pc++];
-                    Cell variable = NewVariable();
+                    var variable = NewVariable();
                     _stack[_e + FrameHeaderSize + slot] = variable;
                     _x[code[_pc++]] = variable;
                     break;
@@ -770,7 +794,7 @@ public sealed class Machine : IDisposable
 
                 case OpCode.PutConstant:
                 {
-                    Cell constant = constants[code[_pc++]];
+                    var constant = constants[code[_pc++]];
                     _x[code[_pc++]] = constant;
                     break;
                 }
@@ -856,7 +880,7 @@ public sealed class Machine : IDisposable
 
         PushChoicePoint(BytecodeProgram.RedoBuiltinAddress);
 
-        ref ChoicePoint point = ref _choicePoints[_b - 1];
+        ref var point = ref _choicePoints[_b - 1];
         point.BuiltinId = builtin;
         point.BuiltinResume = resume;
         point.BuiltinState = state;
@@ -932,6 +956,13 @@ public sealed class Machine : IDisposable
             _machine._argumentCount = arity;
             _machine._continuation = next;
             _machine._b0 = _machine._b;
+            if (
+                !_machine._program.IsUserPredicate(functorId) && _machine._program.Builtins.TryGetId(functorId, out var builtinId)
+            )
+            {
+                return CallBuiltin(builtinId, arity, next);
+            }
+
             return _machine.TryEntryPoint(functorId, out _machine._pc);
         }
 
@@ -945,10 +976,17 @@ public sealed class Machine : IDisposable
 
             _machine._argumentCount = arity;
             _machine._b0 = _machine._b;
+            if (
+                !_machine._program.IsUserPredicate(functorId) && _machine._program.Builtins.TryGetId(functorId, out var builtinId)
+            )
+            {
+                return CallBuiltin(builtinId, arity, _machine._continuation);
+            }
+
             return _machine.TryEntryPoint(functorId, out _machine._pc);
         }
 
-        /// <summary>Calls a native predicate and continues at <paramref name="next"/>.</summary>
+        /// <summary>Calls a native predicate, or its user replacement, and continues at <paramref name="next"/>.</summary>
         public bool CallBuiltin(int builtinId, int arity, int next)
         {
             if (Woke(arity))
@@ -957,6 +995,13 @@ public sealed class Machine : IDisposable
             }
 
             _machine._argumentCount = arity;
+            if (_machine._program.TryGetUserPredicate(builtinId, out var functorId))
+            {
+                _machine._continuation = next;
+                _machine._b0 = _machine._b;
+                return _machine.TryEntryPoint(functorId, out _machine._pc);
+            }
+
             _machine._currentBuiltin = builtinId;
             _machine._pc = next;
             return _machine._program.Builtins.Implementation(builtinId)(_machine);
@@ -982,8 +1027,8 @@ public sealed class Machine : IDisposable
                 return true;
             }
 
-            _machine.CutTo((int)_machine._stack[_machine._e + FrameCutBarrier].Integer);
             _machine._pc = next;
+            _machine.CutTo((int)_machine._stack[_machine._e + FrameCutBarrier].Integer);
             return true;
         }
 
@@ -1032,8 +1077,8 @@ public sealed class Machine : IDisposable
                 return true;
             }
 
-            _machine.CutTo((int)_machine._stack[_machine._e + FrameHeaderSize + slot].Integer);
             _machine._pc = next;
+            _machine.CutTo((int)_machine._stack[_machine._e + FrameHeaderSize + slot].Integer);
             return true;
         }
 
@@ -1080,7 +1125,7 @@ public sealed class Machine : IDisposable
             _machine.PushChoicePoint(BytecodeProgram.PopAndFailAddress);
             _machine._argumentCount = savedArity;
 
-            ref ChoicePoint frame = ref _machine._choicePoints[_machine._b - 1];
+            ref var frame = ref _machine._choicePoints[_machine._b - 1];
             frame.CatchRecovery = recovery;
             frame.CatcherSlot = catcherSlot;
             frame.CatchActive = true;
@@ -1244,7 +1289,7 @@ public sealed class Machine : IDisposable
         /// <summary>Creates a fresh variable in an environment slot and argument register.</summary>
         public bool PutVariable(int slot, int argument, int next)
         {
-            Cell variable = _machine.NewVariable();
+            var variable = _machine.NewVariable();
             _machine._stack[_machine._e + FrameHeaderSize + slot] = variable;
             _machine._x[argument] = variable;
             _machine._pc = next;
@@ -1340,49 +1385,66 @@ public sealed class Machine : IDisposable
     /// </param>
     private void RequireCallable(Cell goal, Cell whole)
     {
-        goal = Dereference(goal);
+        _callableVisited.Clear();
+        _callableTop = 0;
+        PushCallable(goal, whole);
 
-        if (goal.Tag == CellTag.Reference)
+        while (_callableTop > 0)
         {
-            // An unbound sub-goal is not an error here: it is resolved when control reaches it.
-            return;
+            whole = _callableStack[--_callableTop];
+            goal = Dereference(_callableStack[--_callableTop]);
+
+            if (goal.Tag is CellTag.Reference or CellTag.Atom)
+            {
+                // An unbound sub-goal is not an error here: it is resolved when control reaches it.
+                continue;
+            }
+
+            if (goal.Tag != CellTag.Structure)
+            {
+                throw PrologErrors.Type(this, "callable", whole);
+            }
+
+            var functorId = _heap[goal.Index].Index;
+            var functor = _symbols.GetFunctor(functorId);
+            var name = _symbols.AtomName(functor.NameAtom);
+
+            var binary =
+                functor.Arity == 2
+                && name is "," or ";" or "->" or "*->"
+                && (name != "*->" || !_program.IsUserPredicate(functorId));
+            var unary = functor.Arity == 1 && name == "\\+";
+
+            // A cyclic control term revisits a construct it already validated; stop rather than
+            // walking it forever.
+            if ((binary || unary) && !_callableVisited.Add(goal.Index))
+            {
+                continue;
+            }
+
+            if (binary)
+            {
+                PushCallable(_heap[goal.Index + 2], whole);
+                PushCallable(_heap[goal.Index + 1], whole);
+            }
+            else if (unary)
+            {
+                // \+/1 names its own argument as the culprit, where call/1 names the goal it was given.
+                var inner = Dereference(_heap[goal.Index + 1]);
+                PushCallable(inner, inner);
+            }
+        }
+    }
+
+    private void PushCallable(Cell goal, Cell whole)
+    {
+        if (_callableTop + 2 > _callableStack.Length)
+        {
+            Array.Resize(ref _callableStack, _callableStack.Length * 2);
         }
 
-        if (goal.Tag == CellTag.Atom)
-        {
-            return;
-        }
-
-        if (goal.Tag != CellTag.Structure)
-        {
-            throw PrologErrors.Type(this, "callable", whole);
-        }
-
-        var functorId = _heap[goal.Index].Index;
-        Functor functor = _symbols.GetFunctor(functorId);
-        var name = _symbols.AtomName(functor.NameAtom);
-
-        var binary = functor.Arity == 2 && name is "," or ";" or "->" or "*->";
-        var unary = functor.Arity == 1 && name == "\\+";
-
-        // A rational control term revisits a construct it already validated; stop rather than
-        // recurse forever. The set is cleared by the two entry points before the walk starts.
-        if ((binary || unary) && !_callableVisited.Add(goal.Index))
-        {
-            return;
-        }
-
-        if (binary)
-        {
-            RequireCallable(_heap[goal.Index + 1], whole);
-            RequireCallable(_heap[goal.Index + 2], whole);
-        }
-        else if (unary)
-        {
-            // \+/1 names its own argument as the culprit, where call/1 names the goal it was given.
-            Cell inner = Dereference(_heap[goal.Index + 1]);
-            RequireCallable(inner, inner);
-        }
+        _callableStack[_callableTop++] = goal;
+        _callableStack[_callableTop++] = whole;
     }
 
     /// <summary>
@@ -1397,7 +1459,6 @@ public sealed class Machine : IDisposable
             throw PrologErrors.Instantiation(this);
         }
 
-        _callableVisited.Clear();
         RequireCallable(goal, goal);
     }
 
@@ -1419,7 +1480,7 @@ public sealed class Machine : IDisposable
             _collections.Add(new Collection());
         }
 
-        Collection collection = _collections[_collectDepth++];
+        var collection = _collections[_collectDepth++];
         collection.Buffer.Clear();
         collection.Roots.Clear();
     }
@@ -1427,20 +1488,20 @@ public sealed class Machine : IDisposable
     /// <summary>Copies one solution into the innermost collection.</summary>
     internal void AddCollected(Cell term)
     {
-        Collection collection = _collections[_collectDepth - 1];
+        var collection = _collections[_collectDepth - 1];
         collection.Roots.Add(collection.Buffer.Copy(this, term));
     }
 
     /// <summary>Ends the innermost collection and returns its solutions as a list.</summary>
     internal Cell EndCollect()
     {
-        Collection collection = _collections[--_collectDepth];
+        var collection = _collections[--_collectDepth];
         var origin = collection.Buffer.Materialize(this);
 
-        Cell list = Cell.Atom(_symbols.EmptyList);
+        var list = Cell.Atom(_symbols.EmptyList);
         for (var i = collection.Roots.Count - 1; i >= 0; i--)
         {
-            Cell element = _heap[origin + collection.Roots[i]];
+            var element = _heap[origin + collection.Roots[i]];
             list = CreateStructure(_symbols.ListFunctor, [element, list]);
         }
 
@@ -1465,21 +1526,21 @@ public sealed class Machine : IDisposable
     /// </summary>
     private bool EnterDynamic(int functorId)
     {
-        DynamicPredicate predicate = _program.FindDynamic(functorId) ?? throw PrologErrors.UndefinedProcedure(this, functorId);
+        var predicate = _program.FindDynamic(functorId) ?? throw PrologErrors.UndefinedProcedure(this, functorId);
 
         var generation = _program.Generation;
-        Cell callKey = predicate.Arity >= 1 ? ClauseIndexing.CallKey(this, _x[0]) : ClauseIndexing.AnyKey;
-        DynamicClause? clause = DynamicPredicate.FirstVisibleMatching(predicate.First, generation, callKey);
+        var callKey = predicate.Arity >= 1 ? ClauseIndexing.CallKey(this, _x[0]) : ClauseIndexing.AnyKey;
+        var clause = DynamicPredicate.FirstVisibleMatching(predicate.First, generation, callKey);
         if (clause is null)
         {
             return false;
         }
 
-        DynamicClause? following = DynamicPredicate.FirstVisibleMatching(clause.Next, generation, callKey);
+        var following = DynamicPredicate.FirstVisibleMatching(clause.Next, generation, callKey);
         if (following is not null)
         {
             PushChoicePoint(BytecodeProgram.NextClauseAddress);
-            ref ChoicePoint point = ref _choicePoints[_b - 1];
+            ref var point = ref _choicePoints[_b - 1];
             point.NextClause = following;
             point.ClauseGeneration = generation;
             point.IndexKey = callKey;
@@ -1495,8 +1556,8 @@ public sealed class Machine : IDisposable
     /// </summary>
     private bool EnterStatic(int tableId)
     {
-        BytecodeProgram.StaticClauseIndex table = _program.StaticIndex(tableId);
-        Cell callKey = ClauseIndexing.CallKey(this, _x[0]);
+        var table = _program.StaticIndex(tableId);
+        var callKey = ClauseIndexing.CallKey(this, _x[0]);
 
         var first = table.NextMatch(0, callKey);
         if (first < 0)
@@ -1508,7 +1569,7 @@ public sealed class Machine : IDisposable
         if (following >= 0)
         {
             PushChoicePoint(BytecodeProgram.NextStaticClauseAddress);
-            ref ChoicePoint point = ref _choicePoints[_b - 1];
+            ref var point = ref _choicePoints[_b - 1];
             point.IndexTable = tableId;
             point.IndexNext = following;
             point.IndexKey = callKey;
@@ -1546,7 +1607,7 @@ public sealed class Machine : IDisposable
                 continue;
             }
 
-            ChoicePoint frame = _choicePoints[index];
+            var frame = _choicePoints[index];
 
             // Pop the catch frame itself: a ball is caught at most once by the same catch/3.
             _b = index;
@@ -1563,14 +1624,21 @@ public sealed class Machine : IDisposable
 
             // Rebuild the ball above the restored heap top, then try the catcher against it.
             var origin = error.Ball!.Materialize(this);
-            Cell ball = _heap[origin + error.BallRoot];
-            Cell catcher = _stack[frame.Environment + FrameHeaderSize + frame.CatcherSlot];
+            var ball = _heap[origin + error.BallRoot];
+            var catcher = _stack[frame.Environment + FrameHeaderSize + frame.CatcherSlot];
 
             var mark = _tr;
             var previous = _forceTrail;
             _forceTrail = true;
-            var matched = Unify(catcher, ball);
-            _forceTrail = previous;
+            bool matched;
+            try
+            {
+                matched = Unify(catcher, ball);
+            }
+            finally
+            {
+                _forceTrail = previous;
+            }
 
             if (matched)
             {
@@ -1599,7 +1667,7 @@ public sealed class Machine : IDisposable
         EnsureHeap(1 + arguments.Length);
         var address = _h;
         _heap[_h++] = Cell.Functor(functorId);
-        foreach (Cell argument in arguments)
+        foreach (var argument in arguments)
         {
             _heap[_h++] = argument;
         }
@@ -1610,7 +1678,7 @@ public sealed class Machine : IDisposable
     /// <summary>Builds a list from <paramref name="items"/> ending in <paramref name="tail"/>.</summary>
     public Cell CreateList(ReadOnlySpan<Cell> items, Cell tail)
     {
-        Cell result = tail;
+        var result = tail;
         for (var i = items.Length - 1; i >= 0; i--)
         {
             result = CreateStructure(_symbols.ListFunctor, [items[i], result]);
@@ -1628,10 +1696,15 @@ public sealed class Machine : IDisposable
         var trailMark = _tr;
         var previous = _forceTrail;
         _forceTrail = true;
-        var unified = Unify(left, right);
-        _forceTrail = previous;
-        UndoTrail(trailMark);
-        return unified;
+        try
+        {
+            return Unify(left, right);
+        }
+        finally
+        {
+            _forceTrail = previous;
+            UndoTrail(trailMark);
+        }
     }
 
     /// <summary>
@@ -1672,17 +1745,22 @@ public sealed class Machine : IDisposable
     /// </summary>
     private bool MetaCall()
     {
-        Cell goal = Dereference(_x[0]);
+        var goal = Dereference(_x[0]);
 
+        _callableVisited.Clear();
         while (goal.Tag == CellTag.Structure && _heap[goal.Index].Index == _callFunctor)
         {
+            if (!_callableVisited.Add(goal.Index))
+            {
+                throw PrologErrors.Representation(this, "cyclic_term");
+            }
+
             goal = Dereference(_heap[goal.Index + 1]);
         }
 
         // A control construct has to be whole before any of it runs: ISO 7.8.3 makes
         // call((fail, 4)) a type error rather than a failure, even though the conjunction would
         // never reach the 4.
-        _callableVisited.Clear();
         RequireCallable(goal, goal);
 
         if (IsControlGoal(goal) && _program.RuntimeCompiler is not null)
@@ -1729,7 +1807,7 @@ public sealed class Machine : IDisposable
             throw PrologErrors.Permission(this, "access", "implementation_specific_feature", functorId);
         }
 
-        if (_program.Builtins.TryGetId(functorId, out var builtinId))
+        if (!_program.IsUserPredicate(functorId) && _program.Builtins.TryGetId(functorId, out var builtinId))
         {
             _currentBuiltin = builtinId;
             return _program.Builtins.Implementation(builtinId)(this);
@@ -1751,9 +1829,11 @@ public sealed class Machine : IDisposable
             return false;
         }
 
-        Functor functor = _symbols.GetFunctor(_heap[goal.Index].Index);
+        var functorId = _heap[goal.Index].Index;
+        var functor = _symbols.GetFunctor(functorId);
         var name = _symbols.AtomName(functor.NameAtom);
-        return (functor.Arity == 2 && name is "," or ";" or "->" or "*->") || (functor.Arity == 1 && name == "\\+");
+        return (functor.Arity == 2 && name is "," or ";" or "->" || (name == "*->" && !_program.IsUserPredicate(functorId)))
+            || (functor.Arity == 1 && name == "\\+");
     }
 
     /// <summary>Requests that the current run stop with <paramref name="exitCode"/>, as <c>halt/1</c> does.</summary>
@@ -1773,7 +1853,7 @@ public sealed class Machine : IDisposable
     {
         while (cell.Tag == CellTag.Reference)
         {
-            Cell target = _heap[cell.Index];
+            var target = _heap[cell.Index];
             if (target.Tag == CellTag.Reference && target.Index == cell.Index)
             {
                 return cell;
@@ -1797,7 +1877,7 @@ public sealed class Machine : IDisposable
     /// </summary>
     public bool Unify(Cell left, Cell right)
     {
-        OccursCheckMode mode = _program.Flags.OccursCheck;
+        var mode = _program.Flags.OccursCheck;
         return mode == OccursCheckMode.False ? UnifyCore(left, right, occursCheck: false) : UnifyGuarded(left, right, mode);
     }
 
@@ -1822,8 +1902,8 @@ public sealed class Machine : IDisposable
 
         while (_unificationTop > 0)
         {
-            Cell b = _unificationStack[--_unificationTop];
-            Cell a = _unificationStack[--_unificationTop];
+            var b = _unificationStack[--_unificationTop];
+            var a = _unificationStack[--_unificationTop];
             a = Dereference(a);
             b = Dereference(b);
 
@@ -1934,6 +2014,7 @@ public sealed class Machine : IDisposable
         _b0 = 0;
         _savedTop = 0;
         _unificationTop = 0;
+        _callableTop = 0;
         _occursCheckTop = 0;
         _writeMode = false;
         _structureArgument = 0;
@@ -1945,6 +2026,7 @@ public sealed class Machine : IDisposable
         _collectDepth = 0;
         _hasFrozen = false;
         _wokenCount = 0;
+        _deferredCleanups.Clear();
         ExitCode = 0;
         if (_program.HasRetiredClauses)
             _program.ReclaimDynamicClauses();
@@ -2010,11 +2092,11 @@ public sealed class Machine : IDisposable
 
     private bool GetStructure(int functorId, Cell subject)
     {
-        Cell cell = Dereference(subject);
+        var cell = Dereference(subject);
 
         if (cell.Tag == CellTag.Reference)
         {
-            Cell structure = BeginStructure(functorId);
+            var structure = BeginStructure(functorId);
             Bind(cell.Index, structure);
             return true;
         }
@@ -2031,7 +2113,7 @@ public sealed class Machine : IDisposable
 
     private bool UnifyConstantWith(Cell subject, Cell constant)
     {
-        Cell cell = Dereference(subject);
+        var cell = Dereference(subject);
         if (cell.Tag == CellTag.Reference)
         {
             Bind(cell.Index, constant);
@@ -2100,7 +2182,7 @@ public sealed class Machine : IDisposable
             {
                 while (_valueUndoTop > 0 && _valueUndo[_valueUndoTop - 1].TrailMark == _tr)
                 {
-                    ref ValueUndo assignment = ref _valueUndo[--_valueUndoTop];
+                    ref var assignment = ref _valueUndo[--_valueUndoTop];
                     _heap[assignment.Address] = assignment.Previous;
                 }
 
@@ -2115,7 +2197,7 @@ public sealed class Machine : IDisposable
         // recorded assignment, so they can never fire one.
         while (_globalUndoTop > 0 && _globalUndo[_globalUndoTop - 1].TrailMark > mark)
         {
-            ref GlobalUndo undo = ref _globalUndo[--_globalUndoTop];
+            ref var undo = ref _globalUndo[--_globalUndoTop];
             if (undo.HadValue)
             {
                 _globals[undo.KeyAtom] = undo.Previous;
@@ -2130,7 +2212,7 @@ public sealed class Machine : IDisposable
         // reasoning about tentative marks holds.
         while (_frozenUndoTop > 0 && _frozenUndo[_frozenUndoTop - 1].TrailMark > mark)
         {
-            ref FrozenUndo undo = ref _frozenUndo[--_frozenUndoTop];
+            ref var undo = ref _frozenUndo[--_frozenUndoTop];
             if (undo.HadGoal)
             {
                 _frozen[undo.Address] = undo.Previous;
@@ -2152,7 +2234,7 @@ public sealed class Machine : IDisposable
     {
         if (backtrackable && _b > 0 && address < _choicePoints[_b - 1].HeapTop)
         {
-            Cell sentinel = NewVariable();
+            var sentinel = NewVariable();
             if (_tr == _trail.Length)
             {
                 Array.Resize(ref _trail, _trail.Length * 2);
@@ -2165,7 +2247,7 @@ public sealed class Machine : IDisposable
                 Array.Resize(ref _valueUndo, _valueUndo.Length * 2);
             }
 
-            ref ValueUndo undo = ref _valueUndo[_valueUndoTop++];
+            ref var undo = ref _valueUndo[_valueUndoTop++];
             undo.TrailMark = _tr;
             undo.Address = address;
             undo.Previous = _heap[address];
@@ -2181,6 +2263,32 @@ public sealed class Machine : IDisposable
         public Cell Previous;
     }
 
+    private DetachedTerm Detach(Cell value)
+    {
+        var buffer = new TermBuffer();
+        var frozen = HasFrozen ? TermBuiltins.FrozenPairs(this, value) : Cell.Atom(_symbols.EmptyList);
+        if (TermList.IsEmpty(this, frozen))
+        {
+            return new DetachedTerm(buffer, buffer.Copy(this, value), false);
+        }
+
+        var pair = CreateStructure(_wakePairFunctor, [value, frozen]);
+        return new DetachedTerm(buffer, buffer.Copy(this, pair), true);
+    }
+
+    private Cell MaterializeDetached(DetachedTerm detached)
+    {
+        var origin = detached.Buffer.Materialize(this);
+        var copy = _heap[origin + detached.Root];
+        if (!detached.HasFrozenGoals)
+        {
+            return copy;
+        }
+
+        TermBuiltins.RestoreFrozenGoals(this, _heap[copy.Index + 2]);
+        return _heap[copy.Index + 1];
+    }
+
     /// <summary>
     /// Sets the global variable named by <paramref name="keyAtom"/>. A backtrackable assignment
     /// stores the live cell and is undone when the trail unwinds below the sentinel entry pushed
@@ -2190,15 +2298,13 @@ public sealed class Machine : IDisposable
     {
         if (!backtrackable)
         {
-            var buffer = new TermBuffer();
-            var root = buffer.Copy(this, value);
-            _globals[keyAtom] = new GlobalVariable(default, buffer, root);
+            _globals[keyAtom] = new GlobalVariable(default, Detach(value));
             return;
         }
 
         // The sentinel gives this assignment its own trail position, so undo entries stay totally
         // ordered against choice-point trail tops even when nothing else was trailed in between.
-        Cell sentinel = NewVariable();
+        var sentinel = NewVariable();
         if (_tr == _trail.Length)
         {
             Array.Resize(ref _trail, _trail.Length * 2);
@@ -2211,13 +2317,13 @@ public sealed class Machine : IDisposable
             Array.Resize(ref _globalUndo, _globalUndo.Length * 2);
         }
 
-        ref GlobalUndo undo = ref _globalUndo[_globalUndoTop++];
+        ref var undo = ref _globalUndo[_globalUndoTop++];
         undo.TrailMark = _tr;
         undo.KeyAtom = keyAtom;
-        undo.HadValue = _globals.TryGetValue(keyAtom, out GlobalVariable previous);
+        undo.HadValue = _globals.TryGetValue(keyAtom, out var previous);
         undo.Previous = previous;
 
-        _globals[keyAtom] = new GlobalVariable(value, null, 0);
+        _globals[keyAtom] = new GlobalVariable(value, null);
     }
 
     /// <summary>
@@ -2226,20 +2332,45 @@ public sealed class Machine : IDisposable
     /// </summary>
     internal bool TryGetGlobal(int keyAtom, out Cell value)
     {
-        if (!_globals.TryGetValue(keyAtom, out GlobalVariable entry))
+        if (!_globals.TryGetValue(keyAtom, out var entry))
         {
             value = default;
             return false;
         }
 
-        if (entry.Detached is TermBuffer buffer)
+        value = entry.Detached is DetachedTerm detached ? MaterializeDetached(detached) : entry.Live;
+        return true;
+    }
+
+    internal bool RegisterCleanup(int barrier, Cell cleanup)
+    {
+        // Capture before Goal runs: its failure choice point protects this argument, including
+        // an unbound reference whose binding may change between solutions or before an outer cut.
+        _deferredCleanups.Add(new DeferredCleanup(barrier, cleanup, false));
+        return true;
+    }
+
+    internal bool DeferCleanup(int barrier)
+    {
+        for (var index = _deferredCleanups.Count - 1; index >= 0; index--)
         {
-            var origin = buffer.Materialize(this);
-            value = _heap[origin + entry.Root];
-            return true;
+            if (_deferredCleanups[index].Barrier == barrier)
+            {
+                _deferredCleanups[index] = _deferredCleanups[index] with { Deferred = true };
+                return true;
+            }
         }
 
-        value = entry.Live;
+        throw new InvalidOperationException("A cleanup must be registered before its goal runs.");
+    }
+
+    internal bool UndeferCleanup()
+    {
+        if (_deferredCleanups.Count > 0)
+        {
+            _deferredCleanups.RemoveAt(_deferredCleanups.Count - 1);
+        }
+
         return true;
     }
 
@@ -2265,7 +2396,11 @@ public sealed class Machine : IDisposable
         return found;
     }
 
-    private readonly record struct GlobalVariable(Cell Live, TermBuffer? Detached, int Root);
+    private readonly record struct DetachedTerm(TermBuffer Buffer, int Root, bool HasFrozenGoals);
+
+    private readonly record struct GlobalVariable(Cell Live, DetachedTerm? Detached);
+
+    private readonly record struct DeferredCleanup(int Barrier, Cell Cleanup, bool Deferred);
 
     private struct GlobalUndo
     {
@@ -2282,10 +2417,10 @@ public sealed class Machine : IDisposable
     /// </summary>
     internal void Freeze(int address, Cell goal)
     {
-        var hadGoal = _frozen.TryGetValue(address, out Cell previous);
-        Cell frozen = hadGoal ? CreateStructure(_frozenAndFunctor, [previous, goal]) : goal;
+        var hadGoal = _frozen.TryGetValue(address, out var previous);
+        var frozen = hadGoal ? CreateStructure(_frozenAndFunctor, [previous, goal]) : goal;
 
-        Cell sentinel = NewVariable();
+        var sentinel = NewVariable();
         if (_tr == _trail.Length)
         {
             Array.Resize(ref _trail, _trail.Length * 2);
@@ -2298,7 +2433,7 @@ public sealed class Machine : IDisposable
             Array.Resize(ref _frozenUndo, _frozenUndo.Length * 2);
         }
 
-        ref FrozenUndo undo = ref _frozenUndo[_frozenUndoTop++];
+        ref var undo = ref _frozenUndo[_frozenUndoTop++];
         undo.TrailMark = _tr;
         undo.Address = address;
         undo.HadGoal = hadGoal;
@@ -2373,11 +2508,11 @@ public sealed class Machine : IDisposable
             _stack[_e + FrameHeaderSize + 2 + i] = _x[i];
         }
 
-        Cell pairs = Cell.Atom(_symbols.EmptyList);
+        var pairs = Cell.Atom(_symbols.EmptyList);
         for (var i = _wakeAddresses.Count - 1; i >= 0; i--)
         {
             var address = _wakeAddresses[i];
-            Cell pair = CreateStructure(_wakePairFunctor, [Cell.Reference(address), _frozen[address]]);
+            var pair = CreateStructure(_wakePairFunctor, [Cell.Reference(address), _frozen[address]]);
             pairs = CreateList([pair], pairs);
         }
 
@@ -2427,7 +2562,7 @@ public sealed class Machine : IDisposable
 
         Array.Copy(_x, 0, _savedArguments, _savedTop, _argumentCount);
 
-        ref ChoicePoint point = ref _choicePoints[_b];
+        ref var point = ref _choicePoints[_b];
         point.Alternative = alternative;
         point.ArgumentBase = _savedTop;
         point.ArgumentCount = _argumentCount;
@@ -2459,7 +2594,7 @@ public sealed class Machine : IDisposable
             return false;
         }
 
-        ref ChoicePoint point = ref _choicePoints[_b - 1];
+        ref var point = ref _choicePoints[_b - 1];
         UndoTrail(point.TrailTop);
         _h = point.HeapTop;
         Array.Copy(_savedArguments, point.ArgumentBase, _x, 0, point.ArgumentCount);
@@ -2482,8 +2617,44 @@ public sealed class Machine : IDisposable
             return;
         }
 
+        var retained = _deferredCleanups.Count;
+        while (retained > 0 && _deferredCleanups[retained - 1].Barrier > barrier)
+        {
+            retained--;
+        }
+
+        var cleanups = Cell.Atom(_symbols.EmptyList);
+        if (retained < _deferredCleanups.Count)
+        {
+            for (var index = retained; index < _deferredCleanups.Count; index++)
+            {
+                var record = _deferredCleanups[index];
+                if (!record.Deferred)
+                {
+                    throw new InvalidOperationException("An active cleanup cannot be discarded before its goal returns.");
+                }
+
+                cleanups = CreateList([record.Cleanup], cleanups);
+            }
+
+            _deferredCleanups.RemoveRange(retained, _deferredCleanups.Count - retained);
+        }
+
         _b = barrier;
         _savedTop = barrier > 0 ? _choicePoints[barrier - 1].ArgumentBase + _choicePoints[barrier - 1].ArgumentCount : 0;
+        if (TermList.IsEmpty(this, cleanups))
+        {
+            return;
+        }
+
+        _x[0] = cleanups;
+        _argumentCount = 1;
+        _continuation = _pc;
+        _b0 = _b;
+        if (!TryEntryPoint(_runCleanupsFunctor, out _pc))
+        {
+            throw PrologErrors.UndefinedProcedure(this, _runCleanupsFunctor);
+        }
     }
 
     private void PushUnification(Cell left, Cell right)
@@ -2505,7 +2676,7 @@ public sealed class Machine : IDisposable
 
         while (_occursCheckTop > 0)
         {
-            Cell cell = Dereference(_occursCheckStack[--_occursCheckTop]);
+            var cell = Dereference(_occursCheckStack[--_occursCheckTop]);
 
             if (cell.Tag == CellTag.Reference)
             {

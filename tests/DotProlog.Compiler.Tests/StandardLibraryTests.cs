@@ -108,6 +108,40 @@ public sealed class StandardLibraryTests
     [InlineData("pairs_values([a-1, b-2], V), write(V)", "[1,2]")]
     public void ProvidesTheListLibrary(string goal, string expected) => Assert.Equal(expected, PrologTestHost.RunGoal(goal));
 
+    [Theory]
+    [InlineData("numlist(1.0, 3, _)", "type_error(integer,1.0)")]
+    [InlineData("numlist(1, 3.0, _)", "type_error(integer,3.0)")]
+    [InlineData("numlist(1.5, 3.5, _)", "type_error(integer,1.5)")]
+    [InlineData("numlist(1, atom, _)", "type_error(integer,atom)")]
+    [InlineData("numlist(_, 3, _)", "instantiation_error")]
+    [InlineData("numlist(1, _, _)", "instantiation_error")]
+    public void NumlistValidatesBothIntegerEndpoints(string goal, string expected) =>
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch({goal}, error(E, _), write(E))"));
+
+    [Theory]
+    [InlineData("sum_list")]
+    [InlineData("max_list")]
+    [InlineData("min_list")]
+    public void NumericListAggregatesRejectPartialListsWithoutClosingThem(string predicate)
+    {
+        Assert.Equal(
+            "instantiation_error",
+            PrologTestHost.RunGoal($"L = [1, 2|Tail], catch({predicate}(L, _), error(E, _), true), var(Tail), write(E)")
+        );
+    }
+
+    [Fact]
+    public void FindallWithATailDoesNotCallAReplacementAppend() =>
+        Assert.Equal(
+            "[a,b,c]",
+            PrologTestHost.Run(
+                """
+                append(_, _, _) :- fail.
+                :- initialization((findall(X, (X = a ; X = b), L, [c]), write(L))).
+                """
+            )
+        );
+
     [Fact]
     public void LengthEnumeratesListsOfGrowingLength() =>
         Assert.Equal("[0,1,2,3]", PrologTestHost.RunGoal("findall(N, (between(0, 3, N), length(_, N)), L), write(L)"));

@@ -57,6 +57,12 @@ Control constructs compile inline in the containing clause. This preserves ISO c
 control term reached through `call/1` is lowered at run time with a meta-call barrier so the same
 scope rules apply.
 
+Deferred cleanup records retain the original cleanup argument before the guarded goal runs. Its
+failure choice point protects that argument through backtracking, preserving caller variables and
+frozen goals. A surrounding cut schedules the discarded cleanups through ordinary library calls,
+inner first. Stream property enumeration keeps its immutable result snapshot in a heap list protected
+by its retry choice points, so it follows normal heap restoration and query reset.
+
 A goal frozen with `freeze/2` is kept in a table keyed by its variable's heap address and undone
 through the trail like a backtrackable global variable. Binding that variable only records its
 address, since a binding can happen while a structure is still being written. The next call,

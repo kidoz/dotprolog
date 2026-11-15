@@ -49,7 +49,7 @@ a corpus of ledger goals against SWI-Prolog itself and asserts the outputs agree
 | Single-sided unification rules (`=>`) | Absent; a later roadmap phase |
 | Delimited continuations | Absent; a later roadmap phase |
 | Global variables | Supported: `nb_setval/2`, `nb_getval/2`, `b_setval/2`, `b_getval/2`, and `nb_current/2`, scoped to the engine as SWI scopes them to a thread. `nb_getval/2` and `nb_current/2` materialize a fresh copy per read, so term identity across reads differs from SWI while values agree. `nb_current/2` fails for an unset name — unlike `nb_getval/2`'s existence error — and enumerates every set variable when the name is unbound |
-| `setup_call_cleanup/3`, `call_cleanup/2` | Supported for deterministic exit (including the redo that exhausts the alternatives), failure, and exceptions, with SWI's probed ball precedence. Divergence: a surrounding cut or commit that discards the goal's pending alternatives does not fire the deferred cleanup — write `once(Goal)` for commit semantics |
+| `setup_call_cleanup/3`, `call_cleanup/2` | Supported for deterministic exit (including the redo that exhausts the alternatives), failure, exceptions, and surrounding cuts, with caller variable sharing and SWI's probed ball precedence. Abandoning a host enumeration without an explicit cut still discards its deferred cleanup |
 | Threads, engines, coroutining interactors | Absent. One machine runs one goal at a time; concurrency belongs to the .NET host today |
 | Garbage collection | Provided by the .NET runtime rather than a Prolog-specific collector |
 

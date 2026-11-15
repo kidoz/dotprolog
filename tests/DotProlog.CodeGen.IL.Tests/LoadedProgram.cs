@@ -19,10 +19,20 @@ internal sealed class LoadedProgram : IDisposable
         bool indexFirstArgument = true,
         bool linearVariableFallback = true
     )
+        : this([("test.pl", source)], mode, overrides, fuseBlocks, indexFirstArgument, linearVariableFallback) { }
+
+    internal LoadedProgram(
+        IReadOnlyList<(string Name, string Text)> sources,
+        PrologLanguageMode mode = PrologLanguageMode.Modern,
+        PrologFlagOverrides? overrides = null,
+        bool fuseBlocks = true,
+        bool indexFirstArgument = true,
+        bool linearVariableFallback = true
+    )
     {
         using var stream = new MemoryStream();
         var diagnostics = IlAssemblyEmitter.Emit(
-            [("test.pl", source)],
+            sources,
             "TestProgram",
             stream,
             fuseBlocks,

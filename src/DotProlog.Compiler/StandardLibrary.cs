@@ -41,42 +41,50 @@ internal static class StandardLibrary
         % --- Cleanup goals -----------------------------------------------------------
         % setup_call_cleanup/3 runs Cleanup exactly once when Goal's outcome is decided:
         % a deterministic success (including the redo that exhausts the alternatives),
-        % failure, or a thrown ball. A surrounding cut that discards Goal's pending
-        % alternatives does not reach the deferred cleanup — write once(Goal) when
-        % commit semantics are wanted. The SWI rules this follows: once(Setup) runs
-        % first; a ball from Goal outranks anything Cleanup throws; Cleanup's failure
-        % is ignored while its ball propagates when nothing else is pending.
+        % failure, a thrown ball, or a surrounding cut that discards Goal's pending
+        % alternatives. The SWI rules this follows: once(Setup) runs first; a ball from
+        % Goal outranks anything Cleanup throws; Cleanup's failure is ignored while its
+        % ball propagates when nothing else is pending.
 
         setup_call_cleanup(Setup, Goal, Cleanup) :-
             once(Setup),
-            catch('$call_cleanup'(Goal, Cleanup), Ball, '$cleanup_recover'(Cleanup, Ball)).
+            catch('$call_cleanup'(Goal, Cleanup, Outcome), Ball, '$cleanup_recover'(Cleanup, Ball)),
+            '$cleanup_outcome'(Outcome, Cleanup).
 
         call_cleanup(Goal, Cleanup) :-
             setup_call_cleanup(true, Goal, Cleanup).
 
-        % Equal depths around the meta-call mean a deterministic exit: the cut then
-        % discards the failure clause so cleanup cannot run a second time.
-        '$call_cleanup'(Goal, Cleanup) :-
+        % Equal depths around the meta-call mean a deterministic exit. Remove any record
+        % left by an earlier solution before the commit cut, so it cannot clean up again.
+        '$call_cleanup'(Goal, Cleanup, Outcome) :-
             '$choice_points'(B0),
+            '$register_cleanup'(B0, Cleanup),
             call(Goal),
             '$choice_points'(B1),
-            (   B1 =:= B0
-            ->  !,
-                '$cleanup_once'(Cleanup)
-            ;   true
+            (   B1 =:= B0,
+                '$undefer_cleanup',
+                !,
+                Outcome = success
+            ;   Outcome = deferred(B0)
             ).
-        '$call_cleanup'(_, Cleanup) :-
-            '$cleanup_once'(Cleanup),
-            fail.
+        '$call_cleanup'(_, _, failed) :- '$undefer_cleanup'.
 
-        % A ball the cleanup threw after already running is marked, so the recovery
-        % can rethrow it without running the cleanup again.
-        '$cleanup_once'(Cleanup) :-
-            catch(ignore(Cleanup), Ball, throw('$cleanup_ball'(Ball))).
+        '$cleanup_outcome'(success, Cleanup) :- ignore(Cleanup).
+        '$cleanup_outcome'(deferred(B0), _) :- '$defer_cleanup'(B0).
+        '$cleanup_outcome'(failed, Cleanup) :- ignore(Cleanup), fail.
 
-        '$cleanup_recover'(_, '$cleanup_ball'(Ball)) :- !, throw(Ball).
         '$cleanup_recover'(Cleanup, Ball) :-
+            '$undefer_cleanup',
             catch(ignore(Cleanup), _, true),
+            throw(Ball).
+
+        '$run_cleanups'([]).
+        '$run_cleanups'([Cleanup|Rest]) :-
+            catch(ignore(Cleanup), Ball, '$run_cleanups_after_ball'(Rest, Ball)),
+            '$run_cleanups'(Rest).
+
+        '$run_cleanups_after_ball'(Rest, Ball) :-
+            catch('$run_cleanups'(Rest), _, true),
             throw(Ball).
 
         % --- Coroutining (freeze/2) -----------------------------------------------------
@@ -164,6 +172,9 @@ internal static class StandardLibrary
 
         append([], L, L).
         append([H|T], L, [H|R]) :- append(T, L, R).
+
+        '$append'([], L, L).
+        '$append'([H|T], L, [H|R]) :- '$append'(T, L, R).
 
         member(X, [X|_]).
         member(X, [_|T]) :- member(X, T).
@@ -356,23 +367,27 @@ internal static class StandardLibrary
             call(G, H1, H2, H3, V0, V1),
             '$foldl'(T1, T2, T3, G, V1, V).
 
-        numlist(L, H, R) :- L =< H, '$numlist'(L, H, R).
+        numlist(L, H, R) :-
+            must_be(integer, L),
+            must_be(integer, H),
+            L =< H,
+            '$numlist'(L, H, R).
 
         '$numlist'(H, H, [H]) :- !.
         '$numlist'(L, H, [L|T]) :- L1 is L + 1, '$numlist'(L1, H, T).
 
-        sum_list(L, S) :- '$sum_list'(L, 0, S).
+        sum_list(L, S) :- must_be(list, L), '$sum_list'(L, 0, S).
         sumlist(L, S) :- sum_list(L, S).
 
         '$sum_list'([], S, S).
         '$sum_list'([H|T], A, S) :- A1 is A + H, '$sum_list'(T, A1, S).
 
-        max_list([H|T], M) :- '$max_list'(T, H, M).
+        max_list(L, M) :- must_be(list, L), L = [H|T], '$max_list'(T, H, M).
 
         '$max_list'([], M, M).
         '$max_list'([H|T], A, M) :- ( H > A -> A1 = H ; A1 = A ), '$max_list'(T, A1, M).
 
-        min_list([H|T], M) :- '$min_list'(T, H, M).
+        min_list(L, M) :- must_be(list, L), L = [H|T], '$min_list'(T, H, M).
 
         '$min_list'([], M, M).
         '$min_list'([H|T], A, M) :- ( H < A -> A1 = H ; A1 = A ), '$min_list'(T, A1, M).
@@ -1124,18 +1139,23 @@ internal static class StandardLibrary
         % the free-variable walk below.
         ^(_, Goal) :- call(Goal).
 
-        bagof(Template, Goal, Bag) :-
+        bagof(Template, Goal, Bag) :- '$bagof_entry'(Template, Goal, Bag).
+
+        '$bagof_entry'(Template, Goal, Bag) :-
             '$validate_callable'(Goal),
             '$validate_partial_list'(Bag),
             term_variables(Template, Bound),
             '$free_variables'(Goal, Bound, [], Reversed),
-            reverse(Reversed, Witness),
-            '$bagof'(Witness, Template, Goal, Bag).
+            '$reverse'(Reversed, [], Witness),
+            '$strip_quantifiers'(Goal, Stripped),
+            '$bagof'(Witness, Template, Stripped, Bag).
 
-        setof(Template, Goal, Set) :-
+        setof(Template, Goal, Set) :- '$setof_entry'(Template, Goal, Set).
+
+        '$setof_entry'(Template, Goal, Set) :-
             '$validate_callable'(Goal),
             '$validate_partial_list'(Set),
-            bagof(Template, Goal, Bag),
+            '$bagof_entry'(Template, Goal, Bag),
             sort(Bag, Set).
 
         % With nothing free, there is one group and no binding to report.
@@ -1151,7 +1171,10 @@ internal static class StandardLibrary
             Pairs \== [],
             keysort(Pairs, Sorted),
             '$group_pairs'(Sorted, Groups),
-            member(Witness-Bag, Groups).
+            '$group_member'(Witness-Bag, Groups).
+
+        '$group_member'(X, [X|_]).
+        '$group_member'(X, [_|Groups]) :- '$group_member'(X, Groups).
 
         '$group_pairs'([], []).
         '$group_pairs'([K-V|T], [K-[V|Vs]|Groups]) :-
@@ -1171,11 +1194,15 @@ internal static class StandardLibrary
         % Only a leading chain of ^/2 terms is existential syntax for bagof/3. A
         % caret nested inside a control construct is an ordinary callable goal, so
         % its variables remain free for grouping.
+        '$strip_quantifiers'(_^Goal, Stripped) :- !,
+            '$strip_quantifiers'(Goal, Stripped).
+        '$strip_quantifiers'(Goal, Goal).
+
         '$free_variables'(Goal, _, Free, Free) :- var(Goal), !.
         '$free_variables'(Quantified^Goal, Bound, Free0, Free) :-
             !,
             term_variables(Quantified, Vars),
-            append(Vars, Bound, Bound1),
+            '$append'(Vars, Bound, Bound1),
             '$free_variables'(Goal, Bound1, Free0, Free).
         '$free_variables'(Goal, Bound, Free0, Free) :-
             '$free_goal_variables'(Goal, Bound, Free0, Free).
@@ -1213,7 +1240,7 @@ internal static class StandardLibrary
         % onto Tail, so consecutive calls can grow one list without a final append.
         findall(Template, Goal, Bag, Tail) :-
             findall(Template, Goal, Solutions),
-            append(Solutions, Tail, Bag).
+            '$append'(Solutions, Tail, Bag).
 
         % --- Counting solutions (call_nth/2, countall/2) ---------------------------------
         % As the Prolog prologue has them. The count lives in a term updated with nb_setarg/3, so it
@@ -1325,23 +1352,23 @@ internal static class StandardLibrary
         aggregate(Template, _, _) :-
             var(Template),
             instantiation_error(Template).
-        aggregate(count, Goal, Count) :- bagof(x, Goal, Xs), length(Xs, Count).
-        aggregate(count(T), Goal, Count) :- bagof(T, Goal, Xs), length(Xs, Count).
-        aggregate(bag(T), Goal, Bag) :- bagof(T, Goal, Bag).
-        aggregate(set(T), Goal, Set) :- setof(T, Goal, Set).
-        aggregate(sum(E), Goal, Sum) :- bagof(E, Goal, Es), sum_list(Es, Sum).
-        aggregate(max(E), Goal, Max) :- bagof(E, Goal, Es), max_list(Es, Max).
-        aggregate(min(E), Goal, Min) :- bagof(E, Goal, Es), min_list(Es, Min).
+        aggregate(count, Goal, Count) :- '$bagof_entry'(x, Goal, Xs), length(Xs, Count).
+        aggregate(count(T), Goal, Count) :- '$bagof_entry'(T, Goal, Xs), length(Xs, Count).
+        aggregate(bag(T), Goal, Bag) :- '$bagof_entry'(T, Goal, Bag).
+        aggregate(set(T), Goal, Set) :- '$setof_entry'(T, Goal, Set).
+        aggregate(sum(E), Goal, Sum) :- '$bagof_entry'(E, Goal, Es), sum_list(Es, Sum).
+        aggregate(max(E), Goal, Max) :- '$bagof_entry'(E, Goal, Es), max_list(Es, Max).
+        aggregate(min(E), Goal, Min) :- '$bagof_entry'(E, Goal, Es), min_list(Es, Min).
         aggregate(max(E, W), Goal, max(Max, Witness)) :-
-            bagof(E-W, Goal, Pairs),
+            '$bagof_entry'(E-W, Goal, Pairs),
             '$aggregate_max_pair'(Pairs, Max, Witness).
         aggregate(min(E, W), Goal, min(Min, Witness)) :-
-            bagof(E-W, Goal, Pairs),
+            '$bagof_entry'(E-W, Goal, Pairs),
             '$aggregate_min_pair'(Pairs, Min, Witness).
         aggregate(Template, Goal, Result) :-
             '$aggregate_template_args'(Template, Name, Specs),
             '$aggregate_tuple'(Specs, Tuple),
-            bagof(Tuple, Goal, Tuples),
+            '$bagof_entry'(Tuple, Goal, Tuples),
             '$aggregate_columns'(Specs, Tuples, Results),
             Result =.. [Name|Results].
 
@@ -1351,37 +1378,37 @@ internal static class StandardLibrary
         aggregate(Template, _, _, _) :-
             var(Template),
             instantiation_error(Template).
-        aggregate(count, D, Goal, Count) :- setof(D, Goal, Ds), length(Ds, Count).
-        aggregate(count(T), D, Goal, Count) :- setof(D-T, Goal, Ps), length(Ps, Count).
-        aggregate(bag(T), D, Goal, Bag) :- setof(D-T, Goal, Ps), pairs_values(Ps, Bag).
+        aggregate(count, D, Goal, Count) :- '$setof_entry'(D, Goal, Ds), length(Ds, Count).
+        aggregate(count(T), D, Goal, Count) :- '$setof_entry'(D-T, Goal, Ps), length(Ps, Count).
+        aggregate(bag(T), D, Goal, Bag) :- '$setof_entry'(D-T, Goal, Ps), pairs_values(Ps, Bag).
         aggregate(set(T), D, Goal, Set) :-
-            setof(D-T, Goal, Ps),
+            '$setof_entry'(D-T, Goal, Ps),
             pairs_values(Ps, Vs),
             sort(Vs, Set).
         aggregate(sum(E), D, Goal, Sum) :-
-            setof(D-E, Goal, Ps),
+            '$setof_entry'(D-E, Goal, Ps),
             pairs_values(Ps, Es),
             sum_list(Es, Sum).
         aggregate(max(E), D, Goal, Max) :-
-            setof(D-E, Goal, Ps),
+            '$setof_entry'(D-E, Goal, Ps),
             pairs_values(Ps, Es),
             max_list(Es, Max).
         aggregate(min(E), D, Goal, Min) :-
-            setof(D-E, Goal, Ps),
+            '$setof_entry'(D-E, Goal, Ps),
             pairs_values(Ps, Es),
             min_list(Es, Min).
         aggregate(max(E, W), D, Goal, max(Max, Witness)) :-
-            setof(D-(E-W), Goal, Ps),
+            '$setof_entry'(D-(E-W), Goal, Ps),
             pairs_values(Ps, Pairs),
             '$aggregate_max_pair'(Pairs, Max, Witness).
         aggregate(min(E, W), D, Goal, min(Min, Witness)) :-
-            setof(D-(E-W), Goal, Ps),
+            '$setof_entry'(D-(E-W), Goal, Ps),
             pairs_values(Ps, Pairs),
             '$aggregate_min_pair'(Pairs, Min, Witness).
         aggregate(Template, D, Goal, Result) :-
             '$aggregate_template_args'(Template, Name, Specs),
             '$aggregate_tuple'(Specs, Tuple),
-            setof(D-Tuple, Goal, Ps),
+            '$setof_entry'(D-Tuple, Goal, Ps),
             pairs_values(Ps, Tuples),
             '$aggregate_columns'(Specs, Tuples, Results),
             Result =.. [Name|Results].

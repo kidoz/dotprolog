@@ -150,6 +150,11 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Fixed
 
+- Deferred cleanup on a surrounding cut preserves caller variables, subsequent bindings, and frozen
+  goals across bytecode and compiled calls. Stream property enumeration releases its snapshot with
+  the machine call state. Text streams skip an initial UTF-8 byte-order mark, including after
+  repositioning, and arithmetic `min/2` and `max/2` compare integer and rational operands exactly.
+
 - Reachability and unused-import linting conservatively suppress analysis for module-qualified clause
   heads instead of reporting their local helpers as unreferenced.
 
