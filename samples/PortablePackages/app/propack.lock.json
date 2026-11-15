@@ -15,7 +15,7 @@
         "sha256": null
       },
       "requestedRevision": null,
-      "hash": "01e8f7a0f014c012ef83118bb2bccc2c656ed72da5e444a39053e78242767273"
+      "hash": "9101171705fe1b63096bb7e6051e6bf0f113823719e3608e82360d40b79e09af"
     },
     {
       "name": "example/words",
@@ -29,7 +29,7 @@
         "sha256": null
       },
       "requestedRevision": null,
-      "hash": "f444b53908083415c244f7c7e24d79a9f69768201d415168282d5b30da6dc0a2"
+      "hash": "f45132a63780d963c61c730bd2ec2f83bfc9b2d8f15a01fb2d9d5bbff2e50040"
     }
   ]
 }

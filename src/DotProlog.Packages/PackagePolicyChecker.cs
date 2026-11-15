@@ -18,10 +18,12 @@ internal static partial class PackagePolicyChecker
             ?? throw new InvalidDataException("Empty propack.policy.json.");
         if (policy.Schema != 1)
             throw new InvalidDataException("Unsupported policy schema.");
+        HashSet<string> policyInputs = new(StringComparer.Ordinal) { "propack.policy.json" };
         List<PackageAdvisory> advisories = [.. policy.Advisories];
         foreach (var relative in policy.AdvisoryFiles)
         {
             var file = PackageFiles.Inside(root, relative);
+            policyInputs.Add(Path.GetRelativePath(root, file).Replace('\\', '/'));
             var feed =
                 JsonSerializer.Deserialize(PackageFiles.ReadText(file), PackageJsonContext.Default.PackageAdvisoryFile)
                 ?? throw new InvalidDataException($"Empty advisory file: {relative}");
@@ -42,7 +44,7 @@ internal static partial class PackagePolicyChecker
                     continue;
                 if (advisory.Hash is not null)
                 {
-                    hash ??= PackageFiles.HashTree(package.Directory);
+                    hash ??= PackageFiles.HashTree(package.Directory, excludedFiles: package.Hash is null ? policyInputs : null);
                     if (!string.Equals(advisory.Hash, hash, StringComparison.OrdinalIgnoreCase))
                         continue;
                 }

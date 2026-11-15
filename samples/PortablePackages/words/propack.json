@@ -3,7 +3,7 @@
   "name": "example/words",
   "version": "1.0.0",
   "engines": {
-    "dotprolog": "^0.16.0",
+    "dotprolog": "^0.17.0",
     "swi": "*"
   },
   "modules": {

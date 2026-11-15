@@ -35,9 +35,32 @@ work="$audit_root/consumer with spaces"
 mkdir -p "$DOTNET_CLI_HOME" "$NUGET_PACKAGES" "$work"
 
 cd "$work"
-dotnet new nugetconfig --force
+cat >nuget.config <<'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+  </packageSources>
+</configuration>
+EOF
 dotnet nuget add source "$package_feed" --name dotprolog-local --configfile nuget.config
 dotnet new install "$package_feed/DotProlog.Templates.$version.nupkg"
+
+# A known package ID at an unavailable version must fail against only the isolated local feed.
+mkdir UpstreamIsolation
+cat >UpstreamIsolation/UpstreamIsolation.csproj <<EOF
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>$target_framework</TargetFramework></PropertyGroup>
+  <ItemGroup><PackageReference Include="DotProlog.Compiler" Version="0.0.0" /></ItemGroup>
+</Project>
+EOF
+if dotnet restore UpstreamIsolation/UpstreamIsolation.csproj >"$audit_root/upstream-isolation.log" 2>&1; then
+    echo "restore unexpectedly resolved an unavailable package version" >&2
+    exit 1
+fi
+grep -F 'DotProlog.Compiler' "$audit_root/upstream-isolation.log"
+grep -F '0.0.0' "$audit_root/upstream-isolation.log"
+grep -F 'dotprolog-local' "$audit_root/upstream-isolation.log"
 
 # Adding another framework must preserve the existing template default.
 dotnet new prolog-console -n DefaultConsole --DotPrologVersion "$version"
@@ -81,11 +104,101 @@ System.Console.WriteLine(rules.Double(21));
 EOF
 dotnet run --project Consumer/Consumer.csproj -c Release | grep -Fx "42"
 
+# A user library remains composable after its generated facade crosses a NuGet package boundary.
+# Keep the fixture package out of the product artifacts that this script audits and CI uploads.
+user_feed="$audit_root/user-feed"
+mkdir "$user_feed"
+dotnet pack Rules/Rules.dplproj -c Release -o "$user_feed" -p:Version=1.2.3
+test -f "$user_feed/Rules.1.2.3.nupkg"
+dotnet nuget add source "$user_feed" --name dotprolog-user --configfile nuget.config
+mkdir PackageConsumer
+cat >PackageConsumer/PackageConsumer.csproj <<EOF
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>$target_framework</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup><PackageReference Include="Rules" Version="1.2.3" /></ItemGroup>
+</Project>
+EOF
+cat >PackageConsumer/Program.cs <<'EOF'
+var rules = Rules.RulesModule.Create();
+System.Console.WriteLine(rules.Double(21));
+System.Console.WriteLine(rules.Positive(21));
+System.Console.WriteLine(string.Join(",", rules.Upto(3)));
+EOF
+package_output=$(dotnet run --project PackageConsumer/PackageConsumer.csproj -c Release)
+printf '%s\n' "$package_output" | grep -Fx "42"
+printf '%s\n' "$package_output" | grep -Fx "True"
+printf '%s\n' "$package_output" | grep -Fx "1,2,3"
+
 test -f "$package_feed/DotProlog.Tool.$version.nupkg"
 test -f "$package_feed/DotProlog.Tool.any.$version.nupkg"
 if [[ -n "$expected_tool_rid" ]]; then
     test -f "$package_feed/DotProlog.Tool.$expected_tool_rid.$version.nupkg"
 fi
+
+# Check the actual archives as well as installation: a tool command without its declared entry
+# point cannot run, and the pointer must reference implementations rather than contain one.
+python3 - "$package_feed" "$version" "$expected_tool_rid" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+from pathlib import Path
+from zipfile import ZipFile
+
+feed = Path(sys.argv[1])
+version = sys.argv[2]
+native_rid = sys.argv[3]
+
+
+def read_command(package_name, settings_path):
+    with ZipFile(feed / package_name) as package:
+        names = package.namelist()
+        assert len(names) == len(set(names)), f"{package_name} contains duplicate entries"
+        assert settings_path in names, f"{package_name} is missing {settings_path}"
+        root = ET.fromstring(package.read(settings_path))
+        commands = root.findall("./Commands/Command")
+        assert len(commands) == 1, f"{package_name} must declare exactly one command"
+        return package_name, names, settings_path, commands[0], root
+
+
+def check_implementation(package_name, settings_directory, runner, entry_point):
+    settings_path = f"{settings_directory}/DotnetToolSettings.xml"
+    _, names, _, command, _ = read_command(package_name, settings_path)
+    assert command.get("Name") == "dotnet-prolog"
+    assert command.get("Runner") == runner
+    assert command.get("EntryPoint") == entry_point
+    packaged_entry_point = f"{settings_directory}/{entry_point}"
+    assert packaged_entry_point in names, f"{package_name} is missing {packaged_entry_point}"
+
+
+check_implementation(
+    f"DotProlog.Tool.any.{version}.nupkg",
+    "tools/net10.0/any",
+    "dotnet",
+    "dotnet-prolog.dll",
+)
+if native_rid:
+    executable = "dotnet-prolog.exe" if native_rid.startswith("win-") else "dotnet-prolog"
+    check_implementation(
+        f"DotProlog.Tool.{native_rid}.{version}.nupkg",
+        f"tools/any/{native_rid}",
+        "executable",
+        executable,
+    )
+
+pointer_name = f"DotProlog.Tool.{version}.nupkg"
+_, _, _, pointer_command, pointer_root = read_command(pointer_name, "tools/any/any/DotnetToolSettings.xml")
+assert pointer_command.attrib == {"Name": "dotnet-prolog"}
+expected_packages = {
+    rid: f"DotProlog.Tool.{rid}" for rid in ("linux-x64", "win-x64", "osx-arm64", "any")
+}
+actual_packages = {
+    element.get("RuntimeIdentifier"): element.get("Id")
+    for element in pointer_root.findall("./RuntimeIdentifierPackages/RuntimeIdentifierPackage")
+}
+assert actual_packages == expected_packages
+PY
 
 # One-shot execution proves that the pointer package resolves the best RID implementation from an
 # isolated feed without leaving a global or local tool installation behind.

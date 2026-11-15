@@ -85,6 +85,63 @@ public sealed class PackageWorkflowTests : IDisposable
         Assert.Equal("second", run.Log.Trim());
     }
 
+    [Fact]
+    public async Task MalformedDeepLicenseExpressionFailsRestoreAndSdkBuild()
+    {
+        Assert.SkipUnless(
+            Environment.GetEnvironmentVariable("DOTPROLOG_RUN_AOT_TESTS") == "1",
+            "Set DOTPROLOG_RUN_AOT_TESTS=1 for SDK package tests."
+        );
+        var source = Path.Combine(RepositoryLayout.Root, "src");
+        var app = Path.Combine(_directory, "app");
+        Directory.CreateDirectory(app);
+        await Write(Path.Combine(app, "propack.json"), """{"name":"example/app"}""");
+        await Write(Path.Combine(app, "main.pl"), ":- initialization(main).\nmain :- writeln(ok).\n");
+        var expression = new string('(', 512) + "MIT";
+        await Write(Path.Combine(app, "UPSTREAM.json"), $$"""{"license":"{{expression}}"}""");
+        var project = Path.Combine(app, "App.dplproj");
+        await Write(
+            project,
+            $"""
+            <Project Sdk="Microsoft.NET.Sdk">
+                <Import Project="{source}/DotProlog.Sdk/Sdk/Sdk.props" />
+                <PropertyGroup>
+                    <OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework>
+                    <RootNamespace>PackageApp</RootNamespace>
+                    <DotPrologTasksAssembly>{source}/DotProlog.Build.Tasks/bin/Debug/net10.0/DotProlog.Build.Tasks.dll</DotPrologTasksAssembly>
+                </PropertyGroup>
+                <ItemGroup><ProjectReference Include="{source}/DotProlog.Compiler/DotProlog.Compiler.csproj" /></ItemGroup>
+                <Import Project="{source}/DotProlog.Sdk/Sdk/Sdk.targets" />
+            </Project>
+            """
+        );
+        await Success("build", "-nodereuse:false", Path.Combine(source, "DotProlog.Build.Tasks"));
+        await Success("build", "-nodereuse:false", Path.Combine(source, "DotProlog.Packages.Cli"));
+        var tool = Path.Combine(source, "DotProlog.Packages.Cli", "bin", "Debug", "net10.0", "propack.dll");
+        var cache = Path.Combine(_directory, "cache");
+        await Success(tool, "restore", "--project", app, "--cache", cache);
+        await Write(Path.Combine(app, "propack.policy.json"), """{"licenses":["MIT"]}""");
+
+        var restore = await ChildProcess.RunAsync(
+            "dotnet",
+            [tool, "restore", "--project", app, "--cache", cache],
+            RepositoryLayout.Root
+        );
+        Assert.Equal(65, restore.ExitCode);
+        Assert.Contains("Package example/app Invalid license expression", restore.Log, StringComparison.Ordinal);
+
+        var environment = new Dictionary<string, string?> { ["PROPACK_CACHE"] = cache };
+        var build = await ChildProcess.RunAsync(
+            "dotnet",
+            ["build", "-nodereuse:false", project],
+            RepositoryLayout.Root,
+            environment
+        );
+        Assert.NotEqual(0, build.ExitCode);
+        Assert.Contains("Package validation failed", build.Log, StringComparison.Ordinal);
+        Assert.Contains("Package example/app Invalid license expression", build.Log, StringComparison.Ordinal);
+    }
+
     private static Task Write(string path, string text) =>
         File.WriteAllTextAsync(path, text, TestContext.Current.CancellationToken);
 

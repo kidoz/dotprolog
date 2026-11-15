@@ -81,6 +81,42 @@ internal static class PackageFiles
         }
     }
 
+    public static string CanonicalPath(string path)
+    {
+        var full = System.IO.Path.GetFullPath(path);
+        for (var links = 0; ; links++)
+        {
+            if (links > 256)
+                throw new InvalidDataException($"Too many symbolic links while resolving: {path}");
+            var root = System.IO.Path.GetPathRoot(full)!;
+            var current = root;
+            var relative = System.IO.Path.GetRelativePath(root, full);
+            if (relative == ".")
+                return current;
+            var resolved = true;
+            var parts = relative.Split(
+                [System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar],
+                StringSplitOptions.RemoveEmptyEntries
+            );
+            for (var index = 0; index < parts.Length; index++)
+            {
+                current = System.IO.Path.Combine(current, parts[index]);
+                FileSystemInfo entry = Directory.Exists(current) ? new DirectoryInfo(current) : new FileInfo(current);
+                if (entry.LinkTarget is null)
+                    continue;
+                full =
+                    entry.ResolveLinkTarget(returnFinalTarget: true)?.FullName
+                    ?? throw new InvalidDataException($"Cannot resolve symbolic link: {current}");
+                foreach (var remainder in parts[(index + 1)..])
+                    full = System.IO.Path.Combine(full, remainder);
+                resolved = false;
+                break;
+            }
+            if (resolved)
+                return System.IO.Path.GetFullPath(current);
+        }
+    }
+
     public static string Inside(string root, string relative)
     {
         var fullRoot = System.IO.Path.GetFullPath(root);
@@ -136,12 +172,14 @@ internal static class PackageFiles
         }
     }
 
-    public static string HashTree(string root, bool requireSnapshot = false)
+    public static string HashTree(string root, bool requireSnapshot = false, IReadOnlySet<string>? excludedFiles = null)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         long total = 0;
         foreach (var file in Files(root, requireSnapshot))
         {
+            if (excludedFiles?.Contains(file) == true)
+                continue;
             var (digest, bytes) = HashInput(root, file, MaxBytes - total);
             total += bytes;
             hash.AppendData(Encoding.UTF8.GetBytes(file + "\0" + digest + "\n"));

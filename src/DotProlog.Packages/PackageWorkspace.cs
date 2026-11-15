@@ -23,7 +23,7 @@ public sealed partial class PackageWorkspace
         );
         // GetRelativePath applies the platform's path comparison and normalizes directory boundaries.
         // Only parent-relative paths and paths on another file-system root are outside the project.
-        var relativeCache = Path.GetRelativePath(_root, _cache);
+        var relativeCache = Path.GetRelativePath(PackageFiles.CanonicalPath(_root), PackageFiles.CanonicalPath(_cache));
         if (
             !Path.IsPathRooted(relativeCache)
             && relativeCache != ".."
@@ -131,17 +131,18 @@ public sealed partial class PackageWorkspace
                         throw new InvalidDataException($"Expected package {request.Name}, source declares {package.Name}.");
                     if (!explicitSource && package.Version != source.Version)
                         throw new InvalidDataException($"Catalog version disagrees with {package.Name} manifest.");
+                    var baseDirectory = source.Path ?? directory;
                     candidate = new Candidate(
                         package,
                         new LockedPackage
                         {
                             Name = package.Name,
                             Version = package.Version,
-                            Source = Portable(pinned),
+                            Source = Portable(pinned, explicitSource ? request.BaseDirectory : _root),
                             RequestedRevision = source.Revision,
                             Hash = PackageFiles.HashTree(directory, requireSnapshot: true),
                         },
-                        source.Path ?? directory
+                        baseDirectory
                     );
                     acquired.Add(key, candidate);
                 }
@@ -223,26 +224,7 @@ public sealed partial class PackageWorkspace
             ?? throw new InvalidDataException("Empty lockfile.");
         if (locked.Schema != 1 || locked.ManifestHash != PackageFiles.HashFile(ManifestPath) || locked.Engine != manifest.Engine)
             throw new InvalidDataException("Manifest changed or unsupported lock schema; run update explicitly.");
-        foreach (var package in locked.Packages)
-        {
-            if (package is null)
-                throw new InvalidDataException("Null package in lockfile.");
-            var directory = CachePath(package.Hash);
-            var source = Normalize(package.Source, _root);
-            if (source.Path is not null && PackageFiles.HashTree(source.Path) != package.Hash)
-                throw new InvalidDataException($"Local package {package.Name} changed; run update explicitly.");
-            if (!Directory.Exists(directory) && acquire)
-            {
-                var fetched = PackageFiles.Acquire(source, _cache);
-                if (PackageFiles.HashTree(fetched.Directory, requireSnapshot: true) != package.Hash)
-                    throw new InvalidDataException($"Content hash mismatch for {package.Name}.");
-            }
-            if (!Directory.Exists(directory))
-                throw new InvalidDataException($"Missing cached package {package.Name}; run restore --locked.");
-            if (PackageFiles.HashTree(directory, requireSnapshot: true) != package.Hash)
-                throw new InvalidDataException($"Corrupt cached package {package.Name}.");
-        }
-        ValidateGraph(manifest, locked);
+        ValidateGraph(manifest, locked, acquire);
         EnforcePolicy(manifest, locked);
         return locked;
     }
@@ -255,55 +237,84 @@ public sealed partial class PackageWorkspace
         PackagePolicyChecker.Enforce(_root, packages);
     }
 
-    private void ValidateGraph(PackageManifest root, PackageLock locked)
+    private void ValidateGraph(PackageManifest root, PackageLock locked, bool acquire = false)
     {
         Dictionary<string, LockedPackage> graph = new(StringComparer.Ordinal);
-        Dictionary<string, string> modules = new(StringComparer.Ordinal);
-        AddModules(root, _root, modules);
         foreach (var package in locked.Packages)
         {
+            if (package is null)
+                throw new InvalidDataException("Null package in lockfile.");
             if (!graph.TryAdd(package.Name, package))
                 throw new InvalidDataException($"Duplicate locked package {package.Name}.");
-            var manifest = ReadManifest(CachePath(package.Hash));
-            ValidatePackageFiles(CachePath(package.Hash), manifest);
-            if (manifest.Name != package.Name || manifest.Version != package.Version)
-                throw new InvalidDataException($"Locked identity mismatch: {package.Name}.");
-            CheckEngine(manifest, root.Engine, null);
-            AddModules(manifest, CachePath(package.Hash), modules);
         }
+        Dictionary<string, string> modules = new(StringComparer.Ordinal);
+        AddModules(root, _root, modules);
         HashSet<string> visited = new(StringComparer.Ordinal);
         HashSet<string> active = new(StringComparer.Ordinal);
         Visit(root, _root);
         if (visited.Count != graph.Count)
             throw new InvalidDataException("Lockfile contains unreachable packages.");
+        foreach (var package in locked.Packages)
+        {
+            var directory = CachePath(package.Hash);
+            var manifest = ReadManifest(directory);
+            ValidatePackageFiles(directory, manifest);
+            if (manifest.Name != package.Name || manifest.Version != package.Version)
+                throw new InvalidDataException($"Locked identity mismatch: {package.Name}.");
+            CheckEngine(manifest, root.Engine, null);
+            AddModules(manifest, directory, modules);
+        }
         void Visit(PackageManifest manifest, string baseDirectory)
         {
             if (!active.Add(manifest.Name))
                 throw new InvalidDataException($"Dependency cycle at {manifest.Name}.");
             foreach (var (name, source) in manifest.Dependencies)
             {
-                if (
-                    !graph.TryGetValue(name, out var child)
-                    || !Satisfies(child, new Request(name, source, baseDirectory, manifest.Name))
-                )
+                var request = new Request(name, source, baseDirectory, manifest.Name);
+                if (!graph.TryGetValue(name, out var child) || !Satisfies(child, request))
                     throw new InvalidDataException($"Dependency conflict: {manifest.Name} requires {name} {source.Version}.");
                 if (active.Contains(name))
                     throw new InvalidDataException($"Dependency cycle at {name}.");
                 if (visited.Add(name))
-                    Visit(ReadManifest(CachePath(child.Hash)), Normalize(child.Source, _root).Path ?? CachePath(child.Hash));
+                {
+                    var directory = ValidatePackage(child, request, acquire);
+                    var sourceBase = HasSource(request.Source) ? baseDirectory : _root;
+                    var childBase = Normalize(child.Source, sourceBase).Path ?? directory;
+                    Visit(ReadManifest(directory), childBase);
+                }
             }
             active.Remove(manifest.Name);
         }
     }
 
-    private bool Satisfies(LockedPackage package, Request request)
+    private string ValidatePackage(LockedPackage package, Request request, bool acquire)
+    {
+        var directory = CachePath(package.Hash);
+        var sourceBase = HasSource(request.Source) ? request.BaseDirectory : _root;
+        var source = Normalize(package.Source, sourceBase);
+        if (source.Path is not null && PackageFiles.HashTree(source.Path) != package.Hash)
+            throw new InvalidDataException($"Local package {package.Name} changed; run update explicitly.");
+        if (!Directory.Exists(directory) && acquire)
+        {
+            var fetched = PackageFiles.Acquire(source, _cache);
+            if (PackageFiles.HashTree(fetched.Directory, requireSnapshot: true) != package.Hash)
+                throw new InvalidDataException($"Content hash mismatch for {package.Name}.");
+        }
+        if (!Directory.Exists(directory))
+            throw new InvalidDataException($"Missing cached package {package.Name}; run restore --locked.");
+        if (PackageFiles.HashTree(directory, requireSnapshot: true) != package.Hash)
+            throw new InvalidDataException($"Corrupt cached package {package.Name}.");
+        return directory;
+    }
+
+    private static bool Satisfies(LockedPackage package, Request request)
     {
         if (!PackageVersions.Matches(package.Version, request.Source.Version))
             return false;
         if (!HasSource(request.Source))
             return true;
         var expected = Normalize(request.Source, request.BaseDirectory);
-        var actual = Normalize(package.Source, _root);
+        var actual = Normalize(package.Source, request.BaseDirectory);
         return expected.Path == actual.Path
             && expected.Git == actual.Git
             && expected.Archive == actual.Archive
@@ -334,10 +345,10 @@ public sealed partial class PackageWorkspace
         );
     }
 
-    private PackageSource Portable(PackageSource source)
+    private static PackageSource Portable(PackageSource source, string baseDirectory)
     {
         string? Relative(string? value) =>
-            value is null || !Path.IsPathRooted(value) ? value : Path.GetRelativePath(_root, value).Replace('\\', '/');
+            value is null || !Path.IsPathRooted(value) ? value : Path.GetRelativePath(baseDirectory, value).Replace('\\', '/');
         return source with { Path = Relative(source.Path), Git = Relative(source.Git), Archive = Relative(source.Archive) };
     }
 

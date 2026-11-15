@@ -50,6 +50,49 @@ public sealed class PackageTests : IDisposable
         _ = new PackageWorkspace(Root, _directory);
     }
 
+    [Theory]
+    [InlineData("cache")]
+    [InlineData("parent")]
+    [InlineData("project")]
+    public void Cache_containment_resolves_symbolic_links(string location)
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Creating symbolic links can require additional Windows privileges.");
+        var project = Root;
+        string cache;
+        if (location == "project")
+        {
+            project = Path.Combine(_directory, "project-link");
+            Directory.CreateSymbolicLink(project, Root);
+            cache = Path.Combine(Root, "cache");
+        }
+        else
+        {
+            var link = Path.Combine(_directory, "cache-link");
+            Directory.CreateSymbolicLink(link, Root);
+            cache = location == "parent" ? Path.Combine(link, "cache") : link;
+        }
+        var canonicalRoot = PackageFiles.CanonicalPath(Root);
+        Assert.Equal(canonicalRoot, PackageFiles.CanonicalPath(project));
+        Assert.Equal(
+            location == "cache" ? canonicalRoot : Path.Combine(canonicalRoot, "cache"),
+            PackageFiles.CanonicalPath(cache)
+        );
+        var error = Assert.Throws<ArgumentException>(() => new PackageWorkspace(project, cache));
+        Assert.Equal("cacheDirectory", error.ParamName);
+        Assert.Contains("outside the project", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Cache_symlink_to_an_external_directory_is_allowed()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Creating symbolic links can require additional Windows privileges.");
+        var target = Path.Combine(_directory, "cache-target");
+        var link = Path.Combine(_directory, "cache-link");
+        Directory.CreateDirectory(target);
+        Directory.CreateSymbolicLink(link, target);
+        _ = new PackageWorkspace(Root, link);
+    }
+
     [Fact]
     public void File_system_root_project_has_no_cache_directory_outside_it_on_the_same_root()
     {
@@ -123,7 +166,7 @@ public sealed class PackageTests : IDisposable
         using var invalid = new PrologEngine();
         Assert.Contains(invalid.ConsultText(":- use_module(library(42)).").Diagnostics, d => d.Id == "DPL1008");
         using var strict = new PrologEngine(PrologLanguageMode.StrictIso) { LibraryFiles = Workspace.GetLibraries() };
-        Assert.Contains(strict.ConsultText(":- use_module(library(words)).").Diagnostics, d => d.Id == "DPL1018");
+        Assert.Contains(strict.ConsultText(":- use_module(library(words)).\n").Diagnostics, d => d.Id == "DPL1018");
         using var configured = new PrologEngine { LibraryFiles = Workspace.GetLibraries() };
         Assert.True(configured.ConsultText(":- use_module(library(words), [word/1]).").Success);
         Assert.True(configured.Query("word(hello)").Prove());
@@ -741,6 +784,44 @@ public sealed class PackageTests : IDisposable
     }
 
     [Theory]
+    [InlineData("git")]
+    [InlineData("zip")]
+    public void Locked_restore_reacquires_nested_path_dependencies_after_relocation(string transport)
+    {
+        var parent = Package("source", "demo/parent", "1.0.0", "parent", "ok.");
+        var child = Path.Combine(parent, "child");
+        Directory.CreateDirectory(child);
+        Write(child, new PackageManifest { Name = "demo/child" });
+        var parentManifest = PackageWorkspace.ReadManifest(parent);
+        parentManifest.Dependencies["demo/child"] = new PackageSource { Path = "child" };
+        Write(parent, parentManifest);
+        Write(
+            Root,
+            new PackageManifest
+            {
+                Name = "demo/app",
+                Dependencies = new() { ["demo/parent"] = Source(parent, transport) },
+            }
+        );
+        Workspace.Restore();
+        var original = File.ReadAllText(Path.Combine(Root, "propack.lock.json"));
+        var locked = JsonSerializer.Deserialize(original, PackageJsonContext.Default.PackageLock)!;
+        Assert.Equal("child", locked.Packages.Single(p => p.Name == "demo/child").Source.Path);
+        Assert.DoesNotContain(Cache, original, StringComparison.Ordinal);
+
+        Directory.Delete(Cache, true);
+        var relocated = Path.Combine(_directory, "relocated");
+        Directory.Move(Root, relocated);
+        var relocatedCache = Path.Combine(_directory, "relocated-cache");
+        var workspace = new PackageWorkspace(relocated, relocatedCache);
+        workspace.Restore(locked: true);
+
+        Assert.Single(workspace.GetLibraries());
+        Assert.Equal(original, File.ReadAllText(Path.Combine(relocated, "propack.lock.json")));
+        Assert.DoesNotContain(Cache, original, StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData("1.9.0", "^1.2.3", true)]
     [InlineData("2.0.0", "^1.2.3", false)]
     [InlineData("0.2.9", "^0.2.3", true)]
@@ -856,6 +937,80 @@ public sealed class PackageTests : IDisposable
             Assert.Throws<InvalidDataException>(() => Workspace.Check()).Message,
             StringComparison.Ordinal
         );
+    }
+
+    [Fact]
+    public void Restore_reports_a_malformed_deep_license_expression_as_a_package_error()
+    {
+        Write(Root, new PackageManifest { Name = "demo/app" });
+        var expression = new string('(', 2048) + "MIT";
+        File.WriteAllText(Path.Combine(Root, "UPSTREAM.json"), $$"""{ "license": "{{expression}}" }""");
+        WritePolicy("""{ "licenses": ["MIT"] }""");
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        var result = PackageCommands.Execute(["restore", "--project", Root, "--cache", Cache], output, error);
+
+        Assert.Equal(65, result);
+        Assert.Contains("Package demo/app Invalid license expression", error.ToString(), StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(Root, "propack.lock.json")));
+    }
+
+    [Fact]
+    public void Root_hash_advisories_exclude_policy_and_advisory_inputs()
+    {
+        Write(Root, new PackageManifest { Name = "demo/app" });
+        File.WriteAllText(Path.Combine(Root, "main.pl"), "main.\n");
+        Workspace.Restore();
+        var rootHash = PackageFiles.HashTree(Root);
+        WritePolicy(
+            $$"""
+            {
+              "advisories": [
+                { "id": "ROOT-1", "package": "demo/app", "hash": "{{rootHash}}", "summary": "Original summary." }
+              ]
+            }
+            """
+        );
+        var inline = Assert.Throws<InvalidDataException>(() => Workspace.Check());
+        Assert.Contains("ROOT-1", inline.Message, StringComparison.Ordinal);
+        WritePolicy(
+            $$"""
+            {
+              "advisories": [
+                { "id": "ROOT-1", "package": "demo/app", "hash": "{{rootHash}}", "summary": "Changed summary." }
+              ]
+            }
+            """
+        );
+        var changedPolicy = Assert.Throws<InvalidDataException>(() => Workspace.Check());
+        Assert.Contains("Changed summary.", changedPolicy.Message, StringComparison.Ordinal);
+
+        WritePolicy("""{ "advisoryFiles": ["feed.json"] }""");
+        File.WriteAllText(
+            Path.Combine(Root, "feed.json"),
+            $$"""
+            {
+              "advisories": [
+                { "id": "ROOT-2", "package": "demo/app", "hash": "{{rootHash}}", "summary": "Feed summary." }
+              ]
+            }
+            """
+        );
+        var feed = Assert.Throws<InvalidDataException>(() => Workspace.Check());
+        Assert.Contains("ROOT-2", feed.Message, StringComparison.Ordinal);
+        File.WriteAllText(
+            Path.Combine(Root, "feed.json"),
+            $$"""
+            {
+              "advisories": [
+                { "id": "ROOT-2", "package": "demo/app", "hash": "{{rootHash}}", "summary": "Changed feed summary." }
+              ]
+            }
+            """
+        );
+        var changedFeed = Assert.Throws<InvalidDataException>(() => Workspace.Check());
+        Assert.Contains("Changed feed summary.", changedFeed.Message, StringComparison.Ordinal);
     }
 
     private void WritePolicy(string json) => File.WriteAllText(Path.Combine(Root, "propack.policy.json"), json);
