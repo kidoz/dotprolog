@@ -35,7 +35,7 @@ internal static class Program
     private static bool ExerciseHostBoundaries()
     {
         using var engine = new PrologEngine { Output = TextWriter.Null };
-        LoadResult deep = engine.ConsultText(new string('(', 20_000) + "a" + new string(')', 20_000) + ".", "deep.pl");
+        var deep = engine.ConsultText(new string('(', 20_000) + "a" + new string(')', 20_000) + ".", "deep.pl");
         if (deep.Success || deep.Diagnostics.Count != 1 || deep.Diagnostics[0].Id != DiagnosticIds.NestingLimitExceeded)
         {
             return false;
@@ -110,7 +110,7 @@ internal static class Program
     {
         var path = args.Length > 0 ? args[0] : Path.Combine(AppContext.BaseDirectory, "acceptance.pl");
         using var engine = new PrologEngine();
-        IPricingModule pricing = PricingModule.Create(engine);
+        using var pricing = PricingModule.Create(engine);
         var maxAritySource = $"f({string.Join(",", Enumerable.Repeat("a", 256))})";
 
         if (
@@ -147,6 +147,7 @@ internal static class Program
                 tier(1200, gold),
                 compiled_runtime(native),
                 write(compiled_cross_paths), nl,
+                foreign_echo(foreign_from_consulted),
 
                 consult('{{path.Replace("\\", "\\\\", StringComparison.Ordinal)}}'),
 
@@ -198,7 +199,10 @@ internal static class Program
                 % ISO arithmetic uses the same evaluator after NativeAOT trimming.
                 Rounded is round(-1.5), Quotient is 6 / 3, Sine is sin(0),
                 format("arithmetic=~w,~w,~w~n", [Rounded, Quotient, Sine]),
-                catch(_ is 0.0 / 0.0, error(evaluation_error(undefined), _), write(arithmetic_error)), nl,
+                catch(_ is 0.0 / 0.0, error(evaluation_error(zero_divisor), _), write(arithmetic_error)), nl,
+                min(9007199254740993, 9007199254740992) =:= 9007199254740992,
+                max(1<<2000, 1<<2001) =:= 1<<2001,
+                once((call_cleanup(member(_, [a,b]), CutDone = yes), !, CutDone == yes)),
                 \ 10 =:= -11,
                 -10 \/ 12 =:= -2,
                 -10 /\ 12 =:= 4,
@@ -760,7 +764,7 @@ internal static class Program
 
         try
         {
-            RunResult result = engine.RunPendingGoals();
+            var result = engine.RunPendingGoals();
             Console.Out.Flush();
             return result == RunResult.Success ? 0 : 2;
         }
@@ -773,7 +777,7 @@ internal static class Program
 
     private static bool Report(LoadResult loaded, string what)
     {
-        foreach (Diagnostic diagnostic in loaded.Diagnostics)
+        foreach (var diagnostic in loaded.Diagnostics)
         {
             Console.Error.WriteLine($"{what}: {diagnostic}");
         }
@@ -785,8 +789,7 @@ internal static class Program
     {
         using var engine = new PrologEngine { Input = new FailingReader() };
         if (
-            engine.RunGoal("catch(get_char(_), error(system_error, _), true)", out IReadOnlyList<Diagnostic> inputDiagnostics)
-                != RunResult.Success
+            engine.RunGoal("catch(get_char(_), error(system_error, _), true)", out var inputDiagnostics) != RunResult.Success
             || inputDiagnostics.Count != 0
         )
         {
@@ -795,8 +798,7 @@ internal static class Program
 
         engine.Output = new FailingWriter();
         if (
-            engine.RunGoal("catch(write(native), error(system_error, _), true)", out IReadOnlyList<Diagnostic> outputDiagnostics)
-                != RunResult.Success
+            engine.RunGoal("catch(write(native), error(system_error, _), true)", out var outputDiagnostics) != RunResult.Success
             || outputDiagnostics.Count != 0
         )
         {
@@ -806,7 +808,7 @@ internal static class Program
         engine.Output = new DisposedWriter();
         return engine.RunGoal(
                 "catch(close(user_output, [force(false)]), error(system_error, _), true), " + "close(user_output, [force(true)])",
-                out IReadOnlyList<Diagnostic> closeDiagnostics
+                out var closeDiagnostics
             ) == RunResult.Success
             && closeDiagnostics.Count == 0;
     }
