@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace DotProlog.Compiler.Tests;
 
 /// <summary>ISO binary streams, byte input and output, type permissions, and byte domains.</summary>
@@ -50,6 +52,72 @@ public sealed class BinaryStreamTests : IDisposable
                 """
             )
         );
+    }
+
+    [Fact]
+    public void ResetReadsBytesAppendedAfterPastEnd()
+    {
+        var path = Path("append-after-eof.bin");
+        File.WriteAllBytes(path, [10]);
+
+        Assert.Equal(
+            "[10,-1,20,-1]\n",
+            PrologTestHost.RunGoal(
+                $"""
+                open('{path}', read, R, [type(binary), eof_action(reset)]),
+                  get_byte(R, A), get_byte(R, FirstEnd),
+                  open('{path}', append, W, [type(binary)]), put_byte(W, 20), close(W),
+                  get_byte(R, B), get_byte(R, SecondEnd),
+                close(R), write([A,FirstEnd,B,SecondEnd]), nl
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public async Task NonSeekableBinaryInputPeeksWithoutSeeking()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "FIFOs are Unix inputs.");
+        var path = Path("peek.fifo");
+        await CreateFifo(path);
+        var writer = WriteFifo(path, [10, 20]);
+
+        Assert.Equal(
+            "yes\n",
+            PrologTestHost.RunGoal(
+                $"""
+                open('{path}', read, In, [type(binary)]),
+                  stream_property(In, reposition(false)),
+                  \+ stream_property(In, position(_)),
+                  peek_byte(In, 10), get_byte(In, 10),
+                  peek_byte(In, 20), get_byte(In, 20),
+                  peek_byte(In, -1), at_end_of_stream(In),
+                close(In), write(yes), nl
+                """
+            )
+        );
+        await writer.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task ExplicitRepositionRejectsNonSeekableBinaryInput()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "FIFOs are Unix inputs.");
+        var path = Path("reposition.fifo");
+        await CreateFifo(path);
+        var writer = Task.Run(
+            () =>
+            {
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite);
+            },
+            TestContext.Current.CancellationToken
+        );
+
+        Assert.Equal(
+            $"permission_error(open,source_sink,'{path}')",
+            PrologTestHost.RunGoal($"catch(open('{path}', read, _, [type(binary), reposition(true)]), error(E, _), writeq(E))")
+        );
+        await writer.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -220,4 +288,23 @@ public sealed class BinaryStreamTests : IDisposable
         var path = Path("option-errors.bin");
         Assert.Equal(expected, PrologTestHost.RunGoal($"catch(open('{path}', write, _, [{option}]), error(E, _), write(E))"));
     }
+
+    private static async Task CreateFifo(string path)
+    {
+        var start = new ProcessStartInfo("mkfifo");
+        start.ArgumentList.Add(path);
+        using var process = Process.Start(start)!;
+        await process.WaitForExitAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0, process.ExitCode);
+    }
+
+    private static Task WriteFifo(string path, byte[] bytes) =>
+        Task.Run(
+            () =>
+            {
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite);
+                stream.Write(bytes, 0, bytes.Length);
+            },
+            TestContext.Current.CancellationToken
+        );
 }

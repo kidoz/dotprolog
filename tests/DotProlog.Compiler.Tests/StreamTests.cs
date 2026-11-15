@@ -38,6 +38,63 @@ public sealed class StreamTests : IDisposable
         );
     }
 
+    [Theory]
+    [InlineData(256)]
+    [InlineData(512)]
+    public void LargeMultilineQuotedInputRetainsEveryCharacter(int lines)
+    {
+        var input = "'" + string.Concat(Enumerable.Repeat("value\\\n", lines)) + "'.\n";
+
+        Assert.Equal($"{5 * lines}\n", RunWithInput(":- initialization((read(T), atom_length(T, N), write(N), nl)).", input));
+    }
+
+    [Theory]
+    [InlineData(256)]
+    [InlineData(512)]
+    public void LargeMultilineCommentsDoNotCreateTerminators(int lines)
+    {
+        var input = "/*\n" + string.Concat(Enumerable.Repeat(". not a term\n", lines)) + "*/ ok.\n";
+
+        Assert.Equal("ok\n", RunWithInput(":- initialization((read(T), write(T), nl)).", input));
+    }
+
+    [Fact]
+    public void ConvertedLineCommentDelimitersAreHonoredIncrementally()
+    {
+        Assert.Equal(
+            "first-second\n",
+            RunWithInput(
+                """
+                :- char_conversion(x, '%').
+                :- set_prolog_flag(char_conversion, on).
+                :- initialization((read(A), read(B), write(A-B), nl)).
+                """,
+                "first x . ignored\n. second.\n"
+            )
+        );
+    }
+
+    [Fact]
+    public void ConvertedBlockCommentDelimitersAreHonoredIncrementally()
+    {
+        Assert.Equal(
+            "first-second\n",
+            RunWithInput(
+                """
+                :- char_conversion(x, /).
+                :- char_conversion(y, *).
+                :- set_prolog_flag(char_conversion, on).
+                :- initialization((read(A), read(B), write(A-B), nl)).
+                """,
+                "first xy . ignored yx. second.\n"
+            )
+        );
+    }
+
+    [Fact]
+    public void CharacterCodeFullStopIsNotAClauseTerminator() =>
+        Assert.Equal("46\n", RunWithInput(":- initialization((read(T), write(T), nl)).", "0'.. next.\n"));
+
     [Fact]
     public void ReadsTermsFromStandardInput() =>
         Assert.Equal(
@@ -284,6 +341,71 @@ public sealed class StreamTests : IDisposable
             )
         );
     }
+
+    [Theory]
+    [InlineData("get_code(S, _)")]
+    [InlineData("peek_char(S, _)")]
+    [InlineData("read(S, _)")]
+    public void InvalidUtf8RaisesRepresentationError(string operation)
+    {
+        var path = Path("invalid-utf8.txt");
+        File.WriteAllBytes(path, [0xF0, 0x28, 0x8C, 0x28]);
+
+        Assert.Equal(
+            "representation_error(character)",
+            PrologTestHost.RunGoal($"open('{path}', read, S), catch({operation}, error(E, _), write(E)), close(S, [force(true)])")
+        );
+    }
+
+    [Fact]
+    public void Utf16ByteOrderMarkIsNotDetectedAsAnEncoding()
+    {
+        var path = Path("utf16-bom.txt");
+        File.WriteAllBytes(path, [0xFF, 0xFE, 0x61, 0x00]);
+
+        Assert.Equal(
+            "representation_error(character)",
+            PrologTestHost.RunGoal(
+                $"open('{path}', read, S), catch(get_code(S, _), error(E, _), write(E)), close(S, [force(true)])"
+            )
+        );
+    }
+
+    [Fact]
+    public void InitialUtf8ByteOrderMarkIsSkippedAndAnEmbeddedOneIsPreserved()
+    {
+        var path = Path("utf8-bom.txt");
+        File.WriteAllBytes(path, [0xEF, 0xBB, 0xBF, 0x61, 0xEF, 0xBB, 0xBF]);
+
+        Assert.Equal(
+            "[97,65279]\n",
+            PrologTestHost.RunGoal($"open('{path}', read, S), get_code(S, A), get_code(S, Bom), close(S), write([A,Bom]), nl")
+        );
+    }
+
+    [Theory]
+    [InlineData(PrologLanguageMode.Modern)]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    public void ReadsBomPrefixedTermsAndRestoresTheInitialPosition(PrologLanguageMode mode)
+    {
+        var path = Path("utf8-bom-terms.txt");
+        File.WriteAllText(path, "hello.\nworld.\n", new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+        using var engine = new PrologEngine(mode);
+
+        Assert.True(
+            engine
+                .Query(
+                    $"open('{path}', read, S), stream_property(S, position(P)), "
+                        + "peek_code(S, 104), read(S, hello), read(S, world), "
+                        + "set_stream_position(S, P), read(S, hello), close(S)"
+                )
+                .Prove()
+        );
+    }
+
+    [Fact]
+    public void AtEndOfStreamFailsForAnOutputStream() =>
+        Assert.Equal("no\n", PrologTestHost.RunGoal("(at_end_of_stream(user_output) -> write(yes) ; write(no)), nl"));
 
     [Fact]
     public void AtEndOfStreamReportsWhereTheReaderIs()

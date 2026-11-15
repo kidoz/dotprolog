@@ -23,6 +23,12 @@ internal static class Program
             return CompilerExecutionProfile.Run(args.AsSpan(1));
         }
 
+        if (args.Length == 1 && args[0] == "--measure-stream-reader")
+        {
+            StreamTermReaderBenchmarks.Measure();
+            return 0;
+        }
+
         if (args.Length == 1 && args[0] == "--compiler-metrics")
         {
             CompilerArtifactMetrics.Write();

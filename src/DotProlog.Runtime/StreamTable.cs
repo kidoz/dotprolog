@@ -29,35 +29,38 @@ public sealed class StreamTable
                 null,
                 null,
                 reposition: false,
-                permanent: true
+                permanent: true,
+                PrologStream.EofAction.Reset
             )
         );
         UserOutput = Add(
             new PrologStream(
                 1,
                 "user_output",
-                "write",
+                "append",
                 "text",
                 "user_output",
                 null,
                 Console.Out,
                 null,
                 reposition: false,
-                permanent: true
+                permanent: true,
+                PrologStream.EofAction.Reset
             )
         );
         UserError = Add(
             new PrologStream(
                 2,
                 "user_error",
-                "write",
+                "append",
                 "text",
                 "user_error",
                 null,
                 Console.Error,
                 null,
                 reposition: false,
-                permanent: true
+                permanent: true,
+                PrologStream.EofAction.Reset
             )
         );
 
@@ -97,7 +100,8 @@ public sealed class StreamTable
         string? alias,
         string type,
         bool reposition,
-        PrologStream.EofAction eofAction
+        PrologStream.EofAction eofAction,
+        bool requireReposition = false
     )
     {
         ArgumentNullException.ThrowIfNull(path);
@@ -107,63 +111,65 @@ public sealed class StreamTable
             throw new InvalidOperationException($"The stream alias '{alias}' is already in use.");
         }
 
-        PrologStream stream =
+        var stream =
             type == "binary"
                 ? OpenBinary(path, mode, alias, reposition, eofAction)
                 : OpenText(path, mode, alias, reposition, eofAction);
+        if (requireReposition && !stream.Reposition)
+        {
+            stream.Close(force: true);
+            throw new IOException("The stream cannot be repositioned.");
+        }
+
         return Add(stream);
     }
 
-    private PrologStream OpenText(string path, string mode, string? alias, bool reposition, PrologStream.EofAction eofAction) =>
-        mode switch
+    private PrologStream OpenText(string path, string mode, string? alias, bool reposition, PrologStream.EofAction eofAction)
+    {
+        if (mode == "read")
         {
-            "read" => new PrologStream(
+            var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            var reader = new PositionedTextReader(input);
+            return new PrologStream(
                 _streams.Count,
                 path,
                 mode,
                 "text",
                 alias,
-                new PositionedTextReader(File.ReadAllText(path)),
+                reader,
                 null,
                 null,
-                reposition,
+                reposition && reader.CanReposition,
                 permanent: false,
                 eofAction
-            ),
-            "write" => new PrologStream(
-                _streams.Count,
-                path,
-                mode,
-                "text",
-                alias,
-                null,
-                new PositionedTextWriter(path, append: false),
-                null,
-                reposition,
-                false,
-                eofAction
-            ),
-            "append" => new PrologStream(
-                _streams.Count,
-                path,
-                mode,
-                "text",
-                alias,
-                null,
-                new PositionedTextWriter(path, append: true),
-                null,
-                reposition,
-                false,
-                eofAction
-            ),
-            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown stream mode."),
-        };
+            );
+        }
+
+        return new PrologStream(
+            _streams.Count,
+            path,
+            mode,
+            "text",
+            alias,
+            null,
+            mode switch
+            {
+                "write" => new PositionedTextWriter(path, append: false),
+                "append" => new PositionedTextWriter(path, append: true),
+                _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown stream mode."),
+            },
+            null,
+            reposition,
+            false,
+            eofAction
+        );
+    }
 
     private PrologStream OpenBinary(string path, string mode, string? alias, bool reposition, PrologStream.EofAction eofAction)
     {
-        FileStream stream = mode switch
+        var stream = mode switch
         {
-            "read" => new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read),
+            "read" => new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete),
             "write" => new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read),
             "append" => OpenBinaryAppend(path),
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown stream mode."),
@@ -178,7 +184,7 @@ public sealed class StreamTable
             null,
             null,
             stream,
-            reposition,
+            reposition && stream.CanSeek,
             permanent: false,
             eofAction
         );
@@ -220,13 +226,13 @@ public sealed class StreamTable
     public PrologStream? ByAlias(string alias)
     {
         ArgumentNullException.ThrowIfNull(alias);
-        return _aliases.TryGetValue(alias, out PrologStream? stream) && stream.IsOpen ? stream : null;
+        return _aliases.TryGetValue(alias, out var stream) && stream.IsOpen ? stream : null;
     }
 
     /// <summary>Closes every stream a program opened, leaving the standard ones.</summary>
     public void CloseAll()
     {
-        foreach (PrologStream stream in _streams)
+        foreach (var stream in _streams)
         {
             if (!stream.IsPermanent && stream.IsOpen)
             {
@@ -269,7 +275,7 @@ public sealed class StreamTable
             return string.Empty;
         }
 
-        (PrologStream previous, StringWriter sink) = _captures.Pop();
+        (var previous, var sink) = _captures.Pop();
         CurrentOutput = previous;
         return sink.ToString();
     }

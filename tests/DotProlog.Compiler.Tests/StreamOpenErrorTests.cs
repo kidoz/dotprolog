@@ -113,6 +113,19 @@ public sealed class StreamOpenErrorTests : IDisposable
         Assert.False(File.Exists(path));
     }
 
+    [Theory]
+    [InlineData("write")]
+    [InlineData("append")]
+    public void MissingOutputDirectoryReportsPermissionError(string mode)
+    {
+        var path = Path("missing/output.txt");
+
+        Assert.Equal(
+            $"permission_error(open,source_sink,'{path}')",
+            PrologTestHost.RunGoal($"catch(open('{path}', {mode}, _), error(E, _), writeq(E))")
+        );
+    }
+
     [Fact]
     public void ExistingSourceThatCannotBeOpenedReportsPermissionError()
     {

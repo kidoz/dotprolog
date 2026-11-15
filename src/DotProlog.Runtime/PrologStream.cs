@@ -27,6 +27,7 @@ public sealed class PrologStream
 
     private string _buffer = string.Empty;
     private EndState _endState;
+    private int _binaryPeek = -1;
 
     internal PrologStream(
         int id,
@@ -85,6 +86,9 @@ public sealed class PrologStream
     /// <summary>Whether <c>set_stream_position/2</c> may restore this stream.</summary>
     internal bool Reposition { get; }
 
+    /// <summary>Whether this stream is attached to a named file.</summary>
+    internal bool HasFileName => Reader is PositionedTextReader || Writer is PositionedTextWriter || BinaryStream is not null;
+
     /// <summary>What an input operation does after an EOF marker has already been returned.</summary>
     internal EofAction EndOfFileAction { get; }
 
@@ -110,7 +114,18 @@ public sealed class PrologStream
 
         if (BinaryStream is not null)
         {
-            return BinaryStream.CanSeek && BinaryStream.Position >= BinaryStream.Length ? EndState.At : EndState.Not;
+            if (_binaryPeek >= 0)
+            {
+                return EndState.Not;
+            }
+
+            return BinaryStream.CanSeek
+                ? BinaryStream.Position >= BinaryStream.Length
+                    ? EndState.At
+                    : EndState.Not
+                : PeekByte() < 0
+                    ? EndState.At
+                    : EndState.Not;
         }
 
         // Inspecting an interactive standard input must not wait for a user keystroke merely to
@@ -121,6 +136,30 @@ public sealed class PrologStream
         }
 
         return _buffer.Length == 0 && Reader!.Peek() < 0 ? EndState.At : EndState.Not;
+    }
+
+    /// <summary>Reads a byte, consuming any byte retained by a peek.</summary>
+    internal int ReadByte()
+    {
+        if (_binaryPeek >= 0)
+        {
+            var next = _binaryPeek;
+            _binaryPeek = -1;
+            return next;
+        }
+
+        return BinaryStream!.ReadByte();
+    }
+
+    /// <summary>Returns the next byte without consuming it, including on a non-seekable stream.</summary>
+    internal int PeekByte()
+    {
+        if (_binaryPeek < 0)
+        {
+            _binaryPeek = BinaryStream!.ReadByte();
+        }
+
+        return _binaryPeek;
     }
 
     /// <summary>Records whether a consuming input operation returned the EOF marker.</summary>
@@ -149,7 +188,7 @@ public sealed class PrologStream
 
         if (BinaryStream is { CanSeek: true })
         {
-            position = BinaryStream.Position;
+            position = BinaryStream.Position - (_binaryPeek >= 0 ? 1 : 0);
             return true;
         }
 
@@ -168,6 +207,7 @@ public sealed class PrologStream
         if (changed)
         {
             _buffer = string.Empty;
+            _binaryPeek = -1;
             _endState = EndState.Not;
         }
 

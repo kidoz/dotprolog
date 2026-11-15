@@ -79,6 +79,29 @@ public sealed class StreamPositionTests : IDisposable
     }
 
     [Fact]
+    public void BinaryPeekDoesNotAdvanceTheLogicalPosition()
+    {
+        var path = Path("peek-position.bin");
+        File.WriteAllBytes(path, [10, 20]);
+
+        Assert.Equal(
+            "10\n",
+            PrologTestHost.RunGoal(
+                $"""
+                open('{path}', read, In, [type(binary)]),
+                  stream_property(In, position(Start)),
+                  peek_byte(In, 10),
+                  stream_property(In, position(Peeked)),
+                  Peeked == Start,
+                  set_stream_position(In, Peeked),
+                  get_byte(In, Byte),
+                close(In), write(Byte), nl
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void RestoringBinaryInputResetsEndOfStream()
     {
         var path = Path("input.bin");

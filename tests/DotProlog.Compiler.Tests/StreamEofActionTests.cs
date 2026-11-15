@@ -135,6 +135,46 @@ public sealed class StreamEofActionTests : IDisposable
     }
 
     [Fact]
+    public void ResetReadsTextAppendedAfterPastEnd()
+    {
+        var path = Path("append-after-eof.txt");
+        File.WriteAllText(path, "a");
+
+        Assert.Equal(
+            "[a,end_of_file,b,end_of_file]\n",
+            PrologTestHost.RunGoal(
+                $"""
+                open('{path}', read, R, [eof_action(reset)]),
+                  get_char(R, A), get_char(R, FirstEnd),
+                  open('{path}', append, W), put_char(W, b), close(W),
+                  get_char(R, B), get_char(R, SecondEnd),
+                close(R), write([A,FirstEnd,B,SecondEnd]), nl
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ResetReadsTermsAppendedAfterPastEnd()
+    {
+        var path = Path("append-terms-after-eof.pl");
+        File.WriteAllText(path, "one.");
+
+        Assert.Equal(
+            "[one,end_of_file,two]\n",
+            PrologTestHost.RunGoal(
+                $"""
+                open('{path}', read, R, [eof_action(reset)]),
+                  read(R, A), read(R, FirstEnd),
+                  open('{path}', append, W), write(W, ' two.'), close(W),
+                  read(R, B),
+                close(R), write([A,FirstEnd,B]), nl
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void RightmostEofActionWins()
     {
         var path = Path("rightmost.txt");
