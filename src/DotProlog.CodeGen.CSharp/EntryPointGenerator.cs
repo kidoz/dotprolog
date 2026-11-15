@@ -116,10 +116,14 @@ public static class EntryPointGenerator
         text.AppendLine("        engine.Machine.CancellationToken = cancellationToken;");
         text.AppendLine("        try");
         text.AppendLine("        {");
+        text.AppendLine("            global::DotProlog.Generated.ForeignPredicateRegistry.Register(engine.Program.Builtins);");
         text.AppendLine("            int[] initialization = __CompiledTests.Install(engine);");
-        text.AppendLine("            foreach (int target in initialization)");
+        text.AppendLine("            global::DotProlog.Runtime.RunResult result = engine.RunInitializers(initialization);");
+        text.AppendLine("            if (result != global::DotProlog.Runtime.RunResult.Success)");
         text.AppendLine("            {");
-        text.AppendLine("                engine.Machine.Run(target);");
+        text.AppendLine(
+            "                throw new global::DotProlog.Runtime.PrologException(result == global::DotProlog.Runtime.RunResult.Halted ? $\"Initialization halted with exit code {engine.Machine.ExitCode}.\" : \"Initialization failed.\");"
+        );
         text.AppendLine("            }");
         text.AppendLine("            return engine;");
         text.AppendLine("        }");
@@ -231,18 +235,11 @@ public static class EntryPointGenerator
             CultureInfo.InvariantCulture,
             $"        using var engine = new global::DotProlog.Compiler.PrologEngine({FlagOverridesSyntax.EngineArguments(languageMode, flagOverrides)});"
         );
-        text.AppendLine("        int[] initialization = __CompiledProgram.Install(engine);");
         text.AppendLine("        try");
         text.AppendLine("        {");
-        text.AppendLine("            global::DotProlog.Runtime.RunResult result = global::DotProlog.Runtime.RunResult.Success;");
-        text.AppendLine("            foreach (int target in initialization)");
-        text.AppendLine("            {");
-        text.AppendLine("                result = engine.Machine.Run(target);");
-        text.AppendLine("                if (result is global::DotProlog.Runtime.RunResult.Halted)");
-        text.AppendLine("                {");
-        text.AppendLine("                    break;");
-        text.AppendLine("                }");
-        text.AppendLine("            }");
+        text.AppendLine("            global::DotProlog.Generated.ForeignPredicateRegistry.Register(engine.Program.Builtins);");
+        text.AppendLine("            int[] initialization = __CompiledProgram.Install(engine);");
+        text.AppendLine("            global::DotProlog.Runtime.RunResult result = engine.RunInitializers(initialization);");
         text.AppendLine("            global::System.Console.Out.Flush();");
         text.AppendLine();
         text.AppendLine("            return result switch");

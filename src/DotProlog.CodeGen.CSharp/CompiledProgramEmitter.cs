@@ -37,10 +37,11 @@ internal static class CompiledProgramEmitter
         PrologLanguageMode languageMode,
         PrologFlagOverrides flagOverrides,
         out IReadOnlyList<Diagnostic> diagnostics,
-        IReadOnlyDictionary<string, string>? libraryFiles = null
+        IReadOnlyDictionary<string, string>? libraryFiles = null,
+        IReadOnlyList<ContractExport>? contractedExports = null
     )
     {
-        CompiledProgramModel? model = CompiledProgramBuilder.Compile(
+        var model = CompiledProgramBuilder.Compile(
             sources,
             hostBuiltins,
             languageMode,
@@ -49,7 +50,65 @@ internal static class CompiledProgramEmitter
             indexFirstArgument: true,
             libraryFiles: libraryFiles
         );
-        return model is null ? string.Empty : Emit(model, typeName, languageMode, model.InitialDoubleQuotes);
+        if (model is null)
+        {
+            return string.Empty;
+        }
+
+        if (contractedExports is not null)
+        {
+            var missing = MissingPredicates(model, contractedExports, sources);
+            if (missing.Count > 0)
+            {
+                diagnostics = [.. diagnostics, .. missing];
+                return string.Empty;
+            }
+        }
+
+        return Emit(model, typeName, languageMode, model.InitialDoubleQuotes);
+    }
+
+    private static List<Diagnostic> MissingPredicates(
+        CompiledProgramModel model,
+        IReadOnlyList<ContractExport> exports,
+        IReadOnlyList<(string Name, string Text)> sources
+    )
+    {
+        HashSet<(string Name, int Arity)> defined = [];
+        foreach (var predicate in model.Predicates)
+        {
+            defined.Add(model.Functors[predicate.Functor]);
+        }
+
+        foreach (var predicate in model.DynamicPredicates)
+        {
+            defined.Add(model.Functors[predicate.Functor]);
+            foreach (var alias in predicate.Aliases)
+            {
+                defined.Add(model.Functors[alias]);
+            }
+        }
+
+        List<Diagnostic> diagnostics = [];
+        foreach (var export in exports)
+        {
+            if (defined.Contains((export.PredicateName, export.Arity)))
+            {
+                continue;
+            }
+
+            diagnostics.Add(
+                new Diagnostic(
+                    CodeGenDiagnosticIds.MissingPredicate,
+                    DiagnosticSeverity.Error,
+                    $"The contract exports {export.PredicateName}/{export.Arity}, but the Prolog program does not define it.",
+                    SourceSpan.None,
+                    sources.Count == 1 ? sources[0].Name : null
+                )
+            );
+        }
+
+        return diagnostics;
     }
 
     private static string Emit(
@@ -128,10 +187,10 @@ internal static class CompiledProgramEmitter
             );
         }
 
-        foreach (PreparationStep step in model.Preparation)
+        foreach (var step in model.Preparation)
         {
             text.AppendLine();
-            foreach (CompiledPredicate predicate in step.Predicates)
+            foreach (var predicate in step.Predicates)
             {
                 text.AppendLine(
                     CultureInfo.InvariantCulture,
@@ -141,10 +200,11 @@ internal static class CompiledProgramEmitter
 
             text.AppendLine(
                 CultureInfo.InvariantCulture,
-                $"        if (engine.Machine.Run(compiled.Target({step.Directive})) is global::DotProlog.Runtime.RunResult.Failure)"
+                $"        if (engine.RunPreparationDirective(compiled.Target({step.Directive})) is global::DotProlog.Runtime.RunResult.Halted)"
             );
             text.AppendLine("        {");
-            text.AppendLine("            engine.Output.Write(\"Warning: directive failed.\\n\");");
+            text.AppendLine("            runtime.Flags.SetDoubleQuotes(enteringDoubleQuotes);");
+            text.AppendLine("            return [];");
             text.AppendLine("        }");
         }
 
@@ -155,7 +215,7 @@ internal static class CompiledProgramEmitter
         }
 
         text.AppendLine();
-        foreach (CompiledPredicate predicate in model.Predicates)
+        foreach (var predicate in model.Predicates)
         {
             text.AppendLine(
                 CultureInfo.InvariantCulture,
@@ -163,13 +223,13 @@ internal static class CompiledProgramEmitter
             );
         }
 
-        foreach (CompiledDynamicPredicate predicate in model.DynamicPredicates)
+        foreach (var predicate in model.DynamicPredicates)
         {
             text.AppendLine(
                 CultureInfo.InvariantCulture,
                 $"        runtime.DeclareCompiledDynamic(functors[{predicate.Functor}]);"
             );
-            foreach (CompiledDynamicClause clause in predicate.Clauses)
+            foreach (var clause in predicate.Clauses)
             {
                 var cells = string.Join(", ", clause.Term.Select(cell => TermCell(cell, "compiled")));
                 text.AppendLine(
@@ -265,8 +325,8 @@ internal static class CompiledProgramEmitter
     {
         for (var index = 0; index < model.Modules.Count; index++)
         {
-            CompiledModule module = model.Modules[index];
-            string variable = $"module{index.ToString(CultureInfo.InvariantCulture)}";
+            var module = model.Modules[index];
+            var variable = $"module{index.ToString(CultureInfo.InvariantCulture)}";
             text.AppendLine(
                 CultureInfo.InvariantCulture,
                 $"        global::DotProlog.Runtime.ModuleDefinition {variable} = runtime.Modules.Declare({SyntaxFacts.Literal(module.Name)});"
@@ -276,7 +336,7 @@ internal static class CompiledProgramEmitter
                 $"        {variable}.InterfacePrepared = {module.InterfacePrepared.ToString().ToLowerInvariant()};"
             );
             text.AppendLine(CultureInfo.InvariantCulture, $"        {variable}.Operators.Clear();");
-            foreach (PrologOperator op in module.Operators)
+            foreach (var op in module.Operators)
             {
                 text.AppendLine(
                     CultureInfo.InvariantCulture,
@@ -309,8 +369,8 @@ internal static class CompiledProgramEmitter
 
             for (var predicateIndex = 0; predicateIndex < module.Predicates.Count; predicateIndex++)
             {
-                CompiledModulePredicate predicate = module.Predicates[predicateIndex];
-                string predicateVariable = $"{variable}Predicate{predicateIndex.ToString(CultureInfo.InvariantCulture)}";
+                var predicate = module.Predicates[predicateIndex];
+                var predicateVariable = $"{variable}Predicate{predicateIndex.ToString(CultureInfo.InvariantCulture)}";
                 text.AppendLine(
                     CultureInfo.InvariantCulture,
                     $"        global::DotProlog.Runtime.ModulePredicateDefinition {predicateVariable} = {variable}.Predicate(new global::DotProlog.Runtime.ModulePredicateIndicator({SyntaxFacts.Literal(predicate.Name)}, {predicate.Arity}));"
@@ -339,7 +399,7 @@ internal static class CompiledProgramEmitter
                     );
                 }
 
-                foreach (CompiledModuleClause clause in predicate.StaticClauses)
+                foreach (var clause in predicate.StaticClauses)
                 {
                     var cells = string.Join(", ", clause.Term.Select(cell => TermCell(cell, "compiled")));
                     text.AppendLine(
@@ -349,7 +409,7 @@ internal static class CompiledProgramEmitter
                 }
             }
 
-            foreach (CompiledModuleImport import in module.Imports)
+            foreach (var import in module.Imports)
             {
                 text.AppendLine(
                     CultureInfo.InvariantCulture,
@@ -377,7 +437,7 @@ internal static class CompiledProgramEmitter
     {
         text.AppendLine("        global::DotProlog.Runtime.Cell[] constants =");
         text.AppendLine("        [");
-        foreach (CompiledConstant constant in model.Constants)
+        foreach (var constant in model.Constants)
         {
             var expression = constant.Tag switch
             {
@@ -401,7 +461,7 @@ internal static class CompiledProgramEmitter
 
     private static string Operation(CompiledProgramModel model, int index)
     {
-        CompiledInstruction instruction = model.Instructions[index];
+        var instruction = model.Instructions[index];
         var next = Target(model, instruction.NextAddress);
         var a = instruction.First.ToString(CultureInfo.InvariantCulture);
         var b = instruction.Second.ToString(CultureInfo.InvariantCulture);

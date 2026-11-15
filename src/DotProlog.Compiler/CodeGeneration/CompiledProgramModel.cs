@@ -57,7 +57,7 @@ internal sealed class CompiledProgramModel
             address = instruction.NextAddress;
         }
 
-        foreach (CompiledInstruction instruction in model.Instructions)
+        foreach (var instruction in model.Instructions)
         {
             switch (instruction.OpCode)
             {
@@ -138,7 +138,7 @@ internal sealed class CompiledProgramModel
             }
         }
 
-        foreach (RawPreparationStep raw in preparation)
+        foreach (var raw in preparation)
         {
             if (!model.InstructionByAddress.TryGetValue(raw.Directive, out var directive))
             {
@@ -158,7 +158,7 @@ internal sealed class CompiledProgramModel
         }
 
         HashSet<DynamicPredicate> seenDynamic = new(ReferenceEqualityComparer.Instance);
-        foreach ((_, DynamicPredicate predicate) in program.DynamicPredicates)
+        foreach ((_, var predicate) in program.DynamicPredicates)
         {
             if (!seenDynamic.Add(predicate))
             {
@@ -167,7 +167,7 @@ internal sealed class CompiledProgramModel
 
             var functor = AddFunctor(program, model, functors, predicate.FunctorId);
             List<int> aliases = [];
-            foreach ((var candidateFunctor, DynamicPredicate candidate) in program.DynamicPredicates)
+            foreach ((var candidateFunctor, var candidate) in program.DynamicPredicates)
             {
                 if (candidateFunctor != predicate.FunctorId && ReferenceEquals(candidate, predicate))
                 {
@@ -176,7 +176,7 @@ internal sealed class CompiledProgramModel
             }
 
             List<CompiledDynamicClause> clauses = [];
-            for (DynamicClause? clause = predicate.First; clause is not null; clause = clause.Next)
+            for (var clause = predicate.First; clause is not null; clause = clause.Next)
             {
                 if (!model.InstructionByAddress.TryGetValue(clause.CodeAddress, out var entry))
                 {
@@ -184,14 +184,18 @@ internal sealed class CompiledProgramModel
                 }
 
                 List<CompiledTermCell> term = [];
-                foreach (Cell cell in clause.Term.Cells)
+                foreach (var cell in clause.Term.Cells)
                 {
                     var value = cell.Tag switch
                     {
                         CellTag.Reference or CellTag.Structure => cell.Index,
                         CellTag.Functor => AddFunctor(program, model, functors, cell.Index),
-                        CellTag.Atom or CellTag.Integer or CellTag.BigInteger or CellTag.Float or CellTag.String =>
-                            AddTermConstant(program, model, termConstants, cell),
+                        CellTag.Atom
+                        or CellTag.Integer
+                        or CellTag.BigInteger
+                        or CellTag.Rational
+                        or CellTag.Float
+                        or CellTag.String => AddTermConstant(program, model, termConstants, cell),
                         _ => throw new InvalidOperationException($"Dynamic term cell {cell.Tag} cannot be generated."),
                     };
                     term.Add(new CompiledTermCell(cell.Tag, value));
@@ -203,14 +207,14 @@ internal sealed class CompiledProgramModel
             model.DynamicPredicates.Add(new CompiledDynamicPredicate(functor, aliases, clauses));
         }
 
-        foreach (ModuleDefinition module in program.Modules.Definitions)
+        foreach (var module in program.Modules.Definitions)
         {
             List<CompiledModulePredicate> predicates = [];
-            foreach (ModulePredicateDefinition predicate in module.Predicates)
+            foreach (var predicate in module.Predicates)
             {
-                string compiledName =
+                var compiledName =
                     module.Name == "user" ? predicate.Indicator.Name : $"{module.Name}:{predicate.Indicator.Name}";
-                int functor = program.Symbols.InternFunctor(compiledName, predicate.Indicator.Arity);
+                var functor = program.Symbols.InternFunctor(compiledName, predicate.Indicator.Arity);
                 if (predicate.Defined && !program.IsUserPredicate(functor))
                 {
                     continue;
@@ -272,7 +276,7 @@ internal sealed class CompiledProgramModel
     )
     {
         List<CompiledTermCell> term = [];
-        foreach (Cell cell in cells)
+        foreach (var cell in cells)
         {
             var value = cell.Tag switch
             {
@@ -318,7 +322,7 @@ internal sealed class CompiledProgramModel
             return reference;
         }
 
-        Functor functor = program.Symbols.GetFunctor(functorId);
+        var functor = program.Symbols.GetFunctor(functorId);
         reference = model.Functors.Count;
         references[functorId] = reference;
         model.Functors.Add((program.Symbols.AtomName(functor.NameAtom), functor.Arity));
@@ -343,7 +347,7 @@ internal sealed class CompiledProgramModel
 
     private static string RationalText(BytecodeProgram program, int rationalId)
     {
-        (System.Numerics.BigInteger numerator, System.Numerics.BigInteger denominator) = program.Symbols.GetRational(rationalId);
+        (var numerator, var denominator) = program.Symbols.GetRational(rationalId);
         return string.Create(CultureInfo.InvariantCulture, $"{numerator}r{denominator}");
     }
 }

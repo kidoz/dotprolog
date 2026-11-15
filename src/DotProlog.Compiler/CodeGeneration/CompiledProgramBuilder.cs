@@ -40,19 +40,22 @@ internal static class CompiledProgramBuilder
         var codeStart = engine.Program.CodeLength;
         List<Diagnostic> allDiagnostics = [];
         List<int> initialization = [];
+        List<int> mainInitialization = [];
         List<RawPreparationStep> preparation = [];
 
         foreach ((var name, var source) in sources)
         {
-            LoadResult loaded = engine.CompileForGeneratedCode(
+            var loaded = engine.CompileForGeneratedCode(
                 source,
                 name,
-                address => preparation.Add(new RawPreparationStep(address, SnapshotPredicates(engine.Program, codeStart)))
+                address => preparation.Add(new RawPreparationStep(address, SnapshotPredicates(engine.Program, codeStart))),
+                initialization,
+                mainInitialization
             );
             allDiagnostics.AddRange(loaded.Diagnostics);
-            initialization.AddRange(loaded.InitializationAddresses);
         }
 
+        initialization.AddRange(mainInitialization);
         diagnostics = allDiagnostics;
         if (allDiagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
         {

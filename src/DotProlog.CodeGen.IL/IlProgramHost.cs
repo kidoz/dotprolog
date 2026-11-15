@@ -26,15 +26,7 @@ public static class IlProgramHost
             var quotes = (DoubleQuotesMode)reader.ReadInt32();
             using var engine = new PrologEngine(mode, new PrologFlagOverrides { DoubleQuotes = quotes });
             var initializers = Install(engine, image, blocks);
-            var result = RunResult.Success;
-            foreach (var target in initializers)
-            {
-                result = engine.Machine.Run(target);
-                if (result is RunResult.Halted or RunResult.Failure)
-                {
-                    break;
-                }
-            }
+            var result = engine.RunInitializers(initializers);
             return result switch
             {
                 RunResult.Halted => engine.Machine.ExitCode,
@@ -131,9 +123,9 @@ public static class IlProgramHost
             for (var i = 0; i < preparationCount; i++)
             {
                 ReadPredicates(reader, runtime, compiled);
-                if (engine.Machine.Run(compiled.Target(reader.ReadInt32())) is RunResult.Failure)
+                if (engine.RunPreparationDirective(compiled.Target(reader.ReadInt32())) is RunResult.Halted)
                 {
-                    engine.Output.Write("Warning: directive failed.\n");
+                    return [];
                 }
             }
         }
