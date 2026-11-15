@@ -44,9 +44,9 @@ internal static class Program
             Func<CancellationToken, Task<ProjectConfiguration>>? reload = project is null
                 ? null
                 : token => ProjectEvaluator.EvaluateAsync(project.ProjectPath, configuration, token);
-            return await new LanguageServer(mode, project, reload)
-                .RunAsync(Console.OpenStandardInput(), Console.OpenStandardOutput())
-                .ConfigureAwait(false);
+            using var input = Console.OpenStandardInput();
+            using var output = Console.OpenStandardOutput();
+            return await new LanguageServer(mode, project, reload).RunAsync(input, output).ConfigureAwait(false);
         }
         catch (Exception exception)
             when (exception

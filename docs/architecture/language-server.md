@@ -9,7 +9,10 @@ check. This is a development prototype, not an installable release or a complete
 
 - `DotProlog.LanguageServer` produces `dotprolog-lsp`, targeting .NET 10 with AOT analysis enabled.
   It is non-packable and is not added to release workflows.
-- StreamJsonRpc 2.26.150 supplies Content-Length framing. An explicit JSON DOM formatter and
+- A bounded reader validates incoming Content-Length framing before retaining a message: headers
+  are limited to 8 KiB and bodies to 8 MiB. Malformed, truncated, or oversized frames receive a
+  parse-error response and end the session with exit code 1; invalid JSON in a valid frame remains
+  recoverable. StreamJsonRpc 2.26.150 supplies serialized, flushed output framing. An explicit JSON DOM formatter and
   ordered dispatch avoid reflection-based serialization and handler registration.
 - `initialize`, `initialized`, `shutdown`, `exit`, and full-text `didOpen`, `didChange`, `didClose`
   notifications are supported. Unknown requests receive method-not-found errors; unknown

@@ -31,9 +31,11 @@ internal sealed class LanguageServer(
         // overload uses a background pipe pump whose completion can outlive RunAsync.
         using var transport = new HeaderDelimitedMessageHandler(
             PipeWriter.Create(output, new StreamPipeWriterOptions(leaveOpen: true)),
-            PipeReader.Create(input, new StreamPipeReaderOptions(leaveOpen: true)),
+            PipeReader.Create(Stream.Null),
             new LspMessageFormatter()
         );
+        var reader = new LspMessageReader(input);
+        await using var readerLifetime = reader.ConfigureAwait(false);
         var analysis = new AnalysisScheduler(
             mode,
             project,
@@ -54,12 +56,17 @@ internal sealed class LanguageServer(
             LspMessage? message;
             try
             {
-                message = (LspMessage?)await transport.ReadAsync(cancellationToken).ConfigureAwait(false);
+                message = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (JsonException)
             {
                 await SendAsync(Error(null, -32700, "Parse error.")).ConfigureAwait(false);
                 continue;
+            }
+            catch (InvalidDataException)
+            {
+                await SendAsync(Error(null, -32700, "Invalid or oversized LSP frame.")).ConfigureAwait(false);
+                return 1;
             }
             if (message is null)
                 return _shutdown ? 0 : 1;
