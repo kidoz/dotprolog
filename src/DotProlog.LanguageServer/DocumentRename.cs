@@ -78,7 +78,7 @@ internal static class DocumentRename
 
     private static Selection Select(IReadOnlyDictionary<string, SourceOutline> outlines, string uri, int line, int character)
     {
-        string key = DocumentSnapshot.Key(uri);
+        var key = DocumentSnapshot.Key(uri);
         if (
             !outlines.TryGetValue(key, out var outline)
             || new SourcePositions(outline.Text).Offset(line, character) is not { } offset
@@ -102,7 +102,7 @@ internal static class DocumentRename
             // Every interpretation of a physical token must agree, including expansions where it is data.
             analyses.UnionWith(target.Renames);
             var view = View(target, group.Key);
-            int end = -1;
+            var end = -1;
             foreach (var site in group.DistinctBy(site => site.Range).OrderBy(site => site.Range.Start))
             {
                 var agreed = NavigationSites.At(view, site.Range.Start);

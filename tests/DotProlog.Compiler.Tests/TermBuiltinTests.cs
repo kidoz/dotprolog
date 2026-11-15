@@ -245,7 +245,7 @@ public sealed class TermBuiltinTests
         using var engine = new PrologEngine { Output = new StringWriter() };
         Assert.True(engine.ConsultText(":- initialization(T =.. []).").Success);
 
-        PrologException exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
+        var exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
 
         Assert.Contains("domain_error(non_empty_list", exception.Message, StringComparison.Ordinal);
     }

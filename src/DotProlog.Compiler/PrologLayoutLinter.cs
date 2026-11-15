@@ -20,7 +20,7 @@ internal static class PrologLayoutLinter
 
         // Every rule that reads raw characters shares one classification of the source, so none of
         // them can disagree with the others about what is code, quoted text, or a comment.
-        SourceRegion[] regions = ClassifyRegions(source);
+        var regions = ClassifyRegions(source);
 
         AnalyzeLines(source, lines, regions, options, fileName, diagnostics, codePoints);
         if (options.RequireSpaceAfterComma)
@@ -41,10 +41,10 @@ internal static class PrologLayoutLinter
         bool codePoints
     )
     {
-        foreach (SourceLine line in lines.All)
+        foreach (var line in lines.All)
         {
             // The limit counts characters as the reader counts them; the span stays in code units.
-            CodePointText characters = CodePointText.Of(source.Substring(line.Start, line.Length), codePoints);
+            var characters = CodePointText.Of(source.Substring(line.Start, line.Length), codePoints);
             if (options.MaxLineLength is int maximum && characters.Length > maximum)
             {
                 var excess = characters.UnitIndex(maximum);
@@ -139,7 +139,7 @@ internal static class PrologLayoutLinter
     )
     {
         var previousEndLine = 0;
-        foreach (SyntaxTerm clause in clauses)
+        foreach (var clause in clauses)
         {
             var startLine = clause.Span.Line;
             var endLine = lines.LineNumberAt(LastOffset(clause.Span));
@@ -161,7 +161,7 @@ internal static class PrologLayoutLinter
 
             if (options.MaxClauseLines is int maximum && endLine - startLine + 1 > maximum)
             {
-                SourceLine firstExcess = lines[startLine + maximum];
+                var firstExcess = lines[startLine + maximum];
                 diagnostics.Add(
                     Warning(
                         LintDiagnosticIds.ClauseTooLong,
@@ -218,7 +218,7 @@ internal static class PrologLayoutLinter
     {
         for (var lineNumber = startLine + 1; lineNumber <= endLine; lineNumber++)
         {
-            SourceLine line = lines[lineNumber];
+            var line = lines[lineNumber];
             var content = line.Start;
             while (content < line.End && source[content] == ' ')
             {
@@ -257,7 +257,7 @@ internal static class PrologLayoutLinter
 
     private static void AnalyzeSubgoals(SyntaxTerm clause, SourceLines lines, string? fileName, List<Diagnostic> diagnostics)
     {
-        SyntaxTerm? goal = clause switch
+        var goal = clause switch
         {
             CompoundTerm { Name: ":-" or "-->", Arity: 2 } rule => rule.Arguments[1],
             CompoundTerm { Name: ":-", Arity: 1 } directive => directive.Arguments[0],
@@ -271,7 +271,7 @@ internal static class PrologLayoutLinter
         Stack<SyntaxTerm> pending = new();
         pending.Push(goal);
 
-        while (pending.TryPop(out SyntaxTerm? term))
+        while (pending.TryPop(out var term))
         {
             if (term is not CompoundTerm compound)
             {
@@ -283,7 +283,7 @@ internal static class PrologLayoutLinter
                 && compound.Arguments[1].Span.Line <= lines.LineNumberAt(LastOffset(compound.Arguments[0].Span))
             )
             {
-                SyntaxTerm right = compound.Arguments[1];
+                var right = compound.Arguments[1];
                 diagnostics.Add(
                     Warning(
                         LintDiagnosticIds.SubgoalLayout,
@@ -326,7 +326,7 @@ internal static class PrologLayoutLinter
 
             // Each shielded token decides only where it ends; one fill and one advance serve them
             // all, so no branch can leave the scan pointing at a character it already consumed.
-            (var end, SourceRegion region) = (current, next) switch
+            (var end, var region) = (current, next) switch
             {
                 ('%', _) => (LineCommentEnd(source, offset), SourceRegion.Comment),
                 ('/', '*') => (BlockCommentEnd(source, offset), SourceRegion.Comment),
@@ -512,7 +512,7 @@ internal static class PrologLayoutLinter
             while (lower <= upper)
             {
                 var middle = lower + ((upper - lower) / 2);
-                SourceLine line = _lines[middle];
+                var line = _lines[middle];
                 var nextStart = middle + 1 < _lines.Count ? _lines[middle + 1].Start : int.MaxValue;
                 if (offset < line.Start)
                 {
@@ -534,7 +534,7 @@ internal static class PrologLayoutLinter
         internal SourceSpan Span(int offset, int length)
         {
             var lineNumber = LineNumberAt(offset);
-            SourceLine line = this[lineNumber];
+            var line = this[lineNumber];
             return new SourceSpan(offset, length, lineNumber, offset - line.Start + 1);
         }
     }

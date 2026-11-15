@@ -20,7 +20,7 @@ internal static class PrologFinalCutLinter
         var module = ModuleTable.UserModule;
         Dictionary<(string Module, PredicateIndicator Indicator), LocalClause> last = [];
         HashSet<(string Module, PredicateIndicator Indicator)> dynamicOrMultifile = [];
-        foreach (SyntaxTerm clause in clauses)
+        foreach (var clause in clauses)
         {
             if (clause is CompoundTerm { Name: ":-", Arity: 1, Arguments: [CompoundTerm directive] })
             {
@@ -29,17 +29,17 @@ internal static class PrologFinalCutLinter
                 continue;
             }
 
-            if (TryRule(clause, out CompoundTerm rule, out PredicateIndicator indicator, out var grammar))
+            if (TryRule(clause, out var rule, out var indicator, out var grammar))
             {
                 last[(module, indicator)] = new LocalClause(rule, indicator, grammar);
             }
-            else if (LintSyntax.TryPredicate(LintSyntax.ClauseHead(clause), grammar: false, out PredicateIndicator fact))
+            else if (LintSyntax.TryPredicate(LintSyntax.ClauseHead(clause), grammar: false, out var fact))
             {
                 last.Remove((module, fact));
             }
         }
 
-        foreach (((string Module, PredicateIndicator Indicator) key, LocalClause clause) in last)
+        foreach ((var key, var clause) in last)
         {
             if (!dynamicOrMultifile.Contains(key))
             {
@@ -59,19 +59,19 @@ internal static class PrologFinalCutLinter
         }
 
         Dictionary<(string Module, PredicateIndicator Indicator), PrologLintProgramModel.ClauseContext> last = [];
-        foreach (PrologLintProgramModel.ClauseContext clause in model.Clauses)
+        foreach (var clause in model.Clauses)
         {
             if (TryRule(clause.Clause, out _, out _, out _))
             {
                 last[(clause.Module, clause.Indicator)] = clause;
             }
-            else if (LintSyntax.TryPredicate(LintSyntax.ClauseHead(clause.Clause), clause.Grammar, out PredicateIndicator fact))
+            else if (LintSyntax.TryPredicate(LintSyntax.ClauseHead(clause.Clause), clause.Grammar, out var fact))
             {
                 last.Remove((clause.Module, fact));
             }
         }
 
-        foreach (((string Module, PredicateIndicator Indicator) key, PrologLintProgramModel.ClauseContext clause) in last)
+        foreach ((var key, var clause) in last)
         {
             if (!model.IsDynamicOrMultifile(key.Module, key.Indicator) && clause.Clause is CompoundTerm rule)
             {
@@ -100,9 +100,9 @@ internal static class PrologFinalCutLinter
             return;
         }
 
-        foreach (SyntaxTerm item in LintSyntax.SequenceItems(directive.Arguments[0]))
+        foreach (var item in LintSyntax.SequenceItems(directive.Arguments[0]))
         {
-            if (LintSyntax.TryIndicator(item, out PredicateIndicator indicator, out _))
+            if (LintSyntax.TryIndicator(item, out var indicator, out _))
             {
                 dynamicOrMultifile.Add((module, indicator));
             }

@@ -63,7 +63,7 @@ internal sealed class DcgTranslator
         head = rule;
         body = rule;
 
-        SyntaxTerm left = rule.Arguments[0];
+        var left = rule.Arguments[0];
         SyntaxTerm pushback = new AtomTerm(TermReader.EmptyListAtom, rule.Span);
         var hasPushback = false;
 
@@ -81,8 +81,8 @@ internal sealed class DcgTranslator
             return false;
         }
 
-        VariableTerm start = NewVariable(rule.Span);
-        VariableTerm end = NewVariable(rule.Span);
+        var start = NewVariable(rule.Span);
+        var end = NewVariable(rule.Span);
 
         head = AddArguments(left, start, end);
 
@@ -93,13 +93,13 @@ internal sealed class DcgTranslator
 
         // With a pushback list the body stops at an intermediate point and the pushback is matched
         // from the rule's own end, so that what it names is left in front of whatever comes next.
-        VariableTerm middle = NewVariable(rule.Span);
-        if (!TryTranslateBody(rule.Arguments[1], start, middle, out SyntaxTerm inner))
+        var middle = NewVariable(rule.Span);
+        if (!TryTranslateBody(rule.Arguments[1], start, middle, out var inner))
         {
             return false;
         }
 
-        if (!TryTranslateSemicontext(pushback, end, middle, out SyntaxTerm pushed))
+        if (!TryTranslateSemicontext(pushback, end, middle, out var pushed))
         {
             return false;
         }
@@ -161,10 +161,10 @@ internal sealed class DcgTranslator
 
             case CompoundTerm { Name: ",", Arity: 2 } conjunction:
             {
-                VariableTerm middle = NewVariable(element.Span);
+                var middle = NewVariable(element.Span);
                 if (
-                    !TryTranslateBody(conjunction.Arguments[0], start, middle, out SyntaxTerm first)
-                    || !TryTranslateBody(conjunction.Arguments[1], middle, end, out SyntaxTerm second)
+                    !TryTranslateBody(conjunction.Arguments[0], start, middle, out var first)
+                    || !TryTranslateBody(conjunction.Arguments[1], middle, end, out var second)
                 )
                 {
                     return false;
@@ -196,8 +196,8 @@ internal sealed class DcgTranslator
             {
                 var alternatives = (CompoundTerm)element;
                 if (
-                    !TryTranslateBody(alternatives.Arguments[0], start, end, out SyntaxTerm left)
-                    || !TryTranslateBody(alternatives.Arguments[1], start, end, out SyntaxTerm right)
+                    !TryTranslateBody(alternatives.Arguments[0], start, end, out var left)
+                    || !TryTranslateBody(alternatives.Arguments[1], start, end, out var right)
                 )
                 {
                     return false;
@@ -209,10 +209,10 @@ internal sealed class DcgTranslator
 
             case CompoundTerm { Name: "->", Arity: 2 } ifThen:
             {
-                VariableTerm middle = NewVariable(element.Span);
+                var middle = NewVariable(element.Span);
                 if (
-                    !TryTranslateBody(ifThen.Arguments[0], start, middle, out SyntaxTerm condition)
-                    || !TryTranslateBody(ifThen.Arguments[1], middle, end, out SyntaxTerm then)
+                    !TryTranslateBody(ifThen.Arguments[0], start, middle, out var condition)
+                    || !TryTranslateBody(ifThen.Arguments[1], middle, end, out var then)
                 )
                 {
                     return false;
@@ -236,7 +236,7 @@ internal sealed class DcgTranslator
             // Negation consumes nothing, whether or not the goal inside it would have.
             case CompoundTerm { Name: "\\+", Arity: 1 } negation:
             {
-                if (!TryTranslateBody(negation.Arguments[0], start, NewVariable(element.Span), out SyntaxTerm inner))
+                if (!TryTranslateBody(negation.Arguments[0], start, NewVariable(element.Span), out var inner))
                 {
                     return false;
                 }
@@ -275,10 +275,10 @@ internal sealed class DcgTranslator
         out SyntaxTerm goal
     )
     {
-        VariableTerm middle = NewVariable(span);
+        var middle = NewVariable(span);
         if (
-            !TryTranslateBody(conditionBody, start, middle, out SyntaxTerm condition)
-            || !TryTranslateBody(thenBody, middle, end, out SyntaxTerm then)
+            !TryTranslateBody(conditionBody, start, middle, out var condition)
+            || !TryTranslateBody(thenBody, middle, end, out var then)
         )
         {
             goal = conditionBody;
@@ -292,7 +292,7 @@ internal sealed class DcgTranslator
             return true;
         }
 
-        if (!TryTranslateBody(alternative, start, end, out SyntaxTerm otherwise))
+        if (!TryTranslateBody(alternative, start, end, out var otherwise))
         {
             goal = alternative;
             return false;
@@ -309,7 +309,7 @@ internal sealed class DcgTranslator
     private bool TryTranslateTerminals(SyntaxTerm list, SyntaxTerm start, SyntaxTerm end, out SyntaxTerm goal)
     {
         List<SyntaxTerm> terminals = [];
-        SyntaxTerm current = list;
+        var current = list;
 
         while (current is CompoundTerm { Name: ".", Arity: 2 } cons)
         {
@@ -324,7 +324,7 @@ internal sealed class DcgTranslator
             return false;
         }
 
-        SyntaxTerm matched = end;
+        var matched = end;
         for (var i = terminals.Count - 1; i >= 0; i--)
         {
             matched = new CompoundTerm(TermReader.ListFunctor, [terminals[i], matched], list.Span);

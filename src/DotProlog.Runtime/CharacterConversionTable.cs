@@ -59,7 +59,7 @@ public sealed class CharacterConversionTable
         _mappings.Clear();
         _versions.Clear();
         _versions.Add([]);
-        foreach (Entry entry in source._versions[^1])
+        foreach (var entry in source._versions[^1])
         {
             Set(entry.Input, entry.Output);
         }

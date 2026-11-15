@@ -21,7 +21,7 @@ public sealed class NumberReaderTests
     {
         Assert.Equal(
             NumberReader.Outcome.Number,
-            NumberReader.Read(text, codePoints: true, rationals: true, digitSeparators: true, out PrologNumber number)
+            NumberReader.Read(text, codePoints: true, rationals: true, digitSeparators: true, out var number)
         );
         Assert.Equal(expected, number.Integer);
     }
@@ -41,7 +41,7 @@ public sealed class NumberReaderTests
     {
         Assert.Equal(
             NumberReader.Outcome.Number,
-            NumberReader.Read(text, codePoints: true, rationals: true, digitSeparators: true, out PrologNumber number)
+            NumberReader.Read(text, codePoints: true, rationals: true, digitSeparators: true, out var number)
         );
         Assert.Equal(expected, number.Integer);
     }

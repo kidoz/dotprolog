@@ -7,20 +7,20 @@ internal static class PrologAllSolutionsLinter
 {
     internal static void Analyze(IReadOnlyList<SyntaxTerm> clauses, string? fileName, List<Diagnostic> diagnostics)
     {
-        foreach (SyntaxTerm clause in clauses)
+        foreach (var clause in clauses)
         {
-            Dictionary<string, int> clauseCounts = VariableCounts(clause);
-            foreach (SyntaxTerm body in LintGoalWalker.Bodies(clause))
+            var clauseCounts = VariableCounts(clause);
+            foreach (var body in LintGoalWalker.Bodies(clause))
             {
-                foreach (CompoundTerm goal in LintGoalWalker.Goals(body))
+                foreach (var goal in LintGoalWalker.Goals(body))
                 {
                     if (goal.Name is not ("findall" or "bagof" or "setof") || goal.Arity != 3)
                     {
                         continue;
                     }
 
-                    SyntaxTerm template = goal.Arguments[0];
-                    SyntaxTerm collectionGoal = StripExistentialQuantifiers(goal.Arguments[1], fileName, diagnostics);
+                    var template = goal.Arguments[0];
+                    var collectionGoal = StripExistentialQuantifiers(goal.Arguments[1], fileName, diagnostics);
                     CheckSharedVariables(template, collectionGoal, fileName, diagnostics);
                     if (goal.Name is "bagof" or "setof")
                     {
@@ -35,11 +35,11 @@ internal static class PrologAllSolutionsLinter
 
     private static SyntaxTerm StripExistentialQuantifiers(SyntaxTerm goal, string? fileName, List<Diagnostic> diagnostics)
     {
-        SyntaxTerm current = goal;
+        var current = goal;
         while (current is CompoundTerm { Name: "^", Arity: 2 } quantified)
         {
             HashSet<string> bound = [.. LintSyntax.Variables(quantified.Arguments[1]).Select(variable => variable.Name)];
-            foreach (VariableTerm variable in LintSyntax.Variables(quantified.Arguments[0]))
+            foreach (var variable in LintSyntax.Variables(quantified.Arguments[0]))
             {
                 if (!variable.IsAnonymous && !bound.Contains(variable.Name))
                 {
@@ -62,8 +62,8 @@ internal static class PrologAllSolutionsLinter
 
     private static void CheckSharedVariables(SyntaxTerm template, SyntaxTerm goal, string? fileName, List<Diagnostic> diagnostics)
     {
-        HashSet<string> templateVariables = NamedVariables(template);
-        HashSet<string> goalVariables = NamedVariables(goal);
+        var templateVariables = NamedVariables(template);
+        var goalVariables = NamedVariables(goal);
         if (templateVariables.Count == 0 && goalVariables.Count == 0 || templateVariables.Overlaps(goalVariables))
         {
             return;
@@ -112,7 +112,7 @@ internal static class PrologAllSolutionsLinter
         pending.Push(body);
         HashSet<CompoundTerm> reported = [];
 
-        while (pending.TryPop(out SyntaxTerm? current))
+        while (pending.TryPop(out var current))
         {
             if (current is not CompoundTerm { Name: ",", Arity: 2 } conjunction)
             {
@@ -151,7 +151,7 @@ internal static class PrologAllSolutionsLinter
     private static Dictionary<string, int> VariableCounts(SyntaxTerm clause)
     {
         Dictionary<string, int> result = new(StringComparer.Ordinal);
-        foreach (VariableTerm variable in LintSyntax.Variables(clause))
+        foreach (var variable in LintSyntax.Variables(clause))
         {
             if (!variable.IsAnonymous)
             {

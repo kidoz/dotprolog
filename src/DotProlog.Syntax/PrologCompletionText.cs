@@ -23,7 +23,7 @@ public sealed class PrologCompletionText
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Token token = lexer.Next();
+            var token = lexer.Next();
             if (token.Kind == TokenKind.Eof)
                 break;
             result._tokens.Add(token);
@@ -38,14 +38,14 @@ public sealed class PrologCompletionText
         if (offset < 0 || offset > _text.Length || _comments.Any(span => offset >= span.Start && offset <= span.End))
             return null;
 
-        int current = -1;
-        int previous = -1;
-        int clauseStart = 0;
-        int clauseEnd = _tokens.Count;
-        for (int index = 0; index < _tokens.Count; index++)
+        var current = -1;
+        var previous = -1;
+        var clauseStart = 0;
+        var clauseEnd = _tokens.Count;
+        for (var index = 0; index < _tokens.Count; index++)
         {
-            Token token = _tokens[index];
-            int end = token.Span.Start + token.Span.Length;
+            var token = _tokens[index];
+            var end = token.Span.Start + token.Span.Length;
             if (token.Kind == TokenKind.End)
             {
                 if (end <= offset)
@@ -70,11 +70,11 @@ public sealed class PrologCompletionText
         }
 
         Token? word = current >= 0 ? _tokens[current] : null;
-        int start = word?.Span.Start ?? offset;
-        int length = word?.Span.Length ?? 0;
-        string prefix = _text[start..offset];
-        bool variable = word?.Kind == TokenKind.Variable;
-        int before = current >= 0 ? current - 1 : previous;
+        var start = word?.Span.Start ?? offset;
+        var length = word?.Span.Length ?? 0;
+        var prefix = _text[start..offset];
+        var variable = word?.Kind == TokenKind.Variable;
+        var before = current >= 0 ? current - 1 : previous;
         string? module = null;
         if (before >= clauseStart && _tokens[before] is { Text: ":", Quoted: false })
         {

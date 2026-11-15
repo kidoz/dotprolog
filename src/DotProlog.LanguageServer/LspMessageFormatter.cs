@@ -29,7 +29,7 @@ internal sealed class LspMessageFormatter : IJsonRpcMessageTextFormatter
     public JsonRpcMessage Deserialize(ReadOnlySequence<byte> contentBuffer)
     {
         var reader = new Utf8JsonReader(contentBuffer);
-        JsonNode? body = JsonNode.Parse(ref reader);
+        var body = JsonNode.Parse(ref reader);
         if (reader.Read())
             throw new JsonException("Unexpected trailing JSON.");
         return new LspMessage(body);

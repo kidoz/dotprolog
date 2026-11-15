@@ -15,7 +15,7 @@ public sealed class WorkspaceTests : IDisposable
     public void UnsavedOperatorIncludeInvalidatesParentAndCloseRestoresDisk()
     {
         Write("operators.pl", ":- op(500, xfy, likes).\n");
-        string parent = ":- include('operators.pl').\nalice likes bob.";
+        var parent = ":- include('operators.pl').\nalice likes bob.";
         var initial = Open("main.pl", parent);
         AssertNoErrors(For(initial, "main.pl"));
         var removed = Open("operators.pl", "");
@@ -46,7 +46,7 @@ public sealed class WorkspaceTests : IDisposable
         Write("child space #.pl", "ok.\r\nvalue('😀', X).");
         var publications = Open("main.pl", ":- include('child space #.pl').");
         var child = For(publications, "child space #.pl");
-        JsonNode singleton = child.Diagnostics.Single(item =>
+        var singleton = child.Diagnostics.Single(item =>
             item!["code"]!.GetValue<string>() == LintDiagnosticIds.SingletonVariable
         )!;
         Assert.Equal(1, singleton["range"]!["start"]!["line"]!.GetValue<int>());
@@ -103,7 +103,7 @@ public sealed class WorkspaceTests : IDisposable
         Write(child, "included(ok).");
         string EditorUri(string file) =>
             "file://" + UriFor(file)["file://".Length..].Replace(":/", "%3A/", StringComparison.Ordinal);
-        string parent = EditorUri("main.pl");
+        var parent = EditorUri("main.pl");
         var initial = _workspace.Update(new DocumentSnapshot(parent, $":- include('{child}').", 1));
         AssertNoErrors(Assert.Single(initial, publication => publication.Uri == parent));
         Assert.True(_workspace.IsNewer(UriFor("main.pl"), 2));
@@ -132,7 +132,7 @@ public sealed class WorkspaceTests : IDisposable
     public void OverlayIdentityNormalizesEscapingAndDotSegments()
     {
         Open("child #.pl", "value(X).");
-        string alias = new Uri(Path.Combine(_directory, "sub", "..", "child #.pl")).AbsoluteUri;
+        var alias = new Uri(Path.Combine(_directory, "sub", "..", "child #.pl")).AbsoluteUri;
         Assert.True(_workspace.IsNewer(alias, 2));
         var publications = Open("main.pl", ":- include('./child #.pl').");
         Assert.DoesNotContain(
@@ -158,9 +158,9 @@ public sealed class WorkspaceTests : IDisposable
     {
         const string source = ":- include('child.pl').\nrun :- child(X), missing(X).";
         Write("child.pl", "child(ok).");
-        string path = Path.Combine(_directory, "main.pl");
+        var path = Path.Combine(_directory, "main.pl");
         var loaded = PrologLintSourceLoader.Load(path, source, new BytecodeProgram());
-        JsonArray expected = DocumentDiagnostics.Convert(
+        var expected = DocumentDiagnostics.Convert(
             source,
             loaded.Diagnostics.Concat(PrologLinter.AnalyzeProgram([loaded.Source])).Where(item => item.FileName == path)
         );

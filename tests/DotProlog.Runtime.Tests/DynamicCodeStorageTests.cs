@@ -8,14 +8,14 @@ public sealed class DynamicCodeStorageTests
     public void ReuseRelocatesBranchAndConstantOperandsWhilePinnedStorageStaysValid()
     {
         var program = new BytecodeProgram();
-        DynamicCodeBlock donor = EmitPrivateBlock(program, 10);
+        var donor = EmitPrivateBlock(program, 10);
         var pinned = program.Emit(OpCode.Stop);
         var pinnedConstant = program.AddConstant(Cell.Integer60(999));
         program.ReleaseDynamicCode(donor);
         var append = program.CodeLength;
         var constants = program.ConstantCount;
 
-        DynamicCodeBlock reused = EmitPrivateBlock(program, 20);
+        var reused = EmitPrivateBlock(program, 20);
         Assert.Equal(donor.CodeStart, reused.CodeStart);
         Assert.Equal(donor.ConstantStart, reused.ConstantStart);
         Assert.Equal(append, program.CodeLength);
@@ -78,7 +78,7 @@ public sealed class DynamicCodeStorageTests
         var program = new BytecodeProgram();
         var code = program.CodeLength;
         var constants = program.ConstantCount;
-        DynamicCodeBlock block = EmitPrivateBlock(program, 40);
+        var block = EmitPrivateBlock(program, 40);
         program.ReleaseDynamicCode(block);
         Assert.Equal(code, program.CodeLength);
         Assert.Equal(constants, program.ConstantCount);
@@ -88,16 +88,16 @@ public sealed class DynamicCodeStorageTests
     public void CodeAndConstantRangesCanBeReusedIndependentlyAndExecuted()
     {
         var program = new BytecodeProgram();
-        DynamicCodeBlock first = EmitLiterals(program, 8, 1, 100);
+        var first = EmitLiterals(program, 8, 1, 100);
         program.Emit(OpCode.Stop);
         var pinned = program.AddConstant(Cell.Integer60(777));
-        DynamicCodeBlock second = EmitLiterals(program, 1, 4, 200);
+        var second = EmitLiterals(program, 1, 4, 200);
         program.Emit(OpCode.Stop);
         program.AddConstant(Cell.Integer60(888));
         program.ReleaseDynamicCode(first);
         program.ReleaseDynamicCode(second);
 
-        DynamicCodeBlock reused = EmitLiterals(program, 8, 4, 300);
+        var reused = EmitLiterals(program, 8, 4, 300);
         Assert.Equal(second.CodeStart, reused.CodeStart);
         Assert.Equal(first.ConstantStart, reused.ConstantStart);
         Assert.Equal(Cell.Integer60(777), program.Constants[pinned]);

@@ -63,7 +63,7 @@ public sealed class FacadeShapeTests
         // det: exactly one solution, one output — the output becomes the return value.
         public double Discount(double price, long percent)
         {
-            PrologValue[] outputs =
+            var outputs =
                 _host.CallOnce(_discount, PrologInput.Float(price), PrologInput.Integer(percent), PrologInput.Output)
                 ?? throw new PrologException("discount/3 was declared det but failed.");
 
@@ -76,7 +76,7 @@ public sealed class FacadeShapeTests
         // nondet: one output — every solution is yielded, lazily.
         public IEnumerable<string> Colour()
         {
-            foreach (PrologValue[] outputs in _host.CallAll(_colour, PrologInput.Output))
+            foreach (var outputs in _host.CallAll(_colour, PrologInput.Output))
             {
                 yield return ((PrologAtom)outputs[0]).Name;
             }
@@ -85,9 +85,9 @@ public sealed class FacadeShapeTests
         // nondet with several outputs — the generator would emit a record; a tuple stands in here.
         public IEnumerable<(IReadOnlyList<string> Left, IReadOnlyList<string> Right)> Split(IReadOnlyList<string> items)
         {
-            PrologInput list = PrologInput.List([.. items.Select(PrologInput.Atom)]);
+            var list = PrologInput.List([.. items.Select(PrologInput.Atom)]);
 
-            foreach (PrologValue[] outputs in _host.CallAll(_split, list, PrologInput.Output, PrologInput.Output))
+            foreach (var outputs in _host.CallAll(_split, list, PrologInput.Output, PrologInput.Output))
             {
                 yield return (Atoms(outputs[0]), Atoms(outputs[1]));
             }
@@ -95,14 +95,14 @@ public sealed class FacadeShapeTests
 
         private static IReadOnlyList<string> Atoms(PrologValue value)
         {
-            Assert.True(value.TryGetList(out IReadOnlyList<PrologValue> items));
+            Assert.True(value.TryGetList(out var items));
             return [.. items.Select(item => ((PrologAtom)item).Name)];
         }
     }
 
     private static PricingModule NewModule(PrologEngine engine)
     {
-        LoadResult loaded = engine.ConsultText(PricingSource, "pricing.pl");
+        var loaded = engine.ConsultText(PricingSource, "pricing.pl");
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
 
         return new PricingModule(new PrologHost(engine.Machine));
@@ -168,7 +168,7 @@ public sealed class FacadeShapeTests
         using var engine = new PrologEngine { Output = TextWriter.Null };
         var host = new PrologHost(engine.Machine);
 
-        PrologException error = Assert.Throws<PrologException>(() => host.Bind("nowhere", 2));
+        var error = Assert.Throws<PrologException>(() => host.Bind("nowhere", 2));
 
         Assert.Contains("existence_error(procedure, nowhere/2)", error.Message, StringComparison.Ordinal);
     }
@@ -180,7 +180,7 @@ public sealed class FacadeShapeTests
         Assert.True(engine.ConsultText(PricingSource, "pricing.pl").Success);
 
         var host = new PrologHost(engine.Machine);
-        PrologPredicate colour = host.Bind("colour", 1);
+        var colour = host.Bind("colour", 1);
 
         Assert.Throws<PrologException>(() => host.Prove(colour, PrologInput.Output, PrologInput.Output));
     }

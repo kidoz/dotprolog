@@ -7,7 +7,7 @@ public sealed class PrologLinterTests
     [Fact]
     public void ReportsAnOrdinarySingletonAtItsOccurrence()
     {
-        Diagnostic diagnostic = Assert.Single(Lint("value(X).", "source.pl"));
+        var diagnostic = Assert.Single(Lint("value(X).", "source.pl"));
 
         Assert.Equal(LintDiagnosticIds.SingletonVariable, diagnostic.Id);
         Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
@@ -18,7 +18,7 @@ public sealed class PrologLinterTests
     [Fact]
     public void RepeatedVariablesAndIntentionalSingletonsAreAccepted()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("same(X, X). ignored(_, _Value).");
+        var diagnostics = Lint("same(X, X). ignored(_, _Value).");
 
         Assert.Empty(diagnostics);
     }
@@ -26,7 +26,7 @@ public sealed class PrologLinterTests
     [Fact]
     public void ReportsARepeatedSingletonMarkerAtItsSecondOccurrence()
     {
-        Diagnostic diagnostic = Assert.Single(Lint("same(_Value, _Value)."));
+        var diagnostic = Assert.Single(Lint("same(_Value, _Value)."));
 
         Assert.Equal(LintDiagnosticIds.RepeatedSingletonMarker, diagnostic.Id);
         Assert.Equal(new SourceSpan(13, 6, 1, 14), diagnostic.Span);
@@ -35,7 +35,7 @@ public sealed class PrologLinterTests
     [Fact]
     public void VariableScopeIsOneClause()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("first(X).\nsecond(X).");
+        var diagnostics = Lint("first(X).\nsecond(X).");
 
         Assert.Collection(
             diagnostics,
@@ -55,7 +55,7 @@ public sealed class PrologLinterTests
     [Fact]
     public void DiagnosticsWithinAClauseFollowSourceOrder()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("pair(Z, A).");
+        var diagnostics = Lint("pair(Z, A).");
 
         Assert.Collection(
             diagnostics,
@@ -75,7 +75,7 @@ public sealed class PrologLinterTests
     [Fact]
     public void DirectivesAreInspectedWithoutSpecialVariableScope()
     {
-        Diagnostic diagnostic = Assert.Single(Lint(":- initialization(writeln(X))."));
+        var diagnostic = Assert.Single(Lint(":- initialization(writeln(X))."));
 
         Assert.Equal(LintDiagnosticIds.SingletonVariable, diagnostic.Id);
         Assert.Equal(1, diagnostic.Span.Line);
@@ -83,7 +83,7 @@ public sealed class PrologLinterTests
 
     private static IReadOnlyList<Diagnostic> Lint(string source, string? fileName = null)
     {
-        ParseResult parsed = TermReader.ReadProgram(source, fileName);
+        var parsed = TermReader.ReadProgram(source, fileName);
         Assert.True(parsed.Success, string.Join(Environment.NewLine, parsed.Diagnostics));
         return PrologLinter.Analyze(parsed.Clauses, fileName);
     }

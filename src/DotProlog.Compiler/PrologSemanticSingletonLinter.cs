@@ -7,15 +7,15 @@ internal static class PrologSemanticSingletonLinter
 {
     internal static void Analyze(IReadOnlyList<SyntaxTerm> clauses, string? fileName, List<Diagnostic> diagnostics)
     {
-        foreach (SyntaxTerm clause in clauses)
+        foreach (var clause in clauses)
         {
-            Dictionary<string, int> clauseCounts = Counts(clause);
+            var clauseCounts = Counts(clause);
             HashSet<string> reported = new(StringComparer.Ordinal);
-            foreach (SyntaxTerm body in LintGoalWalker.Bodies(clause))
+            foreach (var body in LintGoalWalker.Bodies(clause))
             {
                 Stack<SyntaxTerm> pending = new();
                 pending.Push(body);
-                while (pending.TryPop(out SyntaxTerm? current))
+                while (pending.TryPop(out var current))
                 {
                     if (current is not CompoundTerm compound)
                     {
@@ -24,7 +24,7 @@ internal static class PrologSemanticSingletonLinter
 
                     if (compound.Arity == 2 && compound.Name is ";" or "|")
                     {
-                        List<SyntaxTerm> alternatives = Alternatives(compound);
+                        var alternatives = Alternatives(compound);
                         CheckAlternatives(alternatives, clauseCounts, reported, fileName, diagnostics);
                     }
 
@@ -60,7 +60,7 @@ internal static class PrologSemanticSingletonLinter
                 continue;
             }
 
-            VariableTerm occurrence = LintSyntax.Variables(alternatives[0]).First(variable => variable.Name == name);
+            var occurrence = LintSyntax.Variables(alternatives[0]).First(variable => variable.Name == name);
             diagnostics.Add(
                 Warning(
                     LintDiagnosticIds.SemanticSingletonVariable,
@@ -82,7 +82,7 @@ internal static class PrologSemanticSingletonLinter
         List<SyntaxTerm> result = [];
         Stack<SyntaxTerm> pending = new();
         pending.Push(term);
-        while (pending.TryPop(out SyntaxTerm? current))
+        while (pending.TryPop(out var current))
         {
             if (current is CompoundTerm { Name: ";" or "|", Arity: 2 } disjunction)
             {
@@ -101,7 +101,7 @@ internal static class PrologSemanticSingletonLinter
     private static Dictionary<string, int> Counts(SyntaxTerm term)
     {
         Dictionary<string, int> result = new(StringComparer.Ordinal);
-        foreach (VariableTerm variable in LintSyntax.Variables(term))
+        foreach (var variable in LintSyntax.Variables(term))
         {
             if (!variable.IsAnonymous)
             {

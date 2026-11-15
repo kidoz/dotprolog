@@ -31,8 +31,8 @@ internal sealed class SourcePositions
     {
         if (line < 0 || character < 0 || line >= _lines.Count)
             return null;
-        int start = _lines[line];
-        int end = line + 1 < _lines.Count ? _lines[line + 1] : _text.Length;
+        var start = _lines[line];
+        var end = line + 1 < _lines.Count ? _lines[line + 1] : _text.Length;
         while (end > start && _text[end - 1] is '\r' or '\n')
             end--;
         return start + Math.Min(character, end - start);

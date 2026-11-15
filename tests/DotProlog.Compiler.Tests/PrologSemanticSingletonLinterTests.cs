@@ -21,7 +21,7 @@ public sealed class PrologSemanticSingletonLinterTests
 
     private static IReadOnlyList<Diagnostic> Lint(string source)
     {
-        ParseResult parsed = TermReader.ReadProgram(source, "source.pl");
+        var parsed = TermReader.ReadProgram(source, "source.pl");
         Assert.True(parsed.Success, string.Join(Environment.NewLine, parsed.Diagnostics));
         return PrologLinter.Analyze(parsed.Clauses, "source.pl");
     }

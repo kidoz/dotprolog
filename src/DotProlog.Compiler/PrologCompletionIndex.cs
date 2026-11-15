@@ -39,7 +39,7 @@ public sealed class PrologCompletionIndex
         {
             cancellationToken.ThrowIfCancellationRequested();
             List<PrologPredicateCompletion> candidates = [];
-            foreach (PredicateIndicator signature in signatures)
+            foreach (var signature in signatures)
             {
                 var resolution = model.Resolve(module.Name, signature);
                 if (resolution.IsDefined)
@@ -81,7 +81,7 @@ public sealed class PrologCompletionIndex
         IEnumerable<PrologPredicateCompletion>? candidates = null;
         foreach (var scopes in contexts)
         {
-            string current = ModuleTable.UserModule;
+            var current = ModuleTable.UserModule;
             foreach (var scope in scopes)
             {
                 if (scope.Offset > offset)
@@ -98,10 +98,10 @@ public sealed class PrologCompletionIndex
     {
         if (name.Length == 0)
             return false;
-        int first = CharacterClass.At(name, 0, true).Code;
+        var first = CharacterClass.At(name, 0, true).Code;
         if (!CharacterClass.IsIdentifierStart(first) || CharacterClass.IsUpper(first))
             return false;
-        for (int index = 0; index < name.Length; )
+        for (var index = 0; index < name.Length; )
         {
             var (code, width) = CharacterClass.At(name, index, true);
             if (code != '_' && !CharacterClass.IsIdentifierContinue(code))

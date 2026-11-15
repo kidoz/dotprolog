@@ -26,7 +26,7 @@ internal static class SortBuiltins
     /// </summary>
     private static bool Sort4(Machine machine)
     {
-        Cell keyCell = machine.Argument(0);
+        var keyCell = machine.Argument(0);
         if (keyCell.Tag == CellTag.Reference)
         {
             throw PrologErrors.Instantiation(machine);
@@ -37,7 +37,7 @@ internal static class SortBuiltins
             throw PrologErrors.Type(machine, "integer", keyCell);
         }
 
-        Cell orderCell = machine.Argument(1);
+        var orderCell = machine.Argument(1);
         if (orderCell.Tag == CellTag.Reference)
         {
             throw PrologErrors.Instantiation(machine);
@@ -60,9 +60,9 @@ internal static class SortBuiltins
 
     private static bool Sort(Machine machine, int key, bool descending, bool dedupe, int listIndex = 0, int resultIndex = 1)
     {
-        List<Cell> elements = TermList.ReadProper(machine, machine.Argument(listIndex));
+        var elements = TermList.ReadProper(machine, machine.Argument(listIndex));
         ValidatePartialResult(machine, machine.Argument(resultIndex));
-        Cell[] sorted = Arrange(machine, elements, element => KeyOf(machine, element, key), descending, dedupe);
+        var sorted = Arrange(machine, elements, element => KeyOf(machine, element, key), descending, dedupe);
         return machine.Unify(machine.Argument(resultIndex), TermList.Build(machine, sorted));
     }
 
@@ -72,14 +72,14 @@ internal static class SortBuiltins
     /// </summary>
     private static bool KeySort(Machine machine)
     {
-        List<Cell> elements = TermList.ReadProper(machine, machine.Argument(0));
+        var elements = TermList.ReadProper(machine, machine.Argument(0));
         var pair = machine.Symbols.InternFunctor("-", 2);
 
         ValidatePairElements(machine, elements, pair, allowVariables: false);
-        List<Cell> resultElements = ValidatePartialResult(machine, machine.Argument(1));
+        var resultElements = ValidatePartialResult(machine, machine.Argument(1));
         ValidatePairElements(machine, resultElements, pair, allowVariables: true);
 
-        Cell[] sorted = Arrange(
+        var sorted = Arrange(
             machine,
             elements,
             element => machine.HeapAt(machine.Dereference(element).Index + 1),
@@ -93,7 +93,7 @@ internal static class SortBuiltins
     private static List<Cell> ValidatePartialResult(Machine machine, Cell result)
     {
         List<Cell> elements = [];
-        Cell tail = TermList.Read(machine, result, elements);
+        var tail = TermList.Read(machine, result, elements);
         if (!TermList.IsEmpty(machine, tail) && tail.Tag != CellTag.Reference)
         {
             throw PrologErrors.Type(machine, "list", machine.Dereference(result));
@@ -104,9 +104,9 @@ internal static class SortBuiltins
 
     private static void ValidatePairElements(Machine machine, List<Cell> elements, int pair, bool allowVariables)
     {
-        foreach (Cell element in elements)
+        foreach (var element in elements)
         {
-            Cell cell = machine.Dereference(element);
+            var cell = machine.Dereference(element);
             if (cell.Tag == CellTag.Reference)
             {
                 if (allowVariables)
@@ -172,7 +172,7 @@ internal static class SortBuiltins
             return element;
         }
 
-        Cell cell = machine.Dereference(element);
+        var cell = machine.Dereference(element);
 
         if (cell.Tag != CellTag.Structure)
         {

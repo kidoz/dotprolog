@@ -7,7 +7,7 @@ public sealed class PrologLayoutLinterTests
     [Fact]
     public void SemanticProfileDoesNotImposeLayout()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("pair(a,b).\n", PrologLintOptions.SemanticOnly);
+        var diagnostics = Lint("pair(a,b).\n", PrologLintOptions.SemanticOnly);
 
         Assert.Empty(diagnostics);
     }
@@ -28,7 +28,7 @@ public sealed class PrologLayoutLinterTests
     [Fact]
     public void ReportsTabsAndTrailingWhitespaceAtTheirExactLocation()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("fact.\t\n", PrologLintOptions.Covington);
+        var diagnostics = Lint("fact.\t\n", PrologLintOptions.Covington);
 
         Assert.Collection(
             diagnostics,
@@ -42,7 +42,7 @@ public sealed class PrologLayoutLinterTests
     {
         const string source = "rule :-\n  first,\n    second.\n";
 
-        Diagnostic diagnostic = Assert.Single(Lint(source, PrologLintOptions.Covington));
+        var diagnostic = Assert.Single(Lint(source, PrologLintOptions.Covington));
 
         AssertDiagnostic(diagnostic, LintDiagnosticIds.InconsistentIndentation, new SourceSpan(10, 1, 2, 3));
     }
@@ -53,7 +53,7 @@ public sealed class PrologLayoutLinterTests
         const string source = "abcdefghij.\n";
         var options = PrologLintOptions.SemanticOnly with { MaxLineLength = 8 };
 
-        Diagnostic diagnostic = Assert.Single(Lint(source, options));
+        var diagnostic = Assert.Single(Lint(source, options));
 
         AssertDiagnostic(diagnostic, LintDiagnosticIds.LineTooLong, new SourceSpan(8, 3, 1, 9));
     }
@@ -63,17 +63,17 @@ public sealed class PrologLayoutLinterTests
     {
         // Ten code points, fourteen UTF-16 code units: within the limit when characters are code points.
         const string source = "a('😀😀😀😀').\n";
-        ParseResult parsed = TermReader.ReadProgram(source, "source.pl");
+        var parsed = TermReader.ReadProgram(source, "source.pl");
         var options = PrologLintOptions.SemanticOnly with { MaxLineLength = 10 };
 
         Assert.Empty(PrologLinter.AnalyzeSource(source, parsed.Clauses, "source.pl", options));
 
-        Diagnostic diagnostic = Assert.Single(
+        var diagnostic = Assert.Single(
             PrologLinter.AnalyzeSource(source, parsed.Clauses, "source.pl", options with { MaxLineLength = 5 })
         );
         AssertDiagnostic(diagnostic, LintDiagnosticIds.LineTooLong, new SourceSpan(7, 7, 1, 8));
 
-        Diagnostic codeUnits = Assert.Single(
+        var codeUnits = Assert.Single(
             PrologLinter.AnalyzeSource(source, parsed.Clauses, "source.pl", options, codePoints: false)
         );
         Assert.Contains("Line has 14 characters", codeUnits.Message, StringComparison.Ordinal);
@@ -85,7 +85,7 @@ public sealed class PrologLayoutLinterTests
         const string source = "rule :-\n    first,\n    second.\n";
         var options = PrologLintOptions.SemanticOnly with { MaxClauseLines = 2 };
 
-        Diagnostic diagnostic = Assert.Single(Lint(source, options));
+        var diagnostic = Assert.Single(Lint(source, options));
 
         AssertDiagnostic(diagnostic, LintDiagnosticIds.ClauseTooLong, new SourceSpan(19, 1, 3, 1));
     }
@@ -96,7 +96,7 @@ public sealed class PrologLayoutLinterTests
         const string source = "value('a,b', /* x,y */ [a,b]).\n";
         var comma = source.IndexOf("[a,b]", StringComparison.Ordinal) + 2;
 
-        Diagnostic diagnostic = Assert.Single(Lint(source, PrologLintOptions.Covington));
+        var diagnostic = Assert.Single(Lint(source, PrologLintOptions.Covington));
 
         AssertDiagnostic(diagnostic, LintDiagnosticIds.MissingSpaceAfterComma, new SourceSpan(comma, 1, 1, comma + 1));
     }
@@ -111,7 +111,7 @@ public sealed class PrologLayoutLinterTests
     [InlineData("c(0'\\').\nd(X,Y).\n")]
     public void CommaSpacingSurvivesCharacterCodeLiterals(string source)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(source, PrologLintOptions.Covington);
+        var diagnostics = Lint(source, PrologLintOptions.Covington);
 
         Assert.Contains(diagnostics, diagnostic => diagnostic.Id == LintDiagnosticIds.MissingSpaceAfterComma);
     }
@@ -136,7 +136,7 @@ public sealed class PrologLayoutLinterTests
         // still shield its own comma. Only the comma between them is a violation.
         const string source = "c(0'a,'x,y').\n";
 
-        Diagnostic diagnostic = Assert.Single(
+        var diagnostic = Assert.Single(
             Lint(source, PrologLintOptions.Covington),
             diagnostic => diagnostic.Id == LintDiagnosticIds.MissingSpaceAfterComma
         );
@@ -174,7 +174,7 @@ public sealed class PrologLayoutLinterTests
     {
         const string source = "rule :-\n  first,\n    second.\n";
 
-        Diagnostic diagnostic = Assert.Single(
+        var diagnostic = Assert.Single(
             Lint(source, PrologLintOptions.Covington),
             diagnostic => diagnostic.Id == LintDiagnosticIds.InconsistentIndentation
         );
@@ -195,7 +195,7 @@ public sealed class PrologLayoutLinterTests
     [InlineData("rule :- body.\n", 8, 9)]
     public void ReportsClauseBoundaryViolations(string source, int offset, int column)
     {
-        Diagnostic diagnostic = Assert.Single(Lint(source, PrologLintOptions.Covington));
+        var diagnostic = Assert.Single(Lint(source, PrologLintOptions.Covington));
 
         AssertDiagnostic(diagnostic, LintDiagnosticIds.ClauseLayout, new SourceSpan(offset, 1, 1, column));
     }
@@ -205,7 +205,7 @@ public sealed class PrologLayoutLinterTests
     {
         const string source = "rule :-\n    first, second.\n";
 
-        Diagnostic diagnostic = Assert.Single(Lint(source, PrologLintOptions.Covington));
+        var diagnostic = Assert.Single(Lint(source, PrologLintOptions.Covington));
 
         AssertDiagnostic(diagnostic, LintDiagnosticIds.SubgoalLayout, new SourceSpan(19, 1, 2, 12));
     }
@@ -224,7 +224,7 @@ public sealed class PrologLayoutLinterTests
     [Fact]
     public void CrLfSourceRetainsReaderCompatibleLocations()
     {
-        Diagnostic diagnostic = Assert.Single(Lint("fact. \r\n", PrologLintOptions.Covington));
+        var diagnostic = Assert.Single(Lint("fact. \r\n", PrologLintOptions.Covington));
 
         AssertDiagnostic(diagnostic, LintDiagnosticIds.TrailingWhitespace, new SourceSpan(5, 1, 1, 6));
     }
@@ -233,14 +233,14 @@ public sealed class PrologLayoutLinterTests
     public void RejectsNonPositiveThresholds()
     {
         var options = PrologLintOptions.SemanticOnly with { IndentSize = 0 };
-        ParseResult parsed = TermReader.ReadProgram("fact.\n");
+        var parsed = TermReader.ReadProgram("fact.\n");
 
         Assert.Throws<ArgumentOutOfRangeException>(() => PrologLinter.AnalyzeSource("fact.\n", parsed.Clauses, options: options));
     }
 
     private static IReadOnlyList<Diagnostic> Lint(string source, PrologLintOptions options)
     {
-        ParseResult parsed = TermReader.ReadProgram(source, "source.pl");
+        var parsed = TermReader.ReadProgram(source, "source.pl");
         Assert.True(parsed.Success, string.Join(Environment.NewLine, parsed.Diagnostics));
         return PrologLinter.AnalyzeSource(source, parsed.Clauses, "source.pl", options);
     }

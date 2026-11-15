@@ -10,9 +10,9 @@ public sealed class DynamicReclamationTests
         var program = new BytecodeProgram();
         DatabaseBuiltins.Register(program.Builtins);
         var functor = program.Symbols.InternFunctor("item", 1);
-        DynamicPredicate predicate = program.DeclareDynamic(functor);
+        var predicate = program.DeclareDynamic(functor);
         Add(program, predicate, 1);
-        DynamicClause last = Add(program, predicate, 2);
+        var last = Add(program, predicate, 2);
         Assert.True(program.Builtins.TryGetId(program.Symbols.InternFunctor("retract", 1), out var retract));
         var wrapper = program.Symbols.InternFunctor("erase", 1);
         var entry = program.Emit(OpCode.CallBuiltin, retract, 1);
@@ -20,7 +20,7 @@ public sealed class DynamicReclamationTests
         program.DefinePredicate(wrapper, entry);
         using var machine = new Machine(program);
         machine.BeginCall();
-        Cell pattern = machine.CreateStructure(functor, [machine.CreateVariable()]);
+        var pattern = machine.CreateStructure(functor, [machine.CreateVariable()]);
         Assert.Equal(RunResult.Success, machine.Call(wrapper, [pattern]));
         var death = program.NextGeneration();
         last.Death = death;
@@ -36,9 +36,9 @@ public sealed class DynamicReclamationTests
     {
         var program = new BytecodeProgram();
         var functor = program.Symbols.InternFunctor("item", 1);
-        DynamicPredicate predicate = program.DeclareDynamic(functor);
-        DynamicClause first = Add(program, predicate, 1);
-        DynamicClause last = Add(program, predicate, 2);
+        var predicate = program.DeclareDynamic(functor);
+        var first = Add(program, predicate, 1);
+        var last = Add(program, predicate, 2);
         using var reader = new Machine(program);
         using var writer = new Machine(program);
         reader.BeginCall();
@@ -63,16 +63,16 @@ public sealed class DynamicReclamationTests
     {
         var program = new BytecodeProgram();
         var functor = program.Symbols.InternFunctor("item", 1);
-        DynamicPredicate predicate = program.DeclareDynamic(functor);
-        DynamicClause first = Add(program, predicate, 1);
-        DynamicClause middle = Add(program, predicate, 2);
-        DynamicClause tail = Add(program, predicate, 3);
+        var predicate = program.DeclareDynamic(functor);
+        var first = Add(program, predicate, 1);
+        var middle = Add(program, predicate, 2);
+        var tail = Add(program, predicate, 3);
         first.Death = tail.Death = program.NextGeneration();
         program.NoteRetraction(2);
         program.ReclaimDynamicClauses();
         Assert.Same(middle, predicate.First);
         Assert.Null(middle.Next);
-        DynamicClause last = Add(program, predicate, 4);
+        var last = Add(program, predicate, 4);
         Assert.Same(last, middle.Next);
         predicate.Prepend(first);
         first.Death = int.MaxValue;
@@ -85,8 +85,8 @@ public sealed class DynamicReclamationTests
     {
         var program = new BytecodeProgram();
         var functor = program.Symbols.InternFunctor("item", 1);
-        DynamicPredicate predicate = program.DeclareDynamic(functor);
-        DynamicClause first = Add(program, predicate, 1);
+        var predicate = program.DeclareDynamic(functor);
+        var first = Add(program, predicate, 1);
         Add(program, predicate, 2);
         var alias = program.Symbols.InternFunctor("alias", 1);
         Assert.True(program.AliasPredicate(alias, functor));

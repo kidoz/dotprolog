@@ -81,7 +81,7 @@ internal static class NumberReader
             return Outcome.NotANumber;
         }
 
-        Outcome outcome = ReadNumberToken(text, ref position, codePoints, rationals, digitSeparators, out PrologNumber value);
+        var outcome = ReadNumberToken(text, ref position, codePoints, rationals, digitSeparators, out var value);
         if (outcome != Outcome.Number)
         {
             return outcome;
@@ -426,11 +426,11 @@ internal static class NumberReader
 
         if (!isFloat && rationals && position + 1 < text.Length && text[position] == 'r' && char.IsAsciiDigit(text[position + 1]))
         {
-            BigInteger numerator = BigInteger.Parse(digits, NumberStyles.None, CultureInfo.InvariantCulture);
+            var numerator = BigInteger.Parse(digits, NumberStyles.None, CultureInfo.InvariantCulture);
             position++;
             var denominatorDigits = ReadDigits(text, ref position, separators, char.IsAsciiDigit, out _);
 
-            BigInteger denominator = BigInteger.Parse(denominatorDigits, NumberStyles.None, CultureInfo.InvariantCulture);
+            var denominator = BigInteger.Parse(denominatorDigits, NumberStyles.None, CultureInfo.InvariantCulture);
             if (denominator.IsZero)
             {
                 return Outcome.NotANumber;
@@ -440,7 +440,7 @@ internal static class NumberReader
             return Outcome.Number;
         }
 
-        ReadOnlySpan<char> literal = separated ? digits.AsSpan() : text.AsSpan(start, position - start);
+        var literal = separated ? digits.AsSpan() : text.AsSpan(start, position - start);
         if (isFloat)
         {
             var value = double.Parse(literal, CultureInfo.InvariantCulture);

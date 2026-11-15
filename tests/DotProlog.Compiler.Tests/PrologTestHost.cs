@@ -9,7 +9,7 @@ internal static class PrologTestHost
     /// <summary>Consults and runs <paramref name="source"/>, asserting that it compiles and succeeds.</summary>
     internal static string Run(string source)
     {
-        (RunResult result, var output, IReadOnlyList<Diagnostic> diagnostics) = Execute(source);
+        (var result, var output, var diagnostics) = Execute(source);
 
         Assert.Empty(diagnostics);
         Assert.Equal(RunResult.Success, result);
@@ -22,13 +22,13 @@ internal static class PrologTestHost
         var output = new StringWriter();
         using var engine = new PrologEngine { Output = output };
 
-        LoadResult loaded = engine.ConsultText(source, "test.pl");
+        var loaded = engine.ConsultText(source, "test.pl");
         if (!loaded.Success)
         {
             return (RunResult.Failure, output.ToString(), loaded.Diagnostics);
         }
 
-        RunResult result = engine.RunPendingGoals();
+        var result = engine.RunPendingGoals();
         return (result, output.ToString(), loaded.Diagnostics);
     }
 

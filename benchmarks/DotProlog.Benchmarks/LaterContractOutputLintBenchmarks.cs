@@ -42,7 +42,7 @@ public class LaterContractOutputLintBenchmarks
         }
 
         _source = $":- module(benchmark, []).\n{exports}{clauses}";
-        ContractReadResult read = ContractReader.Read(contract.ToString(), "Benchmark", ContractName);
+        var read = ContractReader.Read(contract.ToString(), "Benchmark", ContractName);
         if (!read.Success)
         {
             throw new InvalidOperationException(string.Join("; ", read.Diagnostics));

@@ -35,8 +35,8 @@ public sealed class PrologQuery
     /// <summary>Enumerates every answer, resuming the engine on each step.</summary>
     public IEnumerable<PrologSolution> Solutions()
     {
-        Machine machine = _engine.Machine;
-        RunResult result = machine.Run(_address);
+        var machine = _engine.Machine;
+        var result = machine.Run(_address);
 
         while (result == RunResult.Success)
         {
@@ -51,7 +51,7 @@ public sealed class PrologQuery
     /// <summary>Returns the first answer, or <see langword="null"/> when the goal fails.</summary>
     public PrologSolution? FirstOrDefault()
     {
-        Machine machine = _engine.Machine;
+        var machine = _engine.Machine;
         return machine.Run(_address) == RunResult.Success ? Capture(machine) : null;
     }
 
@@ -61,7 +61,7 @@ public sealed class PrologQuery
 
         if (_variableNames.Length > 0)
         {
-            Cell holder = machine.Dereference(machine.QueryBindings);
+            var holder = machine.Dereference(machine.QueryBindings);
             for (var i = 0; i < _variableNames.Length; i++)
             {
                 bindings[_variableNames[i]] = PrologValue.FromTerm(machine, machine.HeapAt(holder.Index + 1 + i));

@@ -22,7 +22,7 @@ internal static class PrologBuiltinShadowLinter
 
         Dictionary<(string Module, PredicateIndicator Indicator), Candidate> candidates = [];
         var module = ModuleTable.UserModule;
-        foreach (SyntaxTerm clause in clauses)
+        foreach (var clause in clauses)
         {
             if (clause is CompoundTerm { Name: ":-", Arity: 1, Arguments: [SyntaxTerm directiveTerm] })
             {
@@ -55,7 +55,7 @@ internal static class PrologBuiltinShadowLinter
         }
 
         Dictionary<(string Module, PredicateIndicator Indicator), Candidate> candidates = [];
-        foreach (PrologLintProgramModel.ClauseContext clause in model.Clauses)
+        foreach (var clause in model.Clauses)
         {
             if (clause.Clause is not CompoundTerm { Name: ":-", Arity: 1 })
             {
@@ -63,7 +63,7 @@ internal static class PrologBuiltinShadowLinter
             }
         }
 
-        foreach (PrologLintProgramModel.DeclarationSite declaration in model.LocalProcedureDeclarations)
+        foreach (var declaration in model.LocalProcedureDeclarations)
         {
             AddDeclaration(
                 declaration.Indicator,
@@ -85,9 +85,9 @@ internal static class PrologBuiltinShadowLinter
         Dictionary<(string Module, PredicateIndicator Indicator), Candidate> candidates
     )
     {
-        foreach (SyntaxTerm item in LintSyntax.SequenceItems(declarations))
+        foreach (var item in LintSyntax.SequenceItems(declarations))
         {
-            if (LintSyntax.TryIndicator(item, out PredicateIndicator indicator, out bool nonterminal))
+            if (LintSyntax.TryIndicator(item, out var indicator, out var nonterminal))
             {
                 AddDeclaration(indicator, nonterminal, item.Span, module, fileName, candidates);
             }
@@ -103,7 +103,7 @@ internal static class PrologBuiltinShadowLinter
         Dictionary<(string Module, PredicateIndicator Indicator), Candidate> candidates
     )
     {
-        Candidate? candidate = CandidateFor(module, indicator, candidates);
+        var candidate = CandidateFor(module, indicator, candidates);
         if (candidate is not null && candidate.DeclarationSpan is null)
         {
             candidate.DeclarationSpan = span;
@@ -120,13 +120,13 @@ internal static class PrologBuiltinShadowLinter
     )
     {
         var grammar = clause is CompoundTerm { Name: "-->", Arity: 2 };
-        SyntaxTerm head = LintSyntax.ClauseHead(clause);
-        if (!LintSyntax.TryPredicate(head, grammar, out PredicateIndicator indicator))
+        var head = LintSyntax.ClauseHead(clause);
+        if (!LintSyntax.TryPredicate(head, grammar, out var indicator))
         {
             return;
         }
 
-        Candidate? candidate = CandidateFor(module, indicator, candidates);
+        var candidate = CandidateFor(module, indicator, candidates);
         if (candidate is not null && candidate.ClauseSpan is null)
         {
             candidate.ClauseSpan = head is CompoundTerm { NameSpan: { } nameSpan } ? nameSpan : head.Span;
@@ -146,7 +146,7 @@ internal static class PrologBuiltinShadowLinter
             return null;
         }
 
-        if (!candidates.TryGetValue((module, indicator), out Candidate? candidate))
+        if (!candidates.TryGetValue((module, indicator), out var candidate))
         {
             candidate = new Candidate();
             candidates.Add((module, indicator), candidate);
@@ -160,9 +160,9 @@ internal static class PrologBuiltinShadowLinter
         List<Diagnostic> diagnostics
     )
     {
-        foreach (((string module, PredicateIndicator indicator), Candidate candidate) in candidates)
+        foreach (((var module, var indicator), var candidate) in candidates)
         {
-            bool nonterminal = candidate.ClauseSpan is not null ? candidate.ClauseNonterminal : candidate.DeclarationNonterminal;
+            var nonterminal = candidate.ClauseSpan is not null ? candidate.ClauseNonterminal : candidate.DeclarationNonterminal;
             diagnostics.Add(
                 new Diagnostic(
                     LintDiagnosticIds.BuiltinShadow,

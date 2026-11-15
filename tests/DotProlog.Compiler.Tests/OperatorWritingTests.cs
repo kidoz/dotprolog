@@ -117,13 +117,13 @@ public sealed class OperatorWritingTests
     {
         // Each mode reads the source its own way — strict ISO reads - 1 as the integer — and
         // must read what it wrote back the same way.
-        foreach (PrologLanguageMode mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
+        foreach (var mode in new[] { PrologLanguageMode.Modern, PrologLanguageMode.StrictIso })
         {
             using var engine = new PrologEngine(mode);
 
-            Cell original = ReadOntoHeap(engine, source);
+            var original = ReadOntoHeap(engine, source);
             var written = TermWriter.ToDisplayString(engine.Machine, original, quoted: true);
-            Cell reread = ReadOntoHeap(engine, written);
+            var reread = ReadOntoHeap(engine, written);
 
             Assert.True(
                 TermOrder.AreIdentical(engine.Machine, original, reread),
@@ -154,7 +154,7 @@ public sealed class OperatorWritingTests
 
     private static Cell ReadOntoHeap(PrologEngine engine, string source)
     {
-        ParseResult parsed = TermReader.ReadTerm(source, operators: engine.Program.Operators, flags: engine.Program.Flags);
+        var parsed = TermReader.ReadTerm(source, operators: engine.Program.Operators, flags: engine.Program.Flags);
         Assert.Empty(parsed.Diagnostics);
         Assert.Single(parsed.Clauses);
         return TermReifier.ToHeap(engine.Machine, parsed.Clauses[0], []);

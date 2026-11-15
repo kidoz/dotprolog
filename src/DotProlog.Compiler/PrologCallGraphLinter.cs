@@ -11,7 +11,7 @@ internal static class PrologCallGraphLinter
         ArgumentNullException.ThrowIfNull(diagnostics);
 
         CheckDeclarations(model, diagnostics);
-        foreach (PrologLintProgramModel.ClauseContext clause in model.Clauses)
+        foreach (var clause in model.Clauses)
         {
             if (clause.Clause is CompoundTerm { Name: ":-", Arity: 2 } rule)
             {
@@ -38,7 +38,7 @@ internal static class PrologCallGraphLinter
     private static void CheckDeclarations(PrologLintProgramModel model, List<Diagnostic> diagnostics)
     {
         HashSet<(string Module, PredicateIndicator Indicator, string Kind)> reported = [];
-        foreach (PrologLintProgramModel.DeclarationSite declaration in model.Declarations)
+        foreach (var declaration in model.Declarations)
         {
             if (
                 model.Modules.Defines(declaration.Module, declaration.Indicator)
@@ -117,7 +117,7 @@ internal static class PrologCallGraphLinter
         List<Diagnostic> diagnostics
     )
     {
-        int[]? meta = model.MetaArgumentsOf(module, new PredicateIndicator(goal.Name, goal.Arity));
+        var meta = model.MetaArgumentsOf(module, new PredicateIndicator(goal.Name, goal.Arity));
         if (meta is null)
         {
             return;
@@ -251,7 +251,7 @@ internal static class PrologCallGraphLinter
         bool allowTrivialFailure = true
     )
     {
-        PrologLintProgramModel.LintResolution resolution = model.Resolve(module, predicate);
+        var resolution = model.Resolve(module, predicate);
         if (!resolution.Known)
         {
             diagnostics.Add(
@@ -295,19 +295,19 @@ internal static class PrologCallGraphLinter
         List<Diagnostic> diagnostics
     )
     {
-        if (!TrySourceIndicator(site, out PredicateIndicator sourceIndicator))
+        if (!TrySourceIndicator(site, out var sourceIndicator))
         {
             return;
         }
 
         PredicateIndicator compiled = new(sourceIndicator.Name, sourceIndicator.Arity + 2);
-        PrologLintProgramModel.LintResolution resolution = model.Resolve(module, compiled);
+        var resolution = model.Resolve(module, compiled);
         if (resolution.Module is { } target && model.IsNonterminal(target, compiled))
         {
             return;
         }
 
-        PrologLintProgramModel.LintResolution ordinary = model.Resolve(module, sourceIndicator);
+        var ordinary = model.Resolve(module, sourceIndicator);
         if (ordinary.Module is { } ordinaryModule && model.IsOrdinary(ordinaryModule, sourceIndicator))
         {
             diagnostics.Add(

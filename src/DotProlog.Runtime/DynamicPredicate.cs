@@ -51,7 +51,7 @@ internal sealed class DynamicPredicate
     internal int Abolish(int generation)
     {
         var count = 0;
-        for (DynamicClause? clause = First; clause is not null; clause = clause.Next)
+        for (var clause = First; clause is not null; clause = clause.Next)
         {
             if (clause.Death == int.MaxValue)
             {
@@ -96,7 +96,7 @@ internal sealed class DynamicPredicate
     /// </summary>
     internal static DynamicClause? FirstVisible(DynamicClause? from, int generation)
     {
-        for (DynamicClause? clause = from; clause is not null; clause = clause.Next)
+        for (var clause = from; clause is not null; clause = clause.Next)
         {
             if (clause.IsVisibleAt(generation))
             {
@@ -114,7 +114,7 @@ internal sealed class DynamicPredicate
     /// </summary>
     internal static DynamicClause? FirstVisibleMatching(DynamicClause? from, int generation, Cell callKey)
     {
-        for (DynamicClause? clause = from; clause is not null; clause = clause.Next)
+        for (var clause = from; clause is not null; clause = clause.Next)
         {
             if (clause.IsVisibleAt(generation) && ClauseIndexing.Matches(clause.IndexKey, callKey))
             {

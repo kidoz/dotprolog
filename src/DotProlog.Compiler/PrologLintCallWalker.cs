@@ -130,7 +130,7 @@ internal sealed class PrologLintCallWalker
 
     private void WalkMetaArguments(CompoundTerm goal, string module, bool explicitlyQualified)
     {
-        int[]? meta = _model.MetaArgumentsOf(module, new PredicateIndicator(goal.Name, goal.Arity));
+        var meta = _model.MetaArgumentsOf(module, new PredicateIndicator(goal.Name, goal.Arity));
         if (meta is null)
         {
             return;

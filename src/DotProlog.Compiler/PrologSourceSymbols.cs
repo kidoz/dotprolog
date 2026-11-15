@@ -24,8 +24,8 @@ public static class PrologSourceSymbols
             // The lint model also retains initialization goals, which are not definitions.
             if (context.Clause is CompoundTerm { Name: ":-", Arity: 1 })
                 continue;
-            SyntaxTerm head = LintSyntax.ClauseHead(context.Clause);
-            SourceSpan selection = head is CompoundTerm { NameSpan: { } name } ? name : head.Span;
+            var head = LintSyntax.ClauseHead(context.Clause);
+            var selection = head is CompoundTerm { NameSpan: { } name } ? name : head.Span;
             result.Add(
                 new PrologSourceSymbol(
                     context.Source.FileName,

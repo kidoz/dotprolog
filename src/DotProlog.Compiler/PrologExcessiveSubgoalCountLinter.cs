@@ -17,9 +17,9 @@ internal static class PrologExcessiveSubgoalCountLinter
             return;
         }
 
-        int maximumSubgoals = MaximumSubgoals(options);
+        var maximumSubgoals = MaximumSubgoals(options);
         var module = ModuleTable.UserModule;
-        foreach (SyntaxTerm clause in clauses)
+        foreach (var clause in clauses)
         {
             if (clause is CompoundTerm { Name: ":-", Arity: 1, Arguments: [CompoundTerm directive] })
             {
@@ -41,8 +41,8 @@ internal static class PrologExcessiveSubgoalCountLinter
             return;
         }
 
-        int maximumSubgoals = MaximumSubgoals(options);
-        foreach (PrologLintProgramModel.ClauseContext clause in model.Clauses)
+        var maximumSubgoals = MaximumSubgoals(options);
+        foreach (var clause in model.Clauses)
         {
             AnalyzeClause(clause.Clause, clause.Module, maximumSubgoals, clause.Source.FileName, diagnostics);
         }
@@ -73,20 +73,20 @@ internal static class PrologExcessiveSubgoalCountLinter
         var grammar = clause is CompoundTerm { Name: "-->", Arity: 2 };
         if (
             clause is not CompoundTerm { Name: ":-" or "-->", Arity: 2 } rule
-            || !LintSyntax.TryPredicate(LintSyntax.ClauseHead(rule), grammar, out PredicateIndicator indicator)
+            || !LintSyntax.TryPredicate(LintSyntax.ClauseHead(rule), grammar, out var indicator)
         )
         {
             return;
         }
 
-        int count = CountGoals(rule.Arguments[1], grammar);
+        var count = CountGoals(rule.Arguments[1], grammar);
         if (count <= maximumSubgoals)
         {
             return;
         }
 
-        SyntaxTerm head = LintSyntax.ClauseHead(rule);
-        SourceSpan nameSpan = head is CompoundTerm { NameSpan: { } span } ? span : head.Span;
+        var head = LintSyntax.ClauseHead(rule);
+        var nameSpan = head is CompoundTerm { NameSpan: { } span } ? span : head.Span;
         diagnostics.Add(
             new Diagnostic(
                 LintDiagnosticIds.ExcessiveSubgoalCount,

@@ -24,7 +24,7 @@ internal static class PrologMetaPredicateDeclarationSyntax
         var modes = new string[compound.Arity];
         for (var index = 0; index < compound.Arguments.Count; index++)
         {
-            SyntaxTerm argument = compound.Arguments[index];
+            var argument = compound.Arguments[index];
             if (directiveName == "meta_predicate")
             {
                 modes[index] = argument switch

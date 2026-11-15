@@ -20,7 +20,7 @@ internal static class PrologNamingLinter
 
         var module = ModuleTable.UserModule;
         HashSet<(string Module, PredicateIndicator Indicator)> seen = [];
-        foreach (SyntaxTerm clause in clauses)
+        foreach (var clause in clauses)
         {
             if (clause is CompoundTerm { Name: ":-", Arity: 1, Arguments: [CompoundTerm directive] })
             {
@@ -43,7 +43,7 @@ internal static class PrologNamingLinter
         }
 
         HashSet<(string Module, PredicateIndicator Indicator)> seen = [];
-        foreach (PrologLintProgramModel.ClauseContext clause in model.Clauses)
+        foreach (var clause in model.Clauses)
         {
             AnalyzeDefinition(clause.Clause, clause.Module, clause.Source.FileName, seen, diagnostics);
         }
@@ -58,9 +58,9 @@ internal static class PrologNamingLinter
     )
     {
         var grammar = clause is CompoundTerm { Name: "-->", Arity: 2 };
-        SyntaxTerm head = LintSyntax.ClauseHead(clause);
+        var head = LintSyntax.ClauseHead(clause);
         if (
-            !LintSyntax.TryPredicate(head, grammar, out PredicateIndicator indicator)
+            !LintSyntax.TryPredicate(head, grammar, out var indicator)
             || !seen.Add((module, indicator))
             || !ShouldReport(indicator.Name)
         )
@@ -68,7 +68,7 @@ internal static class PrologNamingLinter
             return;
         }
 
-        SourceSpan nameSpan = head is CompoundTerm { NameSpan: { } span } ? span : head.Span;
+        var nameSpan = head is CompoundTerm { NameSpan: { } span } ? span : head.Span;
         diagnostics.Add(
             new Diagnostic(
                 LintDiagnosticIds.NonSnakeCasePredicate,
@@ -92,7 +92,7 @@ internal static class PrologNamingLinter
 
     private static bool IsSymbolic(string name)
     {
-        foreach (Rune rune in name.EnumerateRunes())
+        foreach (var rune in name.EnumerateRunes())
         {
             if (Rune.IsLetterOrDigit(rune))
             {
@@ -112,7 +112,7 @@ internal static class PrologNamingLinter
 
         for (var index = 1; index < name.Length; index++)
         {
-            char current = name[index];
+            var current = name[index];
             if (current is >= 'a' and <= 'z' or >= '0' and <= '9')
             {
                 continue;

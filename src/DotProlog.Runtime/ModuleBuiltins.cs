@@ -28,7 +28,7 @@ internal static class ModuleBuiltins
 
     private static string Context(Machine machine, int argument)
     {
-        Cell module = machine.Argument(argument);
+        var module = machine.Argument(argument);
         if (module.Tag == CellTag.Reference)
         {
             throw PrologErrors.Instantiation(machine);
@@ -44,7 +44,7 @@ internal static class ModuleBuiltins
 
     private static bool CurrentModule(Machine machine, long state)
     {
-        Cell requested = machine.Argument(0);
+        var requested = machine.Argument(0);
         if (requested.Tag is not (CellTag.Reference or CellTag.Atom))
         {
             throw PrologErrors.Type(machine, "atom", requested);
@@ -58,7 +58,7 @@ internal static class ModuleBuiltins
                 continue;
             }
 
-            Cell candidate = Cell.Atom(machine.Symbols.InternAtom(modules[index].Name));
+            var candidate = Cell.Atom(machine.Symbols.InternAtom(modules[index].Name));
             if (!machine.CanUnify(requested, candidate))
             {
                 continue;
@@ -77,12 +77,12 @@ internal static class ModuleBuiltins
 
     private static bool CurrentPredicate(Machine machine, string context, int argument, long state)
     {
-        Cell requested = machine.Argument(argument);
-        Cell pattern = requested;
+        var requested = machine.Argument(argument);
+        var pattern = requested;
         var colon = machine.Symbols.InternFunctor(":", 2);
         if (requested.Tag == CellTag.Structure && machine.HeapAt(requested.Index).Index == colon)
         {
-            Cell moduleTerm = machine.Dereference(machine.HeapAt(requested.Index + 1));
+            var moduleTerm = machine.Dereference(machine.HeapAt(requested.Index + 1));
             if (moduleTerm.Tag == CellTag.Reference)
             {
                 throw PrologErrors.Instantiation(machine);
@@ -99,13 +99,13 @@ internal static class ModuleBuiltins
 
         ValidatePredicateIndicator(machine, pattern);
 
-        if (!machine.Program.Modules.TryGet(context, out ModuleDefinition? module))
+        if (!machine.Program.Modules.TryGet(context, out var module))
         {
             throw PrologErrors.Existence(machine, "module", Atom(machine, context));
         }
 
         List<ModulePredicateIndicator> visible = [];
-        foreach (ModulePredicateDefinition predicate in module!.Predicates)
+        foreach (var predicate in module!.Predicates)
         {
             if (!predicate.Defined || !IsUserProcedure(machine, predicate.DefiningModule, predicate.Indicator))
             {
@@ -115,10 +115,10 @@ internal static class ModuleBuiltins
             visible.Add(predicate.Indicator);
         }
 
-        foreach ((ModulePredicateIndicator indicator, string source) in module.Imports)
+        foreach ((var indicator, var source) in module.Imports)
         {
-            string defining = source;
-            FollowDefinition(machine, indicator, ref defining, out ModulePredicateDefinition? metadata);
+            var defining = source;
+            FollowDefinition(machine, indicator, ref defining, out var metadata);
             if (metadata is { Defined: true } && IsUserProcedure(machine, defining, indicator) && !visible.Contains(indicator))
             {
                 visible.Add(indicator);
@@ -128,8 +128,8 @@ internal static class ModuleBuiltins
         var slash = machine.Symbols.InternFunctor("/", 2);
         for (var index = (int)state; index < visible.Count; index++)
         {
-            ModulePredicateIndicator indicator = visible[index];
-            Cell candidate = machine.CreateStructure(slash, [Atom(machine, indicator.Name), Cell.Integer60(indicator.Arity)]);
+            var indicator = visible[index];
+            var candidate = machine.CreateStructure(slash, [Atom(machine, indicator.Name), Cell.Integer60(indicator.Arity)]);
             if (!machine.CanUnify(pattern, candidate))
             {
                 continue;
@@ -167,8 +167,8 @@ internal static class ModuleBuiltins
             throw PrologErrors.Type(machine, "predicate_indicator", indicator);
         }
 
-        Cell name = machine.Dereference(machine.HeapAt(indicator.Index + 1));
-        Cell arity = machine.Dereference(machine.HeapAt(indicator.Index + 2));
+        var name = machine.Dereference(machine.HeapAt(indicator.Index + 1));
+        var arity = machine.Dereference(machine.HeapAt(indicator.Index + 2));
         if (name.Tag is not (CellTag.Reference or CellTag.Atom))
         {
             throw PrologErrors.Type(machine, "atom", name);
@@ -203,12 +203,12 @@ internal static class ModuleBuiltins
         long state
     )
     {
-        Cell prototype = machine.Argument(prototypeArgument);
-        Cell requestedProperty = machine.Argument(propertyArgument);
+        var prototype = machine.Argument(prototypeArgument);
+        var requestedProperty = machine.Argument(propertyArgument);
         ValidateProperty(machine, requestedProperty);
 
-        ResolvedProcedure procedure = ResolveProcedure(machine, context, prototype);
-        List<Cell> properties = Properties(machine, procedure);
+        var procedure = ResolveProcedure(machine, context, prototype);
+        var properties = Properties(machine, procedure);
 
         for (var index = (int)state; index < properties.Count; index++)
         {
@@ -236,11 +236,11 @@ internal static class ModuleBuiltins
             throw PrologErrors.Instantiation(machine);
         }
 
-        string module = context;
+        var module = context;
         var colon = machine.Symbols.InternFunctor(":", 2);
         while (prototype.Tag == CellTag.Structure && machine.HeapAt(prototype.Index).Index == colon)
         {
-            Cell qualifier = machine.Dereference(machine.HeapAt(prototype.Index + 1));
+            var qualifier = machine.Dereference(machine.HeapAt(prototype.Index + 1));
             if (qualifier.Tag == CellTag.Reference)
             {
                 throw PrologErrors.Instantiation(machine);
@@ -269,7 +269,7 @@ internal static class ModuleBuiltins
                 arity = 0;
                 break;
             case CellTag.Structure:
-                Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(prototype.Index).Index);
+                var functor = machine.Symbols.GetFunctor(machine.HeapAt(prototype.Index).Index);
                 name = machine.Symbols.AtomName(functor.NameAtom);
                 arity = functor.Arity;
                 break;
@@ -284,9 +284,9 @@ internal static class ModuleBuiltins
             name = name[(separator + 1)..];
         }
 
-        if (!machine.Program.Modules.TryGet(module, out ModuleDefinition? visibleModule))
+        if (!machine.Program.Modules.TryGet(module, out var visibleModule))
         {
-            Cell culprit = Cell.Atom(machine.Symbols.InternAtom(module));
+            var culprit = Cell.Atom(machine.Symbols.InternAtom(module));
             throw PrologErrors.Existence(machine, "module", culprit);
         }
 
@@ -294,9 +294,9 @@ internal static class ModuleBuiltins
         var defining = module;
         var imported = false;
         string? importedFrom = null;
-        if (!visibleModule!.TryPredicate(indicator, out ModulePredicateDefinition? metadata) || !metadata!.Defined)
+        if (!visibleModule!.TryPredicate(indicator, out var metadata) || !metadata!.Defined)
         {
-            if (visibleModule.Imports.TryGetValue(indicator, out string? source))
+            if (visibleModule.Imports.TryGetValue(indicator, out var source))
             {
                 defining = source;
                 imported = true;
@@ -327,14 +327,14 @@ internal static class ModuleBuiltins
     {
         HashSet<string> visited = [];
         metadata = null;
-        while (visited.Add(module) && machine.Program.Modules.TryGet(module, out ModuleDefinition? definition))
+        while (visited.Add(module) && machine.Program.Modules.TryGet(module, out var definition))
         {
             if (definition!.TryPredicate(indicator, out metadata) && metadata!.Defined)
             {
                 return;
             }
 
-            if (!definition.Imports.TryGetValue(indicator, out string? source))
+            if (!definition.Imports.TryGetValue(indicator, out var source))
             {
                 return;
             }
@@ -352,8 +352,8 @@ internal static class ModuleBuiltins
 
         List<Cell> properties = [];
         properties.Add(Atom(machine, machine.Program.IsDynamic(procedure.FunctorId) ? "dynamic" : "static"));
-        bool isoModule =
-            machine.Program.Modules.TryGet(procedure.DefiningModule, out ModuleDefinition? definition)
+        var isoModule =
+            machine.Program.Modules.TryGet(procedure.DefiningModule, out var definition)
             && definition!.InterfacePrepared;
         properties.Add(
             Atom(machine, procedure.Metadata is { Exported: false } && !procedure.Builtin && !isoModule ? "private" : "public")
@@ -377,7 +377,7 @@ internal static class ModuleBuiltins
         if (procedure.Metadata?.MetapredicateTemplate is string template)
         {
             Cell[] modes = [.. template.Select(mode => Atom(machine, mode.ToString()))];
-            Cell modeIndicator = machine.CreateStructure(
+            var modeIndicator = machine.CreateStructure(
                 machine.Symbols.InternFunctor(procedure.Indicator.Name, modes.Length),
                 modes
             );
@@ -410,7 +410,7 @@ internal static class ModuleBuiltins
 
         if (property.Tag == CellTag.Atom)
         {
-            string name = machine.Symbols.AtomName(property.Index);
+            var name = machine.Symbols.AtomName(property.Index);
             if (name is "static" or "dynamic" or "public" or "private" or "built_in" or "multifile" or "exported")
             {
                 return;
@@ -421,8 +421,8 @@ internal static class ModuleBuiltins
 
         if (property.Tag == CellTag.Structure)
         {
-            Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(property.Index).Index);
-            string name = machine.Symbols.AtomName(functor.NameAtom);
+            var functor = machine.Symbols.GetFunctor(machine.HeapAt(property.Index).Index);
+            var name = machine.Symbols.AtomName(functor.NameAtom);
             if (functor.Arity == 1 && name is "metapredicate" or "imported_from" or "defined_in")
             {
                 return;

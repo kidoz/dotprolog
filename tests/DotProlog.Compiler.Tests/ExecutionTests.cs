@@ -12,14 +12,14 @@ public sealed class ExecutionTests
         using var engine = new PrologEngine();
         List<Diagnostic> diagnostics = [];
         var compiler = new ClauseCompiler(engine.Program, new ConstantPool(engine.Program), diagnostics, "reuse.pl");
-        SyntaxTerm wideHead = Assert.Single(TermReader.ReadProgram("wide(X, A, B, C, D, E, F, G).").Clauses);
-        SyntaxTerm condition = Assert.Single(TermReader.ReadProgram("(true -> !; fail).").Clauses);
+        var wideHead = Assert.Single(TermReader.ReadProgram("wide(X, A, B, C, D, E, F, G).").Clauses);
+        var condition = Assert.Single(TermReader.ReadProgram("(true -> !; fail).").Clauses);
         Assert.True(compiler.Compile(wideHead, condition) >= 0);
 
-        SyntaxTerm narrowHead = Assert.Single(TermReader.ReadProgram("narrow(X).").Clauses);
-        int narrow = compiler.Compile(narrowHead, null);
+        var narrowHead = Assert.Single(TermReader.ReadProgram("narrow(X).").Clauses);
+        var narrow = compiler.Compile(narrowHead, null);
         Assert.True(narrow >= 0);
-        CompiledProgramModel model = CompiledProgramModel.Create(engine.Program, narrow, [], []);
+        var model = CompiledProgramModel.Create(engine.Program, narrow, [], []);
         Assert.Equal(OpCode.Allocate, model.Instructions[0].OpCode);
         Assert.Equal(1, model.Instructions[0].First);
         Assert.Equal(OpCode.GetVariable, model.Instructions[1].OpCode);
@@ -28,7 +28,7 @@ public sealed class ExecutionTests
 
         Assert.Equal(-1, compiler.Compile(new IntegerTerm(0, SourceSpan.None), null));
         Assert.Single(diagnostics);
-        int recovered = compiler.Compile(new AtomTerm("recovered", SourceSpan.None), null);
+        var recovered = compiler.Compile(new AtomTerm("recovered", SourceSpan.None), null);
         Assert.True(recovered >= 0);
         model = CompiledProgramModel.Create(engine.Program, recovered, [], []);
         Assert.Equal(OpCode.Allocate, model.Instructions[0].OpCode);
@@ -38,7 +38,7 @@ public sealed class ExecutionTests
     [Fact]
     public void SiblingClausesKeepNamedAndAnonymousVariablesIndependent()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             choice(wide(X, A, B, C, D, E, F, G)) :- X = changed, fail.
             choice(pair(X, X)).
@@ -101,7 +101,7 @@ public sealed class ExecutionTests
     )]
     public void StructureHeadsPreserveBindingsAcrossDeferredMatching(string pattern, string result, string input, string expected)
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             $"""
             match({pattern}, {result}).
             :- initialization((findall(R, match({input}, R), Rs), write(Rs))).
@@ -114,7 +114,7 @@ public sealed class ExecutionTests
     [Fact]
     public void DeferredHeadBindingsAreRestoredBeforeTryingTheNextClause()
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             """
             pick(tree(left(X), right(Y)), pair(Y, X), rejected) :- X = changed, fail.
             pick(tree(left(X), right(Y)), pair(Y, X), accepted).
@@ -143,7 +143,7 @@ public sealed class ExecutionTests
     [Fact]
     public void FailedGoalIsReportedRatherThanThrowing()
     {
-        (RunResult result, var output, _) = PrologTestHost.Execute(
+        (var result, var output, _) = PrologTestHost.Execute(
             """
             same(X, X).
 
@@ -273,7 +273,7 @@ public sealed class ExecutionTests
         using var engine = new PrologEngine { Output = new StringWriter() };
         Assert.True(engine.ConsultText(":- initialization(nowhere(1)).").Success);
 
-        PrologException exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
+        var exception = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
 
         Assert.Contains("existence_error(procedure, nowhere/1)", exception.Message, StringComparison.Ordinal);
     }
@@ -281,7 +281,7 @@ public sealed class ExecutionTests
     [Fact]
     public void HaltStopsBeforeLaterGoalsRun()
     {
-        (RunResult result, var output, _) = PrologTestHost.Execute(
+        (var result, var output, _) = PrologTestHost.Execute(
             """
             :- initialization((write(before), nl, halt(3), write(after))).
             """
@@ -352,7 +352,7 @@ public sealed class ExecutionTests
     [Fact]
     public void ReaderDiagnosticsSurfaceThroughConsult()
     {
-        (_, _, IReadOnlyList<Diagnostic> diagnostics) = PrologTestHost.Execute("p(a b).");
+        (_, _, var diagnostics) = PrologTestHost.Execute("p(a b).");
 
         Assert.Equal(DiagnosticIds.UnexpectedToken, Assert.Single(diagnostics).Id);
     }

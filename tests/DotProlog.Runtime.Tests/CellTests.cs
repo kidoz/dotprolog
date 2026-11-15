@@ -17,7 +17,7 @@ public sealed class CellTests
     [InlineData((int)((1L << 30) - 1))]
     public void ReferenceRoundTripsItsAddress(int address)
     {
-        Cell cell = Cell.Reference(address);
+        var cell = Cell.Reference(address);
 
         Assert.Equal(CellTag.Reference, cell.Tag);
         Assert.Equal(address, cell.Index);
@@ -34,7 +34,7 @@ public sealed class CellTests
     [InlineData(Cell.MinInteger)]
     public void IntegerRoundTripsIncludingNegatives(long value)
     {
-        Cell cell = Cell.Integer60(value);
+        var cell = Cell.Integer60(value);
 
         Assert.Equal(CellTag.Integer, cell.Tag);
         Assert.Equal(value, cell.Integer);

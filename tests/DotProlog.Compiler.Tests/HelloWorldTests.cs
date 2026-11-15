@@ -11,7 +11,7 @@ public sealed class HelloWorldTests
         var output = new StringWriter();
         using var engine = new PrologEngine { Output = output };
 
-        LoadResult loaded = engine.ConsultFile("hello.pl");
+        var loaded = engine.ConsultFile("hello.pl");
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
 

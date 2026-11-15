@@ -17,8 +17,8 @@ internal static class PrologNonSteadfastLinter
             return;
         }
 
-        HashSet<PredicateIndicator> multifile = LintDeclarations.MultifileIndicators(clauses);
-        foreach (SyntaxTerm clause in clauses)
+        var multifile = LintDeclarations.MultifileIndicators(clauses);
+        foreach (var clause in clauses)
         {
             AnalyzeClause(clause, multifile.Contains, fileName, diagnostics);
         }
@@ -34,7 +34,7 @@ internal static class PrologNonSteadfastLinter
             return;
         }
 
-        foreach (PrologLintProgramModel.ClauseContext clause in model.Clauses)
+        foreach (var clause in model.Clauses)
         {
             AnalyzeClause(
                 clause.Clause,
@@ -55,7 +55,7 @@ internal static class PrologNonSteadfastLinter
         var grammar = clause is CompoundTerm { Name: "-->", Arity: 2 };
         if (
             clause is not CompoundTerm { Name: ":-" or "-->", Arity: 2 } rule
-            || !LintSyntax.TryPredicate(LintSyntax.ClauseHead(rule), grammar, out PredicateIndicator indicator)
+            || !LintSyntax.TryPredicate(LintSyntax.ClauseHead(rule), grammar, out var indicator)
             || isMultifile(indicator)
             || !HasCrossArgumentAlias(LintSyntax.ClauseHead(rule))
             || LintCutScope.FirstClauseCut(rule.Arguments[1], grammar) is not { } cut

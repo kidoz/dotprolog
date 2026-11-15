@@ -22,7 +22,7 @@ internal static class PrologUnusedImportLinter
             return;
         }
 
-        foreach (PrologLintProgramModel.ImportSite import in model.Imports)
+        foreach (var import in model.Imports)
         {
             if (import.Reexport || import.SourceModule is not { } sourceModule || model.HasNonPredicateEffects(sourceModule))
             {
@@ -31,7 +31,7 @@ internal static class PrologUnusedImportLinter
 
             if (import.Selective)
             {
-                foreach (PrologLintProgramModel.ImportBinding binding in import.Bindings)
+                foreach (var binding in import.Bindings)
                 {
                     UsageKey key = new(import.Importer, sourceModule, binding.Indicator);
                     if (analysis.Used.Contains(key))
@@ -39,7 +39,7 @@ internal static class PrologUnusedImportLinter
                         continue;
                     }
 
-                    string display = LintSyntax.Display(binding.Indicator, binding.Nonterminal);
+                    var display = LintSyntax.Display(binding.Indicator, binding.Nonterminal);
                     diagnostics.Add(
                         new Diagnostic(
                             LintDiagnosticIds.PossiblyUnusedImport,
@@ -84,7 +84,7 @@ internal static class PrologUnusedImportLinter
 
         internal void Build()
         {
-            foreach (PrologLintProgramModel.ClauseContext clause in _model.Clauses)
+            foreach (var clause in _model.Clauses)
             {
                 var walker = new PrologLintCallWalker(_model, AddOrdinaryCall, AddNonterminalCall);
                 switch (clause.Clause)
@@ -106,7 +106,7 @@ internal static class PrologUnusedImportLinter
 
         private void AddOrdinaryCall(PredicateIndicator predicate, string module, bool explicitlyQualified)
         {
-            PrologLintProgramModel.LintResolution resolution = _model.Resolve(module, predicate);
+            var resolution = _model.Resolve(module, predicate);
             if (!resolution.Known || resolution.IsUnknown)
             {
                 Incomplete = true;
@@ -127,7 +127,7 @@ internal static class PrologUnusedImportLinter
         private void AddNonterminalCall(PredicateIndicator sourceIndicator, string module, bool explicitlyQualified)
         {
             PredicateIndicator compiled = new(sourceIndicator.Name, sourceIndicator.Arity + 2);
-            PrologLintProgramModel.LintResolution resolution = _model.Resolve(module, compiled);
+            var resolution = _model.Resolve(module, compiled);
             if (!resolution.Known || resolution.IsUnknown)
             {
                 Incomplete = true;

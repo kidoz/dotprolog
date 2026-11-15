@@ -9,15 +9,15 @@ internal static class LintDeclarations
     {
         HashSet<PredicateIndicator> result = [];
         foreach (
-            CompoundTerm directive in clauses
+            var directive in clauses
                 .OfType<CompoundTerm>()
                 .Where(clause => clause is { Name: ":-", Arity: 1, Arguments: [CompoundTerm { Name: "multifile", Arity: 1 }] })
         )
         {
-            CompoundTerm declaration = (CompoundTerm)directive.Arguments[0];
-            foreach (SyntaxTerm item in LintSyntax.SequenceItems(declaration.Arguments[0]))
+            var declaration = (CompoundTerm)directive.Arguments[0];
+            foreach (var item in LintSyntax.SequenceItems(declaration.Arguments[0]))
             {
-                if (LintSyntax.TryIndicator(item, out PredicateIndicator indicator, out _))
+                if (LintSyntax.TryIndicator(item, out var indicator, out _))
                 {
                     result.Add(indicator);
                 }

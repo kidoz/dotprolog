@@ -36,16 +36,16 @@ internal static class PrologFlagBuiltins
 
     private static bool CurrentPrologFlag(Machine machine, PrologFlags flags, int offset, long state)
     {
-        Cell flag = machine.Argument(offset);
+        var flag = machine.Argument(offset);
         if (flag.Tag is not (CellTag.Reference or CellTag.Atom))
         {
             throw PrologErrors.Type(machine, "atom", flag);
         }
 
-        Cell pattern = machine.CreateStructure(machine.Symbols.InternFunctor("-", 2), [flag, machine.Argument(offset + 1)]);
+        var pattern = machine.CreateStructure(machine.Symbols.InternFunctor("-", 2), [flag, machine.Argument(offset + 1)]);
 
         var count = FlagCount(machine);
-        uint snapshot = state == 0 ? CaptureFlags(flags) : (uint)(state >> 32);
+        var snapshot = state == 0 ? CaptureFlags(flags) : (uint)(state >> 32);
         if (state == 0 && flag.Tag == CellTag.Atom && machine.Program.LanguageMode == PrologLanguageMode.StrictIso)
         {
             var flagName = machine.Symbols.AtomName(flag.Index);
@@ -67,8 +67,8 @@ internal static class PrologFlagBuiltins
 
         for (var index = (int)state; index < count; index++)
         {
-            (var name, Cell value) = ValueAt(machine, snapshot, index);
-            Cell candidate = machine.CreateStructure(
+            (var name, var value) = ValueAt(machine, snapshot, index);
+            var candidate = machine.CreateStructure(
                 machine.Symbols.InternFunctor("-", 2),
                 [Cell.Atom(machine.Symbols.InternAtom(name)), value]
             );
@@ -93,8 +93,8 @@ internal static class PrologFlagBuiltins
 
     private static bool SetPrologFlag(Machine machine, PrologFlags flags, int offset)
     {
-        Cell flag = machine.Argument(offset);
-        Cell value = machine.Argument(offset + 1);
+        var flag = machine.Argument(offset);
+        var value = machine.Argument(offset + 1);
 
         if (flag.Tag == CellTag.Reference || value.Tag == CellTag.Reference)
         {
@@ -214,7 +214,7 @@ internal static class PrologFlagBuiltins
 
     private static PrologException InvalidValue(Machine machine, string flag, Cell value)
     {
-        Cell culprit = machine.CreateStructure(
+        var culprit = machine.CreateStructure(
             machine.Symbols.InternFunctor("+", 2),
             [Cell.Atom(machine.Symbols.InternAtom(flag)), value]
         );
@@ -273,7 +273,7 @@ internal static class PrologFlagBuiltins
 
     private static ModuleDefinition Context(Machine machine, int argument)
     {
-        Cell module = machine.Argument(argument);
+        var module = machine.Argument(argument);
         if (module.Tag == CellTag.Reference)
         {
             throw PrologErrors.Instantiation(machine);
@@ -284,8 +284,8 @@ internal static class PrologFlagBuiltins
             throw PrologErrors.Type(machine, "atom", module);
         }
 
-        string name = machine.Symbols.AtomName(module.Index);
-        return machine.Program.Modules.TryGet(name, out ModuleDefinition? definition)
+        var name = machine.Symbols.AtomName(module.Index);
+        return machine.Program.Modules.TryGet(name, out var definition)
             ? definition!
             : throw PrologErrors.Existence(machine, "module", module);
     }

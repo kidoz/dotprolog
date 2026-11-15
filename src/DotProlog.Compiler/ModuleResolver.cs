@@ -47,7 +47,7 @@ internal sealed class ModuleResolver
         _local = local;
         _program = program;
         _isoContext =
-            isoContext || (modules.Catalog.TryGet(module, out ModuleDefinition? definition) && definition!.InterfacePrepared);
+            isoContext || (modules.Catalog.TryGet(module, out var definition) && definition!.InterfacePrepared);
     }
 
     /// <summary>Whether this resolver has anything to do.</summary>
@@ -103,7 +103,7 @@ internal sealed class ModuleResolver
             );
         }
 
-        string? contextual = _isoContext
+        var contextual = _isoContext
             ? (compound.Name, compound.Arity) switch
             {
                 ("op", 3) => "$op",
@@ -137,7 +137,7 @@ internal sealed class ModuleResolver
                 return WithArguments(compound, ResolveGoal(compound.Arguments[0]), ResolveGoal(compound.Arguments[1]));
 
             case { Name: "\\+", Arity: 1 }:
-                SyntaxTerm goal = ResolveGoal(compound.Arguments[0]);
+                var goal = ResolveGoal(compound.Arguments[0]);
                 return ReferenceEquals(goal, compound.Arguments[0]) ? compound : compound with { Arguments = [goal] };
 
             // ^/2 qualifies a bagof/3 goal; the goal inside it still has to be resolved.
@@ -155,9 +155,9 @@ internal sealed class ModuleResolver
 
         var indicator = new PredicateIndicator(compound.Name, compound.Arity);
         var meta = _modules.MetaArgumentsOf(_module, indicator);
-        IReadOnlyList<SyntaxTerm> arguments = meta is null ? compound.Arguments : ResolveMetaArguments(compound, meta);
+        var arguments = meta is null ? compound.Arguments : ResolveMetaArguments(compound, meta);
 
-        string name = Rename(compound.Name, compound.Arity) ?? compound.Name;
+        var name = Rename(compound.Name, compound.Arity) ?? compound.Name;
         return name == compound.Name && ReferenceEquals(arguments, compound.Arguments)
             ? compound
             : new CompoundTerm(name, arguments, compound.Span);
@@ -169,7 +169,7 @@ internal sealed class ModuleResolver
 
         for (var i = 0; i < compound.Arity; i++)
         {
-            SyntaxTerm resolved = meta[i] switch
+            var resolved = meta[i] switch
             {
                 ModuleTable.ClauseArgument => ResolveClause(compound.Arguments[i]),
                 ModuleTable.HeadArgument => ResolveLocalHead(compound.Arguments[i]),
@@ -238,7 +238,7 @@ internal sealed class ModuleResolver
 
         if (
             _module != ModuleTable.UserModule
-            && _modules.Catalog.TryGet(_module, out ModuleDefinition? definition)
+            && _modules.Catalog.TryGet(_module, out var definition)
             && definition!.InterfacePrepared
             && !IsGlobalProcedure(name, arity)
         )

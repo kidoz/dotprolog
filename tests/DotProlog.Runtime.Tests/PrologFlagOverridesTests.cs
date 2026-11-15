@@ -10,7 +10,7 @@ public sealed class PrologFlagOverridesTests
     [InlineData(";")]
     public void BlankTextParsesToNone(string? text)
     {
-        Assert.True(PrologFlagOverrides.TryParse(text, out PrologFlagOverrides overrides, out var error));
+        Assert.True(PrologFlagOverrides.TryParse(text, out var overrides, out var error));
         Assert.Same(PrologFlagOverrides.None, overrides);
         Assert.True(overrides.IsEmpty);
         Assert.Null(error);
@@ -24,7 +24,7 @@ public sealed class PrologFlagOverridesTests
     [InlineData(" Double_Quotes = ATOM ;", DoubleQuotesMode.Atom)]
     public void DoubleQuotesEntryParses(string text, DoubleQuotesMode expected)
     {
-        Assert.True(PrologFlagOverrides.TryParse(text, out PrologFlagOverrides overrides, out _));
+        Assert.True(PrologFlagOverrides.TryParse(text, out var overrides, out _));
         Assert.Equal(expected, overrides.DoubleQuotes);
         Assert.False(overrides.IsEmpty);
     }
@@ -36,7 +36,7 @@ public sealed class PrologFlagOverridesTests
     [InlineData("double_quotes=codes;double_quotes=chars", "more than once")]
     public void InvalidTextIsRejectedWithTheReason(string text, string reason)
     {
-        Assert.False(PrologFlagOverrides.TryParse(text, out PrologFlagOverrides overrides, out var error));
+        Assert.False(PrologFlagOverrides.TryParse(text, out var overrides, out var error));
         Assert.Same(PrologFlagOverrides.None, overrides);
         Assert.Contains(reason, error, StringComparison.Ordinal);
     }

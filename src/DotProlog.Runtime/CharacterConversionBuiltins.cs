@@ -54,12 +54,12 @@ internal static class CharacterConversionBuiltins
         int start
     )
     {
-        ReadOnlySpan<CharacterConversionTable.Entry> entries = conversions.Entries(version);
+        var entries = conversions.Entries(version);
         for (var index = start; index < entries.Length; index++)
         {
-            CharacterConversionTable.Entry entry = entries[index];
-            Cell input = Character(machine, entry.Input);
-            Cell output = Character(machine, entry.Output);
+            var entry = entries[index];
+            var input = Character(machine, entry.Input);
+            var output = Character(machine, entry.Output);
             if (!machine.CanUnify(machine.Argument(offset), input) || !machine.CanUnify(machine.Argument(offset + 1), output))
             {
                 continue;
@@ -129,7 +129,7 @@ internal static class CharacterConversionBuiltins
 
     private static ModuleDefinition Context(Machine machine, int argument)
     {
-        Cell module = machine.Argument(argument);
+        var module = machine.Argument(argument);
         if (module.Tag == CellTag.Reference)
         {
             throw PrologErrors.Instantiation(machine);
@@ -140,8 +140,8 @@ internal static class CharacterConversionBuiltins
             throw PrologErrors.Type(machine, "atom", module);
         }
 
-        string name = machine.Symbols.AtomName(module.Index);
-        return machine.Program.Modules.TryGet(name, out ModuleDefinition? definition)
+        var name = machine.Symbols.AtomName(module.Index);
+        return machine.Program.Modules.TryGet(name, out var definition)
             ? definition!
             : throw PrologErrors.Existence(machine, "module", module);
     }

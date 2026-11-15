@@ -12,7 +12,7 @@ internal static class PrologMetaPredicateDeclarationLinter
 
         Dictionary<(string Module, PredicateIndicator Indicator), DeclarationHistory> declarations = [];
         var module = ModuleTable.UserModule;
-        foreach (SyntaxTerm clause in clauses)
+        foreach (var clause in clauses)
         {
             if (clause is not CompoundTerm { Name: ":-", Arity: 1, Arguments: [CompoundTerm directive] })
             {
@@ -25,15 +25,15 @@ internal static class PrologMetaPredicateDeclarationLinter
                 continue;
             }
 
-            foreach (SyntaxTerm item in LintSyntax.SequenceItems(directive.Arguments[0]))
+            foreach (var item in LintSyntax.SequenceItems(directive.Arguments[0]))
             {
                 if (
                     PrologMetaPredicateDeclarationSyntax.TryNormalize(
                         directive.Name,
                         item,
-                        out PredicateIndicator indicator,
-                        out string template,
-                        out string signature
+                        out var indicator,
+                        out var template,
+                        out var signature
                     )
                 )
                 {
@@ -60,7 +60,7 @@ internal static class PrologMetaPredicateDeclarationLinter
         ArgumentNullException.ThrowIfNull(diagnostics);
 
         Dictionary<(string Module, PredicateIndicator Indicator), DeclarationHistory> declarations = [];
-        foreach (PrologLintProgramModel.MetaPredicateDeclaration declaration in model.MetaPredicateDeclarations)
+        foreach (var declaration in model.MetaPredicateDeclarations)
         {
             AddDeclaration(declaration, declarations, diagnostics);
         }
@@ -73,7 +73,7 @@ internal static class PrologMetaPredicateDeclarationLinter
     )
     {
         var key = (declaration.Module, declaration.Indicator);
-        if (!declarations.TryGetValue(key, out DeclarationHistory? history))
+        if (!declarations.TryGetValue(key, out var history))
         {
             declarations.Add(key, new DeclarationHistory(declaration.Signature, declaration.Template));
             return;

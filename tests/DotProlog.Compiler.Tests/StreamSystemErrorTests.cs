@@ -21,7 +21,7 @@ public sealed class StreamSystemErrorTests
 
         Assert.Equal(
             RunResult.Success,
-            engine.RunGoal($"catch({operation}, error(system_error, _), true)", out IReadOnlyList<Diagnostic> diagnostics)
+            engine.RunGoal($"catch({operation}, error(system_error, _), true)", out var diagnostics)
         );
         Assert.Empty(diagnostics);
     }
@@ -47,7 +47,7 @@ public sealed class StreamSystemErrorTests
 
         Assert.Equal(
             RunResult.Success,
-            engine.RunGoal($"catch({operation}, error(system_error, _), true)", out IReadOnlyList<Diagnostic> diagnostics)
+            engine.RunGoal($"catch({operation}, error(system_error, _), true)", out var diagnostics)
         );
         Assert.Empty(diagnostics);
     }
@@ -59,7 +59,7 @@ public sealed class StreamSystemErrorTests
 
         Assert.Equal(
             RunResult.Success,
-            engine.RunGoal("close(user_output, [force(true)])", out IReadOnlyList<Diagnostic> diagnostics)
+            engine.RunGoal("close(user_output, [force(true)])", out var diagnostics)
         );
         Assert.Empty(diagnostics);
     }
@@ -75,7 +75,7 @@ public sealed class StreamSystemErrorTests
                 ? "close(user_output, [force(true)]), write(forced)"
                 : "catch(close(user_output, [force(false)]), error(system_error, _), true), write(catchable)";
 
-        Assert.Equal(RunResult.Success, engine.RunGoal(goal, out IReadOnlyList<Diagnostic> diagnostics));
+        Assert.Equal(RunResult.Success, engine.RunGoal(goal, out var diagnostics));
         Assert.Equal(expected, engine.Output.ToString());
         Assert.Empty(diagnostics);
     }

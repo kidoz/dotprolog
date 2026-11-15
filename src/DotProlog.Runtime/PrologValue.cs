@@ -19,7 +19,7 @@ public abstract record PrologValue
     {
         ArgumentNullException.ThrowIfNull(machine);
 
-        Cell root = machine.Dereference(term);
+        var root = machine.Dereference(term);
         if (root.Tag != CellTag.Structure)
         {
             return Convert(machine, root);
@@ -31,11 +31,11 @@ public abstract record PrologValue
 
         while (true)
         {
-            Frame frame = pending.Peek();
+            var frame = pending.Peek();
 
             if (frame.Index < frame.Arguments.Length)
             {
-                Cell argument = machine.Dereference(frame.Arguments[frame.Index]);
+                var argument = machine.Dereference(frame.Arguments[frame.Index]);
                 if (argument.Tag == CellTag.Structure)
                 {
                     if (!active.Add(argument.Index))
@@ -60,7 +60,7 @@ public abstract record PrologValue
                 return completed;
             }
 
-            Frame parent = pending.Peek();
+            var parent = pending.Peek();
             parent.Values[parent.Index++] = completed;
         }
     }
@@ -69,7 +69,7 @@ public abstract record PrologValue
     public bool TryGetList(out IReadOnlyList<PrologValue> items)
     {
         List<PrologValue> collected = [];
-        PrologValue current = this;
+        var current = this;
 
         while (current is PrologCompound { Name: ".", Arguments.Count: 2 } pair)
         {
@@ -102,7 +102,7 @@ public abstract record PrologValue
 
     private static PrologRational RationalValue(Machine machine, Cell cell)
     {
-        (System.Numerics.BigInteger numerator, System.Numerics.BigInteger denominator) = machine.Symbols.GetRational(cell.Index);
+        (var numerator, var denominator) = machine.Symbols.GetRational(cell.Index);
         return new PrologRational(numerator, denominator);
     }
 
@@ -110,7 +110,7 @@ public abstract record PrologValue
     {
         internal static Frame For(Machine machine, Cell structure)
         {
-            Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(structure.Index).Index);
+            var functor = machine.Symbols.GetFunctor(machine.HeapAt(structure.Index).Index);
             var arguments = new Cell[functor.Arity];
             for (var i = 0; i < functor.Arity; i++)
             {

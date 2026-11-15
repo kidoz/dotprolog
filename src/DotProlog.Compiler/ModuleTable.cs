@@ -106,14 +106,14 @@ public sealed class ModuleTable
         ArgumentNullException.ThrowIfNull(module);
         ArgumentNullException.ThrowIfNull(exports);
 
-        if (!_exports.TryGetValue(module, out HashSet<PredicateIndicator>? set))
+        if (!_exports.TryGetValue(module, out var set))
         {
             set = [];
             _exports[module] = set;
         }
 
-        ModuleDefinition definition = Catalog.Declare(module);
-        foreach (PredicateIndicator export in exports)
+        var definition = Catalog.Declare(module);
+        foreach (var export in exports)
         {
             set.Add(export);
             definition.Predicate(ToRuntime(export)).Exported = true;
@@ -122,20 +122,20 @@ public sealed class ModuleTable
 
     /// <summary>Whether <paramref name="module"/> exports <paramref name="predicate"/>.</summary>
     public bool Exports(string module, PredicateIndicator predicate) =>
-        (_exports.TryGetValue(module, out HashSet<PredicateIndicator>? set) && set.Contains(predicate))
+        (_exports.TryGetValue(module, out var set) && set.Contains(predicate))
         || (
-            Catalog.TryGet(module, out ModuleDefinition? definition)
-            && definition!.TryPredicate(ToRuntime(predicate), out ModulePredicateDefinition? metadata)
+            Catalog.TryGet(module, out var definition)
+            && definition!.TryPredicate(ToRuntime(predicate), out var metadata)
             && metadata!.Exported
         );
 
     /// <summary>What <paramref name="module"/> exports, or nothing if it declared no module.</summary>
     public IReadOnlyCollection<PredicateIndicator> ExportsOf(string module)
     {
-        HashSet<PredicateIndicator> exports = _exports.TryGetValue(module, out HashSet<PredicateIndicator>? declared)
+        HashSet<PredicateIndicator> exports = _exports.TryGetValue(module, out var declared)
             ? [.. declared]
             : [];
-        if (Catalog.TryGet(module, out ModuleDefinition? definition))
+        if (Catalog.TryGet(module, out var definition))
         {
             exports.UnionWith(
                 definition!.Predicates.Where(predicate => predicate.Exported).Select(predicate => ToCompiler(predicate.Indicator))
@@ -154,7 +154,7 @@ public sealed class ModuleTable
         ArgumentNullException.ThrowIfNull(importer);
         ArgumentNullException.ThrowIfNull(from);
 
-        if (!_imports.TryGetValue(importer, out Dictionary<PredicateIndicator, string>? map))
+        if (!_imports.TryGetValue(importer, out var map))
         {
             map = [];
             _imports[importer] = map;
@@ -180,18 +180,18 @@ public sealed class ModuleTable
 
     /// <summary>The module <paramref name="importer"/> imported <paramref name="predicate"/> from, if any.</summary>
     public string? ImportedFrom(string importer, PredicateIndicator predicate) =>
-        _imports.TryGetValue(importer, out Dictionary<PredicateIndicator, string>? map)
+        _imports.TryGetValue(importer, out var map)
         && map.TryGetValue(predicate, out var from)
             ? from
-        : Catalog.TryGet(importer, out ModuleDefinition? definition)
-        && definition!.Imports.TryGetValue(ToRuntime(predicate), out string? catalogFrom)
+        : Catalog.TryGet(importer, out var definition)
+        && definition!.Imports.TryGetValue(ToRuntime(predicate), out var catalogFrom)
             ? catalogFrom
         : null;
 
     /// <summary>Follows reexports to the module that contains the procedure's clauses.</summary>
     public string? DefiningModuleOf(string importer, PredicateIndicator predicate)
     {
-        string? current = ImportedFrom(importer, predicate);
+        var current = ImportedFrom(importer, predicate);
         if (current is null)
         {
             return null;
@@ -205,7 +205,7 @@ public sealed class ModuleTable
                 return current;
             }
 
-            string? next = ImportedFrom(current, predicate);
+            var next = ImportedFrom(current, predicate);
             if (next is null)
             {
                 return current;
@@ -285,15 +285,15 @@ public sealed class ModuleTable
         }
 
         if (
-            Catalog.TryGet(module, out ModuleDefinition? localDefinition)
-            && localDefinition!.TryPredicate(ToRuntime(predicate), out ModulePredicateDefinition? localMetadata)
+            Catalog.TryGet(module, out var localDefinition)
+            && localDefinition!.TryPredicate(ToRuntime(predicate), out var localMetadata)
             && localMetadata!.MetapredicateTemplate is string localTemplate
         )
         {
             return RuntimeMetaArguments(localTemplate);
         }
 
-        string? from = DefiningModuleOf(module, predicate);
+        var from = DefiningModuleOf(module, predicate);
         if (from is not null && _moduleMetaArguments.TryGetValue((from, predicate), out var imported))
         {
             return imported;
@@ -301,8 +301,8 @@ public sealed class ModuleTable
 
         if (
             from is not null
-            && Catalog.TryGet(from, out ModuleDefinition? importedDefinition)
-            && importedDefinition!.TryPredicate(ToRuntime(predicate), out ModulePredicateDefinition? importedMetadata)
+            && Catalog.TryGet(from, out var importedDefinition)
+            && importedDefinition!.TryPredicate(ToRuntime(predicate), out var importedMetadata)
             && importedMetadata!.MetapredicateTemplate is string importedTemplate
         )
         {
@@ -323,8 +323,8 @@ public sealed class ModuleTable
 
     /// <summary>Whether a module contains or declares a local procedure.</summary>
     public bool Defines(string module, PredicateIndicator predicate) =>
-        Catalog.TryGet(module, out ModuleDefinition? definition)
-        && definition!.TryPredicate(ToRuntime(predicate), out ModulePredicateDefinition? metadata)
+        Catalog.TryGet(module, out var definition)
+        && definition!.TryPredicate(ToRuntime(predicate), out var metadata)
         && metadata!.Defined;
 
     /// <summary>Marks a module procedure dynamic.</summary>
@@ -378,7 +378,7 @@ public sealed class ModuleTable
     )
     {
         var key = new MultifileKey(module, predicate);
-        if (!_multifileClauses.TryGetValue(key, out List<(SyntaxTerm Head, SyntaxTerm? Body)>? accumulated))
+        if (!_multifileClauses.TryGetValue(key, out var accumulated))
         {
             accumulated = [];
             _multifileClauses[key] = accumulated;

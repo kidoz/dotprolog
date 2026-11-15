@@ -47,8 +47,8 @@ internal static class StringBuiltins
     /// </remarks>
     private static bool TermSourceText(Machine machine)
     {
-        Cell source = machine.Argument(0);
-        Cell mode = machine.Argument(1);
+        var source = machine.Argument(0);
+        var mode = machine.Argument(1);
         var kinds =
             mode.Tag == CellTag.Atom && machine.Symbols.AtomName(mode.Index) == "any"
                 ? TextKinds.Any
@@ -75,8 +75,8 @@ internal static class StringBuiltins
     /// </summary>
     private static bool AtomString(Machine machine, int atom, int text)
     {
-        Cell atomCell = machine.Argument(atom);
-        Cell textCell = machine.Argument(text);
+        var atomCell = machine.Argument(atom);
+        var textCell = machine.Argument(text);
         string? textValue = null;
         string? atomValue = null;
 
@@ -108,7 +108,7 @@ internal static class StringBuiltins
 
     private static bool StringList(Machine machine, bool chars)
     {
-        Cell source = machine.Argument(0);
+        var source = machine.Argument(0);
         if (source.Tag != CellTag.Reference)
         {
             var text = PrologText.Read(machine, source, TextKinds.Any);
@@ -127,7 +127,7 @@ internal static class StringBuiltins
 
     private static bool NumberString(Machine machine)
     {
-        Cell text = machine.Argument(1);
+        var text = machine.Argument(1);
         if (text.Tag != CellTag.Reference)
         {
             var value = PrologText.Read(machine, text, TextKinds.String | TextKinds.List);
@@ -138,11 +138,11 @@ internal static class StringBuiltins
                 return false;
             }
 
-            return TextBuiltins.TryParseNumber(machine, value, out PrologNumber number)
+            return TextBuiltins.TryParseNumber(machine, value, out var number)
                 && machine.Unify(machine.Argument(0), ArithmeticEvaluator.ToCell(machine, number));
         }
 
-        Cell number2 = machine.Argument(0);
+        var number2 = machine.Argument(0);
         if (number2.Tag == CellTag.Reference)
         {
             throw PrologErrors.Instantiation(machine);
@@ -165,9 +165,9 @@ internal static class StringBuiltins
     private static bool SplitString(Machine machine)
     {
         const TextKinds kinds = TextKinds.Atom | TextKinds.String | TextKinds.List;
-        CodePointText text = PrologText.Characters(machine, PrologText.Read(machine, machine.Argument(0), kinds));
-        HashSet<int> separators = CodeSet(machine, PrologText.Read(machine, machine.Argument(1), kinds));
-        HashSet<int> pad = CodeSet(machine, PrologText.Read(machine, machine.Argument(2), kinds));
+        var text = PrologText.Characters(machine, PrologText.Read(machine, machine.Argument(0), kinds));
+        var separators = CodeSet(machine, PrologText.Read(machine, machine.Argument(1), kinds));
+        var pad = CodeSet(machine, PrologText.Read(machine, machine.Argument(2), kinds));
 
         var start = 0;
         var end = text.Length;
@@ -213,7 +213,7 @@ internal static class StringBuiltins
     /// <summary>The codes of the characters of <paramref name="text"/>, as a set.</summary>
     private static HashSet<int> CodeSet(Machine machine, string text)
     {
-        CodePointText characters = PrologText.Characters(machine, text);
+        var characters = PrologText.Characters(machine, text);
         HashSet<int> codes = [];
         for (var i = 0; i < characters.Length; i++)
         {
@@ -237,7 +237,7 @@ internal static class StringBuiltins
     private static bool MapCase(Machine machine, Func<string, string> map)
     {
         var mapped = map(PrologText.Read(machine, machine.Argument(0), TextKinds.Atomic));
-        Cell result = machine.Argument(1);
+        var result = machine.Argument(1);
         if (result.Tag == CellTag.Reference)
         {
             return machine.Unify(result, StringCell(machine, mapped));
@@ -290,9 +290,9 @@ internal static class StringBuiltins
 
     private static bool StringSlice(Machine machine)
     {
-        CodePointText text = PrologText.Characters(machine, PrologText.Read(machine, machine.Argument(0), TextKinds.Atomic));
-        Cell before = machine.Argument(1);
-        Cell length = machine.Argument(2);
+        var text = PrologText.Characters(machine, PrologText.Read(machine, machine.Argument(0), TextKinds.Atomic));
+        var before = machine.Argument(1);
+        var length = machine.Argument(2);
         if (
             before.Tag is not (CellTag.Integer or CellTag.BigInteger)
             || length.Tag is not (CellTag.Integer or CellTag.BigInteger)
@@ -326,7 +326,7 @@ internal static class StringBuiltins
     /// </summary>
     private static bool StringCode(Machine machine)
     {
-        Cell index = machine.Argument(0);
+        var index = machine.Argument(0);
         if (index.Tag is not (CellTag.Integer or CellTag.BigInteger))
         {
             throw PrologErrors.Type(machine, "integer", index);
@@ -343,7 +343,7 @@ internal static class StringBuiltins
             return false;
         }
 
-        CodePointText text = PrologText.Characters(
+        var text = PrologText.Characters(
             machine,
             PrologText.Read(machine, machine.Argument(1), TextKinds.Atom | TextKinds.String | TextKinds.List)
         );

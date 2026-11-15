@@ -26,7 +26,7 @@ internal static class DocumentDefinitions
         {
             if (!documents.TryGetValue(target.FileName, out var document))
                 continue;
-            string uri = new Uri(target.FileName, UriKind.Absolute).AbsoluteUri;
+            var uri = new Uri(target.FileName, UriKind.Absolute).AbsoluteUri;
             var positions = new SourcePositions(document.Text);
             result.Add(
                 (JsonNode)(

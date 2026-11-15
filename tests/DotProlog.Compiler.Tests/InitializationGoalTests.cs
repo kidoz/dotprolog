@@ -68,7 +68,7 @@ public sealed class InitializationGoalTests
     {
         using var engine = new PrologEngine { Output = new StringWriter() };
 
-        PrologException exception = Assert.Throws<PrologException>(() => engine.ConsultText(source));
+        var exception = Assert.Throws<PrologException>(() => engine.ConsultText(source));
 
         Assert.Contains(expected, exception.Message, StringComparison.Ordinal);
     }
@@ -89,7 +89,7 @@ public sealed class InitializationGoalTests
     {
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = new StringWriter() };
 
-        LoadResult loaded = engine.ConsultText(":- initialization(main, main).\nmain.\n");
+        var loaded = engine.ConsultText(":- initialization(main, main).\nmain.\n");
 
         Assert.False(loaded.Success);
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == "DPL1018");

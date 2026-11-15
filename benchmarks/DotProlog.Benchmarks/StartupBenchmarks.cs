@@ -75,8 +75,8 @@ public class StartupBenchmarks
         for (var iteration = 0; iteration < samples.Length; iteration++)
         {
             var sample = samples[iteration];
-            string phase = iteration == 0 ? "First" : "Warm";
-            double microseconds = sample.Ticks * 1_000_000.0 / Stopwatch.Frequency;
+            var phase = iteration == 0 ? "First" : "Warm";
+            var microseconds = sample.Ticks * 1_000_000.0 / Stopwatch.Frequency;
             Console.WriteLine(
                 FormattableString.Invariant(
                     $"{args[0]},{repetitions},{phase},{iteration},{microseconds:F3},{sample.Bytes},{sample.Gen0},{sample.Gen1},{sample.Gen2},{sample.Output}"
@@ -91,14 +91,14 @@ public class StartupBenchmarks
         (string Name, string Text)[] sources
     )
     {
-        int gen0 = GC.CollectionCount(0);
-        int gen1 = GC.CollectionCount(1);
-        int gen2 = GC.CollectionCount(2);
-        long allocated = GC.GetAllocatedBytesForCurrentThread();
-        long start = Stopwatch.GetTimestamp();
-        long output = Execute(compile, sources);
-        long elapsed = Stopwatch.GetTimestamp() - start;
-        long bytes = GC.GetAllocatedBytesForCurrentThread() - allocated;
+        var gen0 = GC.CollectionCount(0);
+        var gen1 = GC.CollectionCount(1);
+        var gen2 = GC.CollectionCount(2);
+        var allocated = GC.GetAllocatedBytesForCurrentThread();
+        var start = Stopwatch.GetTimestamp();
+        var output = Execute(compile, sources);
+        var elapsed = Stopwatch.GetTimestamp() - start;
+        var bytes = GC.GetAllocatedBytesForCurrentThread() - allocated;
         return (elapsed, bytes, GC.CollectionCount(0) - gen0, GC.CollectionCount(1) - gen1, GC.CollectionCount(2) - gen2, output);
     }
 

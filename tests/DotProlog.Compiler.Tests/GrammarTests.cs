@@ -169,7 +169,7 @@ public sealed class GrammarTests
     [Fact]
     public void ANonListSemicontextIsReported()
     {
-        (RunResult result, _, IReadOnlyList<Syntax.Diagnostic> diagnostics) = PrologTestHost.Execute(
+        (var result, _, var diagnostics) = PrologTestHost.Execute(
             "invalid, not_a_list --> [].\n"
         );
 
@@ -180,7 +180,7 @@ public sealed class GrammarTests
     [Fact]
     public void AnImproperSemicontextIsReported()
     {
-        (RunResult result, _, IReadOnlyList<Syntax.Diagnostic> diagnostics) = PrologTestHost.Execute(
+        (var result, _, var diagnostics) = PrologTestHost.Execute(
             "invalid, [a|tail] --> [].\n"
         );
 
@@ -298,7 +298,7 @@ public sealed class GrammarTests
     [Fact]
     public void ARuleHeadThatIsNotANonTerminalIsReported()
     {
-        (RunResult result, _, IReadOnlyList<Syntax.Diagnostic> diagnostics) = PrologTestHost.Execute("1 --> [a].\n");
+        (var result, _, var diagnostics) = PrologTestHost.Execute("1 --> [a].\n");
 
         Assert.NotEqual(RunResult.Success, result);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidGrammarRule);
@@ -307,7 +307,7 @@ public sealed class GrammarTests
     [Fact]
     public void ANumberInARuleBodyIsReported()
     {
-        (_, _, IReadOnlyList<Syntax.Diagnostic> diagnostics) = PrologTestHost.Execute("a --> 1.\n");
+        (_, _, var diagnostics) = PrologTestHost.Execute("a --> 1.\n");
 
         Assert.Contains(diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidGrammarRule);
     }
@@ -319,7 +319,7 @@ public sealed class GrammarTests
     [InlineData("call(G) --> [].")]
     public void AGrammarControlConstructCannotBeDefinedAsARuleHead(string source)
     {
-        (RunResult result, _, IReadOnlyList<Syntax.Diagnostic> diagnostics) = PrologTestHost.Execute(source);
+        (var result, _, var diagnostics) = PrologTestHost.Execute(source);
 
         Assert.NotEqual(RunResult.Success, result);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidGrammarRule);
@@ -328,7 +328,7 @@ public sealed class GrammarTests
     [Fact]
     public void AGrammarRuleCannotExpandToAPredefinedProcedure()
     {
-        (RunResult result, _, IReadOnlyList<Syntax.Diagnostic> diagnostics) = PrologTestHost.Execute("phrase(Body) --> [Body].");
+        (var result, _, var diagnostics) = PrologTestHost.Execute("phrase(Body) --> [Body].");
 
         Assert.NotEqual(RunResult.Success, result);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidGrammarRule);

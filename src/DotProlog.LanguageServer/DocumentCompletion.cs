@@ -16,7 +16,7 @@ internal static class DocumentCompletion
         if (positions.Offset(line, character) is not { } offset || outline.CompletionText.At(offset) is not { } prefix)
             return items;
         if (prefix.IsVariable || prefix.Text.Length == 0 && prefix.Module is null)
-            foreach (string variable in prefix.Variables.Where(name => name.StartsWith(prefix.Text, StringComparison.Ordinal)))
+            foreach (var variable in prefix.Variables.Where(name => name.StartsWith(prefix.Text, StringComparison.Ordinal)))
                 items.Add((JsonNode)Item(variable, variable, 6, "Clause variable", null, positions, prefix.Range));
         if (prefix.IsVariable || outline.Completions.Count == 0)
             return items;

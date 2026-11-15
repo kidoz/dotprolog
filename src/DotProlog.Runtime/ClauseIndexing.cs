@@ -41,7 +41,7 @@ internal static class ClauseIndexing
     /// <summary>Derives the call key from a dereferenced first argument on the machine heap.</summary>
     internal static Cell CallKey(Machine machine, Cell argument)
     {
-        Cell cell = machine.Dereference(argument);
+        var cell = machine.Dereference(argument);
         return cell.Tag switch
         {
             CellTag.Reference => AnyKey,
@@ -59,8 +59,8 @@ internal static class ClauseIndexing
     /// </summary>
     internal static Cell ClauseKeyFromBuffer(ReadOnlySpan<Cell> cells, int root, int ruleFunctorId, int headFunctorId)
     {
-        Cell clause = DereferenceBuffer(cells, cells[root]);
-        Cell head = clause;
+        var clause = DereferenceBuffer(cells, cells[root]);
+        var head = clause;
         if (clause.Tag == CellTag.Structure && cells[clause.Index].Index == ruleFunctorId)
         {
             head = DereferenceBuffer(cells, cells[clause.Index + 1]);
@@ -71,7 +71,7 @@ internal static class ClauseIndexing
             return AnyKey;
         }
 
-        Cell first = DereferenceBuffer(cells, cells[head.Index + 1]);
+        var first = DereferenceBuffer(cells, cells[head.Index + 1]);
         return first.Tag switch
         {
             CellTag.Reference => AnyKey,
@@ -87,8 +87,8 @@ internal static class ClauseIndexing
     /// </summary>
     internal static Cell ClauseKeyFromHeap(Machine machine, Cell clause, int ruleFunctorId, int headFunctorId)
     {
-        Cell term = machine.Dereference(clause);
-        Cell head = term;
+        var term = machine.Dereference(clause);
+        var head = term;
         if (term.Tag == CellTag.Structure && machine.HeapAt(term.Index).Index == ruleFunctorId)
         {
             head = machine.Dereference(machine.HeapAt(term.Index + 1));
@@ -106,7 +106,7 @@ internal static class ClauseIndexing
     {
         while (cell.Tag == CellTag.Reference)
         {
-            Cell target = cells[cell.Index];
+            var target = cells[cell.Index];
             if (target.Tag == CellTag.Reference && target.Index == cell.Index)
             {
                 return cell;

@@ -21,7 +21,7 @@ public sealed class ControlConstructTests
     [InlineData("\\+ (fail, true), choose(X), true", "[a,b]")]
     public void TrailingTruePreservesConjunctionSolutionsAndCutScope(string body, string expected)
     {
-        string output = PrologTestHost.Run(
+        var output = PrologTestHost.Run(
             $"""
             choose(a).
             choose(b).
@@ -97,7 +97,7 @@ public sealed class ControlConstructTests
     [Fact]
     public void IfThenWithoutAnElseFailsWhenItsConditionFails()
     {
-        (RunResult result, var output, _) = PrologTestHost.Execute(":- initialization(( fail -> write(then) )).");
+        (var result, var output, _) = PrologTestHost.Execute(":- initialization(( fail -> write(then) )).");
 
         Assert.Equal(RunResult.Success, result);
         Assert.Equal("Warning: initialization goal failed.\n", output);
@@ -215,7 +215,7 @@ public sealed class ControlConstructTests
     [Fact]
     public void NegationFailsWhenItsGoalSucceeds()
     {
-        (RunResult result, var output, _) = PrologTestHost.Execute(":- initialization(( \\+ (1 = 1), write(no) )).");
+        (var result, var output, _) = PrologTestHost.Execute(":- initialization(( \\+ (1 = 1), write(no) )).");
 
         Assert.Equal(RunResult.Success, result);
         Assert.Equal("Warning: initialization goal failed.\n", output);

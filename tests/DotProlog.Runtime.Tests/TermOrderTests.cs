@@ -9,8 +9,8 @@ public sealed class TermOrderTests
     {
         using var machine = new Machine(new BytecodeProgram());
         var functor = machine.Symbols.InternFunctor("f", 2);
-        Cell left = machine.CreateStructure(functor, [Cell.Integer60(1), Cell.Integer60(100)]);
-        Cell right = machine.CreateStructure(functor, [Cell.Integer60(2), Cell.Integer60(0)]);
+        var left = machine.CreateStructure(functor, [Cell.Integer60(1), Cell.Integer60(100)]);
+        var right = machine.CreateStructure(functor, [Cell.Integer60(2), Cell.Integer60(0)]);
         Assert.True(TermOrder.Compare(machine, left, right) < 0);
         Assert.Empty(machine.ComparisonWork);
         Assert.Empty(machine.ComparisonVisited);
@@ -29,10 +29,10 @@ public sealed class TermOrderTests
     {
         using var machine = new Machine(new BytecodeProgram());
         var functor = machine.Symbols.InternFunctor("f", 2);
-        Cell a = machine.CreateVariable();
-        Cell b = machine.CreateVariable();
-        Cell left = machine.CreateStructure(functor, [a, Cell.Integer60(1)]);
-        Cell right = machine.CreateStructure(functor, [b, Cell.Integer60(2)]);
+        var a = machine.CreateVariable();
+        var b = machine.CreateVariable();
+        var left = machine.CreateStructure(functor, [a, Cell.Integer60(1)]);
+        var right = machine.CreateStructure(functor, [b, Cell.Integer60(2)]);
         Assert.True(machine.Unify(a, left));
         Assert.True(machine.Unify(b, right));
         Assert.True(TermOrder.Compare(machine, left, right) < 0);

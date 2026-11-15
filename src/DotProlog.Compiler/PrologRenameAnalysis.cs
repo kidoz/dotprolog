@@ -73,8 +73,8 @@ public sealed class PrologRenameAnalysis
         }
         foreach (var source in sources)
         {
-            string module = ModuleTable.UserModule;
-            for (int index = 0; index < source.Clauses.Count; index++)
+            var module = ModuleTable.UserModule;
+            for (var index = 0; index < source.Clauses.Count; index++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var clause = source.Clauses[index];
@@ -90,7 +90,7 @@ public sealed class PrologRenameAnalysis
                     continue;
                 }
                 SyntaxTerm? indicators = null;
-                bool template = false;
+                var template = false;
                 switch (directive)
                 {
                     case { Name: "module", Arity: 1 or 2, Arguments: [AtomTerm name, ..] }:
@@ -269,7 +269,7 @@ public sealed class PrologRenameAnalysis
             ];
             if (ready.Length == 0)
                 return true;
-            foreach (string module in ready)
+            foreach (var module in ready)
                 pending.Remove(module);
         }
         return false;

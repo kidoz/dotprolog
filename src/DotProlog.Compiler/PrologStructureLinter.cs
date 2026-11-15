@@ -7,7 +7,7 @@ internal static class PrologStructureLinter
 {
     internal static void Analyze(IReadOnlyList<SyntaxTerm> clauses, string? fileName, List<Diagnostic> diagnostics)
     {
-        List<Declaration> declarations = Declarations(clauses);
+        var declarations = Declarations(clauses);
         HashSet<PredicateIndicator> discontiguous =
         [
             .. declarations
@@ -19,7 +19,7 @@ internal static class PrologStructureLinter
         HashSet<PredicateIndicator> seen = [];
         PredicateIndicator? previous = null;
 
-        foreach (SyntaxTerm clause in clauses)
+        foreach (var clause in clauses)
         {
             if (clause is CompoundTerm { Name: ":-", Arity: 1 })
             {
@@ -27,8 +27,8 @@ internal static class PrologStructureLinter
             }
 
             var grammar = clause is CompoundTerm { Name: "-->", Arity: 2 };
-            SyntaxTerm head = LintSyntax.ClauseHead(clause);
-            if (!LintSyntax.TryPredicate(head, grammar, out PredicateIndicator indicator))
+            var head = LintSyntax.ClauseHead(clause);
+            if (!LintSyntax.TryPredicate(head, grammar, out var indicator))
             {
                 continue;
             }
@@ -70,7 +70,7 @@ internal static class PrologStructureLinter
     private static List<Declaration> Declarations(IReadOnlyList<SyntaxTerm> clauses)
     {
         List<Declaration> result = [];
-        foreach (SyntaxTerm clause in clauses)
+        foreach (var clause in clauses)
         {
             if (clause is not CompoundTerm { Name: ":-", Arity: 1, Arguments: [CompoundTerm declaration] })
             {
@@ -79,9 +79,9 @@ internal static class PrologStructureLinter
 
             if (declaration.Name == "meta_predicate" && declaration.Arity == 1)
             {
-                foreach (SyntaxTerm item in LintSyntax.SequenceItems(declaration.Arguments[0]))
+                foreach (var item in LintSyntax.SequenceItems(declaration.Arguments[0]))
                 {
-                    if (LintSyntax.TryPredicate(item, grammar: false, out PredicateIndicator indicator))
+                    if (LintSyntax.TryPredicate(item, grammar: false, out var indicator))
                     {
                         result.Add(new Declaration("meta_predicate", indicator, LintSyntax.CanonicalForm(item), item.Span));
                     }
@@ -95,9 +95,9 @@ internal static class PrologStructureLinter
                 continue;
             }
 
-            foreach (SyntaxTerm item in LintSyntax.SequenceItems(declaration.Arguments[0]))
+            foreach (var item in LintSyntax.SequenceItems(declaration.Arguments[0]))
             {
-                if (LintSyntax.TryIndicator(item, out PredicateIndicator indicator, out _))
+                if (LintSyntax.TryIndicator(item, out var indicator, out _))
                 {
                     result.Add(new Declaration(declaration.Name, indicator, LintSyntax.CanonicalForm(item), item.Span));
                 }
@@ -116,7 +116,7 @@ internal static class PrologStructureLinter
     {
         HashSet<(string Kind, PredicateIndicator Indicator, string Canonical)> seen = [];
         HashSet<(string Kind, PredicateIndicator Indicator)> undefined = [];
-        foreach (Declaration declaration in declarations)
+        foreach (var declaration in declarations)
         {
             if (!seen.Add((declaration.Kind, declaration.Indicator, declaration.Canonical)))
             {
@@ -150,7 +150,7 @@ internal static class PrologStructureLinter
 
     private static void CheckLeftRecursion(SyntaxTerm clause, SyntaxTerm head, string? fileName, List<Diagnostic> diagnostics)
     {
-        SyntaxTerm? first = clause switch
+        var first = clause switch
         {
             CompoundTerm { Name: ":-", Arity: 2 } rule => LeftmostConjunct(rule.Arguments[1]),
             CompoundTerm { Name: "-->", Arity: 2 } grammar => LeftmostConjunct(grammar.Arguments[1]),

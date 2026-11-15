@@ -115,7 +115,7 @@ internal static class LogtalkTestAdapter
                     throw new InvalidDataException($"{relativePath}: malformed quick-check declaration: {quickCheckHead}");
                 }
 
-                List<string> quickCheckArguments = SplitTopLevel(quickCheckHead[12..^1], ',');
+                var quickCheckArguments = SplitTopLevel(quickCheckHead[12..^1], ',');
                 if (quickCheckArguments.Count != 2 || !quickCheckArguments[0].StartsWith("iso_", StringComparison.Ordinal))
                 {
                     throw new InvalidDataException($"{relativePath}: malformed ISO quick-check declaration: {quickCheckHead}");
@@ -162,7 +162,7 @@ internal static class LogtalkTestAdapter
                 throw new InvalidDataException($"{relativePath}: malformed test head: {head}");
             }
 
-            List<string> arguments = SplitTopLevel(head[5..^1], ',');
+            var arguments = SplitTopLevel(head[5..^1], ',');
             if (arguments.Count is < 1 or > 3)
             {
                 throw new InvalidDataException(
@@ -393,7 +393,7 @@ internal static class LogtalkTestAdapter
             return false;
         }
 
-        List<string> arguments = SplitTopLevel(body[prefix.Length..^1], ',');
+        var arguments = SplitTopLevel(body[prefix.Length..^1], ',');
         if (arguments.Count != 3 || !TryUnwrapBackendBody(arguments[1], out var generator))
         {
             goal = string.Empty;
@@ -612,7 +612,7 @@ internal static class LogtalkTestAdapter
             }
             else if (functor == "variant")
             {
-                List<string> variantArguments = SplitTopLevel(arguments, ',');
+                var variantArguments = SplitTopLevel(arguments, ',');
                 if (variantArguments.Count != 2)
                 {
                     translated = string.Empty;
@@ -625,7 +625,7 @@ internal static class LogtalkTestAdapter
             }
             else
             {
-                List<string> hostArguments = SplitTopLevel(arguments, ',');
+                var hostArguments = SplitTopLevel(arguments, ',');
                 var supportedArity = functor switch
                 {
                     "set_text_input" => hostArguments.Count is 1 or 2,
@@ -760,7 +760,7 @@ internal static class LogtalkTestAdapter
     private static bool TryUnwrapBackendBody(string source, out string goal)
     {
         var body = source.Trim();
-        List<string> parts = SplitTopLevel(body, ',');
+        var parts = SplitTopLevel(body, ',');
         var goals = new List<string>(parts.Count);
 
         foreach (var part in parts)
@@ -863,7 +863,7 @@ internal static class LogtalkTestAdapter
             throw new InvalidDataException($"Malformed lgtunit errors expectation: {errors}");
         }
 
-        List<string> alternatives = SplitTopLevel(list[1..^1], ',');
+        var alternatives = SplitTopLevel(list[1..^1], ',');
         if (alternatives.Count == 0 || alternatives.Any(alternative => alternative.Length == 0))
         {
             throw new InvalidDataException($"Malformed lgtunit errors expectation: {errors}");

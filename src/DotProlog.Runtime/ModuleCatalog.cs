@@ -29,7 +29,7 @@ public sealed class ModuleCatalog
     public ModuleDefinition Declare(string module)
     {
         ArgumentException.ThrowIfNullOrEmpty(module);
-        if (!_modules.TryGetValue(module, out ModuleDefinition? definition))
+        if (!_modules.TryGetValue(module, out var definition))
         {
             definition = new ModuleDefinition(module);
             _modules.Add(module, definition);
@@ -97,7 +97,7 @@ public sealed class ModuleDefinition
     /// <summary>Returns predicate metadata, creating it when a declaration first names the predicate.</summary>
     public ModulePredicateDefinition Predicate(ModulePredicateIndicator indicator)
     {
-        if (!_predicates.TryGetValue(indicator, out ModulePredicateDefinition? predicate))
+        if (!_predicates.TryGetValue(indicator, out var predicate))
         {
             predicate = new ModulePredicateDefinition(indicator, Name);
             _predicates.Add(indicator, predicate);

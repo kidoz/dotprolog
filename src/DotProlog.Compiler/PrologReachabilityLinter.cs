@@ -19,7 +19,7 @@ internal static class PrologReachabilityLinter
 
         HashSet<PredicateNode> reachable = [];
         Stack<PredicateNode> pending = [];
-        foreach (PredicateNode root in analysis.Roots)
+        foreach (var root in analysis.Roots)
         {
             if (reachable.Add(root))
             {
@@ -27,14 +27,14 @@ internal static class PrologReachabilityLinter
             }
         }
 
-        while (pending.TryPop(out PredicateNode current))
+        while (pending.TryPop(out var current))
         {
-            if (!analysis.Edges.TryGetValue(current, out HashSet<PredicateNode>? targets))
+            if (!analysis.Edges.TryGetValue(current, out var targets))
             {
                 continue;
             }
 
-            foreach (PredicateNode target in targets)
+            foreach (var target in targets)
             {
                 if (reachable.Add(target))
                 {
@@ -44,7 +44,7 @@ internal static class PrologReachabilityLinter
         }
 
         foreach (
-            IGrouping<PredicateNode, PrologLintProgramModel.ClauseContext> definition in model
+            var definition in model
                 .Clauses.Where(clause => !clause.Grammar && clause.Clause is not CompoundTerm { Name: ":-", Arity: 1 })
                 .GroupBy(clause => new PredicateNode(clause.Module, clause.Indicator))
         )
@@ -54,7 +54,7 @@ internal static class PrologReachabilityLinter
                 continue;
             }
 
-            PrologLintProgramModel.ClauseContext first = definition.First();
+            var first = definition.First();
             diagnostics.Add(
                 new Diagnostic(
                     LintDiagnosticIds.PossibleUnreferencedPredicate,
@@ -73,7 +73,7 @@ internal static class PrologReachabilityLinter
                 .Select(clause => new PredicateNode(clause.Module, clause.Indicator)),
         ];
         foreach (
-            IGrouping<PredicateNode, PrologLintProgramModel.ClauseContext> definition in model
+            var definition in model
                 .Clauses.Where(clause => clause.Grammar)
                 .GroupBy(clause => new PredicateNode(clause.Module, clause.Indicator))
         )
@@ -83,7 +83,7 @@ internal static class PrologReachabilityLinter
                 continue;
             }
 
-            PrologLintProgramModel.ClauseContext first = definition.First();
+            var first = definition.First();
             diagnostics.Add(
                 new Diagnostic(
                     LintDiagnosticIds.PossibleUnreferencedNonterminal,
@@ -116,7 +116,7 @@ internal static class PrologReachabilityLinter
                 return;
             }
 
-            foreach (PrologLintProgramModel.ClauseContext clause in _model.Clauses)
+            foreach (var clause in _model.Clauses)
             {
                 if (clause.Clause is CompoundTerm { Name: ":-", Arity: 1 })
                 {
@@ -139,7 +139,7 @@ internal static class PrologReachabilityLinter
                 }
             }
 
-            foreach (PrologLintProgramModel.ClauseContext clause in _model.Clauses)
+            foreach (var clause in _model.Clauses)
             {
                 PredicateNode? source = clause.Clause is CompoundTerm { Name: ":-", Arity: 1 }
                     ? null
@@ -174,7 +174,7 @@ internal static class PrologReachabilityLinter
                 return;
             }
 
-            if (!Edges.TryGetValue(from, out HashSet<PredicateNode>? targets))
+            if (!Edges.TryGetValue(from, out var targets))
             {
                 targets = [];
                 Edges.Add(from, targets);
@@ -185,7 +185,7 @@ internal static class PrologReachabilityLinter
 
         private void AddOrdinaryCall(PredicateIndicator predicate, string module, PredicateNode? source)
         {
-            PrologLintProgramModel.LintResolution resolution = _model.Resolve(module, predicate);
+            var resolution = _model.Resolve(module, predicate);
             if (!resolution.Known || resolution.IsUnknown)
             {
                 Incomplete = true;
@@ -201,7 +201,7 @@ internal static class PrologReachabilityLinter
         private void AddNonterminalCall(PredicateIndicator sourceIndicator, string module, PredicateNode? source)
         {
             PredicateIndicator compiled = new(sourceIndicator.Name, sourceIndicator.Arity + 2);
-            PrologLintProgramModel.LintResolution resolution = _model.Resolve(module, compiled);
+            var resolution = _model.Resolve(module, compiled);
             if (resolution.Module is { } target && _model.IsNonterminal(target, compiled))
             {
                 AddEdge(source, new PredicateNode(target, compiled));

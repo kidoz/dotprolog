@@ -40,12 +40,12 @@ internal static class PrologLiteralLinter
 
     internal static void Analyze(IReadOnlyList<SyntaxTerm> clauses, string? fileName, List<Diagnostic> diagnostics)
     {
-        HashSet<PredicateIndicator> definitions = Definitions(clauses);
-        foreach (SyntaxTerm clause in clauses)
+        var definitions = Definitions(clauses);
+        foreach (var clause in clauses)
         {
-            foreach (SyntaxTerm body in LintGoalWalker.Bodies(clause))
+            foreach (var body in LintGoalWalker.Bodies(clause))
             {
-                foreach (CompoundTerm goal in LintGoalWalker.Goals(body))
+                foreach (var goal in LintGoalWalker.Goals(body))
                 {
                     CheckArity(goal, definitions, fileName, diagnostics);
                     CheckFormat(goal, fileName, diagnostics);
@@ -60,10 +60,10 @@ internal static class PrologLiteralLinter
     private static HashSet<PredicateIndicator> Definitions(IReadOnlyList<SyntaxTerm> clauses)
     {
         HashSet<PredicateIndicator> result = [];
-        foreach (SyntaxTerm clause in clauses)
+        foreach (var clause in clauses)
         {
             var grammar = clause is CompoundTerm { Name: "-->", Arity: 2 };
-            if (LintSyntax.TryPredicate(LintSyntax.ClauseHead(clause), grammar, out PredicateIndicator indicator))
+            if (LintSyntax.TryPredicate(LintSyntax.ClauseHead(clause), grammar, out var indicator))
             {
                 result.Add(indicator);
             }
@@ -112,20 +112,20 @@ internal static class PrologLiteralLinter
             return;
         }
 
-        SyntaxTerm format = goal.Arguments[goal.Arity == 3 ? 1 : 0];
-        SyntaxTerm arguments = goal.Arity == 1 ? new AtomTerm("[]", goal.Span) : goal.Arguments[goal.Arity - 1];
+        var format = goal.Arguments[goal.Arity == 3 ? 1 : 0];
+        var arguments = goal.Arity == 1 ? new AtomTerm("[]", goal.Span) : goal.Arguments[goal.Arity - 1];
         if (!TryText(format, out var text))
         {
             return;
         }
 
-        if (!TryParseFormat(text, out List<FormatDirective> directives, out var error))
+        if (!TryParseFormat(text, out var directives, out var error))
         {
             diagnostics.Add(Warning(LintDiagnosticIds.InvalidFormatCall, error!, format.Span, fileName));
             return;
         }
 
-        if (!LintSyntax.TryProperList(arguments, out List<SyntaxTerm> values))
+        if (!LintSyntax.TryProperList(arguments, out var values))
         {
             if (arguments is not VariableTerm and not StringTerm)
             {
@@ -157,7 +157,7 @@ internal static class PrologLiteralLinter
         }
 
         var index = 0;
-        foreach (FormatDirective directive in directives)
+        foreach (var directive in directives)
         {
             if (
                 directive.Star
@@ -254,7 +254,7 @@ internal static class PrologLiteralLinter
                 return false;
             }
 
-            char name = text[index];
+            var name = text[index];
             var consumed = name switch
             {
                 'w' or 'p' or 'q' or 'a' or 'd' or 'D' or 'e' or 'f' or 'g' or 'r' or 'R' or 's' or 'c' or 'i' or '@' => 1,
@@ -292,7 +292,7 @@ internal static class PrologLiteralLinter
 
     private static void ValidateOptionList(SyntaxTerm term, OptionListKind kind, string? fileName, List<Diagnostic> diagnostics)
     {
-        if (!LintSyntax.TryProperList(term, out List<SyntaxTerm> options))
+        if (!LintSyntax.TryProperList(term, out var options))
         {
             if (term is not VariableTerm and not StringTerm)
             {
@@ -302,7 +302,7 @@ internal static class PrologLiteralLinter
             return;
         }
 
-        foreach (SyntaxTerm option in options)
+        foreach (var option in options)
         {
             if (option is not CompoundTerm { Arity: 1 } compound)
             {
@@ -310,7 +310,7 @@ internal static class PrologLiteralLinter
                 continue;
             }
 
-            SyntaxTerm value = compound.Arguments[0];
+            var value = compound.Arguments[0];
             if (value is StringTerm)
             {
                 continue;
@@ -338,7 +338,7 @@ internal static class PrologLiteralLinter
 
     private static bool ValidVariableNames(SyntaxTerm value)
     {
-        if (!LintSyntax.TryProperList(value, out List<SyntaxTerm> names))
+        if (!LintSyntax.TryProperList(value, out var names))
         {
             return false;
         }
@@ -374,7 +374,7 @@ internal static class PrologLiteralLinter
                     return;
                 }
 
-                foreach (SyntaxTerm argument in compound.Arguments)
+                foreach (var argument in compound.Arguments)
                 {
                     CheckArithmeticExpression(argument, fileName, diagnostics);
                 }
@@ -390,9 +390,9 @@ internal static class PrologLiteralLinter
     {
         if (goal.Arity == 2 && goal.Name is "=" or "unify_with_occurs_check" or "\\=" or "==" or "\\==")
         {
-            SyntaxTerm left = goal.Arguments[0];
-            SyntaxTerm right = goal.Arguments[1];
-            bool? equal = GroundEquality(left, right);
+            var left = goal.Arguments[0];
+            var right = goal.Arguments[1];
+            var equal = GroundEquality(left, right);
             if (equal is null && left is VariableTerm leftVariable && right is VariableTerm rightVariable)
             {
                 if (leftVariable.Name == rightVariable.Name && !leftVariable.IsAnonymous)
@@ -458,7 +458,7 @@ internal static class PrologLiteralLinter
             return;
         }
 
-        SyntaxTerm argument = goal.Arguments[0];
+        var argument = goal.Arguments[0];
         bool? succeeds = goal.Name switch
         {
             "var" when IsGround(argument) => false,

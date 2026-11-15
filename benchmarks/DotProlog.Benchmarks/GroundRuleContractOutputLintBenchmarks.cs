@@ -53,7 +53,7 @@ public class GroundRuleContractOutputLintBenchmarks
         }
 
         _source = $":- module(benchmark, []).\n{exports}{clauses}";
-        ContractReadResult read = ContractReader.Read(contract.ToString(), "Benchmark", ContractName);
+        var read = ContractReader.Read(contract.ToString(), "Benchmark", ContractName);
         if (!read.Success)
         {
             throw new InvalidOperationException(string.Join("; ", read.Diagnostics));
@@ -67,14 +67,14 @@ public class GroundRuleContractOutputLintBenchmarks
             throw new InvalidOperationException("The compatible guarded-rule workload produced a diagnostic.");
         }
 
-        string validationText = _source
+        var validationText = _source
             .Replace("p0(0, 0) :- true.", "p0(0, wrong) :- true.", StringComparison.Ordinal)
             .Replace("p0(5, 9) :- true, a = a.", "p0(5, wrong) :- true, a = a.", StringComparison.Ordinal);
         PrologLintSource[] validationSources =
         [
             PrologLintSourceLoader.Load(SourceName, validationText, new BytecodeProgram()).Source,
         ];
-        IReadOnlyList<Diagnostic> validation = PrologContractLinter.Analyze(
+        var validation = PrologContractLinter.Analyze(
             validationSources,
             _contract,
             ContractName,

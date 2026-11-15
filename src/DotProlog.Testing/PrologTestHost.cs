@@ -17,10 +17,10 @@ public static class PrologTestHost
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(sources);
 
-        ITestApplicationBuilder builder = await TestApplication.CreateBuilderAsync(arguments).ConfigureAwait(false);
+        var builder = await TestApplication.CreateBuilderAsync(arguments).ConfigureAwait(false);
         builder.RegisterTestFramework(_ => new TestFrameworkCapabilities(), (_, _) => new PrologTestFramework(sources));
 
-        using ITestApplication application = await builder.BuildAsync().ConfigureAwait(false);
+        using var application = await builder.BuildAsync().ConfigureAwait(false);
         return await application.RunAsync().ConfigureAwait(false);
     }
 
@@ -30,10 +30,10 @@ public static class PrologTestHost
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(engineFactory);
 
-        ITestApplicationBuilder builder = await TestApplication.CreateBuilderAsync(arguments).ConfigureAwait(false);
+        var builder = await TestApplication.CreateBuilderAsync(arguments).ConfigureAwait(false);
         builder.RegisterTestFramework(_ => new TestFrameworkCapabilities(), (_, _) => new PrologTestFramework(engineFactory));
 
-        using ITestApplication application = await builder.BuildAsync().ConfigureAwait(false);
+        using var application = await builder.BuildAsync().ConfigureAwait(false);
         return await application.RunAsync().ConfigureAwait(false);
     }
 
@@ -46,10 +46,10 @@ public static class PrologTestHost
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(engineFactory);
 
-        ITestApplicationBuilder builder = await TestApplication.CreateBuilderAsync(arguments).ConfigureAwait(false);
+        var builder = await TestApplication.CreateBuilderAsync(arguments).ConfigureAwait(false);
         builder.RegisterTestFramework(_ => new TestFrameworkCapabilities(), (_, _) => new PrologTestFramework(engineFactory));
 
-        using ITestApplication application = await builder.BuildAsync().ConfigureAwait(false);
+        using var application = await builder.BuildAsync().ConfigureAwait(false);
         return await application.RunAsync().ConfigureAwait(false);
     }
 }

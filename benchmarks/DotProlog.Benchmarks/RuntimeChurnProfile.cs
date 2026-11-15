@@ -47,7 +47,7 @@ internal static class RuntimeChurnProfile
         );
         var mint = engine.Program.Symbols.InternFunctor("mint", 2);
         var item = engine.Program.Symbols.InternFunctor("item", 1);
-        Cell live = Cell.Atom(engine.Program.Symbols.InternAtom("live"));
+        var live = Cell.Atom(engine.Program.Symbols.InternAtom("live"));
         var machine = engine.Machine;
         if (verifyMemory)
             return VerifyMemory(engine, kind, mint, item, live, rounds, batch);

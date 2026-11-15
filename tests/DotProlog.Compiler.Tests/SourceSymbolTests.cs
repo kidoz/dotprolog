@@ -8,7 +8,7 @@ public sealed class SourceSymbolTests
     [Fact]
     public void SymbolsReuseModuleContextAndPhysicalIncludeOwnership()
     {
-        string root = Path.Combine(Path.GetTempPath(), "symbols", "root.pl");
+        var root = Path.Combine(Path.GetTempPath(), "symbols", "root.pl");
         var loaded = PrologLintSourceLoader.Load(
             root,
             ":- module(m, []). :- include('child.pl'). local. :- initialization(halt(42)).",

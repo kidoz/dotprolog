@@ -23,7 +23,7 @@ public static class PrologErrors
     {
         ArgumentNullException.ThrowIfNull(machine);
 
-        Cell formal = machine.CreateStructure(machine.Symbols.InternFunctor("uninstantiation_error", 1), [culprit]);
+        var formal = machine.CreateStructure(machine.Symbols.InternFunctor("uninstantiation_error", 1), [culprit]);
         return Build(machine, formal, $"uninstantiation_error({TermWriter.ToDisplayString(machine, culprit, quoted: true)})");
     }
 
@@ -53,10 +53,10 @@ public static class PrologErrors
     {
         ArgumentNullException.ThrowIfNull(machine);
 
-        Functor functor = machine.Symbols.GetFunctor(functorId);
-        string compiledName = machine.Symbols.AtomName(functor.NameAtom);
+        var functor = machine.Symbols.GetFunctor(functorId);
+        var compiledName = machine.Symbols.AtomName(functor.NameAtom);
         var separator = compiledName.LastIndexOf(':');
-        Cell indicator = machine.CreateStructure(
+        var indicator = machine.CreateStructure(
             machine.Symbols.InternFunctor("/", 2),
             [
                 Cell.Atom(machine.Symbols.InternAtom(separator > 0 ? compiledName[(separator + 1)..] : compiledName)),
@@ -72,7 +72,7 @@ public static class PrologErrors
             );
         }
 
-        Cell formal = machine.CreateStructure(
+        var formal = machine.CreateStructure(
             machine.Symbols.InternFunctor("existence_error", 2),
             [Cell.Atom(machine.Symbols.InternAtom("procedure")), indicator]
         );
@@ -89,8 +89,8 @@ public static class PrologErrors
     {
         ArgumentNullException.ThrowIfNull(machine);
 
-        Functor functor = machine.Symbols.GetFunctor(functorId);
-        Cell indicator = machine.CreateStructure(
+        var functor = machine.Symbols.GetFunctor(functorId);
+        var indicator = machine.CreateStructure(
             machine.Symbols.InternFunctor("/", 2),
             [Cell.Atom(functor.NameAtom), Cell.Integer60(functor.Arity)]
         );
@@ -103,7 +103,7 @@ public static class PrologErrors
     {
         ArgumentNullException.ThrowIfNull(machine);
 
-        Cell formal = machine.CreateStructure(
+        var formal = machine.CreateStructure(
             machine.Symbols.InternFunctor("permission_error", 3),
             [Cell.Atom(machine.Symbols.InternAtom(operation)), Cell.Atom(machine.Symbols.InternAtom(type)), culprit]
         );
@@ -148,12 +148,12 @@ public static class PrologErrors
     {
         ArgumentNullException.ThrowIfNull(machine);
 
-        Cell indicator = machine.CreateStructure(
+        var indicator = machine.CreateStructure(
             machine.Symbols.InternFunctor("/", 2),
             [Cell.Atom(machine.Symbols.InternAtom(name)), Cell.Integer60(arity)]
         );
 
-        Cell formal = machine.CreateStructure(
+        var formal = machine.CreateStructure(
             machine.Symbols.InternFunctor("type_error", 2),
             [Cell.Atom(machine.Symbols.InternAtom("evaluable")), indicator]
         );
@@ -163,7 +163,7 @@ public static class PrologErrors
 
     private static PrologException Unary(Machine machine, string kind, string argument)
     {
-        Cell formal = machine.CreateStructure(
+        var formal = machine.CreateStructure(
             machine.Symbols.InternFunctor(kind, 1),
             [Cell.Atom(machine.Symbols.InternAtom(argument))]
         );
@@ -181,12 +181,12 @@ public static class PrologErrors
     public static PrologException OccursCheck(Machine machine, Cell variable, Cell term)
     {
         ArgumentNullException.ThrowIfNull(machine);
-        Cell formal = machine.CreateStructure(
+        var formal = machine.CreateStructure(
             machine.Symbols.InternFunctor("representation_error", 1),
             [Cell.Atom(machine.Symbols.InternAtom("term"))]
         );
-        Cell context = machine.CreateStructure(machine.Symbols.InternFunctor("occurs_check", 2), [variable, term]);
-        Cell error = machine.CreateStructure(machine.Symbols.InternFunctor("error", 2), [formal, context]);
+        var context = machine.CreateStructure(machine.Symbols.InternFunctor("occurs_check", 2), [variable, term]);
+        var error = machine.CreateStructure(machine.Symbols.InternFunctor("error", 2), [formal, context]);
         return machine.CreateBall(error, "representation_error(term): the binding would create a rational tree");
     }
 
@@ -199,7 +199,7 @@ public static class PrologErrors
 
     private static PrologException Binary(Machine machine, string kind, string first, Cell culprit)
     {
-        Cell formal = machine.CreateStructure(
+        var formal = machine.CreateStructure(
             machine.Symbols.InternFunctor(kind, 2),
             [Cell.Atom(machine.Symbols.InternAtom(first)), culprit]
         );
@@ -209,7 +209,7 @@ public static class PrologErrors
 
     private static PrologException Build(Machine machine, Cell formal, string description)
     {
-        Cell error = machine.CreateStructure(machine.Symbols.InternFunctor("error", 2), [formal, machine.CreateVariable()]);
+        var error = machine.CreateStructure(machine.Symbols.InternFunctor("error", 2), [formal, machine.CreateVariable()]);
 
         return machine.CreateBall(error, description);
     }

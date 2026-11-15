@@ -15,7 +15,7 @@ internal sealed record DocumentSnapshot(string Uri, string Text, int Version)
             throw new InvalidParametersException();
         try
         {
-            string path = parsed.LocalPath;
+            var path = parsed.LocalPath;
             // VS Code escapes the drive colon as %3A. Uri then treats the path as
             // Unix-style and retains its leading slash, even on Windows.
             if (

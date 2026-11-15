@@ -20,9 +20,9 @@ internal sealed record ProjectConfiguration(
 
     internal static ProjectConfiguration Parse(string json)
     {
-        JsonObject root =
+        var root =
             JsonNode.Parse(json)?.AsObject() ?? throw new InvalidDataException("MSBuild returned no project description.");
-        JsonObject properties =
+        var properties =
             root["Properties"]?.AsObject() ?? throw new InvalidDataException("MSBuild properties are missing.");
         string Property(string name) => properties[name]?.GetValue<string>() ?? string.Empty;
         if (!PrologLanguageModes.TryParse(Property("DotPrologLanguageMode"), out var mode))
@@ -35,19 +35,19 @@ internal sealed record ProjectConfiguration(
             throw new InvalidDataException(
                 "Multi-target projects require a single TargetFramework for language server evaluation."
             );
-        string path = Property("MSBuildProjectFullPath");
+        var path = Property("MSBuildProjectFullPath");
         if (!Path.IsPathFullyQualified(path))
             throw new InvalidDataException("MSBuild returned an invalid project path.");
         return new ProjectConfiguration(path, mode, flags, Items("PrologCompile"), Items("PrologContract"));
 
         string[] Items(string name)
         {
-            JsonArray items =
+            var items =
                 root["Items"]?[name]?.AsArray() ?? throw new InvalidDataException($"MSBuild item list {name} is missing.");
             List<string> paths = [];
-            foreach (JsonNode? item in items)
+            foreach (var item in items)
             {
-                string fullPath = item?["FullPath"]?.GetValue<string>() ?? string.Empty;
+                var fullPath = item?["FullPath"]?.GetValue<string>() ?? string.Empty;
                 if (!Path.IsPathFullyQualified(fullPath))
                     throw new InvalidDataException($"MSBuild returned an invalid {name} path.");
                 paths.Add(Path.GetFullPath(fullPath));

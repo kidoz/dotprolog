@@ -17,7 +17,7 @@ public sealed class ProjectReloadTests : IDisposable
     [Fact]
     public void ReplacementPreservesBuffersAndReanalyzesRemovedOpenFilesAsLooseFiles()
     {
-        string member = Source("member.pl", "disk(ok).");
+        var member = Source("member.pl", "disk(ok).");
         var modern = Configuration([member]);
         var workspace = new DocumentWorkspace(PrologLanguageMode.Modern, modern);
         workspace.StartProject();
@@ -33,8 +33,8 @@ public sealed class ProjectReloadTests : IDisposable
     [Fact]
     public void ReplacementAddsNewSourcesAndClearsRemovedClosedSources()
     {
-        string oldSource = Source("old.pl", "old(X).");
-        string newSource = Source("new.pl", "new(Y).");
+        var oldSource = Source("old.pl", "old(X).");
+        var newSource = Source("new.pl", "new(Y).");
         var workspace = new DocumentWorkspace(PrologLanguageMode.Modern, Configuration([oldSource]));
         workspace.StartProject();
         var changes = workspace.ReplaceProject(Configuration([newSource]));
@@ -48,7 +48,7 @@ public sealed class ProjectReloadTests : IDisposable
     [Fact]
     public async Task FailedReevaluationKeepsLastValidSettingsSuppressesRepeatedErrorsAndRecovers()
     {
-        string member = Source("member.pl", "value(`text`).");
+        var member = Source("member.pl", "value(`text`).");
         var initial = Configuration([member]);
         var calls = 0;
         var server = new LanguageServer(
@@ -63,7 +63,7 @@ public sealed class ProjectReloadTests : IDisposable
             }
         );
         var changed = Changed(new Uri(Path.Combine(_directory, "settings.custom")).AbsoluteUri);
-        (_, List<JsonObject> messages) = await ProtocolTests.RunServerAsync(
+        (_, var messages) = await ProtocolTests.RunServerAsync(
             server,
             Initialize,
             Initialized,
@@ -93,7 +93,7 @@ public sealed class ProjectReloadTests : IDisposable
     [Fact]
     public async Task UnchangedSnapshotRefreshesDiskContentsAndEvaluatesOnlyOncePerValidBatch()
     {
-        string member = Source("member.pl", "value(ok).");
+        var member = Source("member.pl", "value(ok).");
         var initial = Configuration([member]);
         var calls = 0;
         var server = new LanguageServer(
@@ -106,10 +106,10 @@ public sealed class ProjectReloadTests : IDisposable
                 return initial;
             }
         );
-        string uri = new Uri(member).AbsoluteUri;
-        string invalid =
+        var uri = new Uri(member).AbsoluteUri;
+        var invalid =
             """{"jsonrpc":"2.0","method":"workspace/didChangeWatchedFiles","params":{"changes":[{"uri":"file:///bad","type":99}]}}""";
-        (_, List<JsonObject> messages) = await ProtocolTests.RunServerAsync(
+        (_, var messages) = await ProtocolTests.RunServerAsync(
             server,
             Initialize,
             Initialized,
@@ -131,7 +131,7 @@ public sealed class ProjectReloadTests : IDisposable
     [Fact]
     public async Task FailedEvaluationStillAppliesDiskEditsUsingLastValidSnapshot()
     {
-        string member = Source("member.pl", "value(ok).");
+        var member = Source("member.pl", "value(ok).");
         var initial = Configuration([member]);
         var server = new LanguageServer(
             PrologLanguageMode.Modern,
@@ -142,7 +142,7 @@ public sealed class ProjectReloadTests : IDisposable
                 throw new IOException("SDK unavailable");
             }
         );
-        (_, List<JsonObject> messages) = await ProtocolTests.RunServerAsync(
+        (_, var messages) = await ProtocolTests.RunServerAsync(
             server,
             Initialize,
             Initialized,
@@ -193,7 +193,7 @@ public sealed class ProjectReloadTests : IDisposable
 
     private string Source(string name, string text)
     {
-        string path = Path.Combine(_directory, name);
+        var path = Path.Combine(_directory, name);
         File.WriteAllText(path, text);
         return path;
     }

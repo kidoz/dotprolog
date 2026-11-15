@@ -327,7 +327,7 @@ public sealed class SwiDifferentialTests
         var output = new StringWriter();
         using var engine = new PrologEngine { Output = output, Error = output };
 
-        LoadResult loaded = engine.ConsultText($":- initialization(({goal})).", "differential.pl");
+        var loaded = engine.ConsultText($":- initialization(({goal})).", "differential.pl");
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
         return output.ToString();

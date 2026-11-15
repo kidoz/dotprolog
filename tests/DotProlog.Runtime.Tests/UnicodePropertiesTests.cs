@@ -15,7 +15,7 @@ public sealed class UnicodePropertiesTests
     [MemberData(nameof(Tables))]
     public void RangesAreAscendingDisjointPairs(string table)
     {
-        ReadOnlySpan<int> ranges = RangesOf(table);
+        var ranges = RangesOf(table);
 
         Assert.True(ranges.Length > 0 && ranges.Length % 2 == 0);
         for (var index = 0; index < ranges.Length; index += 2)

@@ -27,11 +27,11 @@ public static class PrologSourceDefinitions
             .Clauses.Where(clause => clause.Clause is not CompoundTerm { Name: ":-", Arity: 1 })
             .Select(clause => model.ContextOf(clause.Clause))
             .ToArray();
-        for (int index = 0; index < symbols.Count; index++)
+        for (var index = 0; index < symbols.Count; index++)
         {
             var symbol = symbols[index];
             cancellationToken.ThrowIfCancellationRequested();
-            int arity = symbol.Arity + (symbol.IsNonterminal ? 2 : 0);
+            var arity = symbol.Arity + (symbol.IsNonterminal ? 2 : 0);
             result.Add(
                 new(
                     symbol.FileName,

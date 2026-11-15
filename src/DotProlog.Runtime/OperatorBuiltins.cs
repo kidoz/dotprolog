@@ -33,9 +33,9 @@ internal static class OperatorBuiltins
 
     private static bool Define(Machine machine, OperatorTable operators, int offset)
     {
-        Cell priority = machine.Argument(offset);
-        Cell type = machine.Argument(offset + 1);
-        Cell names = machine.Argument(offset + 2);
+        var priority = machine.Argument(offset);
+        var type = machine.Argument(offset + 1);
+        var names = machine.Argument(offset + 2);
 
         if (priority.Tag == CellTag.Reference || type.Tag == CellTag.Reference || names.Tag == CellTag.Reference)
         {
@@ -57,7 +57,7 @@ internal static class OperatorBuiltins
             throw PrologErrors.Type(machine, "atom", type);
         }
 
-        OperatorType specifier = machine.Symbols.AtomName(type.Index) switch
+        var specifier = machine.Symbols.AtomName(type.Index) switch
         {
             "xfx" => OperatorType.Xfx,
             "xfy" => OperatorType.Xfy,
@@ -85,9 +85,9 @@ internal static class OperatorBuiltins
         }
 
         var definitions = new List<(Cell Name, string Text)>(targets.Count);
-        foreach (Cell target in targets)
+        foreach (var target in targets)
         {
-            Cell name = machine.Dereference(target);
+            var name = machine.Dereference(target);
 
             if (name.Tag == CellTag.Reference)
             {
@@ -100,7 +100,7 @@ internal static class OperatorBuiltins
             }
 
             var text = machine.Symbols.AtomName(name.Index);
-            OperatorDefinitionConflict conflict = operators.DefinitionConflict((int)priority.Integer, specifier, text);
+            var conflict = operators.DefinitionConflict((int)priority.Integer, specifier, text);
             if (conflict != OperatorDefinitionConflict.None)
             {
                 var operation = conflict == OperatorDefinitionConflict.Create ? "create" : "modify";
@@ -140,13 +140,13 @@ internal static class OperatorBuiltins
 
     private static bool Current(Machine machine, OperatorTable operators, int offset, int version, int start)
     {
-        ReadOnlySpan<PrologOperator> entries = operators.Entries(version);
+        var entries = operators.Entries(version);
         for (var index = start; index < entries.Length; index++)
         {
-            PrologOperator entry = entries[index];
-            Cell priority = Cell.Integer60(entry.Priority);
-            Cell specifier = Cell.Atom(machine.Symbols.InternAtom(NameOf(entry.Type)));
-            Cell name = Cell.Atom(machine.Symbols.InternAtom(entry.Name));
+            var entry = entries[index];
+            var priority = Cell.Integer60(entry.Priority);
+            var specifier = Cell.Atom(machine.Symbols.InternAtom(NameOf(entry.Type)));
+            var name = Cell.Atom(machine.Symbols.InternAtom(entry.Name));
 
             if (
                 !machine.CanUnify(machine.Argument(offset), priority)
@@ -184,13 +184,13 @@ internal static class OperatorBuiltins
 
     private static void ValidateCurrentArguments(Machine machine, int offset)
     {
-        Cell priority = machine.Argument(offset);
+        var priority = machine.Argument(offset);
         if (priority.Tag != CellTag.Reference && (priority.Tag != CellTag.Integer || priority.Integer is < 0 or > 1200))
         {
             throw PrologErrors.Domain(machine, "operator_priority", priority);
         }
 
-        Cell specifier = machine.Argument(offset + 1);
+        var specifier = machine.Argument(offset + 1);
         if (
             specifier.Tag != CellTag.Reference
             && (specifier.Tag != CellTag.Atom || !IsSpecifier(machine.Symbols.AtomName(specifier.Index)))
@@ -199,7 +199,7 @@ internal static class OperatorBuiltins
             throw PrologErrors.Domain(machine, "operator_specifier", specifier);
         }
 
-        Cell name = machine.Argument(offset + 2);
+        var name = machine.Argument(offset + 2);
         if (name.Tag is not (CellTag.Reference or CellTag.Atom))
         {
             throw PrologErrors.Type(machine, "atom", name);
@@ -210,7 +210,7 @@ internal static class OperatorBuiltins
 
     private static ModuleDefinition Context(Machine machine, int argument)
     {
-        Cell module = machine.Argument(argument);
+        var module = machine.Argument(argument);
         if (module.Tag == CellTag.Reference)
         {
             throw PrologErrors.Instantiation(machine);
@@ -221,8 +221,8 @@ internal static class OperatorBuiltins
             throw PrologErrors.Type(machine, "atom", module);
         }
 
-        string name = machine.Symbols.AtomName(module.Index);
-        return machine.Program.Modules.TryGet(name, out ModuleDefinition? definition)
+        var name = machine.Symbols.AtomName(module.Index);
+        return machine.Program.Modules.TryGet(name, out var definition)
             ? definition!
             : throw PrologErrors.Existence(machine, "module", module);
     }

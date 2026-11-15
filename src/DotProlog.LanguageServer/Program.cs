@@ -6,9 +6,9 @@ internal static class Program
 {
     private static async Task<int> Main(string[] args)
     {
-        PrologLanguageMode mode = PrologLanguageMode.Modern;
+        var mode = PrologLanguageMode.Modern;
         string? projectPath = null;
-        string configuration = "Debug";
+        var configuration = "Debug";
         HashSet<string> options = new(StringComparer.Ordinal);
         for (var index = 0; index < args.Length; index += 2)
         {
@@ -38,7 +38,7 @@ internal static class Program
 
         try
         {
-            ProjectConfiguration? project = projectPath is null
+            var project = projectPath is null
                 ? null
                 : await ProjectEvaluator.EvaluateAsync(projectPath, configuration).ConfigureAwait(false);
             Func<CancellationToken, Task<ProjectConfiguration>>? reload = project is null

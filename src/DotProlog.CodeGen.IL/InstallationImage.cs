@@ -28,7 +28,7 @@ internal static class InstallationImage
         }
         WriteIntegers(writer, model.Builtins);
         writer.Write(model.Constants.Count);
-        foreach (CompiledConstant constant in model.Constants)
+        foreach (var constant in model.Constants)
         {
             writer.Write((byte)constant.Tag);
             writer.Write(constant.Text ?? string.Empty);
@@ -37,7 +37,7 @@ internal static class InstallationImage
         }
         writer.Write(model.StaticIndexes.Count);
         writer.Write(model.Modules.Count);
-        foreach (CompiledModule module in model.Modules)
+        foreach (var module in model.Modules)
         {
             writer.Write(module.Name);
             writer.Write(module.InterfacePrepared);
@@ -59,7 +59,7 @@ internal static class InstallationImage
             writer.Write((int)module.DoubleQuotes);
             writer.Write((int)module.Unknown);
             writer.Write(module.Predicates.Count);
-            foreach (CompiledModulePredicate predicate in module.Predicates)
+            foreach (var predicate in module.Predicates)
             {
                 writer.Write(predicate.Name);
                 writer.Write(predicate.Arity);
@@ -73,14 +73,14 @@ internal static class InstallationImage
                     writer.Write(predicate.MetapredicateTemplate);
                 }
                 writer.Write(predicate.StaticClauses.Count);
-                foreach (CompiledModuleClause clause in predicate.StaticClauses)
+                foreach (var clause in predicate.StaticClauses)
                 {
                     WriteTerm(writer, clause.Term);
                     writer.Write(clause.Root);
                 }
             }
             writer.Write(module.Imports.Count);
-            foreach (CompiledModuleImport import in module.Imports)
+            foreach (var import in module.Imports)
             {
                 writer.Write(import.Name);
                 writer.Write(import.Arity);
@@ -96,18 +96,18 @@ internal static class InstallationImage
             }
         }
         writer.Write(model.Preparation.Count);
-        foreach (PreparationStep step in model.Preparation)
+        foreach (var step in model.Preparation)
         {
             WritePredicates(writer, step.Predicates, layout);
             writer.Write(layout.BlockByInstruction[step.Directive]);
         }
         WritePredicates(writer, model.Predicates, layout);
         writer.Write(model.DynamicPredicates.Count);
-        foreach (CompiledDynamicPredicate predicate in model.DynamicPredicates)
+        foreach (var predicate in model.DynamicPredicates)
         {
             writer.Write(predicate.Functor);
             writer.Write(predicate.Clauses.Count);
-            foreach (CompiledDynamicClause clause in predicate.Clauses)
+            foreach (var clause in predicate.Clauses)
             {
                 writer.Write(layout.BlockByInstruction[clause.Entry]);
                 WriteTerm(writer, clause.Term);
@@ -136,7 +136,7 @@ internal static class InstallationImage
     private static void WritePredicates(BinaryWriter writer, List<CompiledPredicate> predicates, IlBlockLayout layout)
     {
         writer.Write(predicates.Count);
-        foreach (CompiledPredicate predicate in predicates)
+        foreach (var predicate in predicates)
         {
             writer.Write(predicate.Functor);
             writer.Write(layout.BlockByInstruction[predicate.Entry]);
@@ -146,7 +146,7 @@ internal static class InstallationImage
     private static void WriteTerm(BinaryWriter writer, List<CompiledTermCell> cells)
     {
         writer.Write(cells.Count);
-        foreach (CompiledTermCell cell in cells)
+        foreach (var cell in cells)
         {
             writer.Write((byte)cell.Tag);
             writer.Write(cell.Value);

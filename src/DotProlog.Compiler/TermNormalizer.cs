@@ -30,7 +30,7 @@ internal static class TermNormalizer
         SyntaxTerm[]? rewritten = null;
         for (var i = 0; i < compound.Arguments.Count; i++)
         {
-            SyntaxTerm normalized = Normalize(compound.Arguments[i], doubleQuotes, codePoints);
+            var normalized = Normalize(compound.Arguments[i], doubleQuotes, codePoints);
             if (!ReferenceEquals(normalized, compound.Arguments[i]) && rewritten is null)
             {
                 rewritten = [.. compound.Arguments];

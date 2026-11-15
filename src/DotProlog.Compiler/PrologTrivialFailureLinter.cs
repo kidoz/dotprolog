@@ -14,7 +14,7 @@ internal static class PrologTrivialFailureLinter
         List<Diagnostic> diagnostics
     )
     {
-        IReadOnlyList<SyntaxTerm> arguments = site switch
+        var arguments = site switch
         {
             AtomTerm => [],
             CompoundTerm compound => compound.Arguments,
@@ -25,12 +25,12 @@ internal static class PrologTrivialFailureLinter
             return;
         }
 
-        if (!model.TryStaticClauses(targetModule, predicate, out IReadOnlyList<PrologLintProgramModel.ClauseContext> clauses))
+        if (!model.TryStaticClauses(targetModule, predicate, out var clauses))
         {
             return;
         }
 
-        foreach (PrologLintProgramModel.ClauseContext clause in clauses)
+        foreach (var clause in clauses)
         {
             if (HeadMatches(arguments, LintSyntax.ClauseHead(clause.Clause)) != HeadMatch.NoMatch)
             {
@@ -87,7 +87,7 @@ internal static class PrologTrivialFailureLinter
                 return true;
             }
 
-            if (bindings.TryGetValue(variable.Name, out SyntaxTerm? bound))
+            if (bindings.TryGetValue(variable.Name, out var bound))
             {
                 return LintSyntax.CanonicalForm(argument) == LintSyntax.CanonicalForm(bound);
             }

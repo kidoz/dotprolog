@@ -44,14 +44,14 @@ public class LanguageModeBenchmarks
     [Benchmark(Description = "Consult a string-heavy source")]
     public bool ConsultStringHeavy()
     {
-        using PrologEngine engine = NewEngine();
+        using var engine = NewEngine();
         return engine.ConsultText(StringHeavySource, "bench.pl").Success;
     }
 
     [Benchmark(Description = "Consult 20 separate load units")]
     public bool ConsultManyUnits()
     {
-        using PrologEngine engine = NewEngine();
+        using var engine = NewEngine();
         var success = true;
         for (var index = 0; index < ManyUnits.Length; index++)
         {

@@ -15,22 +15,22 @@ internal static class PrologLocalImportShadowLinter
             return;
         }
 
-        foreach (PrologLintProgramModel.LocalImportShadow shadow in model.LocalImportShadows)
+        foreach (var shadow in model.LocalImportShadows)
         {
-            PrologLintProgramModel.ClauseContext? clause = model.Clauses.FirstOrDefault(clause =>
+            var clause = model.Clauses.FirstOrDefault(clause =>
                 clause.Module == shadow.Importer && clause.Indicator == shadow.Indicator
             );
             SourceSpan span;
             string fileName;
             if (clause is not null)
             {
-                SyntaxTerm head = LintSyntax.ClauseHead(clause.Clause);
+                var head = LintSyntax.ClauseHead(clause.Clause);
                 span = head is CompoundTerm { NameSpan: { } nameSpan } ? nameSpan : head.Span;
                 fileName = clause.Source.FileName;
             }
             else
             {
-                PrologLintProgramModel.DeclarationSite? declaration = model.LocalProcedureDeclarations.FirstOrDefault(
+                var declaration = model.LocalProcedureDeclarations.FirstOrDefault(
                     declaration => declaration.Module == shadow.Importer && declaration.Indicator == shadow.Indicator
                 );
                 if (declaration is null)

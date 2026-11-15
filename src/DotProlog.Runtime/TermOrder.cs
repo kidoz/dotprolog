@@ -56,7 +56,7 @@ public static class TermOrder
         {
             while (work.Count > 0)
             {
-                (Cell a, Cell b) = work[^1];
+                (var a, var b) = work[^1];
                 work.RemoveAt(work.Count - 1);
 
                 a = machine.Dereference(a);
@@ -138,8 +138,8 @@ public static class TermOrder
     {
         var leftFunctor = machine.HeapAt(a.Index).Index;
         var rightFunctor = machine.HeapAt(b.Index).Index;
-        Functor left = machine.Symbols.GetFunctor(leftFunctor);
-        Functor right = machine.Symbols.GetFunctor(rightFunctor);
+        var left = machine.Symbols.GetFunctor(leftFunctor);
+        var right = machine.Symbols.GetFunctor(rightFunctor);
 
         var arity = left.Arity.CompareTo(right.Arity);
         if (arity != 0)
@@ -205,8 +205,8 @@ public static class TermOrder
 
         // Cross-multiplying compares exactly; denominators are positive by canonical form, and
         // equal values always share one representation, so ties cannot cross representations.
-        (System.Numerics.BigInteger leftNumerator, System.Numerics.BigInteger leftDenominator) = NumeratorDenominator(machine, a);
-        (System.Numerics.BigInteger rightNumerator, System.Numerics.BigInteger rightDenominator) = NumeratorDenominator(
+        (var leftNumerator, var leftDenominator) = NumeratorDenominator(machine, a);
+        (var rightNumerator, var rightDenominator) = NumeratorDenominator(
             machine,
             b
         );

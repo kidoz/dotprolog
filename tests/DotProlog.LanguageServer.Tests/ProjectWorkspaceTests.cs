@@ -13,8 +13,8 @@ public sealed class ProjectWorkspaceTests : IDisposable
     [Fact]
     public void ProjectUsesConfiguredFlagsAndResolvesUnopenedSourceFiles()
     {
-        string caller = Source("caller.pl", "run :- helper, atom_codes(_, \"abc\").");
-        string helper = Source("helper.pl", "helper.");
+        var caller = Source("caller.pl", "run :- helper, atom_codes(_, \"abc\").");
+        var helper = Source("helper.pl", "helper.");
         var workspace = new DocumentWorkspace(
             PrologLanguageMode.Modern,
             Configuration([caller, helper], PrologLanguageMode.Modern, DoubleQuotesMode.Codes)
@@ -41,10 +41,10 @@ public sealed class ProjectWorkspaceTests : IDisposable
     [Fact]
     public void ProjectModeAppliesToMembersAndLooseFilesKeepDefaultMode()
     {
-        string member = Source("member.pl", "value(`text`).");
+        var member = Source("member.pl", "value(`text`).");
         var workspace = new DocumentWorkspace(PrologLanguageMode.Modern, Configuration([member], PrologLanguageMode.StrictIso));
         Assert.Contains(For(workspace.StartProject(), member).Diagnostics, item => item!["severity"]!.GetValue<int>() == 1);
-        string loose = Path.Combine(_directory, "loose.pl");
+        var loose = Path.Combine(_directory, "loose.pl");
         Assert.DoesNotContain(
             For(workspace.Update(new DocumentSnapshot(new Uri(loose).AbsoluteUri, "value(`text`).", 1)), loose).Diagnostics,
             item => item!["severity"]!.GetValue<int>() == 1
@@ -54,7 +54,7 @@ public sealed class ProjectWorkspaceTests : IDisposable
     [Fact]
     public void ProjectSourcesRefreshOnDiskChangesAndMissingSourcesAreReported()
     {
-        string member = Source("member.pl", "value(X).");
+        var member = Source("member.pl", "value(X).");
         var workspace = new DocumentWorkspace(PrologLanguageMode.Modern, Configuration([member], PrologLanguageMode.Modern));
         workspace.StartProject();
         File.Delete(member);
@@ -95,7 +95,7 @@ public sealed class ProjectWorkspaceTests : IDisposable
 
     private string Source(string name, string text)
     {
-        string path = Path.Combine(_directory, name);
+        var path = Path.Combine(_directory, name);
         File.WriteAllText(path, text);
         return path;
     }

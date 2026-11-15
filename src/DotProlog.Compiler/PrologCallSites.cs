@@ -69,7 +69,7 @@ internal static class PrologCallSites
                 )
                 {
                     Add(control, site.Module, 0, grammar: site.HideHover, intrinsic: true);
-                    for (int index = control.Arity - 1; index >= 0; index--)
+                    for (var index = control.Arity - 1; index >= 0; index--)
                         pending.Push(site with { Term = control.Arguments[index] });
                     continue;
                 }
@@ -122,14 +122,14 @@ internal static class PrologCallSites
                 }
                 // Do not apply a predefined meta template to an overriding ordinary user predicate.
                 var resolved = model.Resolve(site.Module, indicator);
-                bool declaredMeta =
+                var declaredMeta =
                     resolved.Module is { } owner
                     && model.Modules.Catalog.TryGet(owner, out var definition)
                     && definition!.TryPredicate(new ModulePredicateIndicator(goal.Name, goal.Arity), out var metadata)
                     && metadata!.MetapredicateTemplate is not null;
                 if (resolution is null && !declaredMeta)
                     continue;
-                int[]? meta = model.MetaArgumentsOf(site.Module, indicator);
+                var meta = model.MetaArgumentsOf(site.Module, indicator);
                 if (meta is null)
                     continue;
                 for (var index = 0; index < Math.Min(meta.Length, goal.Arity); index++)

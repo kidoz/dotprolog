@@ -17,7 +17,7 @@ internal sealed class ReferenceIndex
         foreach (var (file, outline) in documents.OrderBy(item => item.Key, StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            string uri = new Uri(file, UriKind.Absolute).AbsoluteUri;
+            var uri = new Uri(file, UriKind.Absolute).AbsoluteUri;
             var positions = new SourcePositions(outline.Text);
             foreach (var site in NavigationSites.All(outline, cancellationToken).OrderBy(site => site.Range.Start))
             {

@@ -86,7 +86,7 @@ public sealed class FreezeTests
     {
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = new StringWriter() };
 
-        LoadResult loaded = engine.ConsultText(":- initialization(freeze(_, true)).\n");
+        var loaded = engine.ConsultText(":- initialization(freeze(_, true)).\n");
 
         Assert.False(loaded.Success);
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == "DPL1018");

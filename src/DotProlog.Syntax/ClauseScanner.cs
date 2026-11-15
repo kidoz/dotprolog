@@ -27,7 +27,7 @@ public static class ClauseScanner
 
         while (true)
         {
-            Token token = lexer.Next();
+            var token = lexer.Next();
 
             switch (token.Kind)
             {

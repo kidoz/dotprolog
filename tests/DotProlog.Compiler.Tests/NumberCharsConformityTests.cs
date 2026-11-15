@@ -166,14 +166,14 @@ public sealed class NumberCharsConformityTests
             "[48,39,92,111,48,92]",
             "[48,39,92,100]",
         ];
-        foreach (string codes in malformed)
+        foreach (var codes in malformed)
         {
-            foreach (string predicate in new[] { "number_chars", "number_codes" })
+            foreach (var predicate in new[] { "number_chars", "number_codes" })
             {
-                string list = predicate == "number_chars" ? "Chars" : codes;
-                foreach (string number in new[] { "N", "0", "39" })
+                var list = predicate == "number_chars" ? "Chars" : codes;
+                foreach (var number in new[] { "N", "0", "39" })
                 {
-                    string goal =
+                    var goal =
                         $"atom_codes(A, {codes}), atom_chars(A, Chars), "
                         + $"catch({predicate}({number}, {list}), error(syntax_error(_), _), Caught = yes), "
                         + "Caught == yes, var(N)";
@@ -183,7 +183,7 @@ public sealed class NumberCharsConformityTests
         }
 
         foreach (
-            (string codes, int expected) in new (string, int)[]
+            (var codes, var expected) in new (string, int)[]
             {
                 ("[48,39,39,39]", 39),
                 ("[48,39,92,39]", 39),
@@ -193,7 +193,7 @@ public sealed class NumberCharsConformityTests
             }
         )
         {
-            string goal =
+            var goal =
                 $"atom_codes(A, {codes}), atom_chars(A, Chars), "
                 + $"number_chars(N, Chars), N == {expected}, number_chars({expected}, Chars), "
                 + $"number_codes(M, {codes}), M == {expected}, number_codes({expected}, {codes})";

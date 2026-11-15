@@ -17,7 +17,7 @@ internal static class PrologCatchAllLinter
             return;
         }
 
-        foreach (SyntaxTerm clause in clauses)
+        foreach (var clause in clauses)
         {
             AnalyzeClause(clause, fileName, diagnostics);
         }
@@ -33,7 +33,7 @@ internal static class PrologCatchAllLinter
             return;
         }
 
-        foreach (PrologLintProgramModel.ClauseContext clause in model.Clauses)
+        foreach (var clause in model.Clauses)
         {
             AnalyzeClause(clause.Clause, clause.Source.FileName, diagnostics);
         }
@@ -44,7 +44,7 @@ internal static class PrologCatchAllLinter
         var grammar = clause is CompoundTerm { Name: "-->", Arity: 2 };
         if (
             clause is not CompoundTerm { Name: ":-" or "-->", Arity: 2 } rule
-            || !LintSyntax.TryPredicate(LintSyntax.ClauseHead(rule), grammar, out PredicateIndicator indicator)
+            || !LintSyntax.TryPredicate(LintSyntax.ClauseHead(rule), grammar, out var indicator)
         )
         {
             return;

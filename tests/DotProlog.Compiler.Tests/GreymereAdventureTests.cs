@@ -15,7 +15,7 @@ public sealed partial class GreymereAdventureTests
         using var input = new StringReader(commands);
         using var output = new StringWriter();
         var engine = new PrologEngine { Input = input, Output = output };
-        LoadResult loaded = engine.ConsultFile(SamplePath("greymere_adventure.pl"));
+        var loaded = engine.ConsultFile(SamplePath("greymere_adventure.pl"));
         Assert.Empty(loaded.Diagnostics);
         Assert.True(loaded.Success);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
@@ -35,7 +35,7 @@ public sealed partial class GreymereAdventureTests
     public void WinningPathPreservesGameStateInEveryMode(string mode, string path)
     {
         var commands = $"graphics({mode}).\n" + File.ReadAllText(SamplePath(path));
-        (PrologEngine engine, var output) = Play(commands);
+        (var engine, var output) = Play(commands);
         Assert.EndsWith("*** YOU ARE VICTORIOUS ***\n", StripColors(output));
         Assert.True(engine.Query("greymere_adventure:flag(victory), greymere_adventure:holding(ember_crown)").Prove());
         Assert.False(engine.Query("greymere_adventure:alive(_)").Prove());
@@ -113,7 +113,7 @@ public sealed partial class GreymereAdventureTests
     [InlineData("graphics(,). graphics(,).\n")]
     public void MalformedCommandPreservesProgressAndAllowsRetry(string malformed)
     {
-        (PrologEngine engine, var output) = Play("talk(reeve).\n" + malformed + "graphics(on).\nstatus.\nquit.\n");
+        (var engine, var output) = Play("talk(reeve).\n" + malformed + "graphics(on).\nstatus.\nquit.\n");
         Assert.True(
             engine
                 .Query(
@@ -165,11 +165,11 @@ public sealed partial class GreymereAdventureTests
     {
         const string reachTower = ReachCourtyard + "go(north).\ngo(north).\ngo(up).\n";
         const string wrongNotes = "ring(dawn).\nring(noon).\nring(dusk).\nring(noon).\n";
-        (PrologEngine failed, var failedOutput) = Play(reachTower + wrongNotes);
+        (var failed, var failedOutput) = Play(reachTower + wrongNotes);
         Assert.False(failed.Query("greymere_adventure:flag(bells_awakened)").Prove());
         Assert.Contains("Begin again", failedOutput, StringComparison.Ordinal);
 
-        (PrologEngine solved, var output) = Play(
+        (var solved, var output) = Play(
             reachTower + wrongNotes + "ring(dawn).\nring(dusk).\nring(noon).\nring(dusk).\njournal.\n"
         );
         Assert.True(solved.Query("greymere_adventure:flag(bells_awakened)").Prove());
@@ -185,7 +185,7 @@ public sealed partial class GreymereAdventureTests
     {
         var path = File.ReadAllText(SamplePath("winning_path.txt"));
         path = path[..path.IndexOf("take(ember_crown).", StringComparison.Ordinal)];
-        (PrologEngine engine, var output) = Play(path.Replace(omittedCommand, "look.", StringComparison.Ordinal));
+        (var engine, var output) = Play(path.Replace(omittedCommand, "look.", StringComparison.Ordinal));
         Assert.True(engine.Query("greymere_adventure:here(ossuary), greymere_adventure:alive(morvane)").Prove());
         Assert.False(engine.Query("greymere_adventure:flag(sanctum_unlocked)").Prove());
         Assert.Contains(explanation, output, StringComparison.Ordinal);
@@ -195,7 +195,7 @@ public sealed partial class GreymereAdventureTests
     public void RescueNeedsRopeAndCannotDuplicateItsReward()
     {
         const string blocked = ReachCourtyard + "go(west).\ngo(down).\ntalk(bellkeeper).\n";
-        (PrologEngine trapped, var blockedOutput) = Play(blocked);
+        (var trapped, var blockedOutput) = Play(blocked);
         Assert.True(trapped.Query("greymere_adventure:here(well_house)").Prove());
         Assert.False(trapped.Query("greymere_adventure:holding(ash_ward)").Prove());
         Assert.Contains("Use a rope", blockedOutput, StringComparison.Ordinal);
@@ -204,7 +204,7 @@ public sealed partial class GreymereAdventureTests
             ReachCourtyard
             + ClearGatehouse
             + "go(west).\nuse(rope).\ngo(down).\ntalk(bellkeeper).\ndrop(ash_ward).\ntalk(bellkeeper).\nlook.\ngo(up).\n";
-        (PrologEngine freed, var output) = Play(rescue);
+        (var freed, var output) = Play(rescue);
         Assert.True(
             freed
                 .Query(
@@ -222,14 +222,14 @@ public sealed partial class GreymereAdventureTests
         const string ingredients = "go(north).\ngo(east).\ntake(moonleaf).\ngo(west).\ngo(south).\n";
         const string commands =
             ingredients + ReachCourtyard + ClearGatehouse + "go(west).\ntake(spring_water).\nbrew(herbal_tonic).\n";
-        (PrologEngine unknownRecipe, var failedOutput) = Play(commands);
+        (var unknownRecipe, var failedOutput) = Play(commands);
         Assert.True(
             unknownRecipe.Query("greymere_adventure:holding(moonleaf), greymere_adventure:holding(spring_water)").Prove()
         );
         Assert.False(unknownRecipe.Query("greymere_adventure:holding(herbal_tonic)").Prove());
         Assert.Contains("do not know this recipe", failedOutput, StringComparison.Ordinal);
 
-        (PrologEngine brewed, var output) = Play(
+        (var brewed, var output) = Play(
             "talk(herbalist).\nbrew(herbal_tonic).\n" + commands + "brew(herbal_tonic).\nuse(herbal_tonic).\nuse(herbal_tonic).\n"
         );
         Assert.True(brewed.Query("greymere_adventure:flag(tonic_brewed), greymere_adventure:player_hp(14)").Prove());
@@ -249,15 +249,15 @@ public sealed partial class GreymereAdventureTests
     {
         var path = File.ReadAllText(SamplePath("winning_path.txt"));
         path = path[..path.IndexOf("take(ember_crown).", StringComparison.Ordinal)];
-        (PrologEngine guarded, var output) = Play(path);
-        (PrologEngine exposed, _) = Play(path.Replace("guard.", "look.", StringComparison.Ordinal));
+        (var guarded, var output) = Play(path);
+        (var exposed, _) = Play(path.Replace("guard.", "look.", StringComparison.Ordinal));
         Assert.True(guarded.Query("greymere_adventure:player_hp(12)").Prove());
         Assert.True(exposed.Query("greymere_adventure:player_hp(8)").Prove());
         Assert.Contains("guard now!", output, StringComparison.Ordinal);
         Assert.False(guarded.Query("greymere_adventure:flag(counter_ready); greymere_adventure:enemy_ready(_)").Prove());
 
         var mercy = File.ReadAllText(SamplePath("mercy_path.txt"));
-        (PrologEngine warded, _) = Play(mercy);
+        (var warded, _) = Play(mercy);
         Assert.True(warded.Query("greymere_adventure:player_hp(13)").Prove());
     }
 
@@ -265,21 +265,21 @@ public sealed partial class GreymereAdventureTests
     public void RestOnlyWorksInVillageAndMapTracksVisitedRooms()
     {
         const string commands = ReachCourtyard + ClearGatehouse + "rest.\nmap.\n";
-        (PrologEngine outside, var output) = Play(commands);
+        (var outside, var output) = Play(commands);
         Assert.True(outside.Query("greymere_adventure:player_hp(12)").Prove());
         Assert.Contains("rest safely only in Greymere", output, StringComparison.Ordinal);
         Assert.Contains("east -> The Fallen Gatehouse", output, StringComparison.Ordinal);
         Assert.Contains("west -> unexplored", output, StringComparison.Ordinal);
         Assert.False(outside.Query("greymere_adventure:visited(well_house)").Prove());
 
-        (PrologEngine rested, _) = Play(commands + "go(south).\ngo(south).\ngo(south).\nrest.\n");
+        (var rested, _) = Play(commands + "go(south).\ngo(south).\ngo(south).\nrest.\n");
         Assert.True(rested.Query("greymere_adventure:player_hp(14)").Prove());
     }
 
     [Fact]
     public void IncompleteCommandsCannotSelectItemsOrQuestRewards()
     {
-        (PrologEngine engine, var output) = Play("talk(X).\ntake(X).\nuse(X).\ngo(X).\nring(X).\nbrew(X).\n");
+        (var engine, var output) = Play("talk(X).\ntake(X).\nuse(X).\ngo(X).\nring(X).\nbrew(X).\n");
         Assert.True(engine.Query("greymere_adventure:here(village_square), greymere_adventure:player_hp(14)").Prove());
         Assert.False(engine.Query("greymere_adventure:flag(_)").Prove());
         Assert.Contains("Use a complete command", output, StringComparison.Ordinal);
@@ -290,7 +290,7 @@ public sealed partial class GreymereAdventureTests
     {
         var path = File.ReadAllText(SamplePath("mercy_path.txt"));
         path = path[..path.IndexOf("use(herbal_tonic).", StringComparison.Ordinal)];
-        (PrologEngine engine, var output) = Play(
+        (var engine, var output) = Play(
             path + "go(up).\ngo(up).\ngo(south).\ngo(south).\ngo(south).\ngo(south).\nrest.\nuse(herbal_tonic).\n"
         );
         Assert.True(engine.Query("greymere_adventure:player_hp(14), greymere_adventure:holding(herbal_tonic)").Prove());
@@ -301,7 +301,7 @@ public sealed partial class GreymereAdventureTests
     public void BrewingInCombatLeavesIngredientsIntact()
     {
         const string garden = "talk(herbalist).\ngo(north).\ngo(east).\ntake(moonleaf).\ngo(west).\ngo(south).\n";
-        (PrologEngine engine, var output) = Play(
+        (var engine, var output) = Play(
             garden + ReachCourtyard + "go(west).\ntake(spring_water).\ngo(east).\ngo(east).\nbrew(herbal_tonic).\n"
         );
         Assert.True(
@@ -319,12 +319,12 @@ public sealed partial class GreymereAdventureTests
     public void GuardBonusDoesNotStackAndRetreatLosesIt()
     {
         const string guardTwice = ReachCourtyard + "go(east).\nguard.\nguard.\n";
-        (PrologEngine countered, var output) = Play(guardTwice + "attack.\n");
+        (var countered, var output) = Play(guardTwice + "attack.\n");
         Assert.True(countered.Query("greymere_adventure:player_hp(12)").Prove());
         Assert.False(countered.Query("greymere_adventure:alive(mire_goblin); greymere_adventure:flag(counter_ready)").Prove());
         Assert.Contains("for 4 damage", output, StringComparison.Ordinal);
 
-        (PrologEngine retreated, _) = Play(guardTwice + "go(west).\ngo(east).\nattack.\n");
+        (var retreated, _) = Play(guardTwice + "go(west).\ngo(east).\nattack.\n");
         Assert.True(retreated.Query("greymere_adventure:enemy_hp(mire_goblin, 2), greymere_adventure:player_hp(10)").Prove());
     }
 
@@ -343,7 +343,7 @@ public sealed partial class GreymereAdventureTests
         const string finishQuest =
             "attune(star).\nattune([wolf,crown,star]).\nattune([star,crown,wolf]).\nbrew(ember_draught).\nuse(ember_draught).\nroute_to(sunken_crypt).\njournal.\n";
 
-        (PrologEngine engine, var output) = Play(
+        (var engine, var output) = Play(
             "graphics(ascii).\n" + reachArchive + learnRunes + recoverLens + returnToObservatory + finishQuest
         );
 
@@ -387,7 +387,7 @@ public sealed partial class GreymereAdventureTests
         path = path.Replace("ring(noon).\n", "ring(noon).\n" + archiveDetour, StringComparison.Ordinal);
         path = path.Replace("use(healing_draught).\n", "use(healing_draught).\n" + cryptDetour, StringComparison.Ordinal);
 
-        (PrologEngine engine, var output) = Play("graphics(ascii).\n" + path);
+        (var engine, var output) = Play("graphics(ascii).\n" + path);
 
         Assert.EndsWith("*** YOU ARE VICTORIOUS ***\n", output);
         Assert.True(

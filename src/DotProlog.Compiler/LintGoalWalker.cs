@@ -16,7 +16,7 @@ internal static class LintGoalWalker
                 yield return directive.Arguments[0];
                 break;
             case CompoundTerm { Name: "-->", Arity: 2 } grammar:
-                foreach (SyntaxTerm body in GrammarGoals(grammar.Arguments[1]))
+                foreach (var body in GrammarGoals(grammar.Arguments[1]))
                 {
                     yield return body;
                 }
@@ -30,7 +30,7 @@ internal static class LintGoalWalker
         Stack<SyntaxTerm> pending = new();
         pending.Push(body);
 
-        while (pending.TryPop(out SyntaxTerm? term))
+        while (pending.TryPop(out var term))
         {
             if (term is not CompoundTerm goal)
             {
@@ -108,7 +108,7 @@ internal static class LintGoalWalker
         Stack<SyntaxTerm> pending = new();
         pending.Push(body);
 
-        while (pending.TryPop(out SyntaxTerm? term))
+        while (pending.TryPop(out var term))
         {
             if (term is not CompoundTerm compound)
             {

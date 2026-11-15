@@ -58,7 +58,7 @@ internal sealed class TermBuffer
 
         while (_work.Count > 0)
         {
-            (Cell source, var slot) = _work[^1];
+            (var source, var slot) = _work[^1];
             _work.RemoveAt(_work.Count - 1);
 
             // A negative slot marks leaving the structure whose heap index the entry carries.
@@ -68,7 +68,7 @@ internal sealed class TermBuffer
                 continue;
             }
 
-            Cell cell = machine.Dereference(source);
+            var cell = machine.Dereference(source);
             switch (cell.Tag)
             {
                 case CellTag.Reference:
@@ -134,7 +134,7 @@ internal sealed class TermBuffer
 
         for (var i = 0; i < _count; i++)
         {
-            Cell cell = _cells[i];
+            var cell = _cells[i];
             machine.WriteHeap(
                 origin + i,
                 cell.Tag switch

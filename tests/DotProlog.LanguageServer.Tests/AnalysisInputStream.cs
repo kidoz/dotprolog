@@ -22,8 +22,8 @@ internal sealed class AnalysisInputStream(IReadOnlyList<byte[]> frames, Func<Tas
             await waitForAnalysis().WaitAsync(cancellationToken);
         if (_frame == frames.Count)
             return 0;
-        byte[] frame = frames[_frame];
-        int count = Math.Min(buffer.Length, frame.Length - _offset);
+        var frame = frames[_frame];
+        var count = Math.Min(buffer.Length, frame.Length - _offset);
         frame.AsMemory(_offset, count).CopyTo(buffer);
         _offset += count;
         if (_offset == frame.Length)

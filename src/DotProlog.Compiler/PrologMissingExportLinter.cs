@@ -10,7 +10,7 @@ internal static class PrologMissingExportLinter
         ArgumentNullException.ThrowIfNull(model);
         ArgumentNullException.ThrowIfNull(diagnostics);
 
-        foreach (PrologLintProgramModel.MissingExport missing in model.MissingExports)
+        foreach (var missing in model.MissingExports)
         {
             diagnostics.Add(
                 new Diagnostic(

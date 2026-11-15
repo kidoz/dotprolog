@@ -49,7 +49,7 @@ public class EngineBenchmarks : IDisposable
     private static PrologEngine NewEngine(string source)
     {
         var engine = new PrologEngine { Output = TextWriter.Null };
-        LoadResult loaded = engine.ConsultText(source);
+        var loaded = engine.ConsultText(source);
         if (!loaded.Success)
         {
             throw new InvalidOperationException($"Benchmark program failed to compile: {string.Join("; ", loaded.Diagnostics)}");
@@ -60,7 +60,7 @@ public class EngineBenchmarks : IDisposable
 
     private static int CompileGoal(PrologEngine engine, string goal)
     {
-        var address = engine.CompileGoal(goal, out IReadOnlyList<Syntax.Diagnostic> diagnostics);
+        var address = engine.CompileGoal(goal, out var diagnostics);
         if (address < 0)
         {
             throw new InvalidOperationException($"Benchmark goal failed to compile: {string.Join("; ", diagnostics)}");

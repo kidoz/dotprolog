@@ -115,7 +115,7 @@ public sealed class ChoicePointProtectionTests
                 .Success
         );
 
-        PrologException error = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
+        var error = Assert.Throws<PrologException>(() => engine.RunPendingGoals());
         Assert.Equal("oops", error.Message);
     }
 }

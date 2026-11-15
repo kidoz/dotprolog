@@ -8,7 +8,7 @@ public sealed class PrologStreamTests
     [Fact]
     public void NormalCloseRetainsTheStreamWhenFlushingFails()
     {
-        PrologStream stream = StreamWith(new FailingWriter());
+        var stream = StreamWith(new FailingWriter());
 
         Assert.Throws<IOException>(() => stream.Close(force: false));
         Assert.True(stream.IsOpen);
@@ -17,7 +17,7 @@ public sealed class PrologStreamTests
     [Fact]
     public void ForceCloseReclaimsTheStreamWhenFlushingFails()
     {
-        PrologStream stream = StreamWith(new FailingWriter());
+        var stream = StreamWith(new FailingWriter());
 
         Assert.True(stream.Close(force: true));
         Assert.False(stream.IsOpen);

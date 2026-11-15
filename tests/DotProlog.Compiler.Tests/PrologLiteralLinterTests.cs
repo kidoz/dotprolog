@@ -64,7 +64,7 @@ public sealed class PrologLiteralLinterTests
     [Fact]
     public void AcceptsBuiltinAndFileLocalArities()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("member(_, _, _).\nrun :- member(1, [1]), member(1, [1], extra).");
+        var diagnostics = Lint("member(_, _, _).\nrun :- member(1, [1]), member(1, [1], extra).");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.PossibleBuiltinArityMismatch));
     }
@@ -91,7 +91,7 @@ public sealed class PrologLiteralLinterTests
     [Fact]
     public void FreshVariableUnificationIsNotReportedAsFailure()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("run :- X = Y.");
+        var diagnostics = Lint("run :- X = Y.");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.AlwaysFalseGoal));
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.NoEffectGoal));
@@ -100,7 +100,7 @@ public sealed class PrologLiteralLinterTests
     [Fact]
     public void GoalShapedDataIsNotAnalyzedAsCode()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("run(result(X = X)).");
+        var diagnostics = Lint("run(result(X = X)).");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.NoEffectGoal));
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.AlwaysFalseGoal));
@@ -108,7 +108,7 @@ public sealed class PrologLiteralLinterTests
 
     private static IReadOnlyList<Diagnostic> Lint(string source)
     {
-        ParseResult parsed = TermReader.ReadProgram(source, "source.pl");
+        var parsed = TermReader.ReadProgram(source, "source.pl");
         Assert.True(parsed.Success, string.Join(Environment.NewLine, parsed.Diagnostics));
         return PrologLinter.Analyze(parsed.Clauses, "source.pl");
     }

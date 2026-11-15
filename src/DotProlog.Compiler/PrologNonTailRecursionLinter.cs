@@ -18,7 +18,7 @@ internal static class PrologNonTailRecursionLinter
         }
 
         var module = ModuleTable.UserModule;
-        foreach (SyntaxTerm clause in clauses)
+        foreach (var clause in clauses)
         {
             if (clause is CompoundTerm { Name: ":-", Arity: 1, Arguments: [CompoundTerm directive] })
             {
@@ -40,7 +40,7 @@ internal static class PrologNonTailRecursionLinter
             return;
         }
 
-        foreach (PrologLintProgramModel.ClauseContext clause in model.Clauses)
+        foreach (var clause in model.Clauses)
         {
             AnalyzeClause(clause.Clause, clause.Module, clause.Source.FileName, diagnostics);
         }
@@ -60,13 +60,13 @@ internal static class PrologNonTailRecursionLinter
         var grammar = clause is CompoundTerm { Name: "-->", Arity: 2 };
         if (
             clause is not CompoundTerm { Name: ":-" or "-->", Arity: 2 } rule
-            || !LintSyntax.TryPredicate(LintSyntax.ClauseHead(rule), grammar, out PredicateIndicator indicator)
+            || !LintSyntax.TryPredicate(LintSyntax.ClauseHead(rule), grammar, out var indicator)
         )
         {
             return;
         }
 
-        PredicateIndicator sourceIndicator = grammar ? new PredicateIndicator(indicator.Name, indicator.Arity - 2) : indicator;
+        var sourceIndicator = grammar ? new PredicateIndicator(indicator.Name, indicator.Arity - 2) : indicator;
         AnalyzeGoals(rule.Arguments[1], module, module, sourceIndicator, grammar, isTail: true, fileName, diagnostics);
     }
 

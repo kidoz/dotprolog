@@ -23,8 +23,8 @@ internal static class AotLinqComparison
 
         try
         {
-            ComparisonResult size = Measure(repositoryRoot, comparisonRoot, rid, iterations, useSizeOptimizedLinq: true);
-            ComparisonResult speed = Measure(repositoryRoot, comparisonRoot, rid, iterations, useSizeOptimizedLinq: false);
+            var size = Measure(repositoryRoot, comparisonRoot, rid, iterations, useSizeOptimizedLinq: true);
+            var speed = Measure(repositoryRoot, comparisonRoot, rid, iterations, useSizeOptimizedLinq: false);
 
             Console.WriteLine($"RID: {rid}; process launches per mode: {iterations}");
             Console.WriteLine("Mode\tPublish bytes\tMean startup (ms)");
@@ -80,7 +80,7 @@ internal static class AotLinqComparison
             RunProcess(executable, ["run", program], repositoryRoot, "Hello! World!");
         }
 
-        TimeSpan elapsed = Stopwatch.GetElapsedTime(started);
+        var elapsed = Stopwatch.GetElapsedTime(started);
         var publishBytes = Directory
             .EnumerateFiles(publishDirectory, "*", SearchOption.AllDirectories)
             .Where(IsDeploymentFile)
@@ -107,7 +107,7 @@ internal static class AotLinqComparison
             startInfo.ArgumentList.Add(argument);
         }
 
-        using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException($"Could not start {fileName}.");
+        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException($"Could not start {fileName}.");
         var output = process.StandardOutput.ReadToEnd();
         var error = process.StandardError.ReadToEnd();
         process.WaitForExit();

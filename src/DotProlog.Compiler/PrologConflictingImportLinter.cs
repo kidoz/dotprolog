@@ -10,7 +10,7 @@ internal static class PrologConflictingImportLinter
         ArgumentNullException.ThrowIfNull(model);
         ArgumentNullException.ThrowIfNull(diagnostics);
 
-        foreach (PrologLintProgramModel.ImportConflict conflict in model.ImportConflicts)
+        foreach (var conflict in model.ImportConflicts)
         {
             diagnostics.Add(
                 new Diagnostic(

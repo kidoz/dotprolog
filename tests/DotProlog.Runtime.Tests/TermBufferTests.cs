@@ -22,7 +22,7 @@ public sealed class TermBufferTests
     [Fact]
     public void CopiesAConstant()
     {
-        using Machine machine = NewMachine();
+        using var machine = NewMachine();
         var buffer = new TermBuffer();
 
         var root = buffer.Copy(machine, Cell.Integer60(42));
@@ -33,11 +33,11 @@ public sealed class TermBufferTests
     [Fact]
     public void CopiesANestedStructure()
     {
-        using Machine machine = NewMachine();
+        using var machine = NewMachine();
         var f = machine.Symbols.InternFunctor("f", 2);
         var g = machine.Symbols.InternFunctor("g", 1);
-        Cell inner = machine.CreateStructure(g, [Cell.Atom(machine.Symbols.InternAtom("a"))]);
-        Cell term = machine.CreateStructure(f, [inner, Cell.Integer60(7)]);
+        var inner = machine.CreateStructure(g, [Cell.Atom(machine.Symbols.InternAtom("a"))]);
+        var term = machine.CreateStructure(f, [inner, Cell.Integer60(7)]);
 
         var buffer = new TermBuffer();
         var root = buffer.Copy(machine, term);
@@ -48,17 +48,17 @@ public sealed class TermBufferTests
     [Fact]
     public void KeepsVariablesSharedWithinOneCopy()
     {
-        using Machine machine = NewMachine();
+        using var machine = NewMachine();
         var f = machine.Symbols.InternFunctor("f", 2);
-        Cell variable = machine.CreateVariable();
-        Cell term = machine.CreateStructure(f, [variable, variable]);
+        var variable = machine.CreateVariable();
+        var term = machine.CreateStructure(f, [variable, variable]);
 
         var buffer = new TermBuffer();
         var root = buffer.Copy(machine, term);
-        Cell rebuilt = Rebuild(machine, buffer, root);
+        var rebuilt = Rebuild(machine, buffer, root);
 
-        Cell left = machine.Dereference(machine.HeapAt(rebuilt.Index + 1));
-        Cell right = machine.Dereference(machine.HeapAt(rebuilt.Index + 2));
+        var left = machine.Dereference(machine.HeapAt(rebuilt.Index + 1));
+        var right = machine.Dereference(machine.HeapAt(rebuilt.Index + 2));
         Assert.Equal(CellTag.Reference, left.Tag);
         Assert.Equal(left, right);
     }
@@ -66,16 +66,16 @@ public sealed class TermBufferTests
     [Fact]
     public void RenamesVariablesApartBetweenCopies()
     {
-        using Machine machine = NewMachine();
-        Cell variable = machine.CreateVariable();
+        using var machine = NewMachine();
+        var variable = machine.CreateVariable();
 
         var buffer = new TermBuffer();
         var first = buffer.Copy(machine, variable);
         var second = buffer.Copy(machine, variable);
 
         var origin = buffer.Materialize(machine);
-        Cell left = machine.Dereference(machine.HeapAt(origin + first));
-        Cell right = machine.Dereference(machine.HeapAt(origin + second));
+        var left = machine.Dereference(machine.HeapAt(origin + first));
+        var right = machine.Dereference(machine.HeapAt(origin + second));
 
         Assert.Equal(CellTag.Reference, left.Tag);
         Assert.NotEqual(left, right);
@@ -84,8 +84,8 @@ public sealed class TermBufferTests
     [Fact]
     public void CopyFollowsBindingsRatherThanRecordingTheReference()
     {
-        using Machine machine = NewMachine();
-        Cell variable = machine.CreateVariable();
+        using var machine = NewMachine();
+        var variable = machine.CreateVariable();
         Assert.True(machine.Unify(variable, Cell.Atom(machine.Symbols.InternAtom("bound"))));
 
         var buffer = new TermBuffer();
@@ -97,14 +97,14 @@ public sealed class TermBufferTests
     [Fact]
     public void CopyingACyclicTermRaisesACatchableRepresentationError()
     {
-        using Machine machine = NewMachine();
+        using var machine = NewMachine();
         var f = machine.Symbols.InternFunctor("f", 1);
-        Cell variable = machine.CreateVariable();
-        Cell term = machine.CreateStructure(f, [variable]);
+        var variable = machine.CreateVariable();
+        var term = machine.CreateStructure(f, [variable]);
         Assert.True(machine.Unify(variable, term));
 
         var buffer = new TermBuffer();
-        PrologException error = Assert.Throws<PrologException>(() => buffer.Copy(machine, term));
+        var error = Assert.Throws<PrologException>(() => buffer.Copy(machine, term));
 
         Assert.Contains("representation_error(cyclic_term)", error.Message);
     }
@@ -112,25 +112,25 @@ public sealed class TermBufferTests
     [Fact]
     public void CyclePreservingCopiesRelocateBackEdgesAndRemainIndependent()
     {
-        using Machine machine = NewMachine();
-        Cell cycle = machine.CreateVariable();
-        Cell variable = machine.CreateVariable();
+        using var machine = NewMachine();
+        var cycle = machine.CreateVariable();
+        var variable = machine.CreateVariable();
         var f = machine.Symbols.InternFunctor("f", 3);
-        Cell term = machine.CreateStructure(f, [variable, cycle, variable]);
+        var term = machine.CreateStructure(f, [variable, cycle, variable]);
         Assert.True(machine.Unify(cycle, term));
 
         var buffer = new TermBuffer();
         var first = buffer.Copy(machine, term, allowCycles: true);
         var second = buffer.Copy(machine, term, allowCycles: true);
         var origin = buffer.Materialize(machine);
-        Cell left = machine.HeapAt(origin + first);
-        Cell right = machine.HeapAt(origin + second);
+        var left = machine.HeapAt(origin + first);
+        var right = machine.HeapAt(origin + second);
 
         Assert.NotEqual(term, left);
         Assert.NotEqual(left, right);
         Assert.Equal(left, machine.HeapAt(left.Index + 2));
         Assert.Equal(right, machine.HeapAt(right.Index + 2));
-        Cell leftVariable = machine.Dereference(machine.HeapAt(left.Index + 1));
+        var leftVariable = machine.Dereference(machine.HeapAt(left.Index + 1));
         Assert.Equal(leftVariable, machine.Dereference(machine.HeapAt(left.Index + 3)));
         Assert.NotEqual(variable, leftVariable);
         Assert.True(machine.Unify(leftVariable, Cell.Integer60(42)));
@@ -141,11 +141,11 @@ public sealed class TermBufferTests
     [Fact]
     public void CopyingASharedSubtermIsNotMistakenForACycle()
     {
-        using Machine machine = NewMachine();
+        using var machine = NewMachine();
         var f = machine.Symbols.InternFunctor("f", 2);
         var g = machine.Symbols.InternFunctor("g", 1);
-        Cell shared = machine.CreateStructure(g, [Cell.Integer60(1)]);
-        Cell term = machine.CreateStructure(f, [shared, shared]);
+        var shared = machine.CreateStructure(g, [Cell.Integer60(1)]);
+        var term = machine.CreateStructure(f, [shared, shared]);
 
         var buffer = new TermBuffer();
         var root = buffer.Copy(machine, term);
@@ -156,7 +156,7 @@ public sealed class TermBufferTests
     [Fact]
     public void ClearDiscardsEverythingCopiedSoFar()
     {
-        using Machine machine = NewMachine();
+        using var machine = NewMachine();
         var buffer = new TermBuffer();
         buffer.Copy(machine, Cell.Integer60(1));
 

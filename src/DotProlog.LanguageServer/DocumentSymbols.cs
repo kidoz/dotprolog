@@ -21,8 +21,8 @@ internal static class DocumentSymbols
         {
             var first = group.First();
             var separator = first.IsNonterminal ? "//" : "/";
-            string indicator = first.Name + separator + first.Arity.ToString(CultureInfo.InvariantCulture);
-            string name = first.Module == "user" ? indicator : first.Module + ":" + indicator;
+            var indicator = first.Name + separator + first.Arity.ToString(CultureInfo.InvariantCulture);
+            var name = first.Module == "user" ? indicator : first.Module + ":" + indicator;
             if (!hierarchical)
             {
                 result.Add(
@@ -37,8 +37,8 @@ internal static class DocumentSymbols
                 );
                 continue;
             }
-            SourceSpan range = group.Aggregate(first.Range, (span, symbol) => span.To(symbol.Range));
-            JsonObject parent = Symbol(name, range, first.SelectionRange);
+            var range = group.Aggregate(first.Range, (span, symbol) => span.To(symbol.Range));
+            var parent = Symbol(name, range, first.SelectionRange);
             parent["detail"] = first.IsNonterminal ? "DCG" : "predicate";
             if (group.Count() > 1)
             {

@@ -17,10 +17,10 @@ internal static class PrologExcessiveArityLinter
             return;
         }
 
-        int maximumArity = MaximumArity(options);
+        var maximumArity = MaximumArity(options);
         var module = ModuleTable.UserModule;
         HashSet<(string Module, PredicateIndicator Indicator)> seen = [];
-        foreach (SyntaxTerm clause in clauses)
+        foreach (var clause in clauses)
         {
             if (clause is CompoundTerm { Name: ":-", Arity: 1, Arguments: [CompoundTerm directive] })
             {
@@ -42,9 +42,9 @@ internal static class PrologExcessiveArityLinter
             return;
         }
 
-        int maximumArity = MaximumArity(options);
+        var maximumArity = MaximumArity(options);
         HashSet<(string Module, PredicateIndicator Indicator)> seen = [];
-        foreach (PrologLintProgramModel.ClauseContext clause in model.Clauses)
+        foreach (var clause in model.Clauses)
         {
             AnalyzeDefinition(clause.Clause, clause.Module, maximumArity, clause.Source.FileName, seen, diagnostics);
         }
@@ -74,19 +74,19 @@ internal static class PrologExcessiveArityLinter
     )
     {
         var grammar = clause is CompoundTerm { Name: "-->", Arity: 2 };
-        SyntaxTerm head = LintSyntax.ClauseHead(clause);
-        if (!LintSyntax.TryPredicate(head, grammar, out PredicateIndicator indicator) || !seen.Add((module, indicator)))
+        var head = LintSyntax.ClauseHead(clause);
+        if (!LintSyntax.TryPredicate(head, grammar, out var indicator) || !seen.Add((module, indicator)))
         {
             return;
         }
 
-        int sourceArity = grammar ? indicator.Arity - 2 : indicator.Arity;
+        var sourceArity = grammar ? indicator.Arity - 2 : indicator.Arity;
         if (sourceArity <= maximumArity)
         {
             return;
         }
 
-        SourceSpan nameSpan = head is CompoundTerm { NameSpan: { } span } ? span : head.Span;
+        var nameSpan = head is CompoundTerm { NameSpan: { } span } ? span : head.Span;
         diagnostics.Add(
             new Diagnostic(
                 LintDiagnosticIds.ExcessivePredicateArity,

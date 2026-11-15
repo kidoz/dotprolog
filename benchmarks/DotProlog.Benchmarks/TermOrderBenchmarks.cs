@@ -28,8 +28,8 @@ public class TermOrderBenchmarks : IDisposable
         else if (Kind is "Compound" or "Cycle")
         {
             var functor = _machine.Symbols.InternFunctor("f", 2);
-            Cell a = _machine.CreateVariable();
-            Cell b = _machine.CreateVariable();
+            var a = _machine.CreateVariable();
+            var b = _machine.CreateVariable();
             _left = _machine.CreateStructure(functor, [a, _left]);
             _right = _machine.CreateStructure(functor, [b, _right]);
             _machine.Unify(a, Kind == "Cycle" ? _left : Cell.Integer60(0));

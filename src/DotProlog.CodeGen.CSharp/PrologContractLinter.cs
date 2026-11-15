@@ -35,21 +35,21 @@ public static class PrologContractLinter
         }
 
         HashSet<PredicateIndicator> contracted = [];
-        foreach (ContractExport export in contract.Exports)
+        foreach (var export in contract.Exports)
         {
             contracted.Add(new PredicateIndicator(export.PredicateName, export.Arity));
         }
 
-        PrologLintProgramModel model = PrologLintProgramModel.BuildForPredicates(
+        var model = PrologLintProgramModel.BuildForPredicates(
             sources,
             contracted,
             leadingOnly: !analyzeLater && !analyzeGroundRules
         );
         Dictionary<PredicateIndicator, string> exportingModules = [];
         HashSet<PredicateIndicator> ambiguous = [];
-        foreach (ModuleDefinition definition in model.Modules.Catalog.Definitions)
+        foreach (var definition in model.Modules.Catalog.Definitions)
         {
-            foreach (PredicateIndicator indicator in model.Modules.ExportsOf(definition.Name))
+            foreach (var indicator in model.Modules.ExportsOf(definition.Name))
             {
                 if (contracted.Contains(indicator) && !exportingModules.TryAdd(indicator, definition.Name))
                 {
@@ -59,11 +59,11 @@ public static class PrologContractLinter
         }
 
         Dictionary<PredicateIndicator, string> eligibleModules = [];
-        foreach (PredicateIndicator indicator in contracted)
+        foreach (var indicator in contracted)
         {
             if (
                 !ambiguous.Contains(indicator)
-                && exportingModules.TryGetValue(indicator, out string? module)
+                && exportingModules.TryGetValue(indicator, out var module)
                 && !model.HasNonPredicateEffects(module)
                 && !model.IsDynamicOrMultifile(module, indicator)
                 && !model.IsNonterminal(module, indicator)
@@ -75,15 +75,15 @@ public static class PrologContractLinter
 
         Dictionary<(string Module, PredicateIndicator Indicator), PrologLintProgramModel.ClauseContext> firstClauses = [];
         Dictionary<(string Module, PredicateIndicator Indicator), List<PrologLintProgramModel.ClauseContext>> factTables = [];
-        foreach (PrologLintProgramModel.ClauseContext clause in model.Clauses)
+        foreach (var clause in model.Clauses)
         {
-            if (eligibleModules.TryGetValue(clause.Indicator, out string? module) && clause.Module == module)
+            if (eligibleModules.TryGetValue(clause.Indicator, out var module) && clause.Module == module)
             {
                 var key = (module, clause.Indicator);
                 firstClauses.TryAdd(key, clause);
                 if (analyzeLater || analyzeGroundRules)
                 {
-                    if (!factTables.TryGetValue(key, out List<PrologLintProgramModel.ClauseContext>? table))
+                    if (!factTables.TryGetValue(key, out var table))
                     {
                         table = [];
                         factTables.Add(key, table);
@@ -95,17 +95,17 @@ public static class PrologContractLinter
         }
 
         List<Diagnostic> diagnostics = [];
-        using Machine? unificationMachine =
+        using var unificationMachine =
             analyzeGroundRules
             || (analyzeLater && contract.Exports.Any(export => export.Determinism is Determinism.Det or Determinism.Semidet))
                 ? new Machine(new BytecodeProgram())
                 : null;
-        foreach (ContractExport export in contract.Exports)
+        foreach (var export in contract.Exports)
         {
             var indicator = new PredicateIndicator(export.PredicateName, export.Arity);
             if (
-                eligibleModules.TryGetValue(indicator, out string? module)
-                && firstClauses.TryGetValue((module, indicator), out PrologLintProgramModel.ClauseContext? first)
+                eligibleModules.TryGetValue(indicator, out var module)
+                && firstClauses.TryGetValue((module, indicator), out var first)
             )
             {
                 AnalyzeExport(module, indicator, export, first, contractFileName, diagnostics);
@@ -113,8 +113,8 @@ public static class PrologContractLinter
 
             if (
                 analyzeLater
-                && eligibleModules.TryGetValue(indicator, out string? laterModule)
-                && factTables.TryGetValue((laterModule, indicator), out List<PrologLintProgramModel.ClauseContext>? table)
+                && eligibleModules.TryGetValue(indicator, out var laterModule)
+                && factTables.TryGetValue((laterModule, indicator), out var table)
             )
             {
                 AnalyzeLaterExport(laterModule, indicator, export, table, contractFileName, unificationMachine, diagnostics);
@@ -122,8 +122,8 @@ public static class PrologContractLinter
 
             if (
                 analyzeGroundRules
-                && eligibleModules.TryGetValue(indicator, out string? groundModule)
-                && factTables.TryGetValue((groundModule, indicator), out List<PrologLintProgramModel.ClauseContext>? groundTable)
+                && eligibleModules.TryGetValue(indicator, out var groundModule)
+                && factTables.TryGetValue((groundModule, indicator), out var groundTable)
             )
             {
                 AnalyzeGroundRuleExport(
@@ -161,8 +161,8 @@ public static class PrologContractLinter
             return;
         }
 
-        SyntaxTerm head = LintSyntax.ClauseHead(first.Clause);
-        IReadOnlyList<SyntaxTerm> headArguments = head switch
+        var head = LintSyntax.ClauseHead(first.Clause);
+        var headArguments = head switch
         {
             AtomTerm when export.Arity == 0 => [],
             CompoundTerm compound when compound.Arity == export.Arity => compound.Arguments,
@@ -175,7 +175,7 @@ public static class PrologContractLinter
 
         for (var index = 0; index < export.Arguments.Count; index++)
         {
-            ContractArgument argument = export.Arguments[index];
+            var argument = export.Arguments[index];
             if (
                 argument.Mode == ArgumentMode.In
                 && !ContractTermCompatibility.MatchesGroundInput(argument.Type, headArguments[index])
@@ -187,10 +187,10 @@ public static class PrologContractLinter
 
         for (var index = 0; index < export.Arguments.Count; index++)
         {
-            ContractArgument argument = export.Arguments[index];
+            var argument = export.Arguments[index];
             if (
                 argument.Mode == ArgumentMode.Out
-                && ContractTermCompatibility.TryGroundValue(headArguments[index], out PrologValue? value)
+                && ContractTermCompatibility.TryGroundValue(headArguments[index], out var value)
                 && !argument.Type.CanMarshalOutput(value)
             )
             {
@@ -217,7 +217,7 @@ public static class PrologContractLinter
         List<Diagnostic> diagnostics
     )
     {
-        if (clauses.Count < 2 || !TryBuildRows(export, clauses, out ClauseRow[]? rows))
+        if (clauses.Count < 2 || !TryBuildRows(export, clauses, out var rows))
         {
             return;
         }
@@ -234,8 +234,8 @@ public static class PrologContractLinter
 
             for (var index = 0; index < export.Arguments.Count; index++)
             {
-                ContractArgument argument = export.Arguments[index];
-                PrologValue value = rows[candidate].Values[index];
+                var argument = export.Arguments[index];
+                var value = rows[candidate].Values[index];
                 if (argument.Mode == ArgumentMode.Out && !argument.Type.CanMarshalOutput(value))
                 {
                     diagnostics.Add(
@@ -262,14 +262,14 @@ public static class PrologContractLinter
         List<Diagnostic> diagnostics
     )
     {
-        if (!TryBuildGuardedRows(export, clauses, unificationMachine, out ClauseRow[]? rows))
+        if (!TryBuildGuardedRows(export, clauses, unificationMachine, out var rows))
         {
             return;
         }
 
         for (var candidate = 0; candidate < rows.Length; candidate++)
         {
-            ClauseRow row = rows[candidate];
+            var row = rows[candidate];
             if (!row.IsRule || !row.BodySucceeds)
             {
                 continue;
@@ -285,8 +285,8 @@ public static class PrologContractLinter
 
             for (var index = 0; index < export.Arguments.Count; index++)
             {
-                ContractArgument argument = export.Arguments[index];
-                PrologValue value = row.Values[index];
+                var argument = export.Arguments[index];
+                var value = row.Values[index];
                 if (argument.Mode == ArgumentMode.Out && !argument.Type.CanMarshalOutput(value))
                 {
                     diagnostics.Add(
@@ -312,8 +312,8 @@ public static class PrologContractLinter
         rows = new ClauseRow[clauses.Count];
         for (var clauseIndex = 0; clauseIndex < clauses.Count; clauseIndex++)
         {
-            PrologLintProgramModel.ClauseContext clause = clauses[clauseIndex];
-            if (!IsFact(clause.Clause) || !TryBuildHeadRow(export, clause, out ClauseRow? row))
+            var clause = clauses[clauseIndex];
+            if (!IsFact(clause.Clause) || !TryBuildHeadRow(export, clause, out var row))
             {
                 rows = null!;
                 return false;
@@ -335,8 +335,8 @@ public static class PrologContractLinter
         rows = new ClauseRow[clauses.Count];
         for (var clauseIndex = 0; clauseIndex < clauses.Count; clauseIndex++)
         {
-            PrologLintProgramModel.ClauseContext clause = clauses[clauseIndex];
-            if (!TryBuildHeadRow(export, clause, out ClauseRow? row))
+            var clause = clauses[clauseIndex];
+            if (!TryBuildHeadRow(export, clause, out var row))
             {
                 rows = null!;
                 return false;
@@ -345,7 +345,7 @@ public static class PrologContractLinter
             if (row.IsRule)
             {
                 var rule = (CompoundTerm)clause.Clause;
-                if (!TryEvaluateGroundBody(rule.Arguments[1], unificationMachine, out bool bodySucceeds))
+                if (!TryEvaluateGroundBody(rule.Arguments[1], unificationMachine, out var bodySucceeds))
                 {
                     rows = null!;
                     return false;
@@ -368,8 +368,8 @@ public static class PrologContractLinter
             return false;
         }
 
-        SyntaxTerm head = LintSyntax.ClauseHead(clause.Clause);
-        IReadOnlyList<SyntaxTerm> arguments = head switch
+        var head = LintSyntax.ClauseHead(clause.Clause);
+        var arguments = head switch
         {
             AtomTerm when export.Arity == 0 => [],
             CompoundTerm compound when compound.Arity == export.Arity => compound.Arguments,
@@ -383,9 +383,9 @@ public static class PrologContractLinter
         var values = new PrologValue[arguments.Count];
         for (var index = 0; index < arguments.Count; index++)
         {
-            ContractArgument argument = export.Arguments[index];
+            var argument = export.Arguments[index];
             if (
-                !ContractTermCompatibility.TryGroundValue(arguments[index], out PrologValue? value)
+                !ContractTermCompatibility.TryGroundValue(arguments[index], out var value)
                 || (
                     argument.Mode == ArgumentMode.In
                     && !ContractTermCompatibility.MatchesGroundInput(argument.Type, arguments[index])
@@ -408,8 +408,8 @@ public static class PrologContractLinter
         if (body is CompoundTerm { Name: ",", Arity: 2 } conjunction)
         {
             if (
-                !TryEvaluateGroundBody(conjunction.Arguments[0], unificationMachine, out bool leftSucceeds)
-                || !TryEvaluateGroundBody(conjunction.Arguments[1], unificationMachine, out bool rightSucceeds)
+                !TryEvaluateGroundBody(conjunction.Arguments[0], unificationMachine, out var leftSucceeds)
+                || !TryEvaluateGroundBody(conjunction.Arguments[1], unificationMachine, out var rightSucceeds)
             )
             {
                 succeeds = false;
@@ -428,8 +428,8 @@ public static class PrologContractLinter
 
         if (
             body is CompoundTerm { Name: "=", Arity: 2 } unification
-            && ContractTermCompatibility.TryGroundValue(unification.Arguments[0], out PrologValue? left)
-            && ContractTermCompatibility.TryGroundValue(unification.Arguments[1], out PrologValue? right)
+            && ContractTermCompatibility.TryGroundValue(unification.Arguments[0], out var left)
+            && ContractTermCompatibility.TryGroundValue(unification.Arguments[1], out var right)
         )
         {
             succeeds = RuntimeUnifiable(left, right, unificationMachine);
@@ -496,8 +496,8 @@ public static class PrologContractLinter
                 return leftFloat.Value.Equals(rightFloat.Value);
         }
 
-        Cell leftCell = PrologInput.FromValue(left).Build(machine);
-        Cell rightCell = PrologInput.FromValue(right).Build(machine);
+        var leftCell = PrologInput.FromValue(left).Build(machine);
+        var rightCell = PrologInput.FromValue(right).Build(machine);
         return machine.CanUnify(leftCell, rightCell);
     }
 

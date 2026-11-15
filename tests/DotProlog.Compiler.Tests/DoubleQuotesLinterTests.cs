@@ -20,7 +20,7 @@ public sealed class DoubleQuotesLinterTests
     [Fact]
     public void CharactersPassedToACodeConversionAreReported()
     {
-        Diagnostic diagnostic = Assert.Single(Lint("p(N) :- number_codes(N, \"42\")."));
+        var diagnostic = Assert.Single(Lint("p(N) :- number_codes(N, \"42\")."));
 
         Assert.Equal(LintDiagnosticIds.DoubleQuotedListKindMismatch, diagnostic.Id);
         Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
@@ -32,7 +32,7 @@ public sealed class DoubleQuotesLinterTests
     [Fact]
     public void CodesPassedToACharacterConversionAreReported()
     {
-        Diagnostic diagnostic = Assert.Single(Lint("p(A) :- atom_chars(A, \"ab\").", DoubleQuotesMode.Codes));
+        var diagnostic = Assert.Single(Lint("p(A) :- atom_chars(A, \"ab\").", DoubleQuotesMode.Codes));
 
         Assert.Equal(LintDiagnosticIds.DoubleQuotedListKindMismatch, diagnostic.Id);
         Assert.Contains("double_quotes=codes", diagnostic.Message, StringComparison.Ordinal);
@@ -45,7 +45,7 @@ public sealed class DoubleQuotesLinterTests
     [InlineData("string_codes")]
     public void AtomTextIsReportedForEveryListConversion(string conversion)
     {
-        Diagnostic diagnostic = Assert.Single(Lint($"p(X) :- {conversion}(X, \"12\").", DoubleQuotesMode.Atom));
+        var diagnostic = Assert.Single(Lint($"p(X) :- {conversion}(X, \"12\").", DoubleQuotesMode.Atom));
 
         Assert.Equal(LintDiagnosticIds.DoubleQuotedListKindMismatch, diagnostic.Id);
         Assert.Contains("reads as an atom", diagnostic.Message, StringComparison.Ordinal);
@@ -66,7 +66,7 @@ public sealed class DoubleQuotesLinterTests
     [Fact]
     public void ADirectiveMovesTheReadingForLaterClausesOnly()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             """
             before :- number_codes(_, "1").
             :- set_prolog_flag(double_quotes, codes).
@@ -74,16 +74,16 @@ public sealed class DoubleQuotesLinterTests
             """
         );
 
-        Diagnostic diagnostic = Assert.Single(diagnostics);
+        var diagnostic = Assert.Single(diagnostics);
         Assert.Equal(1, diagnostic.Span.Line);
     }
 
     [Fact]
     public void PhraseOverCharactersIntoACodeGrammarIsReported()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(CodeGrammar + "main(N) :- phrase(number(N), \"427\").");
+        var diagnostics = Lint(CodeGrammar + "main(N) :- phrase(number(N), \"427\").");
 
-        Diagnostic diagnostic = Assert.Single(diagnostics);
+        var diagnostic = Assert.Single(diagnostics);
         Assert.Equal(LintDiagnosticIds.CodeGrammarOverCharacters, diagnostic.Id);
         Assert.Equal((5, 30), (diagnostic.Span.Line, diagnostic.Span.Column));
         // The message points at the code test, two nonterminals away from the one phrase/2 names.
@@ -93,7 +93,7 @@ public sealed class DoubleQuotesLinterTests
     [Fact]
     public void PhraseThreeAndQualifiedNonterminalsAreFollowed()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(CodeGrammar + "main(N, R) :- phrase(user:number(N), \"427\", R).");
+        var diagnostics = Lint(CodeGrammar + "main(N, R) :- phrase(user:number(N), \"427\", R).");
 
         Assert.Equal(LintDiagnosticIds.CodeGrammarOverCharacters, Assert.Single(diagnostics).Id);
     }
@@ -104,7 +104,7 @@ public sealed class DoubleQuotesLinterTests
     [InlineData("alt --> [0'a].")]
     public void CodeTestsAreFoundThroughGrammarControls(string grammar)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(grammar + "\nmain :- phrase(alt, \"a\").");
+        var diagnostics = Lint(grammar + "\nmain :- phrase(alt, \"a\").");
 
         Assert.Equal(LintDiagnosticIds.CodeGrammarOverCharacters, Assert.Single(diagnostics).Id);
     }
@@ -112,9 +112,9 @@ public sealed class DoubleQuotesLinterTests
     [Fact]
     public void ARuleMixingTextAndCodeTerminalsIsReported()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("greeting --> \"hi\", [0' ], name.\nname --> [w].");
+        var diagnostics = Lint("greeting --> \"hi\", [0' ], name.\nname --> [w].");
 
-        Diagnostic diagnostic = Assert.Single(diagnostics);
+        var diagnostic = Assert.Single(diagnostics);
         Assert.Equal(LintDiagnosticIds.CodeGrammarOverCharacters, diagnostic.Id);
         Assert.Equal((1, 14), (diagnostic.Span.Line, diagnostic.Span.Column));
     }
@@ -122,7 +122,7 @@ public sealed class DoubleQuotesLinterTests
     [Fact]
     public void ACharacterGrammarIsAccepted()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             """
             digits([D|T]) --> digit(D), digits(T).
             digits([D])   --> digit(D).
@@ -140,7 +140,7 @@ public sealed class DoubleQuotesLinterTests
     [Fact]
     public void ACodeGrammarReadingCodesIsAccepted()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ":- set_prolog_flag(double_quotes, codes).\n" + CodeGrammar + "main(N) :- phrase(number(N), \"427\")."
         );
 
@@ -156,7 +156,7 @@ public sealed class DoubleQuotesLinterTests
     [Fact]
     public void DiagnosticsFromEveryRuleFollowSourceOrder()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("p :- number_codes(N, \"1\").\nq(X) :- atom_codes(X, \"a\").");
+        var diagnostics = Lint("p :- number_codes(N, \"1\").\nq(X) :- atom_codes(X, \"a\").");
 
         Assert.Collection(
             diagnostics,
@@ -172,7 +172,7 @@ public sealed class DoubleQuotesLinterTests
 
     private static IReadOnlyList<Diagnostic> Lint(string source, DoubleQuotesMode initial = DoubleQuotesMode.Chars)
     {
-        ParseResult parsed = TermReader.ReadProgram(source, "source.pl");
+        var parsed = TermReader.ReadProgram(source, "source.pl");
         Assert.True(parsed.Success, string.Join(Environment.NewLine, parsed.Diagnostics));
         return PrologLinter.Analyze(parsed.Clauses, "source.pl", initial);
     }

@@ -26,10 +26,10 @@ internal static class GlobalVariableBuiltins
 
     private static bool Current(Machine machine, int fromKeyAtom)
     {
-        Cell key = machine.Argument(0);
+        var key = machine.Argument(0);
         if (key.Tag == CellTag.Atom)
         {
-            return machine.TryGetGlobal(key.Index, out Cell value) && machine.Unify(machine.Argument(1), value);
+            return machine.TryGetGlobal(key.Index, out var value) && machine.Unify(machine.Argument(1), value);
         }
 
         if (key.Tag != CellTag.Reference)
@@ -39,9 +39,9 @@ internal static class GlobalVariableBuiltins
 
         for (var from = fromKeyAtom; machine.TryPeekNextGlobalKey(from, out var keyAtom); from = keyAtom + 1)
         {
-            machine.TryGetGlobal(keyAtom, out Cell value);
-            Cell pattern = machine.CreateStructure(machine.Symbols.InternFunctor("-", 2), [key, machine.Argument(1)]);
-            Cell candidate = machine.CreateStructure(machine.Symbols.InternFunctor("-", 2), [Cell.Atom(keyAtom), value]);
+            machine.TryGetGlobal(keyAtom, out var value);
+            var pattern = machine.CreateStructure(machine.Symbols.InternFunctor("-", 2), [key, machine.Argument(1)]);
+            var candidate = machine.CreateStructure(machine.Symbols.InternFunctor("-", 2), [Cell.Atom(keyAtom), value]);
 
             if (!machine.CanUnify(pattern, candidate))
             {
@@ -68,7 +68,7 @@ internal static class GlobalVariableBuiltins
     private static bool GetValue(Machine machine)
     {
         var key = RequireKey(machine);
-        if (!machine.TryGetGlobal(key, out Cell value))
+        if (!machine.TryGetGlobal(key, out var value))
         {
             throw PrologErrors.Existence(machine, "variable", machine.Argument(0));
         }
@@ -78,7 +78,7 @@ internal static class GlobalVariableBuiltins
 
     private static int RequireKey(Machine machine)
     {
-        Cell key = machine.Argument(0);
+        var key = machine.Argument(0);
         if (key.Tag == CellTag.Reference)
         {
             throw PrologErrors.Instantiation(machine);

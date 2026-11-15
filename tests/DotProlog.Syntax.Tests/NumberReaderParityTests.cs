@@ -161,15 +161,15 @@ public sealed class NumberReaderParityTests
     [MemberData(nameof(Texts))]
     public void TheRuntimeReadsTheListAsTheLexerDoes(string text, bool modern)
     {
-        PrologFlags flags = new BytecodeProgram(modern ? PrologLanguageMode.Modern : PrologLanguageMode.StrictIso).Flags;
+        var flags = new BytecodeProgram(modern ? PrologLanguageMode.Modern : PrologLanguageMode.StrictIso).Flags;
 
-        SyntaxTerm? expected = TermReader.ReadNumber(text, flags, out IReadOnlyList<Diagnostic> diagnostics);
-        NumberReader.Outcome outcome = NumberReader.Read(
+        var expected = TermReader.ReadNumber(text, flags, out var diagnostics);
+        var outcome = NumberReader.Read(
             text,
             flags.CodePointCharacters,
             flags.RationalLiterals,
             flags.DigitSeparators,
-            out PrologNumber number
+            out var number
         );
 
         if (expected is null)

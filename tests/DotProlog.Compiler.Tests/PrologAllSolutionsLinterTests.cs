@@ -22,7 +22,7 @@ public sealed class PrologAllSolutionsLinterTests
     [Fact]
     public void AcceptsSharedTemplateVariablesAndGroundCalls()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint("run(Xs, Ys) :- findall(X, member(X, [1]), Xs), findall(a, true, Ys).");
+        var diagnostics = Lint("run(Xs, Ys) :- findall(X, member(X, [1]), Xs), findall(a, true, Ys).");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.UnsharedAllSolutionsTemplate));
     }
@@ -48,7 +48,7 @@ public sealed class PrologAllSolutionsLinterTests
 
     private static IReadOnlyList<Diagnostic> Lint(string source)
     {
-        ParseResult parsed = TermReader.ReadProgram(source, "source.pl");
+        var parsed = TermReader.ReadProgram(source, "source.pl");
         Assert.True(parsed.Success, string.Join(Environment.NewLine, parsed.Diagnostics));
         return PrologLinter.Analyze(parsed.Clauses, "source.pl");
     }

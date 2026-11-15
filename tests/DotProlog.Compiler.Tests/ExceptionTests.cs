@@ -62,7 +62,7 @@ public sealed class ExceptionTests
     {
         // The frame must go out of scope when the goal succeeds, or an unrelated later throw would
         // be caught by a catch/3 it never ran inside.
-        PrologException error = Uncaught(":- initialization(( catch(true, _, write(wrong)), throw(later) )).");
+        var error = Uncaught(":- initialization(( catch(true, _, write(wrong)), throw(later) )).");
 
         Assert.Equal("later", error.Message);
     }
