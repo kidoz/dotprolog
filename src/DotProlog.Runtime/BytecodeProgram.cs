@@ -41,6 +41,7 @@ public sealed class BytecodeProgram
     private Cell[] _constants = new Cell[64];
     private int[] _entryPoints = new int[64];
     private bool[] _userPredicates = new bool[64];
+    private int[] _userPredicateFunctorsByBuiltin = [];
     private int _constantCount;
     private readonly ReusableRanges _freeDynamicCode = new();
     private readonly ReusableRanges _freeDynamicConstants = new();
@@ -229,7 +230,7 @@ public sealed class BytecodeProgram
 
     internal bool ExecuteCompiled(int target, ref Machine.CompiledExecution execution)
     {
-        (CompiledPredicateBlock block, CompiledProgram program) = _compiledBlocks[DecodeCompiledTarget(target)];
+        (var block, var program) = _compiledBlocks[DecodeCompiledTarget(target)];
         return block(ref execution, program);
     }
 
@@ -255,7 +256,7 @@ public sealed class BytecodeProgram
 
         SetPredicate(functorId, address, userDefined);
 
-        if (_staticAliases.TryGetValue(functorId, out HashSet<int>? aliases))
+        if (_staticAliases.TryGetValue(functorId, out var aliases))
         {
             foreach (var alias in aliases)
             {
@@ -268,7 +269,25 @@ public sealed class BytecodeProgram
     {
         EnsureEntryPoints(functorId + 1);
         _entryPoints[functorId] = address;
-        _userPredicates[functorId] = userDefined && !Builtins.TryGetId(functorId, out _);
+        _userPredicates[functorId] = userDefined;
+
+        if (Builtins.TryGetId(functorId, out var builtinId))
+        {
+            if (builtinId >= _userPredicateFunctorsByBuiltin.Length)
+            {
+                var previous = _userPredicateFunctorsByBuiltin.Length;
+                Array.Resize(ref _userPredicateFunctorsByBuiltin, builtinId + 1);
+                Array.Fill(_userPredicateFunctorsByBuiltin, Undefined, previous, builtinId + 1 - previous);
+            }
+
+            _userPredicateFunctorsByBuiltin[builtinId] = userDefined ? functorId : Undefined;
+        }
+    }
+
+    internal bool TryGetUserPredicate(int builtinId, out int functorId)
+    {
+        functorId = builtinId < _userPredicateFunctorsByBuiltin.Length ? _userPredicateFunctorsByBuiltin[builtinId] : Undefined;
+        return functorId != Undefined && IsUserPredicate(functorId);
     }
 
     /// <summary>Returns the entry address of <paramref name="functorId"/>, or -1 if it is undefined.</summary>
@@ -293,8 +312,8 @@ public sealed class BytecodeProgram
             return false;
         }
 
-        Functor functor = Symbols.GetFunctor(functorId);
-        string name = Symbols.AtomName(functor.NameAtom);
+        var functor = Symbols.GetFunctor(functorId);
+        var name = Symbols.AtomName(functor.NameAtom);
         if (
             IsoLanguageProfile.IsStandardPredicate(name, functor.Arity)
             || (name == "$predicate_property" && functor.Arity == 3)
@@ -340,7 +359,7 @@ public sealed class BytecodeProgram
     /// <exception cref="PrologException">A static predicate of that name and arity already exists.</exception>
     internal DynamicPredicate DeclareDynamic(int functorId, bool userDefined = true)
     {
-        if (_dynamicPredicates.TryGetValue(functorId, out DynamicPredicate? existing))
+        if (_dynamicPredicates.TryGetValue(functorId, out var existing))
         {
             _userPredicates[functorId] |= userDefined;
             return existing;
@@ -377,7 +396,7 @@ public sealed class BytecodeProgram
     public void AddCompiledDynamicClause(int functorId, int codeTarget, Cell[] termCells, int termRoot)
     {
         ArgumentNullException.ThrowIfNull(termCells);
-        DynamicPredicate predicate = DeclareDynamic(functorId);
+        var predicate = DeclareDynamic(functorId);
         predicate.Append(
             new DynamicClause
             {
@@ -406,13 +425,13 @@ public sealed class BytecodeProgram
             return false;
         }
 
-        if (_dynamicPredicates.TryGetValue(target, out DynamicPredicate? dynamic))
+        if (_dynamicPredicates.TryGetValue(target, out var dynamic))
         {
             _dynamicPredicates[alias] = dynamic;
         }
         else
         {
-            if (!_staticAliases.TryGetValue(target, out HashSet<int>? aliases))
+            if (!_staticAliases.TryGetValue(target, out var aliases))
             {
                 aliases = [];
                 _staticAliases[target] = aliases;
@@ -428,7 +447,7 @@ public sealed class BytecodeProgram
 
     /// <summary>Returns the dynamic predicate for <paramref name="functorId"/>, or <see langword="null"/>.</summary>
     internal DynamicPredicate? FindDynamic(int functorId) =>
-        _dynamicPredicates.TryGetValue(functorId, out DynamicPredicate? predicate) ? predicate : null;
+        _dynamicPredicates.TryGetValue(functorId, out var predicate) ? predicate : null;
 
     internal IEnumerable<KeyValuePair<int, DynamicPredicate>> DynamicPredicates => _dynamicPredicates;
 
@@ -438,7 +457,7 @@ public sealed class BytecodeProgram
     /// </summary>
     internal bool AbolishDynamic(int functorId)
     {
-        if (!_dynamicPredicates.TryGetValue(functorId, out DynamicPredicate? predicate))
+        if (!_dynamicPredicates.TryGetValue(functorId, out var predicate))
         {
             return false;
         }
@@ -448,7 +467,7 @@ public sealed class BytecodeProgram
             _retiredPredicates.Add(predicate);
 
         List<int> aliases = [];
-        foreach ((var alias, DynamicPredicate candidate) in _dynamicPredicates)
+        foreach ((var alias, var candidate) in _dynamicPredicates)
         {
             if (ReferenceEquals(candidate, predicate))
             {

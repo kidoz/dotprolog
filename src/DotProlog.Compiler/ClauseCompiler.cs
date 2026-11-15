@@ -139,7 +139,7 @@ internal sealed class ClauseCompiler
         // tail position when the final term is true.
         while (body is CompoundTerm { Name: ",", Arity: 2 } conjunction)
         {
-            SyntaxTerm goal = conjunction.Arguments[0];
+            var goal = conjunction.Arguments[0];
             body = conjunction.Arguments[1];
             if (body is AtomTerm { Name: "true" })
             {
@@ -176,7 +176,7 @@ internal sealed class ClauseCompiler
 
         for (var i = 0; i < compound.Arity; i++)
         {
-            SyntaxTerm argument = compound.Arguments[i];
+            var argument = compound.Arguments[i];
             switch (argument)
             {
                 case VariableTerm variable:
@@ -200,7 +200,7 @@ internal sealed class ClauseCompiler
         // Nested structures are matched breadth-first; the list grows while it is being walked.
         for (var i = 0; i < deferred.Count; i++)
         {
-            (var slot, CompoundTerm term) = deferred[i];
+            (var slot, var term) = deferred[i];
             _program.Emit(OpCode.GetStructureSlot, FunctorOf(term), slot);
             EmitStructureArguments(term, deferred);
         }
@@ -213,7 +213,7 @@ internal sealed class ClauseCompiler
             return;
         }
 
-        foreach (SyntaxTerm argument in term.Arguments)
+        foreach (var argument in term.Arguments)
         {
             switch (argument)
             {
@@ -277,7 +277,14 @@ internal sealed class ClauseCompiler
         var name = goal is CompoundTerm compound ? compound.Name : ((AtomTerm)goal).Name;
         var arity = goal is CompoundTerm withArguments ? withArguments.Arity : 0;
 
-        if (goal is CompoundTerm control && CompileControlConstruct(control, name, isLast))
+        var functorId = _program.Symbols.InternFunctor(name, arity);
+        var hasUserDefinition = HasUserDefinition(functorId);
+
+        if (
+            goal is CompoundTerm control
+            && (!hasUserDefinition || name != "*->")
+            && CompileControlConstruct(control, name, isLast)
+        )
         {
             return;
         }
@@ -292,8 +299,6 @@ internal sealed class ClauseCompiler
             EmitArguments(callable);
         }
 
-        var functorId = _program.Symbols.InternFunctor(name, arity);
-
         if (IsStrictIsoExtension(functorId, name, arity))
         {
             Report(
@@ -304,7 +309,7 @@ internal sealed class ClauseCompiler
             return;
         }
 
-        if (_program.Builtins.TryGetId(functorId, out var builtinId))
+        if (!hasUserDefinition && _program.Builtins.TryGetId(functorId, out var builtinId))
         {
             _program.Emit(OpCode.CallBuiltin, builtinId, arity);
             EmitReturnIfLast(isLast);
@@ -326,7 +331,8 @@ internal sealed class ClauseCompiler
     /// Compiles <c>;/2</c>, <c>-&gt;/2</c>, <c>*-&gt;/2</c>, <c>\+/1</c>, and <c>call/1</c> in place
     /// rather than as calls, and reports whether it did. Compiling them inline is what gives cut its
     /// correct scope: the condition of if-then-else gets its own barrier, while the branches stay
-    /// transparent to a cut that should prune the whole clause.
+    /// transparent to a cut that should prune the whole clause. A user-defined <c>*-&gt;/2</c> is
+    /// an ordinary predicate instead.
     /// </summary>
     private bool CompileControlConstruct(CompoundTerm goal, string name, bool isLast)
     {
@@ -480,7 +486,7 @@ internal sealed class ClauseCompiler
 
         while (work.Count > 0)
         {
-            SyntaxTerm term = work[^1];
+            var term = work[^1];
             work.RemoveAt(work.Count - 1);
 
             switch (term)
@@ -552,7 +558,7 @@ internal sealed class ClauseCompiler
     {
         for (var i = 0; i < goal.Arity; i++)
         {
-            SyntaxTerm argument = goal.Arguments[i];
+            var argument = goal.Arguments[i];
             switch (argument)
             {
                 case VariableTerm variable:
@@ -623,6 +629,9 @@ internal sealed class ClauseCompiler
 
     private int FunctorOf(CompoundTerm term) => _program.Symbols.InternFunctor(term.Name, term.Arity);
 
+    private bool HasUserDefinition(int functorId) =>
+        (_unitDefinitions?.Contains(functorId) ?? false) || _program.IsUserPredicate(functorId);
+
     private bool IsStrictIsoExtension(int functorId, string name, int arity)
     {
         if (
@@ -642,8 +651,7 @@ internal sealed class ClauseCompiler
             || (name == "$read" && arity is 2 or 3)
             || (name == "$read_term" && arity is 3 or 4)
             || IsoLanguageProfile.IsStandardPredicate(name, arity)
-            || (_unitDefinitions?.Contains(functorId) ?? false)
-            || _program.IsUserPredicate(functorId)
+            || HasUserDefinition(functorId)
         )
         {
             return false;
@@ -690,8 +698,8 @@ internal sealed class ClauseCompiler
 
             case RationalTerm rational:
             {
-                PrologNumber value = PrologNumber.FromRational(rational.Numerator, rational.Denominator);
-                Cell cell =
+                var value = PrologNumber.FromRational(rational.Numerator, rational.Denominator);
+                var cell =
                     value.IsRational ? Cell.Rational(_program.Symbols.InternRational(value.Numerator, value.Denominator))
                     : value.IsBig ? Cell.Big(_program.Symbols.InternBig(value.Big))
                     : Cell.Integer60(value.Integer);
