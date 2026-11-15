@@ -14,6 +14,51 @@ public sealed class IncrementalBuildTests : IDisposable
 {
     private const string OptInVariable = "DOTPROLOG_RUN_AOT_TESTS";
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RepositorySdkBuildsTheAnalyzerBeforeItsFirstCompilation(bool publishAot)
+    {
+        Assert.SkipUnless(
+            Environment.GetEnvironmentVariable(OptInVariable) == "1",
+            $"Set {OptInVariable}=1 to run the toolchain integration tests."
+        );
+        await BuildTaskAssembly();
+        WriteProjectFile();
+        WriteModule("rules", "Rules");
+        var configuration = "CleanAnalyzer" + Guid.NewGuid().ToString("N");
+        var analyzer = Path.Combine(
+            RepositoryLayout.Root,
+            "src",
+            "DotProlog.Foreign.SourceGenerator",
+            "bin",
+            configuration,
+            "netstandard2.0",
+            "DotProlog.Foreign.SourceGenerator.dll"
+        );
+        Assert.False(File.Exists(analyzer));
+        var task = Path.Combine(
+            RepositoryLayout.Root,
+            "src",
+            "DotProlog.Build.Tasks",
+            "bin",
+            "Debug",
+            "net10.0",
+            "DotProlog.Build.Tasks.dll"
+        );
+
+        var (exit, log) = await Build(
+            "-c",
+            configuration,
+            "-p:DotPrologTasksAssembly=" + task,
+            "-p:PublishAot=" + publishAot.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        );
+
+        Assert.True(exit == 0, $"Building with no existing analyzer failed:\n{log}");
+        Assert.True(File.Exists(analyzer));
+        Assert.True(File.Exists(Path.Combine(_project, "bin", configuration, "net10.0", "Incremental.dll")));
+    }
+
     private readonly string _project = CreateProjectDirectory();
 
     private static string CreateProjectDirectory()

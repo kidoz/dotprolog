@@ -1,5 +1,14 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project
+    Sdk="Microsoft.NET.Sdk"
+    TreatAsLocalProperty="PublishAot;PublishTrimmed;PublishSingleFile;RuntimeIdentifier;SelfContained"
+>
     <PropertyGroup>
+        <!-- Restore walks this build-time dependency without ProjectReference property-removal metadata. -->
+        <PublishAot>false</PublishAot>
+        <PublishTrimmed>false</PublishTrimmed>
+        <PublishSingleFile>false</PublishSingleFile>
+        <RuntimeIdentifier />
+        <SelfContained>false</SelfContained>
         <TargetFramework>netstandard2.0</TargetFramework>
         <RootNamespace>DotProlog.Foreign.SourceGenerator</RootNamespace>
         <IsRoslynComponent>true</IsRoslynComponent>

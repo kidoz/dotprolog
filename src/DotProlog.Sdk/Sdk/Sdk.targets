@@ -49,14 +49,26 @@
         -->
         <DotPrologTasksAssembly Condition="'$(DotPrologTasksAssembly)' == ''"
             >$(MSBuildThisFileDirectory)..\tasks\net10.0\DotProlog.Build.Tasks.dll</DotPrologTasksAssembly>
+        <!-- Repository imports build the analyzer as a project dependency, even before its first DLL exists. -->
+        <_DotPrologForeignSourceGeneratorProject
+            Condition="'$(DotPrologForeignSourceGeneratorAssembly)' == '' and Exists('$(MSBuildThisFileDirectory)..\..\DotProlog.Foreign.SourceGenerator\DotProlog.Foreign.SourceGenerator.csproj')"
+            >$(MSBuildThisFileDirectory)..\..\DotProlog.Foreign.SourceGenerator\DotProlog.Foreign.SourceGenerator.csproj</_DotPrologForeignSourceGeneratorProject>
+        <DotPrologForeignSourceGeneratorAssembly Condition="'$(_DotPrologForeignSourceGeneratorProject)' != ''"
+            >$(MSBuildThisFileDirectory)..\..\DotProlog.Foreign.SourceGenerator\bin\$(Configuration)\netstandard2.0\DotProlog.Foreign.SourceGenerator.dll</DotPrologForeignSourceGeneratorAssembly>
         <DotPrologForeignSourceGeneratorAssembly Condition="'$(DotPrologForeignSourceGeneratorAssembly)' == ''"
             >$(MSBuildThisFileDirectory)..\analyzers\dotnet\cs\DotProlog.Foreign.SourceGenerator.dll</DotPrologForeignSourceGeneratorAssembly>
-        <DotPrologForeignSourceGeneratorAssembly
-            Condition="!Exists('$(DotPrologForeignSourceGeneratorAssembly)') and Exists('$(RepositoryRoot)src/DotProlog.Foreign.SourceGenerator/bin/$(Configuration)/netstandard2.0/DotProlog.Foreign.SourceGenerator.dll')"
-            >$(RepositoryRoot)src/DotProlog.Foreign.SourceGenerator/bin/$(Configuration)/netstandard2.0/DotProlog.Foreign.SourceGenerator.dll</DotPrologForeignSourceGeneratorAssembly>
     </PropertyGroup>
 
-    <ItemGroup Condition="Exists('$(DotPrologForeignSourceGeneratorAssembly)')">
+    <ItemGroup Condition="'$(_DotPrologForeignSourceGeneratorProject)' != ''">
+        <ProjectReference
+            Include="$(_DotPrologForeignSourceGeneratorProject)"
+            OutputItemType="Analyzer"
+            ReferenceOutputAssembly="false"
+            PrivateAssets="all"
+            GlobalPropertiesToRemove="PublishAot;PublishTrimmed;PublishSingleFile;RuntimeIdentifier;SelfContained"
+        />
+    </ItemGroup>
+    <ItemGroup Condition="'$(_DotPrologForeignSourceGeneratorProject)' == ''">
         <Analyzer Include="$(DotPrologForeignSourceGeneratorAssembly)" />
     </ItemGroup>
 
