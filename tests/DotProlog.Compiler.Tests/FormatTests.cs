@@ -16,8 +16,10 @@ public sealed class FormatTests
     [InlineData("format(\"~2d\", [1234])", "12.34")]
     [InlineData("format(\"~2d\", [-1234])", "-12.34")]
     [InlineData("format(\"~2d\", [7])", "0.07")]
+    [InlineData("format(\"~*d\", [2, 1234])", "12.34")]
     [InlineData("format(\"~D\", [1234567])", "1,234,567")]
     [InlineData("format(\"~2f\", [3.14159])", "3.14")]
+    [InlineData("format(\"~*f\", [2, 3.14159])", "3.14")]
     [InlineData("format(\"~0f\", [3.7])", "4")]
     [InlineData("format(\"~e\", [1234.5])", "1.234500e+03")]
     [InlineData("format(\"~s\", [[104, 105]])", "hi")]
@@ -29,6 +31,7 @@ public sealed class FormatTests
     [InlineData("format(\"~i~w\", [skipped, kept])", "kept")]
     [InlineData("format(\"a~nb\")", "a\nb")]
     [InlineData("format(\"~2n\")", "\n\n")]
+    [InlineData("format(\"~*n\", [2])", "\n\n")]
     public void WritesDirectives(string goal, string expected) => Assert.Equal(expected, PrologTestHost.RunGoal(goal));
 
     [Theory]
@@ -97,6 +100,56 @@ public sealed class FormatTests
             PrologTestHost.RunGoal("catch(format(\"~w\", [a, b]), error(E, _), write(E))")
         );
 
+    [Theory]
+    [InlineData("w")]
+    [InlineData("p")]
+    [InlineData("q")]
+    [InlineData("a")]
+    [InlineData("d")]
+    [InlineData("D")]
+    [InlineData("e")]
+    [InlineData("f")]
+    [InlineData("g")]
+    [InlineData("r")]
+    [InlineData("R")]
+    [InlineData("s")]
+    [InlineData("W")]
+    [InlineData("c")]
+    [InlineData("n")]
+    [InlineData("i")]
+    [InlineData("t")]
+    [InlineData("|")]
+    [InlineData("+")]
+    [InlineData("~")]
+    public void NegativeDynamicCountsAreCatchableFormatErrors(string directive) =>
+        Assert.Equal(
+            $"format_argument_type({directive},-1)",
+            PrologTestHost.RunGoal($"catch(format(\"~*{directive}\", [-1]), error(E, _), write(E))")
+        );
+
+    [Theory]
+    [InlineData("n", "2147483648")]
+    [InlineData("n", "4294967296")]
+    [InlineData("d", "2147483648")]
+    [InlineData("f", "2147483648")]
+    [InlineData("n", "999999999999999999999999999999999999999999")]
+    [InlineData("d", "999999999999999999999999999999999999999999")]
+    [InlineData("f", "999999999999999999999999999999999999999999")]
+    public void OversizedDynamicCountsAreCatchableFormatErrors(string directive, string count) =>
+        Assert.Equal(
+            $"format_argument_type({directive},{count})",
+            PrologTestHost.RunGoal($"catch(format(\"~*{directive}\", [{count}]), error(E, _), write(E))")
+        );
+
+    [Theory]
+    [InlineData("atom(_)", "-1")]
+    [InlineData("user_output", "2147483648")]
+    public void InvalidDynamicCountsAreCatchableForCaptureAndStreamSinks(string sink, string count) =>
+        Assert.Equal(
+            $"format_argument_type(n,{count})",
+            PrologTestHost.RunGoal($"catch(format({sink}, \"prefix~*n\", [{count}]), error(E, _), write(E))")
+        );
+
     [Fact]
     public void TabWritesSpaces() => Assert.Equal("a  b", PrologTestHost.RunGoal("write(a), tab(1 + 1), write(b)"));
 
@@ -110,7 +163,7 @@ public sealed class FormatTests
     [InlineData("format(user_input, \"x\", [])", "permission_error(output,stream,user_input)")]
     public void FormatToABadStreamIsReported(string goal, string expected)
     {
-        (RunResult result, var output, _) = PrologTestHost.Execute($":- initialization(catch({goal}, error(E, _), write(E))).");
+        (var result, var output, _) = PrologTestHost.Execute($":- initialization(catch({goal}, error(E, _), write(E))).");
 
         Assert.Equal(RunResult.Success, result);
         Assert.Equal(expected, output);

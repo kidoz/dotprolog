@@ -43,7 +43,7 @@ internal static class FormatBuiltins
             1,
             static machine =>
             {
-                PrologNumber count = ArithmeticEvaluator.Evaluate(machine, machine.Argument(0));
+                var count = ArithmeticEvaluator.Evaluate(machine, machine.Argument(0));
                 if (count.IsFloat)
                 {
                     throw PrologErrors.Type(machine, "integer", ArithmeticEvaluator.ToCell(machine, count));
@@ -78,7 +78,7 @@ internal static class FormatBuiltins
     private static string Render(Machine machine, Cell format, Cell arguments)
     {
         var text = FormatText(machine, format);
-        List<Cell> given = ArgumentsOf(machine, arguments);
+        var given = ArgumentsOf(machine, arguments);
         var output = new Layout(machine.Symbols.CodePoints);
         var next = 0;
 
@@ -99,6 +99,7 @@ internal static class FormatBuiltins
             // ~`Ct carries a fill character, ~*c takes its count from the arguments, and ~2f
             // carries digits. All three arrive at the directive as the same optional number.
             int? count = null;
+            Cell? dynamicCount = null;
 
             if (text[i] == '`' && i + 1 < text.Length)
             {
@@ -107,7 +108,7 @@ internal static class FormatBuiltins
             }
             else if (text[i] == '*')
             {
-                count = (int)IntegerArgument(machine, given, ref next, arguments);
+                dynamicCount = Next(machine, given, ref next, arguments);
                 i++;
             }
             else
@@ -127,6 +128,11 @@ internal static class FormatBuiltins
             if (i >= text.Length)
             {
                 throw PrologErrors.Domain(machine, "format_string", format);
+            }
+
+            if (dynamicCount is { } countCell)
+            {
+                count = DynamicCount(machine, text[i], countCell);
             }
 
             Directive(machine, output, text[i], count, given, ref next, arguments);
@@ -163,7 +169,7 @@ internal static class FormatBuiltins
 
             case 'a':
             {
-                Cell cell = Next(machine, given, ref next, arguments);
+                var cell = Next(machine, given, ref next, arguments);
                 output.Append(
                     PrologText.TryRead(machine, cell, TextKinds.Atom | TextKinds.String, out var value)
                         ? value
@@ -190,7 +196,7 @@ internal static class FormatBuiltins
 
             case 's':
             {
-                Cell cell = Next(machine, given, ref next, arguments);
+                var cell = Next(machine, given, ref next, arguments);
                 output.Append(
                     PrologText.TryRead(machine, cell, TextKinds.Atom | TextKinds.String | TextKinds.List, out var value)
                         ? value
@@ -201,15 +207,15 @@ internal static class FormatBuiltins
 
             case 'W':
             {
-                Cell term = Next(machine, given, ref next, arguments);
-                Cell options = Next(machine, given, ref next, arguments);
+                var term = Next(machine, given, ref next, arguments);
+                var options = Next(machine, given, ref next, arguments);
                 output.Append(StreamBuiltins.RenderTermWithOptions(machine, term, options));
                 break;
             }
 
             case 'c':
             {
-                Cell cell = Next(machine, given, ref next, arguments);
+                var cell = Next(machine, given, ref next, arguments);
                 if (cell.Tag is not (CellTag.Integer or CellTag.BigInteger))
                 {
                     throw PrologErrors.Type(machine, "integer", cell);
@@ -309,12 +315,12 @@ internal static class FormatBuiltins
     {
         var alphabet = uppercase ? "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" : "0123456789abcdefghijklmnopqrstuvwxyz";
         var negative = value.Sign < 0;
-        System.Numerics.BigInteger magnitude = System.Numerics.BigInteger.Abs(value);
+        var magnitude = System.Numerics.BigInteger.Abs(value);
         var digits = new StringBuilder();
 
         do
         {
-            magnitude = System.Numerics.BigInteger.DivRem(magnitude, radix, out System.Numerics.BigInteger digit);
+            magnitude = System.Numerics.BigInteger.DivRem(magnitude, radix, out var digit);
             digits.Insert(0, alphabet[(int)digit]);
         } while (!magnitude.IsZero);
 
@@ -395,10 +401,19 @@ internal static class FormatBuiltins
             ? machine.Dereference(given[next++])
             : throw PrologErrors.Domain(machine, "format_arguments", machine.Dereference(arguments));
 
-    private static long IntegerArgument(Machine machine, List<Cell> given, ref int next, Cell arguments)
+    private static int DynamicCount(Machine machine, char directive, Cell cell)
     {
-        Cell cell = Next(machine, given, ref next, arguments);
-        return cell.Tag == CellTag.Integer ? cell.Integer : throw PrologErrors.Type(machine, "integer", cell);
+        if (cell.Tag == CellTag.BigInteger || cell.Tag == CellTag.Integer && (cell.Integer < 0 || cell.Integer > int.MaxValue))
+        {
+            throw PrologErrors.FormatArgumentType(machine, directive, cell);
+        }
+
+        if (cell.Tag != CellTag.Integer)
+        {
+            throw PrologErrors.Type(machine, "integer", cell);
+        }
+
+        return (int)cell.Integer;
     }
 
     /// <summary>
