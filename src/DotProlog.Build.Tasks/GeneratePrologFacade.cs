@@ -28,6 +28,10 @@ public sealed class GeneratePrologFacade : Task
     [Required]
     public ITaskItem[] Contracts { get; set; } = [];
 
+    /// <summary>The project directory used to pair sources and contracts by relative path.</summary>
+    [Required]
+    public string ProjectDirectory { get; set; } = string.Empty;
+
     /// <summary>Directory the generated C# is written to, normally <c>obj/</c>.</summary>
     [Required]
     public string OutputPath { get; set; } = string.Empty;
@@ -67,7 +71,7 @@ public sealed class GeneratePrologFacade : Task
             return false;
         }
 
-        if (!PrologLanguageModes.TryParse(LanguageMode, out PrologLanguageMode languageMode))
+        if (!PrologLanguageModes.TryParse(LanguageMode, out var languageMode))
         {
             Log.LogError(
                 $"DotPrologLanguageMode '{LanguageMode}' is not a known Prolog language mode. "
@@ -77,7 +81,7 @@ public sealed class GeneratePrologFacade : Task
             return false;
         }
 
-        if (!PrologFlagOverrides.TryParse(Flags, out PrologFlagOverrides flagOverrides, out var flagsError))
+        if (!PrologFlagOverrides.TryParse(Flags, out var flagOverrides, out var flagsError))
         {
             Log.LogError($"DotPrologFlags is invalid: {flagsError}");
             return false;
@@ -100,6 +104,11 @@ public sealed class GeneratePrologFacade : Task
                     $"{version.Major}.{version.Minor}.{version.Build}"
                 );
             }
+            catch (ArgumentException exception)
+            {
+                Log.LogError($"Package configuration is invalid: {exception.Message}");
+                return false;
+            }
             catch (Exception exception)
                 when (exception
                         is InvalidDataException
@@ -119,7 +128,7 @@ public sealed class GeneratePrologFacade : Task
         if (GenerateEntryPoint)
         {
             var sources = new List<(string Name, string Text)>();
-            foreach (ITaskItem source in Sources)
+            foreach (var source in Sources)
             {
                 var path = source.GetMetadata("FullPath");
                 sources.Add((path, File.ReadAllText(path)));
@@ -152,29 +161,17 @@ public sealed class GeneratePrologFacade : Task
             }
         }
 
-        foreach (ITaskItem contractItem in Contracts)
+        Dictionary<string, string> outputOwners = new(PathComparer);
+        foreach (var contractItem in Contracts)
         {
             var contractPath = contractItem.GetMetadata("FullPath");
-            var moduleName = Path.GetFileNameWithoutExtension(contractPath);
 
-            if (!TryFindSource(moduleName, out var sourcePath))
+            if (!TryFindSource(contractPath, out var sourcePath))
             {
-                Log.LogError(
-                    subcategory: null,
-                    errorCode: CodeGenDiagnosticIds.MissingModuleDeclaration,
-                    helpKeyword: null,
-                    file: contractPath,
-                    lineNumber: 0,
-                    columnNumber: 0,
-                    endLineNumber: 0,
-                    endColumnNumber: 0,
-                    message: $"No PrologCompile item named '{moduleName}.pl' matches this contract."
-                );
-
                 continue;
             }
 
-            ContractReadResult result = ContractReader.Read(File.ReadAllText(contractPath), RootNamespace, contractPath);
+            var result = ContractReader.Read(File.ReadAllText(contractPath), RootNamespace, contractPath);
             ReportDiagnostics(result.Diagnostics, contractPath);
 
             if (!result.Success)
@@ -182,6 +179,17 @@ public sealed class GeneratePrologFacade : Task
                 continue;
             }
 
+            var target = Path.Combine(OutputPath, $"{result.Contract!.ClrTypeName}Module.g.cs");
+            if (outputOwners.TryGetValue(target, out var existingContract))
+            {
+                Log.LogError(
+                    $"Contracts '{existingContract}' and '{contractPath}' both generate '{Path.GetFileName(target)}'. "
+                        + "Give each contract a distinct clr_module/1 name."
+                );
+                continue;
+            }
+
+            outputOwners.Add(target, contractPath);
             var facade = FacadeGenerator.Generate(
                 result.Contract!,
                 File.ReadAllText(sourcePath),
@@ -204,7 +212,6 @@ public sealed class GeneratePrologFacade : Task
                 sourcePath
             );
 
-            var target = Path.Combine(OutputPath, $"{result.Contract!.ClrTypeName}Module.g.cs");
             WriteIfChanged(target, facade);
             generated.Add(new TaskItem(target));
 
@@ -225,14 +232,14 @@ public sealed class GeneratePrologFacade : Task
     {
         List<PrologLintSource> sources = [];
         HashSet<string> paths = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
-        foreach (ITaskItem source in Sources)
+        foreach (var source in Sources)
         {
             Add(source.GetMetadata("FullPath"));
         }
 
         if (libraryFiles is not null)
         {
-            foreach (string path in libraryFiles.Values)
+            foreach (var path in libraryFiles.Values)
             {
                 Add(path);
             }
@@ -248,7 +255,7 @@ public sealed class GeneratePrologFacade : Task
                 return;
             }
 
-            PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+            var loaded = PrologLintSourceLoader.Load(
                 fullPath,
                 File.ReadAllText(fullPath),
                 new BytecodeProgram(languageMode, flagOverrides)
@@ -265,7 +272,7 @@ public sealed class GeneratePrologFacade : Task
     private void RemoveStaleOutputs(List<ITaskItem> generated)
     {
         HashSet<string> expected = new(StringComparer.OrdinalIgnoreCase);
-        foreach (ITaskItem item in generated)
+        foreach (var item in generated)
         {
             expected.Add(Path.GetFullPath(item.ItemSpec));
         }
@@ -283,25 +290,68 @@ public sealed class GeneratePrologFacade : Task
         }
     }
 
-    private bool TryFindSource(string moduleName, out string path)
+    private bool TryFindSource(string contractPath, out string path)
     {
-        foreach (ITaskItem source in Sources)
+        var relativeContract = Path.GetRelativePath(ProjectDirectory, contractPath);
+        var expectedSource = Path.ChangeExtension(relativeContract, ".pl");
+        path = string.Empty;
+
+        foreach (var source in Sources)
         {
             var candidate = source.GetMetadata("FullPath");
-            if (string.Equals(Path.GetFileNameWithoutExtension(candidate), moduleName, StringComparison.Ordinal))
+            var relativeSource = Path.GetRelativePath(ProjectDirectory, candidate);
+            if (!PathComparer.Equals(relativeSource, expectedSource))
+            {
+                continue;
+            }
+
+            if (path.Length == 0)
             {
                 path = candidate;
-                return true;
+                continue;
             }
+
+            Log.LogError(
+                subcategory: null,
+                errorCode: CodeGenDiagnosticIds.MissingModuleDeclaration,
+                helpKeyword: null,
+                file: contractPath,
+                lineNumber: 0,
+                columnNumber: 0,
+                endLineNumber: 0,
+                endColumnNumber: 0,
+                message: $"Multiple PrologCompile items match '{expectedSource}'. Remove duplicate items so each contract has one source."
+            );
+            path = string.Empty;
+            return false;
         }
 
-        path = string.Empty;
+        if (path.Length > 0)
+        {
+            return true;
+        }
+
+        Log.LogError(
+            subcategory: null,
+            errorCode: CodeGenDiagnosticIds.MissingModuleDeclaration,
+            helpKeyword: null,
+            file: contractPath,
+            lineNumber: 0,
+            columnNumber: 0,
+            endLineNumber: 0,
+            endColumnNumber: 0,
+            message: $"No PrologCompile item at '{expectedSource}' matches this contract. "
+                + "A source and contract with the same basename must have the same relative path."
+        );
         return false;
     }
 
+    private static StringComparer PathComparer =>
+        OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+
     private void ReportDiagnostics(IReadOnlyList<Diagnostic> diagnostics, string defaultFile)
     {
-        foreach (Diagnostic diagnostic in diagnostics)
+        foreach (var diagnostic in diagnostics)
         {
             var file = diagnostic.FileName ?? defaultFile;
 

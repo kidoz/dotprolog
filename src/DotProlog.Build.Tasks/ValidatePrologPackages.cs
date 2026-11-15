@@ -19,6 +19,11 @@ public sealed class ValidatePrologPackages : Task
             new PackageWorkspace(PackageDirectory).GetLibraries("dotprolog");
             return true;
         }
+        catch (ArgumentException exception)
+        {
+            Log.LogError($"Package configuration is invalid: {exception.Message}");
+            return false;
+        }
         catch (Exception exception)
             when (exception
                     is InvalidDataException

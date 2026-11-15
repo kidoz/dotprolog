@@ -65,7 +65,7 @@ public sealed class IncrementalBuildTests : IDisposable
         (var firstExit, var firstLog) = await Build();
         Assert.True(firstExit == 0, $"The first build failed:\n{firstLog}");
         Assert.True(File.Exists(rulesFacade), $"No generated facade at {rulesFacade}.");
-        DateTime generatedAt = File.GetLastWriteTimeUtc(stamp);
+        var generatedAt = File.GetLastWriteTimeUtc(stamp);
 
         // Nothing changed, so the stamp the generation target touches must not move.
         (var secondExit, var secondLog) = await Build();
@@ -268,6 +268,197 @@ public sealed class IncrementalBuildTests : IDisposable
         Assert.Contains("Output value of m:value/2", groundRuleLog, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task EffectivePropertiesAndMissingOutputsInvalidateGeneration()
+    {
+        Assert.SkipUnless(
+            Environment.GetEnvironmentVariable(OptInVariable) == "1",
+            $"Set {OptInVariable}=1 to run the toolchain integration tests."
+        );
+        await BuildTaskAssembly();
+        WriteProjectFile();
+        WriteModule("rules", "Rules");
+
+        var generatedPath = Path.Combine(_project, "obj", "prolog");
+        var facade = Path.Combine(generatedPath, "RulesModule.g.cs");
+        var entryPoint = Path.Combine(generatedPath, "PrologProgram.g.cs");
+
+        (var libraryExit, var libraryLog) = await Build();
+        Assert.True(libraryExit == 0, $"The library build failed:\n{libraryLog}");
+        Assert.Contains("namespace Incremental.Rules;", await Read(facade), StringComparison.Ordinal);
+        Assert.False(File.Exists(entryPoint));
+
+        (var namespaceExit, var namespaceLog) = await Build("-p:RootNamespace=Changed.Rules");
+        Assert.True(namespaceExit == 0, $"The namespace-change build failed:\n{namespaceLog}");
+        Assert.Contains("namespace Changed.Rules;", await Read(facade), StringComparison.Ordinal);
+
+        File.Delete(facade);
+        (var missingExit, var missingLog) = await Build("-p:RootNamespace=Changed.Rules");
+        Assert.True(missingExit == 0, $"The missing-output build failed:\n{missingLog}");
+        Assert.True(File.Exists(facade), "A deleted facade was not regenerated.");
+        Assert.Contains("namespace Changed.Rules;", await Read(facade), StringComparison.Ordinal);
+
+        await WriteEffectiveProperties("<OutputType>Exe</OutputType>");
+        (var executableExit, var executableLog) = await Build();
+        Assert.True(executableExit == 0, $"The executable build failed:\n{executableLog}");
+        Assert.True(File.Exists(entryPoint), "Changing OutputType to Exe did not generate an entry point.");
+        Assert.Contains("namespace Incremental.Rules;", await Read(entryPoint), StringComparison.Ordinal);
+
+        File.Delete(entryPoint);
+        (var missingEntryExit, var missingEntryLog) = await Build();
+        Assert.True(missingEntryExit == 0, $"The missing-entry-point build failed:\n{missingEntryLog}");
+        Assert.True(File.Exists(entryPoint), "A deleted entry point was not regenerated.");
+
+        await WriteEffectiveProperties("<DotPrologTestProject>true</DotPrologTestProject>");
+        (var testExit, var testLog) = await Build();
+        Assert.True(testExit == 0, $"The test-project build failed:\n{testLog}");
+        Assert.Contains("DotProlog.Testing.PrologTestHost.RunAsync", await Read(entryPoint), StringComparison.Ordinal);
+
+        await WriteEffectiveProperties(string.Empty);
+        (var restoredExit, var restoredLog) = await Build();
+        Assert.True(restoredExit == 0, $"The restored library build failed:\n{restoredLog}");
+        Assert.Contains("namespace Incremental.Rules;", await Read(facade), StringComparison.Ordinal);
+        Assert.False(File.Exists(entryPoint), "Returning to a library left the stale entry point behind.");
+    }
+
+    [Fact]
+    public async Task SameBasenameSourcesAndContractsPairByRelativePath()
+    {
+        Assert.SkipUnless(
+            Environment.GetEnvironmentVariable(OptInVariable) == "1",
+            $"Set {OptInVariable}=1 to run the toolchain integration tests."
+        );
+        await BuildTaskAssembly();
+        WriteProjectFile();
+        WriteModule("first", "rules", "FirstRules", "alpha_marker");
+        WriteModule("second", "rules", "SecondRules", "omega_marker");
+
+        (var exit, var log) = await Build();
+        Assert.True(exit == 0, $"The duplicate-basename build failed:\n{log}");
+        var generatedPath = Path.Combine(_project, "obj", "prolog");
+        var first = await Read(Path.Combine(generatedPath, "FirstRulesModule.g.cs"));
+        var second = await Read(Path.Combine(generatedPath, "SecondRulesModule.g.cs"));
+        Assert.Contains("alpha_marker", first, StringComparison.Ordinal);
+        Assert.DoesNotContain("omega_marker", first, StringComparison.Ordinal);
+        Assert.Contains("omega_marker", second, StringComparison.Ordinal);
+        Assert.DoesNotContain("alpha_marker", second, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AmbiguousSourcePairsAndGeneratedFilenameCollisionsAreRejected()
+    {
+        Assert.SkipUnless(
+            Environment.GetEnvironmentVariable(OptInVariable) == "1",
+            $"Set {OptInVariable}=1 to run the toolchain integration tests."
+        );
+        await BuildTaskAssembly();
+        WriteProjectFile();
+        WriteModule("rules", "Rules");
+        var project = Path.Combine(_project, "Incremental.dplproj");
+        var text = await Read(project);
+        await File.WriteAllTextAsync(
+            project,
+            text.Replace(
+                "<ProjectReference",
+                "<PrologCompile Include=\"rules.pl\" />\n                    <ProjectReference",
+                StringComparison.Ordinal
+            ),
+            TestContext.Current.CancellationToken
+        );
+
+        (var ambiguousExit, var ambiguousLog) = await Build();
+        Assert.NotEqual(0, ambiguousExit);
+        Assert.Contains("Multiple PrologCompile items match 'rules.pl'", ambiguousLog, StringComparison.Ordinal);
+        Assert.DoesNotContain("MSB4018", ambiguousLog, StringComparison.Ordinal);
+
+        WriteProjectFile();
+        WriteModule("first", "Shared");
+        WriteModule("second", "Shared");
+        await File.WriteAllTextAsync(
+            Path.Combine(_project, "first.dpli"),
+            ":- clr_namespace('First.Namespace').\n:- clr_module('Shared').\n"
+                + ":- clr_export(value/1, nondet, [out(value, atom)]).\n",
+            TestContext.Current.CancellationToken
+        );
+        await File.WriteAllTextAsync(
+            Path.Combine(_project, "second.dpli"),
+            ":- clr_namespace('Second.Namespace').\n:- clr_module('Shared').\n"
+                + ":- clr_export(value/1, nondet, [out(value, atom)]).\n",
+            TestContext.Current.CancellationToken
+        );
+
+        (var collisionExit, var collisionLog) = await Build();
+        Assert.NotEqual(0, collisionExit);
+        Assert.Contains("both generate 'SharedModule.g.cs'", collisionLog, StringComparison.Ordinal);
+        Assert.Contains("distinct clr_module/1 name", collisionLog, StringComparison.Ordinal);
+        Assert.DoesNotContain("MSB4018", collisionLog, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DesignTimeBuildSkipsGenerationAndInvalidPackageConfigurationIsATaskError()
+    {
+        Assert.SkipUnless(
+            Environment.GetEnvironmentVariable(OptInVariable) == "1",
+            $"Set {OptInVariable}=1 to run the toolchain integration tests."
+        );
+        await BuildTaskAssembly();
+        WriteProjectFile();
+        WriteModule("rules", "Rules");
+        await File.WriteAllTextAsync(
+            Path.Combine(_project, "propack.json"),
+            "{\"name\":\"example/app\"}\n",
+            TestContext.Current.CancellationToken
+        );
+        var environment = new Dictionary<string, string?> { ["PROPACK_CACHE"] = Path.Combine(_project, "cache") };
+        var project = Path.Combine(_project, "Incremental.dplproj");
+
+        (var designTimeExit, var designTimeLog) = await Run(
+            "dotnet",
+            [
+                "msbuild",
+                "-nodereuse:false",
+                project,
+                "--nologo",
+                "-target:CoreCompile",
+                "-p:DesignTimeBuild=true",
+                "-p:SkipCompilerExecution=true",
+                "-p:BuildProjectReferences=false",
+            ],
+            environment
+        );
+        Assert.True(designTimeExit == 0, $"The design-time build failed:\n{designTimeLog}");
+        Assert.DoesNotContain("Package configuration is invalid", designTimeLog, StringComparison.Ordinal);
+        var generatedPath = Path.Combine(_project, "obj", "prolog");
+        Assert.False(
+            Directory.Exists(generatedPath) && Directory.EnumerateFiles(generatedPath, "*.g.cs").Any(),
+            "The design-time build generated C# sources."
+        );
+
+        (var invalidExit, var invalidLog) = await Run("dotnet", ["build", "-nodereuse:false", project, "--nologo"], environment);
+        Assert.NotEqual(0, invalidExit);
+        Assert.Contains("Package configuration is invalid", invalidLog, StringComparison.Ordinal);
+        Assert.Contains("outside the project", invalidLog, StringComparison.Ordinal);
+        Assert.DoesNotContain("MSB4018", invalidLog, StringComparison.Ordinal);
+    }
+
+    private static Task<string> Read(string path) => File.ReadAllTextAsync(path, TestContext.Current.CancellationToken);
+
+    private static async Task BuildTaskAssembly()
+    {
+        (var exit, var log) = await Run(
+            "dotnet",
+            ["build", "-nodereuse:false", Path.Combine(RepositoryLayout.Root, "src", "DotProlog.Build.Tasks"), "--nologo"]
+        );
+        Assert.True(exit == 0, $"Building the task failed:\n{log}");
+    }
+
+    private Task WriteEffectiveProperties(string properties) =>
+        File.WriteAllTextAsync(
+            Path.Combine(_project, "Directory.Build.props"),
+            $"<Project><PropertyGroup>{properties}</PropertyGroup></Project>\n",
+            TestContext.Current.CancellationToken
+        );
+
     private void WriteProjectFile()
     {
         var source = Path.Combine(RepositoryLayout.Root, "src");
@@ -285,6 +476,7 @@ public sealed class IncrementalBuildTests : IDisposable
                 </PropertyGroup>
                 <ItemGroup>
                     <ProjectReference Include="{source}/DotProlog.Compiler/DotProlog.Compiler.csproj" />
+                    <ProjectReference Include="{source}/DotProlog.Testing/DotProlog.Testing.csproj" />
                 </ItemGroup>
                 <Import Project="{source}/DotProlog.Sdk/Sdk/Sdk.targets" />
             </Project>
@@ -301,9 +493,22 @@ public sealed class IncrementalBuildTests : IDisposable
         );
     }
 
+    private void WriteModule(string directory, string module, string clrName, string value)
+    {
+        Directory.CreateDirectory(Path.Combine(_project, directory));
+        File.WriteAllText(Path.Combine(_project, directory, $"{module}.pl"), $"value({value}).\n");
+        File.WriteAllText(
+            Path.Combine(_project, directory, $"{module}.dpli"),
+            $":- clr_module('{clrName}').\n:- clr_export(value/1, nondet, [out(value, atom)]).\n"
+        );
+    }
+
     private Task<(int ExitCode, string Log)> Build(params string[] properties) =>
         Run("dotnet", ["build", "-nodereuse:false", Path.Combine(_project, "Incremental.dplproj"), "--nologo", .. properties]);
 
-    private static Task<(int ExitCode, string Log)> Run(string fileName, string[] arguments) =>
-        ChildProcess.RunAsync(fileName, arguments, RepositoryLayout.Root);
+    private static Task<(int ExitCode, string Log)> Run(
+        string fileName,
+        string[] arguments,
+        IReadOnlyDictionary<string, string?>? environment = null
+    ) => ChildProcess.RunAsync(fileName, arguments, RepositoryLayout.Root, environment);
 }
