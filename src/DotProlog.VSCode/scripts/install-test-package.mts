@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { runVSCodeCommand } from "@vscode/test-electron";
 import { root, run } from "./server.mjs";
+import { retryEditorDownload } from "./download-retry.mjs";
 
 const target = process.argv[2];
 if (target && target !== `${process.platform}-${process.arch}`) {
@@ -27,18 +28,24 @@ const packagePath = path.join(
     root,
     `bin/${manifest.name}-${manifest.version}${target ? `-${target}` : ""}.vsix`,
 );
-const result = await runVSCodeCommand(
-    [
-        "--install-extension",
-        packagePath,
-        "--extensions-dir",
-        extensions,
-        "--user-data-dir",
-        path.join(directory, "profile"),
-        "--force",
-        "--no-sandbox",
-    ],
-    { version, cachePath: path.join(root, "bin/vscode-test") },
+const result = await retryEditorDownload(() =>
+    runVSCodeCommand(
+        [
+            "--install-extension",
+            packagePath,
+            "--extensions-dir",
+            extensions,
+            "--user-data-dir",
+            path.join(directory, "profile"),
+            "--force",
+            "--no-sandbox",
+        ],
+        {
+            version,
+            cachePath: path.join(root, "bin/vscode-test"),
+            timeout: 60000,
+        },
+    ),
 );
 console.log(result.stdout);
 const candidates = (await readdir(extensions)).filter((name) =>

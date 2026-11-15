@@ -15,5 +15,9 @@
     },
     "types": ["node", "mocha"]
   },
-  "include": ["src/**/*.ts", "../../tests/DotProlog.VSCode.Tests/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "../../tests/DotProlog.VSCode.Tests/**/*.ts",
+    "../../tests/DotProlog.VSCode.Tests/**/*.mts"
+  ]
 }

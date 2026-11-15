@@ -12,6 +12,7 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { root } from "./server.mjs";
+import { retryEditorDownload } from "./download-retry.mjs";
 
 const extensionPath = process.env.DOTPROLOG_EXTENSION_PATH || root;
 const requestedVersion = process.env.VSCODE_VERSION || "stable";
@@ -81,7 +82,15 @@ try {
     const options = {
         extensionDevelopmentPath: extensionPath,
         extensionTestsPath: path.join(root, "bin/test-runner.cjs"),
-        vscodeExecutablePath: process.env.VSCODE_EXECUTABLE_PATH,
+        vscodeExecutablePath:
+            process.env.VSCODE_EXECUTABLE_PATH ||
+            (await retryEditorDownload(() =>
+                downloadAndUnzipVSCode({
+                    cachePath: path.join(root, "bin/vscode-test"),
+                    version,
+                    timeout: 60000,
+                }),
+            )),
         version,
         cachePath: path.join(root, "bin/vscode-test"),
         launchArgs: [
@@ -106,12 +115,7 @@ try {
     if (restricted) {
         // runTests always appends --disable-workspace-trust. Launch the same Extension Host
         // directly for this check so Restricted Mode is actually exercised.
-        const executable =
-            options.vscodeExecutablePath ||
-            (await downloadAndUnzipVSCode({
-                cachePath: options.cachePath,
-                version,
-            }));
+        const executable = options.vscodeExecutablePath;
         const child = spawn(
             executable,
             [

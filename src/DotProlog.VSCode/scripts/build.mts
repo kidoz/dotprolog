@@ -29,6 +29,7 @@ await build({
     entryPoints: [
         path.join(tests, "launch.test.ts"),
         path.join(tests, "grammar.test.ts"),
+        path.join(tests, "download.test.mts"),
     ],
     outdir: path.join(root, "bin/unit"),
 });
