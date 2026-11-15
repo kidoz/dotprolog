@@ -25,15 +25,25 @@ public static class PrologLinter
         DoubleQuotesMode initialDoubleQuotes = DoubleQuotesMode.Chars
     )
     {
+        return AnalyzeCore(clauses, fileName, initialDoubleQuotes, clauseReadings: null);
+    }
+
+    private static IReadOnlyList<Diagnostic> AnalyzeCore(
+        IReadOnlyList<SyntaxTerm> clauses,
+        string? fileName,
+        DoubleQuotesMode initialDoubleQuotes,
+        IReadOnlyList<DoubleQuotesMode>? clauseReadings
+    )
+    {
         ArgumentNullException.ThrowIfNull(clauses);
 
         List<Diagnostic> diagnostics = [];
-        foreach (SyntaxTerm clause in clauses)
+        foreach (var clause in clauses)
         {
             AnalyzeClause(clause, fileName, diagnostics);
         }
 
-        DoubleQuotesLinter.Analyze(clauses, initialDoubleQuotes, fileName, diagnostics);
+        DoubleQuotesLinter.Analyze(clauses, initialDoubleQuotes, fileName, diagnostics, clauseReadings);
         PrologLiteralLinter.Analyze(clauses, fileName, diagnostics);
         PrologAllSolutionsLinter.Analyze(clauses, fileName, diagnostics);
         PrologStructureLinter.Analyze(clauses, fileName, diagnostics);
@@ -67,10 +77,23 @@ public static class PrologLinter
         bool codePoints = true
     )
     {
+        return AnalyzeSourceCore(source, clauses, fileName, options, initialDoubleQuotes, codePoints, clauseReadings: null);
+    }
+
+    private static IReadOnlyList<Diagnostic> AnalyzeSourceCore(
+        string source,
+        IReadOnlyList<SyntaxTerm> clauses,
+        string? fileName,
+        PrologLintOptions? options,
+        DoubleQuotesMode initialDoubleQuotes,
+        bool codePoints,
+        IReadOnlyList<DoubleQuotesMode>? clauseReadings
+    )
+    {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(clauses);
 
-        List<Diagnostic> diagnostics = [.. Analyze(clauses, fileName, initialDoubleQuotes)];
+        List<Diagnostic> diagnostics = [.. AnalyzeCore(clauses, fileName, initialDoubleQuotes, clauseReadings)];
         PrologNonSteadfastLinter.Analyze(clauses, fileName, options, diagnostics);
         PrologNonTailRecursionLinter.Analyze(clauses, fileName, options, diagnostics);
         PrologMultifileCutLinter.Analyze(clauses, fileName, options, diagnostics);
@@ -100,10 +123,10 @@ public static class PrologLinter
         [
             .. sources.GroupBy(source => source.FileName, PathComparer).Select(group => group.First()),
         ];
-        PrologLintProgramModel model = PrologLintProgramModel.Build(distinct);
-        PrologLintOptions? localOptions = options is null ? null : options with { EnabledRules = [] };
+        var model = PrologLintProgramModel.Build(distinct);
+        var localOptions = options is null ? null : options with { EnabledRules = [] };
         List<Diagnostic> diagnostics = [];
-        foreach (PrologLintSource source in distinct)
+        foreach (var source in distinct)
         {
             foreach (
                 var clauses in source
@@ -111,17 +134,27 @@ public static class PrologLinter
                     .GroupBy(item => source.FileForClause(item.index))
             )
             {
-                IReadOnlyList<Diagnostic> local =
+                var items = clauses.ToArray();
+                IReadOnlyList<DoubleQuotesMode>? clauseReadings = source.ClauseDoubleQuotes is { } capturedReadings
+                    ? items.Select(item => capturedReadings[item.index]).ToArray()
+                    : null;
+                var local =
                     clauses.Key == source.FileName
-                        ? AnalyzeSource(
+                        ? AnalyzeSourceCore(
                             source.Source,
-                            [.. clauses.Select(item => item.clause)],
+                            [.. items.Select(item => item.clause)],
                             clauses.Key,
                             localOptions,
                             source.InitialDoubleQuotes,
-                            source.CodePoints
+                            source.CodePoints,
+                            clauseReadings
                         )
-                        : Analyze([.. clauses.Select(item => item.clause)], clauses.Key, source.InitialDoubleQuotes);
+                        : AnalyzeCore(
+                            [.. items.Select(item => item.clause)],
+                            clauses.Key,
+                            source.InitialDoubleQuotes,
+                            clauseReadings
+                        );
                 diagnostics.AddRange(
                     local.Where(diagnostic =>
                         diagnostic.Id
@@ -167,17 +200,17 @@ public static class PrologLinter
 
     private static void AnalyzeClause(SyntaxTerm clause, string? fileName, List<Diagnostic> diagnostics)
     {
-        List<VariableTerm> occurrences = VariableOccurrences(clause);
+        var occurrences = VariableOccurrences(clause);
         Dictionary<string, List<VariableTerm>> byName = new(StringComparer.Ordinal);
 
-        foreach (VariableTerm variable in occurrences)
+        foreach (var variable in occurrences)
         {
             if (variable.IsAnonymous)
             {
                 continue;
             }
 
-            if (!byName.TryGetValue(variable.Name, out List<VariableTerm>? namedOccurrences))
+            if (!byName.TryGetValue(variable.Name, out var namedOccurrences))
             {
                 namedOccurrences = [];
                 byName.Add(variable.Name, namedOccurrences);
@@ -187,7 +220,7 @@ public static class PrologLinter
         }
 
         List<Diagnostic> clauseDiagnostics = [];
-        foreach ((var name, List<VariableTerm> namedOccurrences) in byName)
+        foreach ((var name, var namedOccurrences) in byName)
         {
             if (name.StartsWith('_'))
             {
@@ -228,7 +261,7 @@ public static class PrologLinter
         Stack<SyntaxTerm> pending = new();
         pending.Push(clause);
 
-        while (pending.TryPop(out SyntaxTerm? term))
+        while (pending.TryPop(out var term))
         {
             if (term is VariableTerm variable)
             {

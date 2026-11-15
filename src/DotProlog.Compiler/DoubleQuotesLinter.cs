@@ -23,23 +23,26 @@ internal static class DoubleQuotesLinter
         IReadOnlyList<SyntaxTerm> clauses,
         DoubleQuotesMode initialDoubleQuotes,
         string? fileName,
-        List<Diagnostic> diagnostics
+        List<Diagnostic> diagnostics,
+        IReadOnlyList<DoubleQuotesMode>? clauseReadings = null
     )
     {
-        var readings = new DoubleQuotesMode[clauses.Count];
+        var readings = clauseReadings is null ? new DoubleQuotesMode[clauses.Count] : [.. clauseReadings];
         Dictionary<(string Name, int Arity), List<GrammarRule>> grammar = [];
         List<(int Clause, GrammarRule Rule)> rules = [];
 
-        DoubleQuotesMode current = initialDoubleQuotes;
+        var current = initialDoubleQuotes;
         for (var index = 0; index < clauses.Count; index++)
         {
-            SyntaxTerm clause = clauses[index];
-            readings[index] = current;
-
-            if (TryDoubleQuotesDirective(clause, out DoubleQuotesMode selected))
+            var clause = clauses[index];
+            if (clauseReadings is null)
             {
-                current = selected;
-                continue;
+                readings[index] = current;
+                if (TryDoubleQuotesDirective(clause, out var selected))
+                {
+                    current = selected;
+                    continue;
+                }
             }
 
             if (
@@ -47,8 +50,8 @@ internal static class DoubleQuotesLinter
                 && TryNonterminal(GrammarHead(rule.Arguments[0]), out var key)
             )
             {
-                GrammarRule analyzed = GrammarRule.Create(rule.Arguments[1]);
-                if (!grammar.TryGetValue(key, out List<GrammarRule>? definitions))
+                var analyzed = GrammarRule.Create(rule.Arguments[1]);
+                if (!grammar.TryGetValue(key, out var definitions))
                 {
                     definitions = [];
                     grammar.Add(key, definitions);
@@ -68,7 +71,7 @@ internal static class DoubleQuotesLinter
             }
         }
 
-        foreach ((var clause, GrammarRule rule) in rules)
+        foreach ((var clause, var rule) in rules)
         {
             if (readings[clause] != DoubleQuotesMode.Chars || rule.TextTerminals.Count == 0)
             {
@@ -90,7 +93,7 @@ internal static class DoubleQuotesLinter
         List<Diagnostic> diagnostics
     )
     {
-        foreach (CompoundTerm goal in Compounds(clause))
+        foreach (var goal in Compounds(clause))
         {
             if (goal is not { Arity: 2, Arguments: [_, StringTerm { Value.Length: > 0 } text] })
             {
@@ -131,7 +134,7 @@ internal static class DoubleQuotesLinter
         List<Diagnostic> diagnostics
     )
     {
-        foreach (CompoundTerm goal in Compounds(clause))
+        foreach (var goal in Compounds(clause))
         {
             if (
                 goal is not { Name: "phrase", Arity: 2 or 3 }
@@ -165,12 +168,12 @@ internal static class DoubleQuotesLinter
 
         while (pending.TryDequeue(out var nonterminal))
         {
-            if (!visited.Add(nonterminal) || !grammar.TryGetValue(nonterminal, out List<GrammarRule>? definitions))
+            if (!visited.Add(nonterminal) || !grammar.TryGetValue(nonterminal, out var definitions))
             {
                 continue;
             }
 
-            foreach (GrammarRule rule in definitions)
+            foreach (var rule in definitions)
             {
                 evidence.AddRange(rule.CodeTests);
                 foreach (var call in rule.Calls)
@@ -200,7 +203,7 @@ internal static class DoubleQuotesLinter
         Stack<SyntaxTerm> pending = new();
         pending.Push(term);
 
-        while (pending.TryPop(out SyntaxTerm? current))
+        while (pending.TryPop(out var current))
         {
             if (current is not CompoundTerm compound)
             {
@@ -216,7 +219,7 @@ internal static class DoubleQuotesLinter
     }
 
     /// <summary>Recognizes exactly the directive shape the loader applies while reading a file.</summary>
-    private static bool TryDoubleQuotesDirective(SyntaxTerm clause, out DoubleQuotesMode selected)
+    internal static bool TryDoubleQuotesDirective(SyntaxTerm clause, out DoubleQuotesMode selected)
     {
         selected = default;
         if (
@@ -347,7 +350,7 @@ internal static class DoubleQuotesLinter
 
             Stack<SyntaxTerm> pending = new();
             pending.Push(body);
-            while (pending.TryPop(out SyntaxTerm? term))
+            while (pending.TryPop(out var term))
             {
                 switch (term)
                 {
@@ -384,9 +387,9 @@ internal static class DoubleQuotesLinter
                 }
             }
 
-            foreach (SyntaxTerm goal in goals)
+            foreach (var goal in goals)
             {
-                foreach (CompoundTerm test in Compounds(goal))
+                foreach (var test in Compounds(goal))
                 {
                     if (IsCodeTest(test, matched))
                     {

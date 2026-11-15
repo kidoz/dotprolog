@@ -42,19 +42,22 @@ public static class PrologLintSourceLoader
         var absolute = Path.GetFullPath(fileName);
         HashSet<string> activeIncludes = new(PathComparer);
         Dictionary<SyntaxTerm, string> owners = new(ReferenceEqualityComparer.Instance);
+        Dictionary<SyntaxTerm, DoubleQuotesMode> doubleQuotes = new(ReferenceEqualityComparer.Instance);
         List<(string FileName, SyntaxTerm? Clause)> sourceOrder = [];
-        ParseResult parsed = ReadWithIncludes(
+        var parsed = ReadWithIncludes(
             source,
             absolute,
             program,
             activeIncludes,
             owners,
+            doubleQuotes,
             sourceOrder,
             readSource,
             cancellationToken
         );
         cancellationToken.ThrowIfCancellationRequested();
         string[] clauseFiles = [.. parsed.Clauses.Select(clause => owners[clause])];
+        DoubleQuotesMode[] clauseReadings = [.. parsed.Clauses.Select(clause => doubleQuotes[clause])];
         var unit = new PrologLintSource(
             absolute,
             source,
@@ -66,6 +69,7 @@ public static class PrologLintSourceLoader
         {
             HasAnalysisGaps = parsed.Diagnostics.Count > 0,
             SourceOrder = sourceOrder,
+            ClauseDoubleQuotes = clauseReadings,
         };
         return new PrologLintSourceLoadResult(unit, parsed.Diagnostics);
     }
@@ -76,6 +80,7 @@ public static class PrologLintSourceLoader
         BytecodeProgram program,
         HashSet<string> activeIncludes,
         Dictionary<SyntaxTerm, string> owners,
+        Dictionary<SyntaxTerm, DoubleQuotesMode> doubleQuotes,
         List<(string FileName, SyntaxTerm? Clause)> sourceOrder,
         Func<string, string> readSource,
         CancellationToken cancellationToken
@@ -98,7 +103,7 @@ public static class PrologLintSourceLoader
             }
 
             sourceOrder.Add((fileName, null));
-            ParseResult parsed = TermReader.ReadProgram(
+            var parsed = TermReader.ReadProgram(
                 source,
                 fileName,
                 program.Operators,
@@ -111,6 +116,7 @@ public static class PrologLintSourceLoader
                         program,
                         activeIncludes,
                         owners,
+                        doubleQuotes,
                         sourceOrder,
                         readSource,
                         cancellationToken
@@ -118,10 +124,12 @@ public static class PrologLintSourceLoader
                 clauseBoundary: clause =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    doubleQuotes[clause] = program.Flags.DoubleQuotes;
                     sourceOrder.Add((fileName, clause));
-                }
+                },
+                readerDirectiveApplied: clause => ApplyDoubleQuotesDirective(clause, program)
             );
-            foreach (SyntaxTerm clause in parsed.Clauses)
+            foreach (var clause in parsed.Clauses)
             {
                 owners.TryAdd(clause, fileName);
             }
@@ -140,6 +148,7 @@ public static class PrologLintSourceLoader
         BytecodeProgram program,
         HashSet<string> activeIncludes,
         Dictionary<SyntaxTerm, string> owners,
+        Dictionary<SyntaxTerm, DoubleQuotesMode> doubleQuotes,
         List<(string FileName, SyntaxTerm? Clause)> sourceOrder,
         Func<string, string> readSource,
         CancellationToken cancellationToken
@@ -185,7 +194,17 @@ public static class PrologLintSourceLoader
 
             cancellationToken.ThrowIfCancellationRequested();
             var source = readSource(path);
-            return ReadWithIncludes(source, path, program, activeIncludes, owners, sourceOrder, readSource, cancellationToken);
+            return ReadWithIncludes(
+                source,
+                path,
+                program,
+                activeIncludes,
+                owners,
+                doubleQuotes,
+                sourceOrder,
+                readSource,
+                cancellationToken
+            );
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
@@ -194,6 +213,17 @@ public static class PrologLintSourceLoader
                 [],
                 [ResolutionWarning($"Cannot include {include.Name}: {exception.Message}", includingFile, include.Span)]
             );
+        }
+    }
+
+    private static void ApplyDoubleQuotesDirective(SyntaxTerm clause, BytecodeProgram program)
+    {
+        if (
+            DoubleQuotesLinter.TryDoubleQuotesDirective(clause, out var selected)
+            && (selected != DoubleQuotesMode.String || program.LanguageMode != PrologLanguageMode.StrictIso)
+        )
+        {
+            program.Flags.DoubleQuotes = selected;
         }
     }
 

@@ -48,7 +48,7 @@ public sealed class LintSourceProviderTests
     [Fact]
     public void ProviderReceivesAbsoluteNestedPathsAndPreservesReaderStateAndOwnership()
     {
-        string root = Path.Combine(Path.GetTempPath(), "DotProlog-provider", "root.pl");
+        var root = Path.Combine(Path.GetTempPath(), "DotProlog-provider", "root.pl");
         List<string> reads = [];
         var loaded = PrologLintSourceLoader.Load(
             root,
@@ -72,9 +72,37 @@ public sealed class LintSourceProviderTests
     }
 
     [Fact]
+    public void IncludeExpansionPreservesDoubleQuotesAcrossPhysicalFileBoundaries()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "DotProlog-provider", "root.pl");
+        var loaded = PrologLintSourceLoader.Load(
+            root,
+            ":- set_prolog_flag(double_quotes, codes).\n"
+                + ":- include('child.pl').\n"
+                + "after_include :- number_codes(_, \"2\").",
+            new BytecodeProgram(),
+            _ => "included :- number_codes(_, \"1\").\n:- set_prolog_flag(double_quotes, chars).",
+            TestContext.Current.CancellationToken
+        );
+
+        var diagnostics = PrologLinter.AnalyzeProgram([loaded.Source]);
+
+        var diagnostic = Assert.Single(
+            diagnostics,
+            diagnostic => diagnostic.Id == LintDiagnosticIds.DoubleQuotedListKindMismatch
+        );
+        Assert.Equal(root, diagnostic.FileName);
+        Assert.Contains("double_quotes=chars", diagnostic.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            diagnostics,
+            diagnostic => diagnostic.FileName?.EndsWith("child.pl", StringComparison.Ordinal) == true
+        );
+    }
+
+    [Fact]
     public void ProviderFailureBecomesResolutionDiagnosticAtIncludeSite()
     {
-        string root = Path.Combine(Path.GetTempPath(), "root.pl");
+        var root = Path.Combine(Path.GetTempPath(), "root.pl");
         var loaded = PrologLintSourceLoader.Load(
             root,
             ":- include('missing.pl').",
@@ -82,7 +110,7 @@ public sealed class LintSourceProviderTests
             _ => throw new FileNotFoundException("Missing overlay"),
             TestContext.Current.CancellationToken
         );
-        Diagnostic diagnostic = Assert.Single(loaded.Diagnostics);
+        var diagnostic = Assert.Single(loaded.Diagnostics);
         Assert.Equal(LintDiagnosticIds.UnresolvedLintSource, diagnostic.Id);
         Assert.Equal(root, diagnostic.FileName);
         Assert.True(diagnostic.Span.Length > 0);
@@ -91,7 +119,7 @@ public sealed class LintSourceProviderTests
     [Fact]
     public void ProviderExpansionKeepsDepthLimit()
     {
-        string root = Path.Combine(Path.GetTempPath(), "root.pl");
+        var root = Path.Combine(Path.GetTempPath(), "root.pl");
         var count = 0;
         var loaded = PrologLintSourceLoader.Load(
             root,
