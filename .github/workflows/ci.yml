@@ -120,7 +120,7 @@ jobs:
       - name: Run independent ISO conformance slice
         if: matrix.os == 'ubuntu-latest'
         run: >-
-          dotnet test tests/Integration/Integration.Tests.csproj
+          dotnet test --project tests/Integration/Integration.Tests.csproj
           -c Release --no-build --no-ansi --
           --filter-class Integration.Tests.LogtalkConformanceTests
         env:
