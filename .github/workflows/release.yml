@@ -130,6 +130,26 @@ jobs:
           dotnet pack src/DotProlog.Tool -c Release -r ${{ matrix.rid }}
           -p:ContinuousIntegrationBuild=true -o tool-package
 
+      - name: Execute the exact native tool package to upload
+        shell: bash
+        env:
+          DOTNET_CLI_HOME: ${{ runner.temp }}/dotprolog-native-tool-home
+          NUGET_PACKAGES: ${{ runner.temp }}/dotprolog-native-tool-packages
+        run: |
+          set -euo pipefail
+          version=$(grep -oE '<VersionPrefix>[^<]+' Directory.Build.props | cut -d'>' -f2)
+          package="tool-package/DotProlog.Tool.${{ matrix.rid }}.$version.nupkg"
+          test -f "$package"
+          test "$(find tool-package -maxdepth 1 -type f -name '*.nupkg' | wc -l)" -eq 1
+          dotnet tool install "DotProlog.Tool.${{ matrix.rid }}" \
+            --tool-path "$RUNNER_TEMP/dotprolog-native-tool" --version "$version" \
+            --source tool-package --no-http-cache
+          tool="$RUNNER_TEMP/dotprolog-native-tool/dotnet-prolog"
+          if [ -f "$tool.exe" ]; then
+            tool="$tool.exe"
+          fi
+          "$tool" run samples/HelloProlog/hello.pl | grep -Fx "Hello! World!"
+
       - name: Name the binary after its platform
         shell: bash
         run: |
@@ -157,7 +177,7 @@ jobs:
     name: Package
     needs: [verify, native]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -183,6 +203,27 @@ jobs:
       - name: Test packed templates and tool
         run: tests/Integration/verify-packages.sh artifacts linux-x64
 
+      - name: Install .NET 11 SDK
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 11.0.x
+
+      - name: Test the release packages as .NET 11 consumers
+        run: |
+          cp global.json "$RUNNER_TEMP/dotprolog-release-global.json"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path('global.json')
+          data = json.loads(path.read_text())
+          data['sdk']['version'] = '11.0.100'
+          data['sdk']['rollForward'] = 'latestFeature'
+          path.write_text(json.dumps(data, indent=2) + '\n')
+          PY
+          dotnet --version
+          tests/Integration/verify-packages.sh artifacts linux-x64 net11.0
+          cp "$RUNNER_TEMP/dotprolog-release-global.json" global.json
+
       - name: Software bill of materials
         run: |
           dotnet tool install --global CycloneDX --version 6.2.0
@@ -190,6 +231,12 @@ jobs:
 
       - name: Checksums
         run: cd artifacts && sha256sum *.nupkg *.snupkg sbom.json > SHA256SUMS
+
+      - name: Verify package checksums and exact inventory
+        run: |
+          python tests/Integration/test_release_assets.py
+          version=$(grep -oE '<VersionPrefix>[^<]+' Directory.Build.props | cut -d'>' -f2)
+          python tests/Integration/verify-release-assets.py --version "$version" --directory artifacts
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -263,7 +310,7 @@ jobs:
     # always() keeps this reachable on a manual run, where every build job above is skipped.
     if: always() && inputs.product != 'propack' && (github.event_name == 'workflow_dispatch' || needs.release.result == 'success')
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
     environment: release
     # A job-level block replaces the workflow-level one, so contents has to be restated. Trusted
     # publishing exchanges this OIDC token for a short-lived nuget.org key; without id-token the
@@ -281,20 +328,27 @@ jobs:
           name: packages
           path: artifacts
 
-      # A manual run publishes the packages already attached to that version's GitHub release,
-      # which are the same files the tag run built and checksummed. The symbol packages have to
-      # come down too: only the .nupkg files are pushed, and each one carries its .snupkg along
-      # from the same directory.
-      - name: Download the release packages
+      # A manual run publishes the packages already attached to that version's GitHub release.
+      # Download the complete asset set so its release-level SHA256SUMS can be checked in full;
+      # the inventory gate then rejects missing, extra, or wrong-version NuGet packages.
+      - name: Download the release assets
         if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          gh release download "v${{ inputs.version }}" --repo "$GITHUB_REPOSITORY" \
-            --pattern '*.nupkg' --pattern '*.snupkg' --dir artifacts
+          gh release download "v${{ inputs.version }}" --repo "$GITHUB_REPOSITORY" --dir artifacts
           ls artifacts
+
+      - name: Verify release checksums and exact package inventory
+        run: |
+          set -euo pipefail
+          version="${{ inputs.version }}"
+          if [ -z "$version" ]; then
+            version=$(grep -oE '<VersionPrefix>[^<]+' Directory.Build.props | cut -d'>' -f2)
+          fi
+          python tests/Integration/verify-release-assets.py --version "$version" --directory artifacts
 
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
@@ -341,23 +395,14 @@ jobs:
             --source https://api.nuget.org/v3/index.json \
             --api-key "$NUGET_API_KEY"
 
-      - name: Verify plc installation from NuGet.org
+      - name: Verify public tools and all templates from NuGet.org
         run: |
           set -euo pipefail
           version="${{ inputs.version }}"
           if [ -z "$version" ]; then
             version=$(grep -oE '<VersionPrefix>[^<]+' Directory.Build.props | cut -d'>' -f2)
           fi
-          for attempt in $(seq 1 20); do
-            if dotnet tool install DotProlog.Compiler.Cli --tool-path "$RUNNER_TEMP/plc-published" --version "$version" --no-http-cache; then
-              "$RUNNER_TEMP/plc-published/plc" --version | grep -Fx "plc $version"
-              "$RUNNER_TEMP/plc-published/plc" --help | grep -F -- "--packages DIR"
-              exit 0
-            fi
-            sleep 30
-          done
-          echo "::error::DotProlog.Compiler.Cli $version did not become installable from NuGet.org."
-          exit 1
+          tests/Integration/verify-public-release.sh "$version"
 
   publish-propack:
     name: Publish propack to NuGet
