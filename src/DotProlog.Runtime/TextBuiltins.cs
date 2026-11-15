@@ -62,7 +62,7 @@ internal static class TextBuiltins
     /// </summary>
     private static bool CharType(Machine machine, bool code, int fromCode)
     {
-        Cell value = machine.Argument(0);
+        var value = machine.Argument(0);
         if (value.Tag == CellTag.Reference)
         {
             return EnumerateCharType(machine, code, fromCode);
@@ -95,7 +95,7 @@ internal static class TextBuiltins
             character = PrologText.CodeOf(name);
         }
 
-        Cell type = machine.Argument(1);
+        var type = machine.Argument(1);
         if (type.Tag == CellTag.Reference)
         {
             throw PrologErrors.Instantiation(machine);
@@ -108,7 +108,7 @@ internal static class TextBuiltins
         }
 
         var (parametricName, companion) = ParametricType(machine, type);
-        return TryCompanion(machine, parametricName, character, code, out Cell companionValue)
+        return TryCompanion(machine, parametricName, character, code, out var companionValue)
             && machine.Unify(companion, companionValue);
     }
 
@@ -119,7 +119,7 @@ internal static class TextBuiltins
     /// </summary>
     private static bool EnumerateCharType(Machine machine, bool code, int fromCode)
     {
-        Cell type = machine.Argument(1);
+        var type = machine.Argument(1);
         if (type.Tag == CellTag.Reference)
         {
             throw PrologErrors.Instantiation(machine);
@@ -169,7 +169,7 @@ internal static class TextBuiltins
                 machine.PushRetry(candidate + 1);
             }
 
-            Cell characterCell = code
+            var characterCell = code
                 ? Cell.Integer60(candidate)
                 : Cell.Atom(machine.Symbols.InternAtom(PrologText.CharacterOf(candidate)));
             return machine.Unify(machine.Argument(0), characterCell)
@@ -186,7 +186,7 @@ internal static class TextBuiltins
             throw PrologErrors.Domain(machine, "char_type", type);
         }
 
-        Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(type.Index).Index);
+        var functor = machine.Symbols.GetFunctor(machine.HeapAt(type.Index).Index);
         var name = machine.Symbols.AtomName(functor.NameAtom);
         if (functor.Arity != 1 || name is not ("digit" or "code" or "to_lower" or "to_upper" or "upper" or "lower"))
         {
@@ -388,7 +388,7 @@ internal static class TextBuiltins
     /// <summary>The characters of an argument that must be an atom.</summary>
     private static CodePointText AtomCharacters(Machine machine, int index)
     {
-        Cell cell = machine.Argument(index);
+        var cell = machine.Argument(index);
 
         if (cell.Tag == CellTag.Reference)
         {
@@ -401,7 +401,7 @@ internal static class TextBuiltins
     private static bool AtomLength(Machine machine)
     {
         var actual = AtomCharacters(machine, 0).Length;
-        Cell length = machine.Argument(1);
+        var length = machine.Argument(1);
 
         if (length.Tag == CellTag.Reference)
         {
@@ -430,15 +430,31 @@ internal static class TextBuiltins
 
     private static bool CharCode(Machine machine)
     {
-        Cell character = machine.Argument(0);
-        Cell code = machine.Argument(1);
+        var character = machine.Argument(0);
+        var code = machine.Argument(1);
 
         if (character.Tag == CellTag.Atom)
         {
             var name = machine.Symbols.AtomName(character.Index);
-            return PrologText.IsCharacter(machine, name)
-                ? machine.Unify(code, Cell.Integer60(PrologText.CodeOf(name)))
-                : throw PrologErrors.Type(machine, "character", character);
+            if (!PrologText.IsCharacter(machine, name))
+            {
+                throw PrologErrors.Type(machine, "character", character);
+            }
+
+            if (code.Tag != CellTag.Reference)
+            {
+                if (code.Tag is not (CellTag.Integer or CellTag.BigInteger))
+                {
+                    throw PrologErrors.Type(machine, "integer", code);
+                }
+
+                if (code.Tag == CellTag.BigInteger || !PrologText.IsCode(machine, code.Integer))
+                {
+                    throw PrologErrors.Representation(machine, "character_code");
+                }
+            }
+
+            return machine.Unify(code, Cell.Integer60(PrologText.CodeOf(name)));
         }
 
         if (character.Tag != CellTag.Reference)
@@ -472,7 +488,7 @@ internal static class TextBuiltins
     {
         var text = PrologText.Read(machine, machine.Argument(0), TextKinds.Atomic);
         var changed = upper ? text.ToUpperInvariant() : text.ToLowerInvariant();
-        Cell result = machine.Argument(1);
+        var result = machine.Argument(1);
         if (result.Tag == CellTag.Reference)
         {
             return machine.Unify(result, Cell.Atom(machine.Symbols.InternAtom(changed)));
@@ -489,12 +505,12 @@ internal static class TextBuiltins
     /// </summary>
     private static bool AtomNumber(Machine machine)
     {
-        Cell atom = machine.Argument(0);
+        var atom = machine.Argument(0);
 
         if (atom.Tag == CellTag.Atom)
         {
             var text = machine.Symbols.AtomName(atom.Index);
-            return TryParseNumber(machine, text, out PrologNumber number)
+            return TryParseNumber(machine, text, out var number)
                 && machine.Unify(machine.Argument(1), ArithmeticEvaluator.ToCell(machine, number));
         }
 
@@ -503,7 +519,7 @@ internal static class TextBuiltins
             throw PrologErrors.Type(machine, "atom", atom);
         }
 
-        Cell value = machine.Argument(1);
+        var value = machine.Argument(1);
         if (value.Tag == CellTag.Reference)
         {
             throw PrologErrors.Instantiation(machine);
@@ -521,8 +537,8 @@ internal static class TextBuiltins
     /// </summary>
     private static bool Convert(Machine machine, bool chars, bool numeric)
     {
-        Cell list = machine.Argument(1);
-        Cell source = machine.Argument(0);
+        var list = machine.Argument(1);
+        var source = machine.Argument(0);
 
         if (numeric)
         {
@@ -535,11 +551,11 @@ internal static class TextBuiltins
         }
 
         List<Cell> elements = [];
-        Cell tail = ReadAcyclic(machine, list, elements);
+        var tail = ReadAcyclic(machine, list, elements);
         var open = tail.Tag == CellTag.Reference;
-        foreach (Cell element in elements)
+        foreach (var element in elements)
         {
-            Cell cell = machine.Dereference(element);
+            var cell = machine.Dereference(element);
             if (cell.Tag == CellTag.Reference)
             {
                 open = true;
@@ -587,11 +603,11 @@ internal static class TextBuiltins
         }
 
         List<Cell> elements = [];
-        Cell tail = ReadAcyclic(machine, list, elements);
+        var tail = ReadAcyclic(machine, list, elements);
         var open = tail.Tag == CellTag.Reference;
-        foreach (Cell element in elements)
+        foreach (var element in elements)
         {
-            Cell cell = machine.Dereference(element);
+            var cell = machine.Dereference(element);
             if (cell.Tag == CellTag.Reference)
             {
                 open = true;
@@ -608,12 +624,12 @@ internal static class TextBuiltins
 
         if (!open)
         {
-            NumberReader.Outcome outcome = NumberReader.Read(
+            var outcome = NumberReader.Read(
                 ReadText(machine, elements, chars),
                 machine.Symbols.CodePoints,
                 machine.Program.Flags.RationalLiterals,
                 machine.Program.Flags.DigitSeparators,
-                out PrologNumber parsed
+                out var parsed
             );
             return outcome switch
             {
@@ -646,8 +662,8 @@ internal static class TextBuiltins
     /// </summary>
     private static Cell ReadAcyclic(Machine machine, Cell list, List<Cell> elements)
     {
-        Cell cell = machine.Dereference(list);
-        Cell mark = cell;
+        var cell = machine.Dereference(list);
+        var mark = cell;
         int power = 1,
             steps = 0;
 
@@ -707,9 +723,9 @@ internal static class TextBuiltins
     {
         var text = new StringBuilder();
 
-        foreach (Cell element in elements)
+        foreach (var element in elements)
         {
-            Cell cell = machine.Dereference(element);
+            var cell = machine.Dereference(element);
 
             if (cell.Tag == CellTag.Reference)
             {
@@ -774,9 +790,9 @@ internal static class TextBuiltins
     /// <param name="state">The split position to try, counted from the left.</param>
     private static bool AtomConcat(Machine machine, long state)
     {
-        Cell first = machine.Argument(0);
-        Cell second = machine.Argument(1);
-        Cell whole = machine.Argument(2);
+        var first = machine.Argument(0);
+        var second = machine.Argument(1);
+        var whole = machine.Argument(2);
 
         ValidateAtomOrVariable(machine, first);
         ValidateAtomOrVariable(machine, second);
@@ -799,7 +815,7 @@ internal static class TextBuiltins
             return machine.Unify(whole, Cell.Atom(machine.Symbols.InternAtom(left + right)));
         }
 
-        CodePointText text = machine.Symbols.TextOf(whole.Index);
+        var text = machine.Symbols.TextOf(whole.Index);
 
         var split = (int)state;
         if (split > text.Length)
@@ -837,12 +853,12 @@ internal static class TextBuiltins
     /// </param>
     private static bool SubAtom(Machine machine, long state)
     {
-        CodePointText text = AtomCharacters(machine, 0);
+        var text = AtomCharacters(machine, 0);
         var before = Constraint(machine, 1);
         var length = Constraint(machine, 2);
         var after = Constraint(machine, 3);
 
-        Cell sub = machine.Argument(4);
+        var sub = machine.Argument(4);
         if (sub.Tag == CellTag.Reference)
         {
             return Enumerate(machine, text, before, length, after, state);
@@ -955,7 +971,7 @@ internal static class TextBuiltins
     /// <summary>An argument that must be a non-negative integer if it is bound at all.</summary>
     private static long? Constraint(Machine machine, int index)
     {
-        Cell cell = machine.Argument(index);
+        var cell = machine.Argument(index);
 
         return cell.Tag switch
         {
@@ -972,7 +988,7 @@ internal static class TextBuiltins
     private static bool AtomicListConcat3(Machine machine)
     {
         var separator = JoinText(machine, machine.Argument(1));
-        Cell list = machine.Argument(0);
+        var list = machine.Argument(0);
 
         if (TermList.IsProper(machine, list))
         {
@@ -999,11 +1015,11 @@ internal static class TextBuiltins
     private static bool Join(Machine machine, Cell list, string separator, int resultIndex)
     {
         var text = new StringBuilder();
-        List<Cell> elements = TermList.ReadProper(machine, list);
+        var elements = TermList.ReadProper(machine, list);
 
         for (var i = 0; i < elements.Count; i++)
         {
-            Cell element = machine.Dereference(elements[i]);
+            var element = machine.Dereference(elements[i]);
 
             if (i > 0)
             {
@@ -1031,7 +1047,7 @@ internal static class TextBuiltins
 
     private static Cell SyntaxErrorTerm(Machine machine, string what)
     {
-        Cell formal = machine.CreateStructure(
+        var formal = machine.CreateStructure(
             machine.Symbols.InternFunctor("syntax_error", 1),
             [Cell.Atom(machine.Symbols.InternAtom(what))]
         );
@@ -1039,296 +1055,21 @@ internal static class TextBuiltins
         return machine.CreateStructure(machine.Symbols.InternFunctor("error", 2), [formal, machine.CreateVariable()]);
     }
 
-    /// <summary>
-    /// Parses Prolog number syntax: an optional sign, then a decimal, <c>0x</c>/<c>0o</c>/<c>0b</c>,
-    /// or <c>0'c</c> integer, or a float with a fraction and an optional exponent.
-    /// </summary>
-    /// <remarks>
-    /// This is a second, smaller number reader than the one in the syntax layer, because the runtime
-    /// deliberately does not depend on it. The two must agree on what a number looks like; the tests
-    /// for <c>atom_number/2</c> are what hold them together. Integers are unbounded, so
-    /// only a float outside binary64 still raises the reader's error rather than returning false —
-    /// <c>syntax_error(float_overflow)</c>.
-    /// </remarks>
+    /// <summary>Reads a number with the grammar shared by all numeric conversion predicates.</summary>
     internal static bool TryParseNumber(Machine machine, string text, out PrologNumber number)
     {
-        number = default;
-        ReadOnlySpan<char> span = text.AsSpan().TrimStart();
-
-        if (span.Length == 0)
+        var outcome = NumberReader.Read(
+            text,
+            machine.Symbols.CodePoints,
+            machine.Program.Flags.RationalLiterals,
+            machine.Program.Flags.DigitSeparators,
+            out number
+        );
+        if (outcome == NumberReader.Outcome.FloatOverflow)
         {
-            return false;
-        }
-
-        if (span[0] == '\'' || (span[0] == '-' && (span.Length == 1 || !char.IsAsciiDigit(span[1]))))
-        {
-            NumberReader.Outcome outcome = NumberReader.Read(
-                text,
-                machine.Symbols.CodePoints,
-                machine.Program.Flags.RationalLiterals,
-                machine.Program.Flags.DigitSeparators,
-                out number
-            );
-            if (outcome == NumberReader.Outcome.FloatOverflow)
-            {
-                throw machine.CreateBall(SyntaxErrorTerm(machine, "float_overflow"), "syntax_error(float_overflow)");
-            }
-
-            return outcome == NumberReader.Outcome.Number;
-        }
-
-        var negative = span[0] == '-';
-        if (span[0] is '-' or '+')
-        {
-            span = span[1..];
-        }
-
-        if (span.Length == 0)
-        {
-            return false;
-        }
-
-        // Digit separators are dropped before parsing; they belong to integers, so a separated
-        // text is no float.
-        var separated = false;
-        if (machine.Program.Flags.DigitSeparators && span.IndexOf('_') >= 0)
-        {
-            var cleaned = CleanDigitSeparators(span, out separated);
-            span = cleaned.AsSpan();
-        }
-
-        if (TryParseRadix(span, machine.Symbols.CodePoints, out System.Numerics.BigInteger radixValue))
-        {
-            number = PrologNumber.FromBig(negative ? -radixValue : radixValue);
-            return true;
-        }
-
-        var rationalSeparator = span.IndexOf('r');
-        if (
-            rationalSeparator > 0
-            && machine.Program.LanguageMode != PrologLanguageMode.StrictIso
-            && AllAsciiDigits(span[..rationalSeparator])
-            && AllAsciiDigits(span[(rationalSeparator + 1)..])
-        )
-        {
-            var numerator = System.Numerics.BigInteger.Parse(
-                span[..rationalSeparator],
-                NumberStyles.None,
-                CultureInfo.InvariantCulture
-            );
-            var denominator = System.Numerics.BigInteger.Parse(
-                span[(rationalSeparator + 1)..],
-                NumberStyles.None,
-                CultureInfo.InvariantCulture
-            );
-            if (denominator.IsZero)
-            {
-                return false;
-            }
-
-            number = PrologNumber.FromRational(negative ? -numerator : numerator, denominator);
-            return true;
-        }
-
-        foreach (var c in span)
-        {
-            if (!char.IsAsciiDigit(c) && c != '.' && c != 'e' && c != 'E' && c != '+' && c != '-')
-            {
-                return false;
-            }
-        }
-
-        var real = span.Contains('.');
-
-        if (real && separated)
-        {
-            return false;
-        }
-
-        if (!real)
-        {
-            foreach (var c in span)
-            {
-                if (!char.IsAsciiDigit(c))
-                {
-                    return false;
-                }
-            }
-
-            if (long.TryParse(span, NumberStyles.None, CultureInfo.InvariantCulture, out var integer))
-            {
-                number = PrologNumber.FromInteger(negative ? -integer : integer);
-                return true;
-            }
-
-            var big = System.Numerics.BigInteger.Parse(span, NumberStyles.None, CultureInfo.InvariantCulture);
-            number = PrologNumber.FromBig(negative ? -big : big);
-            return true;
-        }
-
-        // A Prolog float needs digits on both sides of the point, so ".5" and "1." are not numbers.
-        var point = span.IndexOf('.');
-        if (point == 0 || (point > 0 && (point == span.Length - 1 || !char.IsAsciiDigit(span[point + 1]))))
-        {
-            return false;
-        }
-
-        if (!double.TryParse(span, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
-        {
-            return false;
-        }
-
-        if (double.IsInfinity(value))
-        {
-            // double.TryParse rounds an oversized literal to infinity; runtime-read floats stay
-            // finite, so this raises the same error as the reader path.
             throw machine.CreateBall(SyntaxErrorTerm(machine, "float_overflow"), "syntax_error(float_overflow)");
         }
 
-        number = PrologNumber.FromReal(negative ? -value : value);
-        return true;
-    }
-
-    private static bool AllAsciiDigits(ReadOnlySpan<char> span)
-    {
-        if (span.Length == 0)
-        {
-            return false;
-        }
-
-        foreach (var c in span)
-        {
-            if (!char.IsAsciiDigit(c))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /// <summary>
-    /// Drops digit separators from number text: an underscore between digits — a hex digit counts in
-    /// a radix literal — followed by layout text, white space and comments. An underscore anywhere
-    /// else stays, for the strict parse to reject; <paramref name="separated"/> tells the caller a
-    /// separator was dropped, because a separated text is an integer, never a float.
-    /// </summary>
-    private static string CleanDigitSeparators(ReadOnlySpan<char> span, out bool separated)
-    {
-        var builder = new StringBuilder(span.Length);
-        separated = false;
-
-        var index = 0;
-        while (index < span.Length)
-        {
-            var c = span[index];
-            if (c == '_' && builder.Length > 0 && char.IsAsciiLetterOrDigit(builder[^1]))
-            {
-                var lookahead = index + 1;
-                SkipDigitSeparatorLayout(span, ref lookahead);
-                if (lookahead < span.Length && char.IsAsciiLetterOrDigit(span[lookahead]))
-                {
-                    separated = true;
-                    index = lookahead;
-                    continue;
-                }
-            }
-
-            builder.Append(c);
-            index++;
-        }
-
-        return builder.ToString();
-    }
-
-    /// <summary>Skips white space and comments after a digit separator's underscore.</summary>
-    private static void SkipDigitSeparatorLayout(ReadOnlySpan<char> span, ref int index)
-    {
-        while (index < span.Length)
-        {
-            if (char.IsWhiteSpace(span[index]))
-            {
-                index++;
-            }
-            else if (span[index] == '%')
-            {
-                while (index < span.Length && span[index] != '\n')
-                {
-                    index++;
-                }
-            }
-            else if (index + 1 < span.Length && span[index] == '/' && span[index + 1] == '*')
-            {
-                var end = span[(index + 2)..].IndexOf("*/");
-                if (end < 0)
-                {
-                    return;
-                }
-
-                index += 2 + end + 2;
-            }
-            else
-            {
-                return;
-            }
-        }
-    }
-
-    private static bool TryParseRadix(ReadOnlySpan<char> span, bool codePoints, out System.Numerics.BigInteger value)
-    {
-        value = 0;
-
-        if (span.Length < 3 || span[0] != '0')
-        {
-            return false;
-        }
-
-        // 0'c is the code of the character that follows, which is how Prolog spells a character literal.
-        if (span[1] == '\'')
-        {
-            if (span.Length == 4 && codePoints && char.IsHighSurrogate(span[2]) && char.IsLowSurrogate(span[3]))
-            {
-                value = char.ConvertToUtf32(span[2], span[3]);
-                return true;
-            }
-
-            if (span.Length != 3)
-            {
-                return false;
-            }
-
-            value = span[2];
-            return true;
-        }
-
-        var radix = char.ToLowerInvariant(span[1]) switch
-        {
-            'x' => 16,
-            'o' => 8,
-            'b' => 2,
-            _ => 0,
-        };
-
-        if (radix == 0)
-        {
-            return false;
-        }
-
-        foreach (var c in span[2..])
-        {
-            var digit =
-                char.IsAsciiDigit(c) ? c - '0'
-                : char.IsAsciiLetter(c) ? char.ToLowerInvariant(c) - 'a' + 10
-                : -1;
-
-            if (digit < 0 || digit >= radix)
-            {
-                return false;
-            }
-
-            value = (value * radix) + digit;
-        }
-
-        return true;
+        return outcome == NumberReader.Outcome.Number;
     }
 }
