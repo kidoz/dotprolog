@@ -12,7 +12,7 @@ public static class CoreBuiltins
     public static void RegisterAll(BytecodeProgram program)
     {
         ArgumentNullException.ThrowIfNull(program);
-        BuiltinRegistry registry = program.Builtins;
+        var registry = program.Builtins;
 
         registry.Register("true", 0, static _ => true);
         registry.Register("fail", 0, static _ => false);
@@ -33,7 +33,7 @@ public static class CoreBuiltins
             1,
             static machine =>
             {
-                Cell code = machine.Argument(0);
+                var code = machine.Argument(0);
                 if (code.Tag == CellTag.Reference)
                 {
                     throw PrologErrors.Instantiation(machine);
@@ -56,7 +56,7 @@ public static class CoreBuiltins
             2,
             static machine =>
             {
-                PrologNumber value = ArithmeticEvaluator.Evaluate(machine, machine.Argument(1));
+                var value = ArithmeticEvaluator.Evaluate(machine, machine.Argument(1));
                 return machine.Unify(machine.Argument(0), ArithmeticEvaluator.ToCell(machine, value));
             }
         );
@@ -75,7 +75,7 @@ public static class CoreBuiltins
             1,
             static machine =>
             {
-                Cell ball = machine.Argument(0);
+                var ball = machine.Argument(0);
                 throw ball.Tag == CellTag.Reference
                     ? PrologErrors.Instantiation(machine)
                     : machine.CreateBall(ball, TermWriter.ToDisplayString(machine, ball, quoted: true));
@@ -172,8 +172,8 @@ public static class CoreBuiltins
     /// </summary>
     private static bool Succ(Machine machine)
     {
-        Cell value = machine.Argument(0);
-        Cell successor = machine.Argument(1);
+        var value = machine.Argument(0);
+        var successor = machine.Argument(1);
 
         if (value.Tag == CellTag.Reference && successor.Tag == CellTag.Reference)
         {
@@ -188,7 +188,7 @@ public static class CoreBuiltins
         if (successor.Tag != CellTag.Reference)
         {
             // succ(X, 0) has no solution, because 0 is not the successor of a natural number.
-            System.Numerics.BigInteger given = IntegerValue(machine, successor);
+            var given = IntegerValue(machine, successor);
             return given.Sign > 0 && machine.Unify(value, IntegerCell(machine, given - 1));
         }
 
@@ -216,9 +216,9 @@ public static class CoreBuiltins
     /// <summary><c>plus(?A, ?B, ?Sum)</c>: any one of the three may be the unbound one.</summary>
     private static bool Plus(Machine machine)
     {
-        Cell first = machine.Argument(0);
-        Cell second = machine.Argument(1);
-        Cell sum = machine.Argument(2);
+        var first = machine.Argument(0);
+        var second = machine.Argument(1);
+        var sum = machine.Argument(2);
 
         var firstIsInteger = first.Tag is CellTag.Integer or CellTag.BigInteger;
         var secondIsInteger = second.Tag is CellTag.Integer or CellTag.BigInteger;
@@ -256,9 +256,9 @@ public static class CoreBuiltins
     /// <summary>Accepts a proper or partial list and reports every other tail as an ISO list type error.</summary>
     private static bool ValidatePartialList(Machine machine)
     {
-        Cell list = machine.Argument(0);
+        var list = machine.Argument(0);
         List<Cell> elements = [];
-        Cell tail = TermList.Read(machine, list, elements);
+        var tail = TermList.Read(machine, list, elements);
 
         return TermList.IsEmpty(machine, tail) || tail.Tag == CellTag.Reference
             ? true
@@ -277,9 +277,9 @@ public static class CoreBuiltins
     /// </summary>
     private static bool ValidateTerminalSequence(Machine machine)
     {
-        Cell sequence = machine.Argument(0);
+        var sequence = machine.Argument(0);
         List<Cell> elements = [];
-        Cell tail = TermList.Read(machine, sequence, elements);
+        var tail = TermList.Read(machine, sequence, elements);
 
         return TermList.IsEmpty(machine, tail) || tail.Tag == CellTag.Reference
             ? true
@@ -290,14 +290,14 @@ public static class CoreBuiltins
     /// <c>'$qualify'(+Module, +Goal, -Resolved)</c>: the predicate a goal names inside a module.
     /// </summary>
     /// <remarks>
-    /// A module's predicates are compiled under the name <c>module:predicate</c>, so resolving is
-    /// interning that name and checking it exists. When it does not, the plain name is used, which is
-    /// what makes a library predicate and anything in <c>user</c> reachable from inside a module.
+    /// A module's predicates are compiled under the name <c>module:predicate</c>.
+    /// Resolution follows local definitions, imports, and reexports. Predefined procedures keep their plain names, is
+    /// and compatibility modules can fall back to a plain user procedure when no module procedure is visible.
     /// </remarks>
     private static bool Qualify(Machine machine)
     {
-        Cell module = machine.Argument(0);
-        Cell goal = machine.Argument(1);
+        var module = machine.Argument(0);
+        var goal = machine.Argument(1);
 
         if (module.Tag == CellTag.Reference || goal.Tag == CellTag.Reference)
         {
@@ -332,21 +332,24 @@ public static class CoreBuiltins
 
         if (goal.Tag == CellTag.Atom)
         {
-            string atomGoalName = machine.Symbols.AtomName(goal.Index);
+            var atomGoalName = machine.Symbols.AtomName(goal.Index);
             if (atomGoalName is "!" or "true" or "fail" or "false")
             {
                 return machine.Unify(machine.Argument(2), goal);
             }
 
-            var qualified = machine.Symbols.InternFunctor($"{prefix}:{atomGoalName}", 0);
+            var atomIndicator = new ModulePredicateIndicator(atomGoalName, 0);
+            var atomDefiningModule = DefiningModule(machine, prefix, atomIndicator);
+            var qualified = machine.Symbols.InternFunctor(QualifiedName(atomDefiningModule, atomGoalName), 0);
             var plain = machine.Symbols.InternFunctor(atomGoalName, 0);
-            bool isoContext =
-                machine.Program.Modules.TryGet(prefix, out ModuleDefinition? atomDefinition) && atomDefinition!.InterfacePrepared;
+            var isoContext = machine.Program.Modules.TryGet(prefix, out var atomDefinition) && atomDefinition!.InterfacePrepared;
             return machine.Unify(
                 machine.Argument(2),
-                machine.Program.IsDefined(qualified)
+                atomDefiningModule != prefix
+                || machine.Program.IsDefined(qualified)
                 || machine.Program.IsDynamic(qualified)
-                || (isoContext && !machine.Program.IsDefined(plain) && !machine.Program.Builtins.TryGetId(plain, out _))
+                || machine.Program.Builtins.TryGetId(qualified, out _)
+                || (isoContext && !IsPredefined(machine, plain))
                     ? Cell.Atom(machine.Symbols.GetFunctor(qualified).NameAtom)
                     : goal
             );
@@ -357,8 +360,8 @@ public static class CoreBuiltins
             throw PrologErrors.Type(machine, "callable", goal);
         }
 
-        Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(goal.Index).Index);
-        string goalName = machine.Symbols.AtomName(functor.NameAtom);
+        var functor = machine.Symbols.GetFunctor(machine.HeapAt(goal.Index).Index);
+        var goalName = machine.Symbols.AtomName(functor.NameAtom);
         if (goalName is "," or ";" or "->" or "*->" && functor.Arity == 2)
         {
             return machine.Unify(
@@ -395,7 +398,7 @@ public static class CoreBuiltins
             );
         }
 
-        string? contextual = (goalName, functor.Arity) switch
+        var contextual = (goalName, functor.Arity) switch
         {
             ("predicate_property", 2) => "$predicate_property",
             ("current_predicate", 1) => "$current_predicate",
@@ -426,29 +429,11 @@ public static class CoreBuiltins
                 contextualArguments[index + 1] = machine.HeapAt(goal.Index + 1 + index);
             }
 
-            Cell contextualGoal = machine.CreateStructure(
+            var contextualGoal = machine.CreateStructure(
                 machine.Symbols.InternFunctor(contextual, contextualArguments.Length),
                 contextualArguments
             );
             return machine.Unify(machine.Argument(2), contextualGoal);
-        }
-
-        var target = machine.Symbols.InternFunctor($"{prefix}:{goalName}", functor.Arity);
-
-        var plainTarget = machine.Symbols.InternFunctor(goalName, functor.Arity);
-        bool strictModuleContext =
-            machine.Program.Modules.TryGet(prefix, out ModuleDefinition? targetModule) && targetModule!.InterfacePrepared;
-        if (
-            !machine.Program.IsDefined(target)
-            && !machine.Program.IsDynamic(target)
-            && (
-                !strictModuleContext
-                || machine.Program.IsDefined(plainTarget)
-                || machine.Program.Builtins.TryGetId(plainTarget, out _)
-            )
-        )
-        {
-            return machine.Unify(machine.Argument(2), goal);
         }
 
         var arguments = new Cell[functor.Arity];
@@ -466,9 +451,10 @@ public static class CoreBuiltins
         }
 
         var indicator = new ModulePredicateIndicator(goalName, functor.Arity);
+        var definingModule = DefiningModule(machine, prefix, indicator);
         if (
-            machine.Program.Modules.TryGet(prefix, out ModuleDefinition? definition)
-            && definition!.TryPredicate(indicator, out ModulePredicateDefinition? metadata)
+            machine.Program.Modules.TryGet(definingModule, out var definition)
+            && definition!.TryPredicate(indicator, out var metadata)
             && metadata!.MetapredicateTemplate is string template
         )
         {
@@ -481,7 +467,70 @@ public static class CoreBuiltins
             }
         }
 
+        var target = machine.Symbols.InternFunctor(QualifiedName(definingModule, goalName), functor.Arity);
+        var plainTarget = machine.Symbols.InternFunctor(goalName, functor.Arity);
+        var strictModuleContext = machine.Program.Modules.TryGet(prefix, out var targetModule) && targetModule!.InterfacePrepared;
+        if (
+            definingModule == prefix
+            && !machine.Program.IsDefined(target)
+            && !machine.Program.IsDynamic(target)
+            && !machine.Program.Builtins.TryGetId(target, out _)
+            && (!strictModuleContext || IsPredefined(machine, plainTarget))
+        )
+        {
+            target = plainTarget;
+        }
+
         return machine.Unify(machine.Argument(2), machine.CreateStructure(target, arguments));
+    }
+
+    private static string DefiningModule(Machine machine, string context, ModulePredicateIndicator indicator)
+    {
+        if (indicator.Name.Contains(':'))
+        {
+            var resolved = machine.Symbols.InternFunctor(indicator.Name, indicator.Arity);
+            if (machine.Program.IsDefined(resolved) || machine.Program.IsDynamic(resolved))
+            {
+                return "user";
+            }
+        }
+
+        var current = context;
+        HashSet<string> visited = [];
+        while (visited.Add(current))
+        {
+            var functor = machine.Symbols.InternFunctor(QualifiedName(current, indicator.Name), indicator.Arity);
+            if (machine.Program.IsDefined(functor) || machine.Program.IsDynamic(functor))
+            {
+                return current;
+            }
+
+            if (
+                !machine.Program.Modules.TryGet(current, out var definition)
+                || !definition!.Imports.TryGetValue(indicator, out var importedFrom)
+            )
+            {
+                break;
+            }
+
+            current = importedFrom;
+        }
+
+        return context;
+    }
+
+    private static string QualifiedName(string module, string name) => module == "user" ? name : $"{module}:{name}";
+
+    private static bool IsPredefined(Machine machine, int functor) =>
+        ((machine.Program.IsDefined(functor) || machine.Program.IsDynamic(functor)) && !machine.Program.IsUserPredicate(functor))
+        || machine.Program.Builtins.TryGetId(functor, out _)
+        || IsImplicitControlProcedure(machine, functor);
+
+    private static bool IsImplicitControlProcedure(Machine machine, int functor)
+    {
+        var value = machine.Symbols.GetFunctor(functor);
+        var name = machine.Symbols.AtomName(value.NameAtom);
+        return (value.Arity == 1 && name is "call" or "\\+") || (value.Arity == 2 && name is "," or ";" or "->" or "*->");
     }
 
     private static Cell WithCallingContext(Machine machine, Cell module, Cell goal, int colonFunctor) =>
@@ -498,8 +547,11 @@ public static class CoreBuiltins
             ("call_cleanup", 2) => [0, 1],
             ("catch", 3) => [0, 2],
             ("with_output_to", 2) => [1],
+            ("initialization", 2) or ("call_nth", 2) or ("countall", 2) => [0],
+            ("freeze", 2) => [1],
             ("call", >= 1 and <= 8) => [0],
-            ("maplist", >= 2 and <= 5) or ("foldl", >= 4 and <= 6) or ("include", 3) or ("exclude", 3) => [0],
+            ("maplist", >= 2 and <= 8) or ("foldl", >= 4 and <= 6) or ("map_assoc", 2 or 3) or ("include", 3) or ("exclude", 3) =>
+                [0],
             ("partition", 4) or ("predsort", 3) or ("phrase", 2 or 3) => [0],
             _ => [],
         };
@@ -516,23 +568,23 @@ public static class CoreBuiltins
     /// </summary>
     private static bool AddArguments(Machine machine)
     {
-        Cell goal = machine.Argument(0);
+        var goal = machine.Argument(0);
 
         if (goal.Tag == CellTag.Reference)
         {
             throw PrologErrors.Instantiation(machine);
         }
 
-        List<Cell> extra = TermList.ReadProper(machine, machine.Argument(1));
+        var extra = TermList.ReadProper(machine, machine.Argument(1));
 
         // A qualified closure keeps its qualification: M:foo with an extra argument is M:foo(X), so
         // that the resolution happens once, when the goal is finally called.
         var colon = machine.Symbols.InternFunctor(":", 2);
         if (goal.Tag == CellTag.Structure && machine.HeapAt(goal.Index).Index == colon && extra.Count > 0)
         {
-            Cell module = machine.HeapAt(goal.Index + 1);
-            Cell inner = machine.Dereference(machine.HeapAt(goal.Index + 2));
-            Cell expanded = machine.CreateVariable();
+            var module = machine.HeapAt(goal.Index + 1);
+            var inner = machine.Dereference(machine.HeapAt(goal.Index + 2));
+            var expanded = machine.CreateVariable();
 
             return Extend(machine, inner, extra, expanded)
                 && machine.Unify(machine.Argument(2), machine.CreateStructure(colon, [module, expanded]));
@@ -560,7 +612,7 @@ public static class CoreBuiltins
             throw PrologErrors.Type(machine, "callable", goal);
         }
 
-        Functor functor = machine.Symbols.GetFunctor(machine.HeapAt(goal.Index).Index);
+        var functor = machine.Symbols.GetFunctor(machine.HeapAt(goal.Index).Index);
         var arity = functor.Arity + extra.Count;
 
         if (arity >= Machine.ArgumentRegisterCount)
@@ -595,8 +647,8 @@ public static class CoreBuiltins
     /// </param>
     private static bool Between(Machine machine, long next)
     {
-        Cell low = machine.Argument(0);
-        Cell high = machine.Argument(1);
+        var low = machine.Argument(0);
+        var high = machine.Argument(1);
 
         if (low.Tag == CellTag.Reference || high.Tag == CellTag.Reference)
         {
@@ -615,20 +667,20 @@ public static class CoreBuiltins
             throw PrologErrors.Type(machine, "integer", high);
         }
 
-        System.Numerics.BigInteger floor = IntegerValue(machine, low);
+        var floor = IntegerValue(machine, low);
         System.Numerics.BigInteger? ceiling = unbounded ? null : IntegerValue(machine, high);
-        Cell target = machine.Argument(2);
+        var target = machine.Argument(2);
 
         // With X already bound, between/3 is a range check with no solutions to enumerate.
         if (target.Tag is CellTag.Integer or CellTag.BigInteger)
         {
-            System.Numerics.BigInteger bound = IntegerValue(machine, target);
+            var bound = IntegerValue(machine, target);
             return bound >= floor && (ceiling is null || bound <= ceiling.Value);
         }
 
         // The retry state is the offset from Low; a running enumeration cannot exhaust a long.
         var offset = next == long.MinValue ? 0 : next;
-        System.Numerics.BigInteger value = floor + offset;
+        var value = floor + offset;
 
         if (ceiling is not null && value > ceiling.Value)
         {

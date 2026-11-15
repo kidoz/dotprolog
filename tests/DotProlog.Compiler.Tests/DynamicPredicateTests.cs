@@ -278,4 +278,43 @@ public sealed class DynamicPredicateTests
             PrologTestHost.RunGoal("assertz(s(1)), assertz(s(2)), assertz((firsts(X) :- s(X), !)), firsts(Y), write(Y), nl")
         );
     }
+
+    [Theory]
+    [InlineData("asserta((call(_) :- true))", "permission_error(modify,static_procedure,call/1)")]
+    [InlineData("assertz((','(_, _) :- true))", "permission_error(modify,static_procedure,(,)/2)")]
+    [InlineData("abolish((;)/2)", "permission_error(modify,static_procedure,(;)/2)")]
+    [InlineData("retractall('->'(_, _))", "permission_error(modify,static_procedure,(->)/2)")]
+    [InlineData("retract('\\\\+'(_))", "permission_error(modify,static_procedure,(\\+)/1)")]
+    [InlineData("clause(call(_), _)", "permission_error(access,private_procedure,call/1)")]
+    [InlineData("clause((_; _), _)", "permission_error(access,private_procedure,(;)/2)")]
+    public void ControlProceduresAreStaticAndPrivate(string goal, string expected)
+    {
+        Assert.Equal(expected, PrologTestHost.RunGoal($"catch(({goal}), error(E, _), write(E))"));
+    }
+
+    [Theory]
+    [InlineData("asserta")]
+    [InlineData("assertz")]
+    public void AssertionRejectsNestedNonCallableBodiesWithoutDefiningThePredicate(string assertion)
+    {
+        var output = PrologTestHost.RunGoal(
+            $"Body = (true, 4), catch({assertion}((nested_invalid :- Body)), "
+                + "error(type_error(callable, Culprit), _), Culprit == Body), "
+                + "\\+ current_predicate(nested_invalid/0), write(ok)"
+        );
+
+        Assert.Equal("ok", output);
+    }
+
+    [Fact]
+    public void AssertionValidatesARuntimeBuiltNestedControlBody()
+    {
+        var output = PrologTestHost.RunGoal(
+            "Body = (fail ; (true, 4)), Clause = (nested_invalid :- Body), "
+                + "catch(assertz(Clause), error(type_error(callable, Culprit), _), Culprit == Body), "
+                + "\\+ current_predicate(nested_invalid/0), write(ok)"
+        );
+
+        Assert.Equal("ok", output);
+    }
 }

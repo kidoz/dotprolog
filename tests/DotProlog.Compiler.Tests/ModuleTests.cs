@@ -21,7 +21,7 @@ public sealed class ModuleTests : IDisposable
     [InlineData("other:p(X).")]
     public void UserModuleResolutionReusesUnchangedSyntax(string source)
     {
-        SyntaxTerm term = Assert.Single(TermReader.ReadProgram(source).Clauses);
+        var term = Assert.Single(TermReader.ReadProgram(source).Clauses);
         var resolver = new ModuleResolver(new ModuleTable(), ModuleTable.UserModule, [new("p", 0), new("p", 1)]);
 
         Assert.Same(term, resolver.ResolveGoal(term));
@@ -74,7 +74,7 @@ public sealed class ModuleTests : IDisposable
     public void InterfaceReaderDirectivesOnlyAffectBodies(PrologLanguageMode mode)
     {
         using var engine = new PrologEngine(mode);
-        LoadResult loaded = engine.ConsultText(
+        var loaded = engine.ConsultText(
             """
             :- module(words).
             :- set_prolog_flag(double_quotes, atom).
@@ -88,7 +88,7 @@ public sealed class ModuleTests : IDisposable
             a.
             text("ok").
             :- end_body(words).
-            """,
+            """ + "\n",
             "interface-reader.pl"
         );
         Assert.Empty(loaded.Diagnostics);
@@ -103,13 +103,13 @@ public sealed class ModuleTests : IDisposable
     public void InterfaceOperatorsCannotParseLaterInterfaceTerms(PrologLanguageMode mode)
     {
         using var engine = new PrologEngine(mode);
-        LoadResult loaded = engine.ConsultText(
+        var loaded = engine.ConsultText(
             """
             :- module(words).
             :- op(500, xfy, join).
             :- export(a join b).
             :- end_module(words).
-            """,
+            """ + "\n",
             "interface-operator.pl"
         );
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id.StartsWith("DPL0", StringComparison.Ordinal));
@@ -122,7 +122,7 @@ public sealed class ModuleTests : IDisposable
     private string Write(string name, string source)
     {
         var path = System.IO.Path.Combine(_directory, name);
-        File.WriteAllText(path, source);
+        File.WriteAllText(path, source + "\n");
         return path.Replace("\\", "/", StringComparison.Ordinal);
     }
 
@@ -132,7 +132,7 @@ public sealed class ModuleTests : IDisposable
         var output = new StringWriter();
         using var engine = new PrologEngine { Output = output, Input = TextReader.Null };
 
-        LoadResult loaded = engine.ConsultFile(path);
+        var loaded = engine.ConsultFile(path);
         Assert.Empty(loaded.Diagnostics);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
         return output.ToString();
@@ -151,7 +151,7 @@ public sealed class ModuleTests : IDisposable
             describe(N) :- helper(N).
 
             helper(N) :- write(from_shapes(N)).
-            """
+            """ + "\n"
         );
 
         var main = Write(
@@ -162,7 +162,7 @@ public sealed class ModuleTests : IDisposable
             helper(N) :- write(from_main(N)).
 
             :- initialization((describe(1), nl, helper(2), nl)).
-            """
+            """ + "\n"
         );
 
         Assert.Equal("from_shapes(1)\nfrom_main(2)\n", RunFile(main));
@@ -179,7 +179,7 @@ public sealed class ModuleTests : IDisposable
             square(N, S) :- S is N * N.
 
             :- initialization((square(3, S), write(S), nl)).
-            """
+            """ + "\n"
         );
 
         Assert.Equal("9\n", RunFile(path));
@@ -198,7 +198,7 @@ public sealed class ModuleTests : IDisposable
             secret :- write(no).
 
             :- initialization(catch(secret, error(existence_error(procedure, PI), _), (write(PI), nl))).
-            """
+            """ + "\n"
         );
 
         Assert.Equal("secret/0\n", RunFile(path));
@@ -213,7 +213,7 @@ public sealed class ModuleTests : IDisposable
             :- module(library, []).
 
             internal(reached).
-            """
+            """ + "\n"
         );
 
         var main = Write(
@@ -221,7 +221,7 @@ public sealed class ModuleTests : IDisposable
             """
             :- use_module(library).
             :- initialization((library:internal(X), write(X), nl)).
-            """
+            """ + "\n"
         );
 
         Assert.Equal("reached\n", RunFile(main));
@@ -237,7 +237,7 @@ public sealed class ModuleTests : IDisposable
 
             first(1).
             second(2).
-            """
+            """ + "\n"
         );
 
         var main = Write(
@@ -246,7 +246,7 @@ public sealed class ModuleTests : IDisposable
             :- use_module(pair, [first/1]).
 
             :- initialization((first(A), write(A), nl)).
-            """
+            """ + "\n"
         );
 
         Assert.Equal("1\n", RunFile(main));
@@ -261,12 +261,12 @@ public sealed class ModuleTests : IDisposable
             :- module(library, [visible/0]).
             visible.
             hidden.
-            """
+            """ + "\n"
         );
         var main = Write("main.pl", ":- use_module(library, [hidden/0]).\n");
 
         using var engine = new PrologEngine { Output = TextWriter.Null };
-        LoadResult loaded = engine.ConsultFile(main);
+        var loaded = engine.ConsultFile(main);
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidModuleImport);
     }
@@ -279,12 +279,12 @@ public sealed class ModuleTests : IDisposable
             """
             :- module(library, [visible/0]).
             visible.
-            """
+            """ + "\n"
         );
         var main = Write("main.pl", ":- use_module(library, [visible]).\n");
 
         using var engine = new PrologEngine { Output = TextWriter.Null };
-        LoadResult loaded = engine.ConsultFile(main);
+        var loaded = engine.ConsultFile(main);
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidModuleImport);
     }
@@ -300,11 +300,11 @@ public sealed class ModuleTests : IDisposable
             :- module(main, []).
             :- use_module(first).
             :- use_module(second).
-            """
+            """ + "\n"
         );
 
         using var engine = new PrologEngine { Output = TextWriter.Null };
-        LoadResult loaded = engine.ConsultFile(main);
+        var loaded = engine.ConsultFile(main);
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidModuleImport);
     }
@@ -317,11 +317,11 @@ public sealed class ModuleTests : IDisposable
             """
             before.
             :- module(late, [before/0]).
-            """
+            """ + "\n"
         );
 
         using var engine = new PrologEngine { Output = TextWriter.Null };
-        LoadResult loaded = engine.ConsultFile(path);
+        var loaded = engine.ConsultFile(path);
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidModuleDeclaration);
     }
@@ -334,11 +334,11 @@ public sealed class ModuleTests : IDisposable
             """
             :- module(first, []).
             :- module(second, []).
-            """
+            """ + "\n"
         );
 
         using var engine = new PrologEngine { Output = TextWriter.Null };
-        LoadResult loaded = engine.ConsultFile(path);
+        var loaded = engine.ConsultFile(path);
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidModuleDeclaration);
     }
@@ -354,7 +354,7 @@ public sealed class ModuleTests : IDisposable
             go :- length([a, b, c], N), atom_length(hello, M), Total is N + M, write(Total), nl.
 
             :- initialization(go).
-            """
+            """ + "\n"
         );
 
         Assert.Equal("8\n", RunFile(path));
@@ -375,7 +375,7 @@ public sealed class ModuleTests : IDisposable
             double(X, Y) :- Y is X * 2.
 
             :- initialization(go).
-            """
+            """ + "\n"
         );
 
         Assert.Equal("[2,4,6]\n", RunFile(path));
@@ -395,7 +395,7 @@ public sealed class ModuleTests : IDisposable
             item(b).
 
             :- initialization(go).
-            """
+            """ + "\n"
         );
 
         Assert.Equal("[a,b]\n", RunFile(path));
@@ -414,7 +414,7 @@ public sealed class ModuleTests : IDisposable
             local(X) :- write(ran(X)), nl.
 
             :- initialization(go).
-            """
+            """ + "\n"
         );
 
         Assert.Equal("ran(x)\n", RunFile(path));
@@ -430,7 +430,7 @@ public sealed class ModuleTests : IDisposable
             :- meta_predicate twice(0).
 
             twice(G) :- call(G), call(G).
-            """
+            """ + "\n"
         );
 
         var main = Write(
@@ -439,7 +439,7 @@ public sealed class ModuleTests : IDisposable
             :- use_module(runner).
 
             :- initialization(twice(write(x))).
-            """
+            """ + "\n"
         );
 
         Assert.Equal("xx", RunFile(main));
@@ -456,7 +456,7 @@ public sealed class ModuleTests : IDisposable
 
             put(X) :- assertz(fact(X)).
             all(L) :- findall(X, fact(X), L).
-            """
+            """ + "\n"
         );
 
         var main = Write(
@@ -466,7 +466,7 @@ public sealed class ModuleTests : IDisposable
             :- dynamic fact/1.
 
             :- initialization((assertz(fact(mine)), put(theirs), all(L), write(L), nl, findall(X, fact(X), M), write(M), nl)).
-            """
+            """ + "\n"
         );
 
         Assert.Equal("[theirs]\n[mine]\n", RunFile(main));
@@ -484,7 +484,7 @@ public sealed class ModuleTests : IDisposable
             :- dynamic note/1.
 
             all_notes(L) :- findall(X, note(X), L).
-            """
+            """ + "\n"
         );
 
         var main = Write(
@@ -497,7 +497,7 @@ public sealed class ModuleTests : IDisposable
                  notes:assertz(note(two)),
                  all_notes(L), write(L), nl,
                  findall(X, note(X), M), write(M), nl)).
-            """
+            """ + "\n"
         );
 
         Assert.Equal("[one,two]\n[one,two]\n", RunFile(main));
@@ -513,7 +513,7 @@ public sealed class ModuleTests : IDisposable
 
             digits([D|T]) --> [D], digits(T).
             digits([D])   --> [D].
-            """
+            """ + "\n"
         );
 
         var main = Write(
@@ -522,7 +522,7 @@ public sealed class ModuleTests : IDisposable
             :- use_module(grammar).
 
             :- initialization((phrase(digits(D), [1, 2]), write(D), nl)).
-            """
+            """ + "\n"
         );
 
         Assert.Equal("[1,2]\n", RunFile(main));
@@ -542,7 +542,7 @@ public sealed class ModuleTests : IDisposable
             token(X) --> [X].
 
             :- initialization((phrase(token(a), [a]), write(ok), nl)).
-            """
+            """ + "\n"
         );
 
         Assert.Equal("ok\n", RunFile(path));
@@ -557,7 +557,7 @@ public sealed class ModuleTests : IDisposable
         var path = Write($"{declaration}-bad.pl", $":- {declaration} token//-1.\n");
 
         using var engine = new PrologEngine { Output = TextWriter.Null };
-        LoadResult loaded = engine.ConsultFile(path);
+        var loaded = engine.ConsultFile(path);
 
         Assert.False(loaded.Success);
     }
@@ -573,7 +573,7 @@ public sealed class ModuleTests : IDisposable
             tick :- write(tick).
 
             :- initialization((write(loaded), nl)).
-            """
+            """ + "\n"
         );
 
         Write(
@@ -583,7 +583,7 @@ public sealed class ModuleTests : IDisposable
             :- use_module(counter).
 
             go :- tick.
-            """
+            """ + "\n"
         );
 
         var main = Write(
@@ -593,7 +593,7 @@ public sealed class ModuleTests : IDisposable
             :- use_module(middle).
 
             :- initialization((go, nl)).
-            """
+            """ + "\n"
         );
 
         Assert.Equal("loaded\ntick\n", RunFile(main));
@@ -608,7 +608,7 @@ public sealed class ModuleTests : IDisposable
             helper(X) :- write(X).
 
             :- initialization((helper(unqualified), nl)).
-            """
+            """ + "\n"
         );
 
         Assert.Equal("unqualified\n", RunFile(path));
@@ -620,7 +620,7 @@ public sealed class ModuleTests : IDisposable
         var path = Write("missing.pl", ":- use_module(nowhere).\n");
 
         using var engine = new PrologEngine { Output = TextWriter.Null };
-        LoadResult loaded = engine.ConsultFile(path);
+        var loaded = engine.ConsultFile(path);
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.ModuleNotFound);
     }
@@ -631,7 +631,7 @@ public sealed class ModuleTests : IDisposable
         var path = Write("bad.pl", ":- module(bad, [oops]).\n");
 
         using var engine = new PrologEngine { Output = TextWriter.Null };
-        LoadResult loaded = engine.ConsultFile(path);
+        var loaded = engine.ConsultFile(path);
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidModuleDeclaration);
     }
@@ -664,7 +664,7 @@ public sealed class ModuleTests : IDisposable
         var output = new StringWriter();
         using var engine = new PrologEngine(mode) { Output = output, Input = TextReader.Null };
 
-        LoadResult loaded = engine.ConsultText(source, "iso-modules.pl");
+        var loaded = engine.ConsultText(source + "\n", "iso-modules.pl");
 
         Assert.Empty(loaded.Diagnostics);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
@@ -681,7 +681,7 @@ public sealed class ModuleTests : IDisposable
             """;
 
         using var engine = new PrologEngine { Output = TextWriter.Null };
-        LoadResult loaded = engine.ConsultText(source, "bad-iso-modules.pl");
+        var loaded = engine.ConsultText(source + "\n", "bad-iso-modules.pl");
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidIsoModuleText);
     }
@@ -691,12 +691,12 @@ public sealed class ModuleTests : IDisposable
     {
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
 
-        LoadResult loaded = engine.ConsultText(
+        var loaded = engine.ConsultText(
             """
             :- body(missing).
             p.
             :- end_body(missing).
-            """,
+            """ + "\n",
             "missing-interface.pl"
         );
 
@@ -709,21 +709,21 @@ public sealed class ModuleTests : IDisposable
         var output = new StringWriter();
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
-        LoadResult interfaceLoaded = engine.ConsultText(
+        var interfaceLoaded = engine.ConsultText(
             """
             :- module(separate).
             :- export(value/1).
             :- end_module(separate).
-            """,
+            """ + "\n",
             "separate-interface.pl"
         );
-        LoadResult bodyLoaded = engine.ConsultText(
+        var bodyLoaded = engine.ConsultText(
             """
             :- body(separate).
             value(ok).
             :- initialization((value(X), write(X))).
             :- end_body(separate).
-            """,
+            """ + "\n",
             "separate-body.pl"
         );
 
@@ -755,7 +755,7 @@ public sealed class ModuleTests : IDisposable
         var output = new StringWriter();
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
-        LoadResult loaded = engine.ConsultText(source, "nested-user-body.pl");
+        var loaded = engine.ConsultText(source + "\n", "nested-user-body.pl");
 
         Assert.Empty(loaded.Diagnostics);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
@@ -789,7 +789,7 @@ public sealed class ModuleTests : IDisposable
         var output = new StringWriter();
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
-        LoadResult loaded = engine.ConsultText(source, "mixed-module-text.pl");
+        var loaded = engine.ConsultText(source + "\n", "mixed-module-text.pl");
 
         Assert.Empty(loaded.Diagnostics);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
@@ -823,7 +823,7 @@ public sealed class ModuleTests : IDisposable
         var output = new StringWriter();
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
-        LoadResult loaded = engine.ConsultText(source, "metapredicate-export.pl");
+        var loaded = engine.ConsultText(source + "\n", "metapredicate-export.pl");
 
         Assert.Empty(loaded.Diagnostics);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
@@ -836,12 +836,12 @@ public sealed class ModuleTests : IDisposable
     public void AnIsoInterfaceCannotExportAPredefinedProcedure(string indicator)
     {
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
-        LoadResult loaded = engine.ConsultText(
+        var loaded = engine.ConsultText(
             $"""
             :- module(invalid).
             :- export({indicator}).
             :- end_module(invalid).
-            """,
+            """ + "\n",
             "invalid-export.pl"
         );
 
@@ -856,12 +856,12 @@ public sealed class ModuleTests : IDisposable
     public void AnIsoInterfaceRejectsInvalidDeclarations(string declaration)
     {
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
-        LoadResult loaded = engine.ConsultText(
+        var loaded = engine.ConsultText(
             $"""
             :- module(invalid).
             {declaration}
             :- end_module(invalid).
-            """,
+            """ + "\n",
             "invalid-interface.pl"
         );
 
@@ -881,7 +881,7 @@ public sealed class ModuleTests : IDisposable
             """;
 
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
-        LoadResult loaded = engine.ConsultText(source, "invalid-body-heads.pl");
+        var loaded = engine.ConsultText(source + "\n", "invalid-body-heads.pl");
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.InvalidIsoModuleText);
     }
@@ -920,7 +920,7 @@ public sealed class ModuleTests : IDisposable
         var output = new StringWriter();
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
-        LoadResult loaded = engine.ConsultText(source, "iso-reflection.pl");
+        var loaded = engine.ConsultText(source + "\n", "iso-reflection.pl");
 
         Assert.Empty(loaded.Diagnostics);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
@@ -976,10 +976,10 @@ public sealed class ModuleTests : IDisposable
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso)
         {
             Output = output,
-            Input = new StringReader("alice likes bob."),
+            Input = new StringReader("alice likes bob.\n"),
         };
 
-        LoadResult loaded = engine.ConsultText(source, "iso-reader-state.pl");
+        var loaded = engine.ConsultText(source + "\n", "iso-reader-state.pl");
 
         Assert.Empty(loaded.Diagnostics);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
@@ -1030,7 +1030,7 @@ public sealed class ModuleTests : IDisposable
         var output = new StringWriter();
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
-        LoadResult loaded = engine.ConsultText(source, "iso-database.pl");
+        var loaded = engine.ConsultText(source + "\n", "iso-database.pl");
 
         Assert.Empty(loaded.Diagnostics);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
@@ -1068,7 +1068,7 @@ public sealed class ModuleTests : IDisposable
         var output = new StringWriter();
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
-        LoadResult loaded = engine.ConsultText(source, "iso-static-clause.pl");
+        var loaded = engine.ConsultText(source + "\n", "iso-static-clause.pl");
 
         Assert.Empty(loaded.Diagnostics);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
@@ -1079,13 +1079,13 @@ public sealed class ModuleTests : IDisposable
     public void ModernDynamicModuleClausesRetainTheirResolvedBodies()
     {
         using var engine = new PrologEngine();
-        LoadResult loaded = engine.ConsultText(
+        var loaded = engine.ConsultText(
             """
             :- module(memo, [item/1]).
             :- dynamic item/1.
             local(one).
             item(X) :- local(X).
-            """,
+            """ + "\n",
             "modern-stored-clause.pl"
         );
 
@@ -1122,7 +1122,7 @@ public sealed class ModuleTests : IDisposable
         var output = new StringWriter();
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
-        LoadResult loaded = engine.ConsultText(source, "iso-dynamic-clause.pl");
+        var loaded = engine.ConsultText(source + "\n", "iso-dynamic-clause.pl");
 
         Assert.Empty(loaded.Diagnostics);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
@@ -1162,7 +1162,7 @@ public sealed class ModuleTests : IDisposable
         var output = new StringWriter();
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
-        LoadResult loaded = engine.ConsultText(source, "iso-meta.pl");
+        var loaded = engine.ConsultText(source + "\n", "iso-meta.pl");
 
         Assert.Empty(loaded.Diagnostics);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
@@ -1198,7 +1198,7 @@ public sealed class ModuleTests : IDisposable
         var output = new StringWriter();
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
-        LoadResult loaded = engine.ConsultText(source, "iso-explicit-context.pl");
+        var loaded = engine.ConsultText(source + "\n", "iso-explicit-context.pl");
 
         Assert.Empty(loaded.Diagnostics);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
@@ -1222,7 +1222,7 @@ public sealed class ModuleTests : IDisposable
         var output = new StringWriter();
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
-        LoadResult loaded = engine.ConsultText(source, "iso-unknown.pl");
+        var loaded = engine.ConsultText(source + "\n", "iso-unknown.pl");
 
         Assert.Empty(loaded.Diagnostics);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
@@ -1237,7 +1237,7 @@ public sealed class ModuleTests : IDisposable
     {
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = TextWriter.Null };
 
-        LoadResult loaded = engine.ConsultText(source, "compatibility.pl");
+        var loaded = engine.ConsultText(source + "\n", "compatibility.pl");
 
         Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Id == CompilerDiagnosticIds.StrictIsoViolation);
     }
@@ -1280,7 +1280,7 @@ public sealed class ModuleTests : IDisposable
         var output = new StringWriter();
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
 
-        LoadResult loaded = engine.ConsultText(source, "iso-reexport.pl");
+        var loaded = engine.ConsultText(source + "\n", "iso-reexport.pl");
 
         Assert.Empty(loaded.Diagnostics);
         Assert.Equal(RunResult.Success, engine.RunPendingGoals());
@@ -1311,7 +1311,7 @@ public sealed class ModuleTests : IDisposable
     {
         var catalog = new ModuleCatalog();
         var runtimeIndicator = new ModulePredicateIndicator("apply", 1);
-        ModulePredicateDefinition generated = catalog.Declare("generated").Predicate(runtimeIndicator);
+        var generated = catalog.Declare("generated").Predicate(runtimeIndicator);
         generated.Exported = true;
         generated.Defined = true;
         generated.MetapredicateTemplate = ":";
@@ -1324,5 +1324,306 @@ public sealed class ModuleTests : IDisposable
         Assert.Contains(compilerIndicator, modules.ExportsOf("generated"));
         Assert.Equal("generated", modules.ImportedFrom("runtime", compilerIndicator));
         Assert.Equal([0], Assert.IsType<int[]>(modules.MetaArgumentsOf("runtime", compilerIndicator)));
+    }
+
+    [Theory]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    [InlineData(PrologLanguageMode.Modern)]
+    public void RuntimeQualifiedGoalsFollowImportsAndReexportsDespiteCollisions(PrologLanguageMode mode)
+    {
+        const string source = """
+            :- module(other).
+            :- export(q/1).
+            :- end_module(other).
+            :- body(other).
+            q(wrong).
+            :- end_body(other).
+
+            :- module(base).
+            :- export(q/1).
+            :- end_module(base).
+            :- body(base).
+            q(right).
+            :- end_body(base).
+
+            :- module(facade).
+            :- reexport(base).
+            :- end_module(facade).
+            :- body(facade).
+            :- end_body(facade).
+
+            :- module(c).
+            :- export(run/0).
+            :- end_module(c).
+            :- body(c).
+            :- import(facade).
+            run :- Goal = q(X), call(Goal), write(X), c:q(Y), write(Y).
+            :- end_body(c).
+
+            q(user).
+            :- initialization(c:run).
+            """;
+
+        var output = new StringWriter();
+        using var engine = new PrologEngine(mode) { Output = output, Input = TextReader.Null };
+
+        var loaded = engine.ConsultText(source + "\n", "runtime-import-lookup.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("rightright", output.ToString());
+    }
+
+    [Fact]
+    public void RuntimeQualificationDoesNotFallBackToAnInvisibleUserProcedure()
+    {
+        const string source = """
+            :- module(k).
+            :- end_module(k).
+            :- body(k).
+            :- end_body(k).
+
+            a1(user).
+            :- initialization(catch(k:a1, error(existence_error(procedure, k:a1/0), _), write(ok))).
+            """;
+
+        var output = new StringWriter();
+        using var engine = new PrologEngine(PrologLanguageMode.StrictIso) { Output = output, Input = TextReader.Null };
+
+        var loaded = engine.ConsultText(source + "\n", "invisible-user-procedure.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("ok", output.ToString());
+    }
+
+    [Theory]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    [InlineData(PrologLanguageMode.Modern)]
+    public void QualifiedBuiltInMetaPredicatesRetainTheirCallingContextDespiteCollisions(PrologLanguageMode mode)
+    {
+        const string source = """
+            :- module(c).
+            :- export(local/1).
+            :- end_module(c).
+            :- body(c).
+            local(c).
+            :- end_body(c).
+
+            :- module(caller).
+            :- export(run/0).
+            :- end_module(caller).
+            :- body(caller).
+            run :-
+                c:call(local(A)), write(A),
+                c:once(local(B)), write(B),
+                c:findall(X, local(X), L), write(L),
+                c:bagof(Y, local(Y), Bag), write(Bag),
+                c:setof(Z, local(Z), Set), write(Set),
+                c:catch(local(D), _, fail), write(D),
+                c:catch(throw(ball), ball, local(E)), write(E).
+            :- end_body(caller).
+
+            local(user).
+            :- initialization(caller:run).
+            """;
+
+        var output = new StringWriter();
+        using var engine = new PrologEngine(mode) { Output = output, Input = TextReader.Null };
+
+        var loaded = engine.ConsultText(source + "\n", "qualified-meta-context.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("cc[c][c][c]cc", output.ToString());
+    }
+
+    [Fact]
+    public void QualifiedModernMetaPredicatesCoverFreezeAndExtendedHigherOrderArities()
+    {
+        const string source = """
+            :- module(modern_meta).
+            :- export(run/0).
+            :- end_module(modern_meta).
+            :- body(modern_meta).
+            run :-
+                modern_meta:freeze(X, local(freeze)), X = 1,
+                modern_meta:maplist(local5, [a], [b], [c], [d], [e]),
+                modern_meta:maplist(local6, [a], [b], [c], [d], [e], [f]),
+                modern_meta:maplist(local7, [a], [b], [c], [d], [e], [f], [g]),
+                list_to_assoc([a-one], Assoc), modern_meta:map_assoc(local, Assoc),
+                modern_meta:call_nth(local(count), Nth),
+                modern_meta:countall(local(count), Count),
+                modern_meta:initialization(local(initialization), after_load),
+                write(Nth-Count).
+            local(Value) :- write(Value).
+            local5(_, _, _, _, _) :- write(maplist5).
+            local6(_, _, _, _, _, _) :- write(maplist6).
+            local7(_, _, _, _, _, _, _) :- write(maplist7).
+            :- end_body(modern_meta).
+
+            local(user).
+            :- initialization(modern_meta:run).
+            """;
+
+        var output = new StringWriter();
+        using var engine = new PrologEngine { Output = output, Input = TextReader.Null };
+
+        var loaded = engine.ConsultText(source + "\n", "modern-meta-positions.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("freezemaplist5maplist6maplist7onecountcountinitialization1-1", output.ToString());
+    }
+
+    [Theory]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    [InlineData(PrologLanguageMode.Modern)]
+    public void RuntimeBuiltDatabaseGoalsRejectQualifiedImportedProcedures(PrologLanguageMode mode)
+    {
+        const string source = """
+            :- module(provider).
+            :- export(e/1).
+            :- export(f/0).
+            :- end_module(provider).
+            :- body(provider).
+            :- dynamic(e/1).
+            :- dynamic(f/0).
+            e(orig).
+            f.
+            :- end_body(provider).
+
+            :- module(imp).
+            :- end_module(imp).
+            :- body(imp).
+            :- import(provider).
+            :- end_body(imp).
+
+            :- initialization((
+                A = asserta(imp:e(zed)),
+                catch(call(A), error(permission_error(modify, implicit, e/1), _), write(assert)),
+                B = abolish(imp:f/0),
+                catch(call(B), error(permission_error(modify, implicit, f/0), _), write(abolish)),
+                C = retract(imp:e(orig)),
+                catch(call(C), error(permission_error(modify, implicit, e/1), _), write(retract)),
+                D = clause(imp:e(_), _),
+                catch(call(D), error(permission_error(access, implicit, e/1), _), write(clause)),
+                findall(X, imp:e(X), Items), write(Items)
+            )).
+            """;
+
+        var output = new StringWriter();
+        using var engine = new PrologEngine(mode) { Output = output, Input = TextReader.Null };
+
+        var loaded = engine.ConsultText(source + "\n", "qualified-import-modification.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("assertabolishretractclause[orig]", output.ToString());
+    }
+
+    [Theory]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    [InlineData(PrologLanguageMode.Modern)]
+    public void RuntimeBuiltAssertionNormalizesAQualifiedRuleInsideAnotherQualification(PrologLanguageMode mode)
+    {
+        const string source = """
+            :- module(m).
+            :- end_module(m).
+            :- body(m).
+            :- end_body(m).
+
+            :- module(dm).
+            :- export(h/0).
+            :- end_module(dm).
+            :- body(dm).
+            :- dynamic(h/0).
+            :- end_body(dm).
+
+            :- initialization((
+                B = true,
+                Rule =.. [':-', dm:h, B],
+                Goal = asserta(m:Rule),
+                call(Goal),
+                dm:h,
+                write(ok)
+            )).
+            """;
+
+        var output = new StringWriter();
+        using var engine = new PrologEngine(mode) { Output = output, Input = TextReader.Null };
+
+        var loaded = engine.ConsultText(source + "\n", "nested-qualified-rule.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("ok", output.ToString());
+    }
+
+    [Theory]
+    [InlineData(PrologLanguageMode.StrictIso)]
+    [InlineData(PrologLanguageMode.Modern)]
+    public void RuntimeBuiltClauseEnumeratesQualifiedStaticClauses(PrologLanguageMode mode)
+    {
+        const string source = """
+            :- module(fixed).
+            :- export(p/1).
+            :- end_module(fixed).
+            :- body(fixed).
+            p(one).
+            p(two).
+            :- end_body(fixed).
+
+            :- initialization((
+                Goal = clause(fixed:p(X), B),
+                findall(X-B, call(Goal), Clauses),
+                write(Clauses)
+            )).
+            """;
+
+        var output = new StringWriter();
+        using var engine = new PrologEngine(mode) { Output = output, Input = TextReader.Null };
+
+        var loaded = engine.ConsultText(source + "\n", "qualified-static-clause.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("[one-true,two-true]", output.ToString());
+    }
+
+    [Theory]
+    [InlineData(PrologLanguageMode.StrictIso, "asserta(fixed:p(two))")]
+    [InlineData(PrologLanguageMode.StrictIso, "retract(fixed:p(one))")]
+    [InlineData(PrologLanguageMode.StrictIso, "retractall(fixed:p(_))")]
+    [InlineData(PrologLanguageMode.StrictIso, "abolish(fixed:p/1)")]
+    [InlineData(PrologLanguageMode.Modern, "asserta(fixed:p(two))")]
+    [InlineData(PrologLanguageMode.Modern, "retract(fixed:p(one))")]
+    [InlineData(PrologLanguageMode.Modern, "retractall(fixed:p(_))")]
+    [InlineData(PrologLanguageMode.Modern, "abolish(fixed:p/1)")]
+    public void RuntimeBuiltDatabaseGoalsRejectQualifiedStaticProcedures(PrologLanguageMode mode, string operation)
+    {
+        var source = $"""
+                      :- module(fixed).
+                      :- export(p/1).
+                      :- end_module(fixed).
+                      :- body(fixed).
+                      p(one).
+                      :- end_body(fixed).
+
+                      :- initialization((
+                          Goal = {operation},
+                          catch(call(Goal), error(permission_error(modify, static_procedure, _), _), write(ok)),
+                          fixed:p(one)
+                      )).
+                      """;
+
+        var output = new StringWriter();
+        using var engine = new PrologEngine(mode) { Output = output, Input = TextReader.Null };
+
+        var loaded = engine.ConsultText(source + "\n", "qualified-static-modification.pl");
+
+        Assert.Empty(loaded.Diagnostics);
+        Assert.Equal(RunResult.Success, engine.RunPendingGoals());
+        Assert.Equal("ok", output.ToString());
     }
 }
