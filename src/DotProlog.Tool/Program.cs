@@ -77,7 +77,7 @@ internal static class Program
 
     private static int Run(ReadOnlySpan<string> args, TextWriter output, TextWriter error)
     {
-        PrologLanguageMode languageMode = PrologLanguageMode.Modern;
+        var languageMode = PrologLanguageMode.Modern;
         List<string> flagEntries = [];
         List<string> paths = [];
         string? packageDirectory = null;
@@ -143,7 +143,7 @@ internal static class Program
             return ExitUsage;
         }
 
-        if (!TryParseFlagEntries(flagEntries, error, out PrologFlagOverrides flagOverrides))
+        if (!TryParseFlagEntries(flagEntries, error, out var flagOverrides))
         {
             return ExitUsage;
         }
@@ -155,6 +155,11 @@ internal static class Program
             return ExitUsage;
         }
 
+        if (!TryCreateProgram(languageMode, flagOverrides, error, out _))
+        {
+            return ExitUsage;
+        }
+
         using var engine = new PrologEngine(languageMode, flagOverrides) { Output = output, Error = error };
 
         // Directives run while the file loads, so an error one raises surfaces here as it would from
@@ -163,15 +168,24 @@ internal static class Program
         {
             if (packageDirectory is not null)
             {
-                var version = typeof(Program).Assembly.GetName().Version!;
-                engine.LibraryFiles = new PackageWorkspace(packageDirectory).GetLibraries(
-                    "dotprolog",
-                    $"{version.Major}.{version.Minor}.{version.Build}"
-                );
+                try
+                {
+                    var version = typeof(Program).Assembly.GetName().Version!;
+                    engine.LibraryFiles = new PackageWorkspace(packageDirectory).GetLibraries(
+                        "dotprolog",
+                        $"{version.Major}.{version.Minor}.{version.Build}"
+                    );
+                }
+                catch (Exception exception)
+                    when (exception is ArgumentException or InvalidOperationException or NotSupportedException)
+                {
+                    error.WriteLine($"error: {exception.Message}");
+                    return ExitCompileError;
+                }
             }
 
-            LoadResult loaded = engine.ConsultFile(path);
-            foreach (Diagnostic diagnostic in loaded.Diagnostics)
+            var loaded = engine.ConsultFile(path);
+            foreach (var diagnostic in loaded.Diagnostics)
             {
                 error.WriteLine(diagnostic.ToString());
             }
@@ -181,7 +195,7 @@ internal static class Program
                 return ExitCompileError;
             }
 
-            RunResult result = engine.RunPendingGoals();
+            var result = engine.RunPendingGoals();
             output.Flush();
 
             return result switch
@@ -212,8 +226,8 @@ internal static class Program
 
     private static int Lint(ReadOnlySpan<string> args, TextWriter error)
     {
-        PrologLanguageMode languageMode = PrologLanguageMode.Modern;
-        PrologLintOptions lintOptions = PrologLintOptions.SemanticOnly;
+        var languageMode = PrologLanguageMode.Modern;
+        var lintOptions = PrologLintOptions.SemanticOnly;
         var warningsAsErrors = false;
         int? indentSize = null;
         int? maxLineLength = null;
@@ -286,7 +300,7 @@ internal static class Program
                 }
 
                 var selected = args[++index];
-                string? rule = selected.ToUpperInvariant() switch
+                var rule = selected.ToUpperInvariant() switch
                 {
                     LintDiagnosticIds.PossibleNonSteadfastClause => LintDiagnosticIds.PossibleNonSteadfastClause,
                     LintDiagnosticIds.PossibleNonTailRecursion => LintDiagnosticIds.PossibleNonTailRecursion,
@@ -416,7 +430,7 @@ internal static class Program
             return ExitUsage;
         }
 
-        if (!TryParseFlagEntries(flagEntries, error, out PrologFlagOverrides flagOverrides))
+        if (!TryParseFlagEntries(flagEntries, error, out var flagOverrides))
         {
             return ExitUsage;
         }
@@ -463,8 +477,8 @@ internal static class Program
                 continue;
             }
 
-            ContractReadResult result = ContractReader.Read(text, "DotProlog", absolute);
-            foreach (Diagnostic diagnostic in result.Diagnostics)
+            var result = ContractReader.Read(text, "DotProlog", absolute);
+            foreach (var diagnostic in result.Diagnostics)
             {
                 error.WriteLine(diagnostic.ToString());
                 foundErrors |= diagnostic.Severity == DiagnosticSeverity.Error;
@@ -500,10 +514,14 @@ internal static class Program
                 continue;
             }
 
-            var program = new BytecodeProgram(languageMode, flagOverrides);
-            PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(absolute, source, program);
+            if (!TryCreateProgram(languageMode, flagOverrides, error, out var program))
+            {
+                return ExitUsage;
+            }
+
+            var loaded = PrologLintSourceLoader.Load(absolute, source, program);
             sources.Add(loaded.Source);
-            foreach (Diagnostic diagnostic in loaded.Diagnostics)
+            foreach (var diagnostic in loaded.Diagnostics)
             {
                 error.WriteLine(diagnostic.ToString());
                 foundErrors |= diagnostic.Severity == DiagnosticSeverity.Error;
@@ -511,16 +529,16 @@ internal static class Program
             }
         }
 
-        foreach (Diagnostic diagnostic in PrologLinter.AnalyzeProgram(sources, lintOptions))
+        foreach (var diagnostic in PrologLinter.AnalyzeProgram(sources, lintOptions))
         {
             error.WriteLine(diagnostic.ToString());
             foundErrors |= diagnostic.Severity == DiagnosticSeverity.Error;
             foundWarnings |= diagnostic.Severity == DiagnosticSeverity.Warning;
         }
 
-        foreach ((ModuleContract contract, string fileName) in contracts)
+        foreach ((var contract, var fileName) in contracts)
         {
-            foreach (Diagnostic diagnostic in PrologContractLinter.Analyze(sources, contract, fileName, lintOptions))
+            foreach (var diagnostic in PrologContractLinter.Analyze(sources, contract, fileName, lintOptions))
             {
                 error.WriteLine(diagnostic.ToString());
                 foundErrors |= diagnostic.Severity == DiagnosticSeverity.Error;
@@ -561,6 +579,26 @@ internal static class Program
 
         flagEntries.Add(args[++index]);
         return true;
+    }
+
+    private static bool TryCreateProgram(
+        PrologLanguageMode languageMode,
+        PrologFlagOverrides flagOverrides,
+        TextWriter error,
+        out BytecodeProgram program
+    )
+    {
+        try
+        {
+            program = new BytecodeProgram(languageMode, flagOverrides);
+            return true;
+        }
+        catch (ArgumentException exception)
+        {
+            error.WriteLine($"error: invalid flag override: {exception.Message}");
+            program = null!;
+            return false;
+        }
     }
 
     private static bool TryParseFlagEntries(List<string> flagEntries, TextWriter error, out PrologFlagOverrides flagOverrides)
