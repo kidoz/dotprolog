@@ -131,7 +131,7 @@ iso_review_case(trig_endpoints, (A is asin(0), B is acos(1), C is tan(0), [A,B,C
 % Cor.1 6.3.7: atom-valued double quotes take part in the grammar.
 :- set_prolog_flag(double_quotes, atom).
 iso_review_case(double_quoted_infix, (1 "+" 2 * 3 == 1 + 2 * 3)).
-iso_review_case(double_quoted_prefix, ("-"7 == -(7))).
+iso_review_case(double_quoted_prefix, ("-" 7 == -(7))).
 iso_review_case(double_quoted_functor, ("pair"(left,right) == pair(left,right))).
 iso_review_case(double_quoted_operator_functor, ("+"(4,5) == +(4,5))).
 

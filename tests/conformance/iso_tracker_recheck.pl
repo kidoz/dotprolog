@@ -40,5 +40,28 @@ tracker_case(atan_large_integer,
 % Part 1 9.3.5.3 d concerns the nonzero mathematical result, not the input size.
 tracker_case(exp_underflow, R is exp(-(10^400)), R, error(evaluation_error(underflow))).
 
+% StrictIso stream reads currently reject these valid quoted-token forms with
+% syntax_error('DPL0003'). Keep them visible until the runtime reader is fixed.
+tracker_case(backquoted_atom,
+    (tracker_read_atom('`hello`', Term), Term == hello), ok, solutions([ok])).
+tracker_case(backquoted_operator,
+    (tracker_read_atom('left `is` right', Term), Term == is(left,right)), ok, solutions([ok])).
+tracker_case(backquoted_numeric_escape,
+    (atom_codes(Source, [96,92,49,55,55,92,96]), atom_codes(Delete, [127]),
+     tracker_read_atom(Source, Term), Term == Delete), ok, solutions([ok])).
+tracker_case(quoted_prefix_operator,
+    (atom_codes(Source, [39,100,121,110,97,109,105,99,39,32,112,114,101,100,105,99,97,116,101]),
+     tracker_read_atom(Source, Term), Term == dynamic(predicate)), ok, solutions([ok])).
+
+tracker_read_atom(Text, Term) :-
+    open('iso_tracker_input.tmp', write, Output),
+    write(Output, Text),
+    write(Output, '.\n'),
+    close(Output),
+    open('iso_tracker_input.tmp', read, Input),
+    catch(read_term(Input, Read, []), Ball, (close(Input), throw(Ball))),
+    close(Input),
+    Term = Read.
+
 tracker_member(X, [X|_]).
 tracker_member(X, [_|Xs]) :- tracker_member(X, Xs).

@@ -149,7 +149,7 @@ public sealed class IsoPartOneInventoryTests
     public void EveryPartOneControlConstructCompilesInStrictMode()
     {
         using var engine = new PrologEngine(PrologLanguageMode.StrictIso);
-        LoadResult loaded = engine.ConsultText(
+        var loaded = engine.ConsultText(
             """
             controls :-
                 true,
@@ -160,7 +160,7 @@ public sealed class IsoPartOneInventoryTests
                 (true -> true ; fail),
                 \+ fail,
                 catch(throw(caught), caught, true).
-            """
+            """ + "\n"
         );
 
         Assert.True(loaded.Success, string.Join("; ", loaded.Diagnostics));
