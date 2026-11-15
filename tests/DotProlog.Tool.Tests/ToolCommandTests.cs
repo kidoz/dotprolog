@@ -978,6 +978,94 @@ public sealed class ToolCommandTests : IDisposable
     }
 
     [Fact]
+    public void LintRecognizesPredefinedCatch()
+    {
+        var path = Source("catch.pl", "go :- catch(true, _, true).\n");
+
+        (var exitCode, _, var error) = Execute("lint", "--warnings-as-errors", path);
+
+        Assert.Equal(0, exitCode);
+        Assert.Empty(error);
+    }
+
+    [Fact]
+    public void LintDoesNotApplyAPredefinedMetaTemplateToAUserReplacement()
+    {
+        var path = Source("catch-replacement.pl", "catch(_, _, _). go :- catch(missing_goal, catcher, missing_recovery).\n");
+
+        (var exitCode, _, var error) = Execute("lint", "--warnings-as-errors", path);
+
+        Assert.Equal(0, exitCode);
+        Assert.Empty(error);
+    }
+
+    [Fact]
+    public void LintPreservesDoubleQuotesAcrossIncludeBoundaries()
+    {
+        Source("quoted-child.pl", "included :- number_codes(_, \"1\").\n:- set_prolog_flag(double_quotes, chars).\n");
+        var path = Source(
+            "quoted-root.pl",
+            ":- set_prolog_flag(double_quotes, codes).\n"
+                + ":- include('quoted-child.pl').\n"
+                + "after_include :- number_codes(_, \"2\").\n"
+        );
+
+        (var exitCode, _, var error) = Execute("lint", "--warnings-as-errors", path);
+
+        Assert.Equal(1, exitCode);
+        var diagnostic = Assert.Single(error.Split("DPL3011", StringSplitOptions.None).Skip(1));
+        Assert.Contains("double_quotes=chars", error, StringComparison.Ordinal);
+        Assert.Contains($"{path}(3,34): warning DPL3011", error, StringComparison.Ordinal);
+        Assert.DoesNotContain("quoted-child.pl", diagnostic, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(":- dynamic(p/2147483648).")]
+    [InlineData(":- export(p//9223372036854775807).")]
+    public void LintAcceptsOversizedPredicateIndicatorsWithoutThrowing(string text)
+    {
+        var path = Source("oversized-indicator.pl", text);
+
+        (var exitCode, _, var error) = Execute("lint", path);
+
+        Assert.Equal(0, exitCode);
+        Assert.Empty(error);
+    }
+
+    [Theory]
+    [InlineData("run")]
+    [InlineData("lint")]
+    public void StrictIsoStringOverrideIsAUsageError(string command)
+    {
+        var path = Source("strict-string.pl", "value.\n");
+
+        (var exitCode, _, var error) = Execute(command, "--mode", "strict-iso", "--flag", "double_quotes=string", path);
+
+        Assert.Equal(64, exitCode);
+        Assert.Contains("double_quotes=string is an extension value", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RunReportsPackageConfigurationErrors()
+    {
+        var path = Source("package-configuration.pl", "value.\n");
+        var previousCache = Environment.GetEnvironmentVariable("PROPACK_CACHE");
+        try
+        {
+            Environment.SetEnvironmentVariable("PROPACK_CACHE", Path.Combine(_directory, "cache"));
+            (var exitCode, _, var error) = Execute("run", "--packages", _directory, path);
+
+            Assert.Equal(65, exitCode);
+            Assert.StartsWith("error: ", error, StringComparison.Ordinal);
+            Assert.Contains("cache must be outside the project", error, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PROPACK_CACHE", previousCache);
+        }
+    }
+
+    [Fact]
     public void RunDefaultsToModernMode()
     {
         var path = Source("default.pl", ":- initialization((\"ab\" == [a,b], writeln(ok))).\n");

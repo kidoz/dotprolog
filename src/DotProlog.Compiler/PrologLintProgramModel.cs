@@ -67,7 +67,7 @@ internal sealed class PrologLintProgramModel
         var model = new PrologLintProgramModel(sources);
         List<ImportRequest> imports = [];
         HashSet<(string Module, PredicateIndicator Indicator)>? leadingClauses = predicates is null || !leadingOnly ? null : [];
-        foreach (PrologLintSource source in sources)
+        foreach (var source in sources)
         {
             model.CollectDefinitions(source, imports, predicates, leadingClauses);
         }
@@ -83,7 +83,7 @@ internal sealed class PrologLintProgramModel
         while (propagated)
         {
             propagated = false;
-            foreach (ImportSite import in model.Imports)
+            foreach (var import in model.Imports)
             {
                 if (
                     import.SourceModule is { } sourceModule
@@ -111,7 +111,7 @@ internal sealed class PrologLintProgramModel
             return LintResolution.Defined(module);
         }
 
-        string? imported = Modules.DefiningModuleOf(module, predicate);
+        var imported = Modules.DefiningModuleOf(module, predicate);
         if (imported is not null)
         {
             return LintResolution.Defined(imported);
@@ -148,7 +148,23 @@ internal sealed class PrologLintProgramModel
 
     internal bool HasNonPredicateEffects(string module) => _effectfulModules.Contains(module);
 
-    internal int[]? MetaArgumentsOf(string module, PredicateIndicator predicate) => Modules.MetaArgumentsOf(module, predicate);
+    internal int[]? MetaArgumentsOf(string module, PredicateIndicator predicate)
+    {
+        var resolution = Resolve(module, predicate);
+        if (resolution.Module is not { } target)
+        {
+            return Modules.MetaArgumentsOf(module, predicate);
+        }
+
+        if (target != module)
+        {
+            return MetaArgumentsOf(target, predicate);
+        }
+
+        return MetaPredicateDeclarations.Any(declaration => declaration.Module == target && declaration.Indicator == predicate)
+            ? Modules.MetaArgumentsOf(target, predicate)
+            : null;
+    }
 
     internal bool TryStaticClauses(string module, PredicateIndicator predicate, out IReadOnlyList<ClauseContext> clauses)
     {
@@ -171,8 +187,8 @@ internal sealed class PrologLintProgramModel
 
         for (var index = 0; index < source.Clauses.Count; index++)
         {
-            SyntaxTerm clause = source.Clauses[index];
-            PrologLintSource owner =
+            var clause = source.Clauses[index];
+            var owner =
                 source.FileForClause(index) == source.FileName ? source : source with { FileName = source.FileForClause(index) };
             if (clause is CompoundTerm { Name: ":-", Arity: 1, Arguments: [SyntaxTerm directiveTerm] })
             {
@@ -193,9 +209,9 @@ internal sealed class PrologLintProgramModel
             }
 
             var grammar = clause is CompoundTerm { Name: "-->", Arity: 2 };
-            SyntaxTerm head = LintSyntax.ClauseHead(clause);
+            var head = LintSyntax.ClauseHead(clause);
             if (
-                !LintSyntax.TryPredicate(head, grammar, out PredicateIndicator indicator)
+                !LintSyntax.TryPredicate(head, grammar, out var indicator)
                 || (predicates is not null && !predicates.Contains(indicator))
             )
             {
@@ -226,14 +242,14 @@ internal sealed class PrologLintProgramModel
 
     private void CollectModuleScopes(PrologLintSource source)
     {
-        string module = ModuleTable.UserModule;
+        var module = ModuleTable.UserModule;
         Dictionary<string, int> contexts = new(PathComparer);
         IEnumerable<(string FileName, SyntaxTerm? Clause)> order =
             source.SourceOrder
             ?? source.Clauses.Select((clause, index) => (source.FileForClause(index), (SyntaxTerm?)clause)).ToArray();
         foreach (var (file, clause) in order)
         {
-            if (!contexts.TryGetValue(file, out int context) || clause is null)
+            if (!contexts.TryGetValue(file, out var context) || clause is null)
             {
                 context = ModuleScopes.Count;
                 contexts[file] = context;
@@ -331,9 +347,9 @@ internal sealed class PrologLintProgramModel
     private void DeclareExports(string module, SyntaxTerm declarations, PrologLintSource source)
     {
         List<PredicateIndicator> exports = [];
-        foreach (SyntaxTerm item in LintSyntax.SequenceItems(declarations))
+        foreach (var item in LintSyntax.SequenceItems(declarations))
         {
-            if (!LintSyntax.TryIndicator(item, out PredicateIndicator indicator, out var nonterminal))
+            if (!LintSyntax.TryIndicator(item, out var indicator, out var nonterminal))
             {
                 _incompleteExportModules.Add(module);
                 continue;
@@ -355,9 +371,9 @@ internal sealed class PrologLintProgramModel
         PrologLintSource source
     )
     {
-        foreach (SyntaxTerm item in LintSyntax.SequenceItems(declarations))
+        foreach (var item in LintSyntax.SequenceItems(declarations))
         {
-            if (!LintSyntax.TryIndicator(item, out PredicateIndicator indicator, out var nonterminal))
+            if (!LintSyntax.TryIndicator(item, out var indicator, out var nonterminal))
             {
                 continue;
             }
@@ -400,10 +416,10 @@ internal sealed class PrologLintProgramModel
 
     private void DeclareMetaPredicates(string module, SyntaxTerm declarations, PrologLintSource source)
     {
-        foreach (SyntaxTerm item in LintSyntax.SequenceItems(declarations))
+        foreach (var item in LintSyntax.SequenceItems(declarations))
         {
             RecordMetaPredicate("meta_predicate", module, item, source);
-            if (!LintSyntax.TryPredicate(item, grammar: false, out PredicateIndicator indicator))
+            if (!LintSyntax.TryPredicate(item, grammar: false, out var indicator))
             {
                 continue;
             }
@@ -438,7 +454,7 @@ internal sealed class PrologLintProgramModel
 
     private void RecordMetaPredicates(string directiveName, string module, SyntaxTerm declarations, PrologLintSource source)
     {
-        foreach (SyntaxTerm item in LintSyntax.SequenceItems(declarations))
+        foreach (var item in LintSyntax.SequenceItems(declarations))
         {
             RecordMetaPredicate(directiveName, module, item, source);
         }
@@ -450,9 +466,9 @@ internal sealed class PrologLintProgramModel
             PrologMetaPredicateDeclarationSyntax.TryNormalize(
                 directiveName,
                 item,
-                out PredicateIndicator indicator,
-                out string template,
-                out string signature
+                out var indicator,
+                out var template,
+                out var signature
             )
         )
         {
@@ -475,7 +491,7 @@ internal sealed class PrologLintProgramModel
                 .Where(group =>
                     group.Value.All(import =>
                     {
-                        string? dependency = import.FileDirective ? ResolveModulePath(import) : import.SourceModule;
+                        var dependency = import.FileDirective ? ResolveModulePath(import) : import.SourceModule;
                         return dependency is null || dependency == group.Key || !pending.ContainsKey(dependency);
                     })
                 )
@@ -484,7 +500,7 @@ internal sealed class PrologLintProgramModel
             // Cyclic imports retain conservative, source-ordered resolution and cannot stall analysis.
             if (ready.Length == 0)
                 ready = [pending.Keys.First()];
-            foreach (string module in ready)
+            foreach (var module in ready)
             {
                 foreach (var import in pending[module])
                     ResolveImport(import);
@@ -495,7 +511,7 @@ internal sealed class PrologLintProgramModel
 
     private void ResolveImport(ImportRequest request)
     {
-        string? sourceModule = request.SourceModule;
+        var sourceModule = request.SourceModule;
         if (request.FileDirective)
         {
             sourceModule = ResolveModulePath(request);
@@ -520,12 +536,12 @@ internal sealed class PrologLintProgramModel
             _incompleteExportModules.Add(request.Importer);
         }
 
-        IEnumerable<PredicateIndicator> selected = request.Selective
+        var selected = request.Selective
             ? request.Bindings.Select(binding => binding.Indicator)
             : Modules.ExportsOf(sourceModule);
         HashSet<PredicateIndicator> selectedSet = [.. selected];
         HashSet<PredicateIndicator> exports = [.. Modules.ExportsOf(sourceModule)];
-        foreach (PredicateIndicator predicate in selectedSet)
+        foreach (var predicate in selectedSet)
         {
             if (!exports.Contains(predicate))
             {
@@ -538,7 +554,7 @@ internal sealed class PrologLintProgramModel
                 continue;
             }
 
-            if (Modules.TryImport(request.Importer, predicate, sourceModule, out string? conflictingModule))
+            if (Modules.TryImport(request.Importer, predicate, sourceModule, out var conflictingModule))
             {
                 if (request.Reexport)
                 {
@@ -569,7 +585,7 @@ internal sealed class PrologLintProgramModel
             return;
         }
 
-        ImportBinding binding = request.Bindings.First(binding => binding.Indicator == predicate);
+        var binding = request.Bindings.First(binding => binding.Indicator == predicate);
         MissingExports.Add(
             new MissingExport(request.Importer, sourceModule, predicate, binding.Nonterminal, binding.Span, request.Source)
         );
@@ -592,9 +608,9 @@ internal sealed class PrologLintProgramModel
         while (propagated)
         {
             propagated = false;
-            foreach (ImportRequest request in imports.Where(import => import.Reexport))
+            foreach (var request in imports.Where(import => import.Reexport))
             {
-                string? sourceModule = request.FileDirective ? ResolveModulePath(request) : request.SourceModule;
+                var sourceModule = request.FileDirective ? ResolveModulePath(request) : request.SourceModule;
                 if (sourceModule is null || !Modules.Catalog.Contains(sourceModule))
                 {
                     propagated |= _incompleteExportModules.Add(request.Importer);
@@ -609,7 +625,7 @@ internal sealed class PrologLintProgramModel
                 HashSet<PredicateIndicator> exports = [.. Modules.ExportsOf(sourceModule)];
                 if (request.Selective)
                 {
-                    foreach (ImportBinding binding in request.Bindings)
+                    foreach (var binding in request.Bindings)
                     {
                         if (!exports.Contains(binding.Indicator) && HasIncompleteExport(sourceModule, binding.Indicator))
                         {
@@ -640,7 +656,7 @@ internal sealed class PrologLintProgramModel
             return;
         }
 
-        bool nonterminal = request.Selective
+        var nonterminal = request.Selective
             ? request.Bindings.First(binding => binding.Indicator == predicate).Nonterminal
             : _nonterminals.Contains((sourceModule, predicate)) && !_ordinary.Contains((sourceModule, predicate));
         LocalImportShadows.Add(new LocalImportShadow(request.Importer, sourceModule, predicate, nonterminal));
@@ -653,11 +669,11 @@ internal sealed class PrologLintProgramModel
         string laterModule
     )
     {
-        SourceSpan span = request.Directive.Arguments[0].Span;
+        var span = request.Directive.Arguments[0].Span;
         bool nonterminal;
         if (request.Selective)
         {
-            ImportBinding binding = request.Bindings.First(binding => binding.Indicator == predicate);
+            var binding = request.Bindings.First(binding => binding.Indicator == predicate);
             span = binding.Span;
             nonterminal = binding.Nonterminal;
         }
@@ -683,7 +699,7 @@ internal sealed class PrologLintProgramModel
             var path = Path.GetFullPath(
                 Path.Combine(Path.GetDirectoryName(request.Source.FileName) ?? string.Empty, request.Path)
             );
-            return _moduleByPath.TryGetValue(path, out string? module) ? module : null;
+            return _moduleByPath.TryGetValue(path, out var module) ? module : null;
         }
         catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
         {
@@ -856,9 +872,9 @@ internal sealed class PrologLintProgramModel
         {
             complete = true;
             List<ImportBinding> result = [];
-            foreach (SyntaxTerm item in LintSyntax.SequenceItems(term))
+            foreach (var item in LintSyntax.SequenceItems(term))
             {
-                if (LintSyntax.TryIndicator(item, out PredicateIndicator indicator, out var nonterminal))
+                if (LintSyntax.TryIndicator(item, out var indicator, out var nonterminal))
                 {
                     result.Add(new ImportBinding(indicator, nonterminal, item.Span));
                 }

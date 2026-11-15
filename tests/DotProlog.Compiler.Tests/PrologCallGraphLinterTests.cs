@@ -15,7 +15,7 @@ public sealed class PrologCallGraphLinterTests : IDisposable
     [Fact]
     public void ResolvesAnImportedPredicateAcrossNamedFiles()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ("main.pl", ":- module(main, [go/0]). :- use_module('other.pl'). go :- helper."),
             ("other.pl", ":- module(other, [helper/0]). helper.")
         );
@@ -37,7 +37,7 @@ public sealed class PrologCallGraphLinterTests : IDisposable
     [Fact]
     public void SelectiveImportsUseOnlyExportedPredicates()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ("main.pl", ":- module(main, []). :- use_module('other.pl', [missing/0]). go :- missing."),
             ("other.pl", ":- module(other, [helper/0]). helper. private.")
         );
@@ -48,7 +48,7 @@ public sealed class PrologCallGraphLinterTests : IDisposable
     [Fact]
     public void MissingImportSourcesAndModulesRemainUnknown()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ("main.pl", ":- module(main, []). :- use_module('missing.pl'). go :- helper, unknown_module:other.")
         );
 
@@ -58,7 +58,7 @@ public sealed class PrologCallGraphLinterTests : IDisposable
     [Fact]
     public void UserPredicatesRemainVisibleAsGlobalFallbacks()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(("main.pl", ":- module(main, []). go :- helper."), ("user.pl", "helper."));
+        var diagnostics = Lint(("main.pl", ":- module(main, []). go :- helper."), ("user.pl", "helper."));
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.UndefinedPredicate));
     }
@@ -66,7 +66,7 @@ public sealed class PrologCallGraphLinterTests : IDisposable
     [Fact]
     public void ExplicitModuleQualificationResolvesTheTargetModule()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ("main.pl", ":- module(main, []). go :- other:helper."),
             ("other.pl", ":- module(other, []). helper.")
         );
@@ -77,15 +77,58 @@ public sealed class PrologCallGraphLinterTests : IDisposable
     [Fact]
     public void DynamicAndRuntimeGoalsAreNotUndefined()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(":- dynamic(helper/0). go(G) :- helper, G.");
+        var diagnostics = Lint(":- dynamic(helper/0). go(G) :- helper, G.");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.UndefinedPredicate));
     }
 
     [Fact]
+    public void PredefinedCatchDoesNotReportAnUndefinedPredicate()
+    {
+        var diagnostics = Lint("go :- catch(throw(expected), expected, true).");
+
+        Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.UndefinedPredicate));
+    }
+
+    [Fact]
+    public void LocalCatchReplacementDoesNotInheritThePredefinedMetaTemplate()
+    {
+        var diagnostics = Lint("catch(_, _, _). go :- catch(missing_goal, catcher, missing_recovery).");
+
+        Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.UndefinedPredicate));
+    }
+
+    [Fact]
+    public void ImportedCatchReplacementDoesNotInheritThePredefinedMetaTemplate()
+    {
+        var diagnostics = Lint(
+            ("main.pl", ":- module(main, []). :- use_module('other.pl'). go :- catch(missing_goal, catcher, missing_recovery)."),
+            ("other.pl", ":- module(other, [catch/3]). catch(_, _, _).")
+        );
+
+        Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.UndefinedPredicate));
+    }
+
+    [Fact]
+    public void UserCatchReplacementDoesNotInheritThePredefinedMetaTemplateInAnotherModule()
+    {
+        var diagnostics = Lint(
+            ("main.pl", ":- module(main, []). go :- catch(missing_goal, catcher, missing_recovery)."),
+            ("user.pl", "catch(_, _, _).")
+        );
+
+        Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.UndefinedPredicate));
+    }
+
+    [Theory]
+    [InlineData(":- dynamic(p/2147483648).")]
+    [InlineData(":- export(p//9223372036854775807).")]
+    public void OversizedPredicateIndicatorsDoNotThrow(string source) => Assert.Empty(Lint(source));
+
+    [Fact]
     public void MetaClosureUsesTheAdditionalArgumentCount()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ("main.pl", ":- module(main, []). :- use_module('other.pl'). go(X, Y) :- maplist(prefix(a), X, Y)."),
             ("other.pl", ":- module(other, [prefix/3]). prefix(_, _, _).")
         );
@@ -106,7 +149,7 @@ public sealed class PrologCallGraphLinterTests : IDisposable
     [Fact]
     public void FileLocalMetaDeclarationsGuideGoalAnalysis()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(":- meta_predicate(run(0)). run(Goal) :- Goal. go :- run(helper). helper.");
+        var diagnostics = Lint(":- meta_predicate(run(0)). run(Goal) :- Goal. go :- run(helper). helper.");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.UndefinedPredicate));
     }
@@ -118,7 +161,7 @@ public sealed class PrologCallGraphLinterTests : IDisposable
     [Fact]
     public void DeclarationsCanBeDefinedInAnotherNamedFile()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ("declarations.pl", ":- module(m, []). :- discontiguous(p/1)."),
             ("definitions.pl", ":- module(m, []). p(a).")
         );
@@ -150,7 +193,7 @@ public sealed class PrologCallGraphLinterTests : IDisposable
     [Fact]
     public void AcceptsAValidNonterminalCall()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ("main.pl", ":- module(main, []). :- use_module('other.pl'). go(X) :- phrase(p(X), [a])."),
             ("other.pl", ":- module(other, [p//1]). p(_) --> [a].")
         );
@@ -166,7 +209,7 @@ public sealed class PrologCallGraphLinterTests : IDisposable
     [Fact]
     public void IsoModuleExportsAndImportsResolve()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             (
                 "main.pl",
                 ":- module(main). :- export(go/0). :- end_module(main). :- body(main). :- import(other). go :- helper. :- end_body(main)."
@@ -186,7 +229,7 @@ public sealed class PrologCallGraphLinterTests : IDisposable
         Source("parts.pl", ":- initialization(halt(9)). helper. singleton(X).\n");
         Source("main.pl", ":- include('parts.pl'). go :- helper.\n");
 
-        IReadOnlyList<Diagnostic> diagnostics = Load("main.pl");
+        var diagnostics = Load("main.pl");
 
         Assert.DoesNotContain(diagnostics, Id(LintDiagnosticIds.UndefinedPredicate));
         Assert.Contains(diagnostics, diagnostic => diagnostic.FileName?.EndsWith("parts.pl", StringComparison.Ordinal) == true);
@@ -197,7 +240,7 @@ public sealed class PrologCallGraphLinterTests : IDisposable
     {
         Source("main.pl", ":- include('missing.pl').\n");
 
-        IReadOnlyList<Diagnostic> diagnostics = Load("main.pl");
+        var diagnostics = Load("main.pl");
 
         Assert.Contains(diagnostics, Id(LintDiagnosticIds.UnresolvedLintSource));
     }
@@ -208,7 +251,7 @@ public sealed class PrologCallGraphLinterTests : IDisposable
         Source("a.pl", ":- include('b.pl').\n");
         Source("b.pl", ":- include('a.pl').\n");
 
-        IReadOnlyList<Diagnostic> diagnostics = Load("a.pl");
+        var diagnostics = Load("a.pl");
 
         Assert.Contains(diagnostics, Id(LintDiagnosticIds.UnresolvedLintSource));
     }
@@ -224,7 +267,7 @@ public sealed class PrologCallGraphLinterTests : IDisposable
     private IReadOnlyList<Diagnostic> Load(string name)
     {
         var path = Path.Combine(_directory, name);
-        PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
+        var loaded = PrologLintSourceLoader.Load(path, File.ReadAllText(path), new BytecodeProgram());
         return [.. loaded.Diagnostics, .. PrologLinter.AnalyzeProgram([loaded.Source])];
     }
 
@@ -234,9 +277,9 @@ public sealed class PrologCallGraphLinterTests : IDisposable
     {
         List<PrologLintSource> sources = [];
         List<Diagnostic> readerDiagnostics = [];
-        foreach ((string name, string text) in inputs)
+        foreach ((var name, var text) in inputs)
         {
-            PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+            var loaded = PrologLintSourceLoader.Load(
                 Path.Combine(_directory, name),
                 text,
                 new BytecodeProgram()

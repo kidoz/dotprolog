@@ -23,6 +23,15 @@ internal static class LintBuiltinCatalog
         HashSet<PredicateIndicator> result = [];
         var program = new BytecodeProgram();
         CoreBuiltins.RegisterAll(program);
+        for (var functorId = 0; functorId < program.Symbols.FunctorCount; functorId++)
+        {
+            if (program.IsDefined(functorId))
+            {
+                var functor = program.Symbols.GetFunctor(functorId);
+                result.Add(new PredicateIndicator(program.Symbols.AtomName(functor.NameAtom), functor.Arity));
+            }
+        }
+
         foreach (var signature in program.Builtins.RegisteredNames)
         {
             var separator = signature.LastIndexOf('/');
@@ -41,16 +50,16 @@ internal static class LintBuiltinCatalog
 
     private static void AddLibrary(HashSet<PredicateIndicator> result, string source)
     {
-        ParseResult parsed = TermReader.ReadProgram(source, "bundled-library.pl");
+        var parsed = TermReader.ReadProgram(source, "bundled-library.pl");
         if (!parsed.Success)
         {
             throw new InvalidOperationException("The bundled Prolog library could not be read for lint signatures.");
         }
 
-        foreach (SyntaxTerm clause in parsed.Clauses)
+        foreach (var clause in parsed.Clauses)
         {
             var grammar = clause is CompoundTerm { Name: "-->", Arity: 2 };
-            if (LintSyntax.TryPredicate(LintSyntax.ClauseHead(clause), grammar, out PredicateIndicator indicator))
+            if (LintSyntax.TryPredicate(LintSyntax.ClauseHead(clause), grammar, out var indicator))
             {
                 result.Add(indicator);
             }

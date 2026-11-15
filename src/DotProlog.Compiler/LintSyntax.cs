@@ -12,7 +12,7 @@ internal static class LintSyntax
         Stack<SyntaxTerm> pending = new();
         pending.Push(term);
 
-        while (pending.TryPop(out SyntaxTerm? current))
+        while (pending.TryPop(out var current))
         {
             switch (current)
             {
@@ -35,12 +35,12 @@ internal static class LintSyntax
         switch (term)
         {
             case CompoundTerm { Name: ",", Arity: 2 } sequence:
-                foreach (SyntaxTerm item in SequenceItems(sequence.Arguments[0]))
+                foreach (var item in SequenceItems(sequence.Arguments[0]))
                 {
                     yield return item;
                 }
 
-                foreach (SyntaxTerm item in SequenceItems(sequence.Arguments[1]))
+                foreach (var item in SequenceItems(sequence.Arguments[1]))
                 {
                     yield return item;
                 }
@@ -48,7 +48,7 @@ internal static class LintSyntax
                 break;
             case CompoundTerm { Name: ".", Arity: 2 } cons:
                 yield return cons.Arguments[0];
-                foreach (SyntaxTerm item in SequenceItems(cons.Arguments[1]))
+                foreach (var item in SequenceItems(cons.Arguments[1]))
                 {
                     yield return item;
                 }
@@ -65,7 +65,7 @@ internal static class LintSyntax
     internal static bool TryProperList(SyntaxTerm term, out List<SyntaxTerm> elements)
     {
         elements = [];
-        SyntaxTerm current = term;
+        var current = term;
         while (current is CompoundTerm { Name: ".", Arity: 2 } cons)
         {
             elements.Add(cons.Arguments[0]);
@@ -90,7 +90,13 @@ internal static class LintSyntax
         }
 
         nonterminal = slash.Name == "//";
-        indicator = new PredicateIndicator(name.Name, checked((int)arity.Value + (nonterminal ? 2 : 0)));
+        var extraArity = nonterminal ? 2 : 0;
+        if (arity.Value > int.MaxValue - extraArity)
+        {
+            return false;
+        }
+
+        indicator = new PredicateIndicator(name.Name, (int)arity.Value + extraArity);
         return true;
     }
 
@@ -180,7 +186,7 @@ internal static class LintSyntax
             case CompoundTerm compound:
                 AppendQuoted(text, "c", compound.Name);
                 text.Append('/').Append(compound.Arity).Append('(');
-                foreach (SyntaxTerm argument in compound.Arguments)
+                foreach (var argument in compound.Arguments)
                 {
                     AppendCanonical(argument, variables, ref next, text);
                     text.Append(';');
