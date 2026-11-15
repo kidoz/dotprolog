@@ -28,7 +28,7 @@ public sealed class ContractOutputLintCorpusTests
         Output("integer-from-fixnum", "p(42).", "integer", 0),
         Output("integer-from-negative-fixnum", "p(-42).", "integer", 0),
         Output("integer-from-big-integer", "p(9223372036854775808).", "integer", 1),
-        Output("integer-from-widened-integer", "p(576460752303423488).", "integer", 1),
+        Output("integer-from-widened-integer", "p(576460752303423488).", "integer", 0),
         Output("integer-from-float", "p(1.5).", "integer", 1),
         Output("integer-from-rational", "p(1r2).", "integer", 1),
         Output("integer-from-normalized-rational", "p(2r1).", "integer", 0),
@@ -182,7 +182,7 @@ public sealed class ContractOutputLintCorpusTests
     {
         Assert.Equal(2, CorpusVersion);
         Assert.Equal(Cases.Length, Cases.Select(test => test.Name).Distinct(StringComparer.Ordinal).Count());
-        foreach (CorpusCase test in Cases)
+        foreach (var test in Cases)
         {
             var actual = Analyze(test).Count(diagnostic => diagnostic.Id == LintDiagnosticIds.ContractOutputTypeMismatch);
             Assert.True(
@@ -211,7 +211,7 @@ public sealed class ContractOutputLintCorpusTests
     public void EveryRepositoryContractIsFreeOfLeadingFactOutputViolations()
     {
         var root = RepositoryRoot();
-        string[] contracts = Directory.GetFiles(root, "*.dpli", SearchOption.AllDirectories);
+        var contracts = Directory.GetFiles(root, "*.dpli", SearchOption.AllDirectories);
         Assert.NotEmpty(contracts);
         foreach (var contractPath in contracts)
         {
@@ -221,14 +221,14 @@ public sealed class ContractOutputLintCorpusTests
                 continue;
             }
 
-            ContractReadResult contract = ContractReader.Read(File.ReadAllText(contractPath), "Corpus", contractPath);
+            var contract = ContractReader.Read(File.ReadAllText(contractPath), "Corpus", contractPath);
             Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
-            PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+            var loaded = PrologLintSourceLoader.Load(
                 sourcePath,
                 File.ReadAllText(sourcePath),
                 new BytecodeProgram()
             );
-            IReadOnlyList<Diagnostic> diagnostics = PrologContractLinter.Analyze(
+            var diagnostics = PrologContractLinter.Analyze(
                 [loaded.Source],
                 contract.Contract!,
                 contractPath,
@@ -248,7 +248,7 @@ public sealed class ContractOutputLintCorpusTests
     ) =>
         Custom(
             name,
-            [Unit("corpus.pl", $":- module(m, [p/1]). {clauses}")],
+            [Unit("corpus.pl", $":- module(m, [p/1]). {clauses}\n")],
             $"p/1, {determinism}, [out(value, {type})]",
             expectedFindings,
             mode
@@ -263,7 +263,7 @@ public sealed class ContractOutputLintCorpusTests
     ) =>
         Custom(
             name,
-            [Unit("corpus.pl", $":- module(m, [p/2]). p({input}, wrong).")],
+            [Unit("corpus.pl", $":- module(m, [p/2]). p({input}, wrong).\n")],
             $"p/2, det, [in(item, {inputType}), out(value, integer)]",
             expectedFindings,
             mode
@@ -289,7 +289,7 @@ public sealed class ContractOutputLintCorpusTests
                     .Source
             ),
         ];
-        ContractReadResult contract = ContractReader.Read(
+        var contract = ContractReader.Read(
             $":- clr_module('M'). :- clr_export({test.Export}).",
             "Corpus",
             "corpus.dpli"

@@ -9,9 +9,14 @@ public static class PrologMarshal
     /// <summary>Reads an atom as a string.</summary>
     public static string ToAtom(PrologValue value) => value as PrologAtom is { } atom ? atom.Name : throw Mismatch(value, "atom");
 
-    /// <summary>Reads an integer.</summary>
+    /// <summary>Reads an integer in the CLR <see cref="long"/> range from either integer representation.</summary>
     public static long ToInteger(PrologValue value) =>
-        value as PrologInteger is { } integer ? integer.Value : throw Mismatch(value, "integer");
+        value switch
+        {
+            PrologInteger integer => integer.Value,
+            PrologBigInteger big when big.Value >= long.MinValue && big.Value <= long.MaxValue => (long)big.Value,
+            _ => throw Mismatch(value, "integer"),
+        };
 
     /// <summary>Reads an integer of any magnitude, accepting both integer representations.</summary>
     public static System.Numerics.BigInteger ToBigInteger(PrologValue value) =>
@@ -39,7 +44,7 @@ public static class PrologMarshal
         ArgumentNullException.ThrowIfNull(value);
         ArgumentNullException.ThrowIfNull(element);
 
-        if (!value.TryGetList(out IReadOnlyList<PrologValue> items))
+        if (!value.TryGetList(out var items))
         {
             throw Mismatch(value, "list");
         }

@@ -52,7 +52,7 @@ public sealed record ContractType(ContractTypeKind Kind, ContractType? Element =
         return Kind switch
         {
             ContractTypeKind.Atom => value is global::DotProlog.Runtime.PrologAtom,
-            ContractTypeKind.Integer => value is global::DotProlog.Runtime.PrologInteger,
+            ContractTypeKind.Integer => CanMarshalInteger(value),
             ContractTypeKind.Float => value
                 is global::DotProlog.Runtime.PrologFloat
                     or global::DotProlog.Runtime.PrologInteger
@@ -62,6 +62,14 @@ public sealed record ContractType(ContractTypeKind Kind, ContractType? Element =
             _ => value.TryGetList(out var items) && items.All(CanMarshalOutputElement),
         };
     }
+
+    private static bool CanMarshalInteger(global::DotProlog.Runtime.PrologValue value) =>
+        value switch
+        {
+            global::DotProlog.Runtime.PrologInteger => true,
+            global::DotProlog.Runtime.PrologBigInteger big => big.Value >= long.MinValue && big.Value <= long.MaxValue,
+            _ => false,
+        };
 
     private bool CanMarshalOutputElement(global::DotProlog.Runtime.PrologValue value) => Element!.CanMarshalOutput(value);
 

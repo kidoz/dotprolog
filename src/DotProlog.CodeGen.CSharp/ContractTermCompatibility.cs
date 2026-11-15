@@ -23,7 +23,8 @@ internal static class ContractTermCompatibility
         return type.Kind switch
         {
             ContractTypeKind.Atom => term is AtomTerm,
-            ContractTypeKind.Integer => term is IntegerTerm,
+            ContractTypeKind.Integer => term is IntegerTerm
+                || term is BigIntegerTerm big && big.Value >= long.MinValue && big.Value <= long.MaxValue,
             ContractTypeKind.Float => term is FloatTerm,
             _ => false,
         };
@@ -47,7 +48,7 @@ internal static class ContractTermCompatibility
                 value = new PrologFloat(real.Value);
                 return true;
             case RationalTerm rational:
-                PrologNumber number = PrologNumber.FromRational(rational.Numerator, rational.Denominator);
+                var number = PrologNumber.FromRational(rational.Numerator, rational.Denominator);
                 value = number.IsRational ? new PrologRational(number.Numerator, number.Denominator) : IntegerValue(number);
                 return true;
             case StringValueTerm text:
@@ -57,7 +58,7 @@ internal static class ContractTermCompatibility
                 var arguments = new PrologValue[compound.Arity];
                 for (var index = 0; index < arguments.Length; index++)
                 {
-                    if (!TryGroundValue(compound.Arguments[index], out PrologValue? argument))
+                    if (!TryGroundValue(compound.Arguments[index], out var argument))
                     {
                         value = null!;
                         return false;
@@ -94,7 +95,7 @@ internal static class ContractTermCompatibility
 
     private static bool MatchesListInput(ContractType element, SyntaxTerm term)
     {
-        SyntaxTerm current = term;
+        var current = term;
         while (current is CompoundTerm { Name: ".", Arity: 2 } pair)
         {
             if (!MatchesGroundInput(element, pair.Arguments[0]))

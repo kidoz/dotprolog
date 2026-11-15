@@ -35,13 +35,13 @@ public sealed class PrologLaterContractLinterTests : IDisposable
     public void DifferentInputsMakeLaterFactReachable(string determinism)
     {
         const string source = ":- module(m, [p/2]). p(1, 1). p(2, wrong).";
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             source,
             $":- clr_module('M'). :- clr_export(p/2, {determinism}, [in(item, integer), out(value, integer)]).",
             Later
         );
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LaterContractOutputTypeMismatch));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LaterContractOutputTypeMismatch));
         Assert.Equal(source.LastIndexOf("wrong", StringComparison.Ordinal), warning.Span.Start);
         Assert.Equal(5, warning.Span.Length);
         Assert.Contains("Output value of m:p/2", warning.Message, StringComparison.Ordinal);
@@ -56,7 +56,7 @@ public sealed class PrologLaterContractLinterTests : IDisposable
     [InlineData("semidet")]
     public void EarlierUnifiableInputHidesLaterFact(string determinism)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ":- module(m, [p/2]). p(1, 1). p(1, wrong).",
             $":- clr_module('M'). :- clr_export(p/2, {determinism}, [in(item, integer), out(value, integer)]).",
             Later
@@ -72,7 +72,7 @@ public sealed class PrologLaterContractLinterTests : IDisposable
     [InlineData("nondet", "p(1, 1). p(2, wrong).", 1)]
     public void StreamingEnumerationReachesLaterFacts(string determinism, string clauses, int expected)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             $":- module(m, [p/2]). {clauses}",
             $":- clr_module('M'). :- clr_export(p/2, {determinism}, [in(item, integer), out(value, integer)]).",
             Later
@@ -92,7 +92,7 @@ public sealed class PrologLaterContractLinterTests : IDisposable
     [InlineData("[[a],[1]]", "list(list(atom))")]
     public void LaterOutputUsesExistingMarshallerCompatibility(string output, string type)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             $":- module(m, [p/1]). p(ok). p({output}).",
             $":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, {type})]).",
             Later
@@ -104,7 +104,7 @@ public sealed class PrologLaterContractLinterTests : IDisposable
     [Fact]
     public void GroundTermOutputHasNoIncompatibleRepresentation()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ":- module(m, [p/1]). p(ok). p(1). p(1.5). p(1r2). p(foo(bar)). p([a|b]).",
             ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, term)]).",
             Later
@@ -116,7 +116,7 @@ public sealed class PrologLaterContractLinterTests : IDisposable
     [Fact]
     public void FirstAndLaterFindingsDoNotOverlap()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ":- module(m, [p/1]). p(wrong). p(also_wrong).",
             ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, integer)]).",
             Later
@@ -143,7 +143,7 @@ public sealed class PrologLaterContractLinterTests : IDisposable
     [InlineData("p([a,b], 1). p([a,c], wrong).", 1)]
     public void DeterministicReachabilityUsesRuntimeUnification(string clauses, int expected)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             $":- module(m, [p/2]). {clauses}",
             ":- clr_module('M'). :- clr_export(p/2, det, [in(item, term), out(value, integer)]).",
             Later
@@ -169,7 +169,7 @@ public sealed class PrologLaterContractLinterTests : IDisposable
     [InlineData(":- ensure_loaded('missing.pl'). p(1). p(wrong).")]
     public void UncertainTablesRemainSilent(string clauses)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             $":- module(m, [p/1]). {clauses}",
             ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, integer)]).",
             Later
@@ -185,7 +185,7 @@ public sealed class PrologLaterContractLinterTests : IDisposable
     [InlineData("p(1, 1). p(9223372036854775808, wrong).")]
     public void IncompatibleOrVariableInputsRejectTheWholeTable(string clauses)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             $":- module(m, [p/2]). {clauses}",
             ":- clr_module('M'). :- clr_export(p/2, det, [in(item, integer), out(value, integer)]).",
             Later
@@ -197,7 +197,7 @@ public sealed class PrologLaterContractLinterTests : IDisposable
     [Fact]
     public void MixedGrammarIdentityRejectsTheWholeTable()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ":- module(m, [p/2]). p(ok, 1). p --> []. p(2, wrong).",
             ":- clr_module('M'). :- clr_export(p/2, det, [in(item, atom), out(value, integer)]).",
             Later
@@ -209,10 +209,10 @@ public sealed class PrologLaterContractLinterTests : IDisposable
     [Fact]
     public void ImportedOnlyDefinitionRemainsSilent()
     {
-        PrologLintSource imported = Source("a.pl", ":- module(a, [p/1]). p(1). p(wrong).", PrologLanguageMode.Modern);
-        PrologLintSource main = Source("rules.pl", ":- module(m, [p/1]). :- reexport(a).", PrologLanguageMode.Modern);
+        var imported = Source("a.pl", ":- module(a, [p/1]). p(1). p(wrong).", PrologLanguageMode.Modern);
+        var main = Source("rules.pl", ":- module(m, [p/1]). :- reexport(a).", PrologLanguageMode.Modern);
 
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             [imported, main],
             ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, integer)]).",
             Later
@@ -224,10 +224,10 @@ public sealed class PrologLaterContractLinterTests : IDisposable
     [Fact]
     public void AmbiguousModulesRemainSilent()
     {
-        PrologLintSource a = Source("a.pl", ":- module(a, [p/1]). p(1). p(wrong).", PrologLanguageMode.Modern);
-        PrologLintSource b = Source("b.pl", ":- module(b, [p/1]). p(1). p(wrong).", PrologLanguageMode.Modern);
+        var a = Source("a.pl", ":- module(a, [p/1]). p(1). p(wrong).", PrologLanguageMode.Modern);
+        var b = Source("b.pl", ":- module(b, [p/1]). p(1). p(wrong).", PrologLanguageMode.Modern);
 
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             [a, b],
             ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, integer)]).",
             Later
@@ -241,8 +241,8 @@ public sealed class PrologLaterContractLinterTests : IDisposable
     [InlineData(PrologLanguageMode.StrictIso)]
     public void BothModesReportReachableLaterOutputs(PrologLanguageMode mode)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
-            [Source("rules.pl", ":- module(m, [p/1]). p(1). p(wrong).", mode)],
+        var diagnostics = Lint(
+            [Source("rules.pl", ":- module(m, [p/1]). p(1). p(wrong).\n", mode)],
             ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, integer)]).",
             Later
         );
@@ -258,15 +258,15 @@ public sealed class PrologLaterContractLinterTests : IDisposable
         const string facts = "p(1). p(wrong).\n";
         File.WriteAllText(mainPath, ":- module(m, [p/1]). :- include('facts.pl').\n");
         File.WriteAllText(factPath, facts);
-        PrologLintSource loaded = PrologLintSourceLoader.Load(mainPath, File.ReadAllText(mainPath), new BytecodeProgram()).Source;
+        var loaded = PrologLintSourceLoader.Load(mainPath, File.ReadAllText(mainPath), new BytecodeProgram()).Source;
 
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             [loaded],
             ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, integer)]).",
             Later
         );
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LaterContractOutputTypeMismatch));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.LaterContractOutputTypeMismatch));
         Assert.Equal(factPath, warning.FileName);
         Assert.Equal(facts.LastIndexOf("wrong", StringComparison.Ordinal), warning.Span.Start);
     }
@@ -274,7 +274,7 @@ public sealed class PrologLaterContractLinterTests : IDisposable
     [Fact]
     public void MultipleLaterOutputsHaveIndependentFindings()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ":- module(m, [p/3]). p(1, 1, 1). p(2, wrong, also_wrong).",
             ":- clr_module('M'). :- clr_export(p/3, det, [in(item, integer), out(first, integer), out(second, integer)]).",
             Later
@@ -301,7 +301,7 @@ public sealed class PrologLaterContractLinterTests : IDisposable
     )
     {
         var path = Path.Combine(Path.GetTempPath(), "rules.dpli");
-        ContractReadResult result = ContractReader.Read(contract, "Tests", path);
+        var result = ContractReader.Read(contract, "Tests", path);
         Assert.True(result.Success, string.Join("; ", result.Diagnostics));
         return PrologContractLinter.Analyze(sources, result.Contract!, path, options);
     }

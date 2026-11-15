@@ -33,7 +33,7 @@ public sealed class GroundRuleContractOutputLintCorpusTests : IDisposable
         Output("integer-from-fixnum", "42", "integer", 0),
         Output("integer-from-negative-fixnum", "-42", "integer", 0),
         Output("integer-from-big-integer", "9223372036854775808", "integer", 1),
-        Output("integer-from-widened-integer", "576460752303423488", "integer", 1),
+        Output("integer-from-widened-integer", "576460752303423488", "integer", 0),
         Output("integer-from-float", "1.5", "integer", 1),
         Output("integer-from-rational", "1r2", "integer", 1),
         Output("integer-from-normalized-rational", "2r1", "integer", 0),
@@ -414,9 +414,9 @@ public sealed class GroundRuleContractOutputLintCorpusTests : IDisposable
     {
         Assert.Equal(1, CorpusVersion);
         Assert.Equal(Cases.Length, Cases.Select(test => test.Name).Distinct(StringComparer.Ordinal).Count());
-        foreach (CorpusCase test in Cases)
+        foreach (var test in Cases)
         {
-            IReadOnlyList<Diagnostic> diagnostics = Analyze(test);
+            var diagnostics = Analyze(test);
             AssertFindingCount(test, diagnostics, LintDiagnosticIds.GroundRuleContractOutputTypeMismatch, test.ExpectedFindings);
             AssertFindingCount(test, diagnostics, LintDiagnosticIds.ContractOutputTypeMismatch, test.ExpectedLeading);
             AssertFindingCount(test, diagnostics, LintDiagnosticIds.LaterContractOutputTypeMismatch, test.ExpectedLater);
@@ -441,25 +441,25 @@ public sealed class GroundRuleContractOutputLintCorpusTests : IDisposable
     [Fact]
     public void EveryRepositoryContractIsFreeOfGroundRuleOutputViolations()
     {
-        string root = RepositoryRoot();
-        string[] contracts = Directory.GetFiles(root, "*.dpli", SearchOption.AllDirectories);
+        var root = RepositoryRoot();
+        var contracts = Directory.GetFiles(root, "*.dpli", SearchOption.AllDirectories);
         Assert.NotEmpty(contracts);
-        foreach (string contractPath in contracts)
+        foreach (var contractPath in contracts)
         {
-            string sourcePath = Path.ChangeExtension(contractPath, ".pl");
+            var sourcePath = Path.ChangeExtension(contractPath, ".pl");
             if (!File.Exists(sourcePath))
             {
                 continue;
             }
 
-            ContractReadResult contract = ContractReader.Read(File.ReadAllText(contractPath), "Corpus", contractPath);
+            var contract = ContractReader.Read(File.ReadAllText(contractPath), "Corpus", contractPath);
             Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
-            PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+            var loaded = PrologLintSourceLoader.Load(
                 sourcePath,
                 File.ReadAllText(sourcePath),
                 new BytecodeProgram()
             );
-            IReadOnlyList<Diagnostic> diagnostics = PrologContractLinter.Analyze(
+            var diagnostics = PrologContractLinter.Analyze(
                 [loaded.Source],
                 contract.Contract!,
                 contractPath,
@@ -475,27 +475,27 @@ public sealed class GroundRuleContractOutputLintCorpusTests : IDisposable
     [Fact]
     public void IncludedRuleFindingUsesPhysicalFileAndOutputSpan()
     {
-        string mainPath = Path.Combine(_directory, "rules.pl");
-        string rulePath = Path.Combine(_directory, "guarded.pl");
+        var mainPath = Path.Combine(_directory, "rules.pl");
+        var rulePath = Path.Combine(_directory, "guarded.pl");
         const string rules = "p(wrong) :- true.\n";
         File.WriteAllText(mainPath, ":- module(m, [p/1]). :- include('guarded.pl').\n");
         File.WriteAllText(rulePath, rules);
-        PrologLintSource loaded = PrologLintSourceLoader.Load(mainPath, File.ReadAllText(mainPath), new BytecodeProgram()).Source;
-        ContractReadResult contract = ContractReader.Read(
+        var loaded = PrologLintSourceLoader.Load(mainPath, File.ReadAllText(mainPath), new BytecodeProgram()).Source;
+        var contract = ContractReader.Read(
             ":- clr_module('M'). :- clr_export(p/1, nondet, [out(value, integer)]).",
             "Corpus",
             "corpus.dpli"
         );
         Assert.True(contract.Success, string.Join("; ", contract.Diagnostics));
 
-        IReadOnlyList<Diagnostic> diagnostics = PrologContractLinter.Analyze(
+        var diagnostics = PrologContractLinter.Analyze(
             [loaded],
             contract.Contract!,
             "corpus.dpli",
             Enabled
         );
 
-        Diagnostic warning = Assert.Single(
+        var warning = Assert.Single(
             diagnostics,
             diagnostic => diagnostic.Id == LintDiagnosticIds.GroundRuleContractOutputTypeMismatch
         );
@@ -524,7 +524,7 @@ public sealed class GroundRuleContractOutputLintCorpusTests : IDisposable
     ) =>
         Custom(
             name,
-            [Unit("corpus.pl", $":- module(m, [p/1]). {prefix}p({output}) :- {body}.")],
+            [Unit("corpus.pl", $":- module(m, [p/1]). {prefix}p({output}) :- {body}.\n")],
             $"p/1, {determinism}, [out(value, {type})]",
             expectedFindings,
             mode
@@ -540,7 +540,7 @@ public sealed class GroundRuleContractOutputLintCorpusTests : IDisposable
     ) =>
         Custom(
             name,
-            [Unit("corpus.pl", $":- module(m, [p/2]). {clauses}")],
+            [Unit("corpus.pl", $":- module(m, [p/2]). {clauses}\n")],
             $"p/2, {determinism}, [in(item, {inputType}), out(value, integer)]",
             expectedFindings,
             mode
@@ -576,7 +576,7 @@ public sealed class GroundRuleContractOutputLintCorpusTests : IDisposable
                     .Source
             ),
         ];
-        ContractReadResult contract = ContractReader.Read(
+        var contract = ContractReader.Read(
             $":- clr_module('M'). :- clr_export({test.Export}).",
             "Corpus",
             "corpus.dpli"
@@ -587,7 +587,7 @@ public sealed class GroundRuleContractOutputLintCorpusTests : IDisposable
 
     private static void AssertFindingCount(CorpusCase test, IReadOnlyList<Diagnostic> diagnostics, string id, int expected)
     {
-        int actual = diagnostics.Count(diagnostic => diagnostic.Id == id);
+        var actual = diagnostics.Count(diagnostic => diagnostic.Id == id);
         Assert.True(actual == expected, $"{test.Name}: expected {expected} {id} findings, actual {actual}.");
     }
 

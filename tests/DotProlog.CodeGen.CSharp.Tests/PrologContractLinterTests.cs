@@ -34,12 +34,12 @@ public sealed class PrologContractLinterTests : IDisposable
     public void ReportsExactOutputSpanAndMessage()
     {
         const string source = ":- module(m, [p/1]). p(wrong).";
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             source,
             ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)])."
         );
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ContractOutputTypeMismatch));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ContractOutputTypeMismatch));
         Assert.Equal(source.LastIndexOf("wrong", StringComparison.Ordinal), warning.Span.Start);
         Assert.Equal(5, warning.Span.Length);
         Assert.EndsWith("rules.pl", warning.FileName, StringComparison.Ordinal);
@@ -61,9 +61,12 @@ public sealed class PrologContractLinterTests : IDisposable
     [InlineData("[a,b]", "list(atom)")]
     [InlineData("[[a],[b]]", "list(list(atom))")]
     [InlineData("2r1", "integer")]
+    [InlineData("576460752303423488", "integer")]
+    [InlineData("9223372036854775807", "integer")]
+    [InlineData("-9223372036854775808", "integer")]
     public void CompatibleGroundOutputsProduceNoFinding(string output, string type)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             $":- module(m, [p/1]). p({output}).",
             $":- clr_module('M'). :- clr_export(p/1, det, [out(value, {type})])."
         );
@@ -74,7 +77,6 @@ public sealed class PrologContractLinterTests : IDisposable
     [Theory]
     [InlineData("ok", "integer", "atom")]
     [InlineData("1", "atom", "integer")]
-    [InlineData("576460752303423488", "integer", "big_integer")]
     [InlineData("9223372036854775808", "integer", "big_integer")]
     [InlineData("1r2", "integer", "rational")]
     [InlineData("ok", "float", "atom")]
@@ -83,12 +85,12 @@ public sealed class PrologContractLinterTests : IDisposable
     [InlineData("[[a],[1]]", "list(list(atom))", "list")]
     public void IncompatibleGroundOutputsReportTheirRuntimeShape(string output, string type, string shape)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             $":- module(m, [p/1]). p({output}).",
             $":- clr_module('M'). :- clr_export(p/1, det, [out(value, {type})])."
         );
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ContractOutputTypeMismatch));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ContractOutputTypeMismatch));
         Assert.Contains($"ground shape {shape}", warning.Message, StringComparison.Ordinal);
     }
 
@@ -100,7 +102,7 @@ public sealed class PrologContractLinterTests : IDisposable
     [InlineData("foo(bar)", "term")]
     public void GroundCompatibleInputsAllowLeadingFactAnalysis(string input, string type)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             $":- module(m, [p/2]). p({input}, wrong).",
             $":- clr_module('M'). :- clr_export(p/2, det, [in(item, {type}), out(value, integer)])."
         );
@@ -118,7 +120,7 @@ public sealed class PrologContractLinterTests : IDisposable
     [InlineData("X", "atom")]
     public void IncompatibleOrVariableInputsMakeTheResultNotEstablished(string input, string type)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             $":- module(m, [p/2]). p({input}, wrong).",
             $":- clr_module('M'). :- clr_export(p/2, det, [in(item, {type}), out(value, integer)])."
         );
@@ -129,7 +131,7 @@ public sealed class PrologContractLinterTests : IDisposable
     [Fact]
     public void AliasedInputsAreNotSolved()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ":- module(m, [p/3]). p(X, X, wrong).",
             ":- clr_module('M'). :- clr_export(p/3, det, [in(a, atom), in(b, integer), out(value, integer)])."
         );
@@ -143,7 +145,7 @@ public sealed class PrologContractLinterTests : IDisposable
     [InlineData("\"text\"")]
     public void VariableOpenOrReaderDependentOutputsAreNotEstablished(string output)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             $":- module(m, [p/1]). p({output}).",
             ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)])."
         );
@@ -154,7 +156,7 @@ public sealed class PrologContractLinterTests : IDisposable
     [Fact]
     public void LeadingRuleIsNotEstablished()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ":- module(m, [p/1]). p(wrong) :- true.",
             ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)])."
         );
@@ -165,7 +167,7 @@ public sealed class PrologContractLinterTests : IDisposable
     [Fact]
     public void LaterFactIsNotEstablished()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ":- module(m, [p/1]). p(1). p(wrong).",
             ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)])."
         );
@@ -178,7 +180,7 @@ public sealed class PrologContractLinterTests : IDisposable
     [InlineData("multifile")]
     public void DynamicAndMultifileTargetsAreNotEstablished(string declaration)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             $":- module(m, [p/1]). :- {declaration}(p/1). p(wrong).",
             ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)])."
         );
@@ -189,7 +191,7 @@ public sealed class PrologContractLinterTests : IDisposable
     [Fact]
     public void EffectfulModuleIsSkippedWithoutExecutingInitialization()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ":- module(m, [p/1]). :- initialization(halt(9)). p(wrong).",
             ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)])."
         );
@@ -200,7 +202,7 @@ public sealed class PrologContractLinterTests : IDisposable
     [Fact]
     public void MixedOrdinaryAndGrammarDefinitionsAreNotEstablished()
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ":- module(m, [p/2]). p(ok, 1). p --> [].",
             ":- clr_module('M'). :- clr_export(p/2, det, [in(item, atom), out(value, integer)])."
         );
@@ -211,10 +213,10 @@ public sealed class PrologContractLinterTests : IDisposable
     [Fact]
     public void ImportedOnlyDefinitionsAreNotEstablished()
     {
-        PrologLintSource imported = Source("a.pl", ":- module(a, [p/1]). p(wrong).", PrologLanguageMode.Modern);
-        PrologLintSource main = Source("rules.pl", ":- module(m, [p/1]). :- reexport(a).", PrologLanguageMode.Modern);
+        var imported = Source("a.pl", ":- module(a, [p/1]). p(wrong).", PrologLanguageMode.Modern);
+        var main = Source("rules.pl", ":- module(m, [p/1]). :- reexport(a).", PrologLanguageMode.Modern);
 
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             [imported, main],
             ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)])."
         );
@@ -225,10 +227,10 @@ public sealed class PrologContractLinterTests : IDisposable
     [Fact]
     public void AmbiguousExportModulesAreNotEstablished()
     {
-        PrologLintSource a = Source("a.pl", ":- module(a, [p/1]). p(wrong).", PrologLanguageMode.Modern);
-        PrologLintSource b = Source("b.pl", ":- module(b, [p/1]). p(wrong).", PrologLanguageMode.Modern);
+        var a = Source("a.pl", ":- module(a, [p/1]). p(wrong).", PrologLanguageMode.Modern);
+        var b = Source("b.pl", ":- module(b, [p/1]). p(wrong).", PrologLanguageMode.Modern);
 
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             [a, b],
             ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)])."
         );
@@ -243,18 +245,18 @@ public sealed class PrologContractLinterTests : IDisposable
         var factPath = Path.Combine(_directory, "fact.pl");
         File.WriteAllText(mainPath, ":- module(m, [p/1]). :- include('fact.pl').\n");
         File.WriteAllText(factPath, "p(wrong).\n");
-        PrologLintSourceLoadResult loaded = PrologLintSourceLoader.Load(
+        var loaded = PrologLintSourceLoader.Load(
             mainPath,
             File.ReadAllText(mainPath),
             new BytecodeProgram()
         );
 
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             [loaded.Source],
             ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)])."
         );
 
-        Diagnostic warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ContractOutputTypeMismatch));
+        var warning = Assert.Single(diagnostics, Id(LintDiagnosticIds.ContractOutputTypeMismatch));
         Assert.Equal(factPath, warning.FileName);
         Assert.Equal(2, warning.Span.Start);
     }
@@ -264,8 +266,8 @@ public sealed class PrologContractLinterTests : IDisposable
     [InlineData(PrologLanguageMode.StrictIso)]
     public void BothLanguageModesUseTheSameContractCompatibility(PrologLanguageMode mode)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
-            ":- module(m, [p/1]). p(wrong).",
+        var diagnostics = Lint(
+            ":- module(m, [p/1]). p(wrong).\n",
             ":- clr_module('M'). :- clr_export(p/1, det, [out(value, integer)]).",
             mode
         );
@@ -280,7 +282,7 @@ public sealed class PrologContractLinterTests : IDisposable
     [InlineData("nondet")]
     public void EveryDeterminismDeclarationUsesTheSameOutputContract(string determinism)
     {
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             ":- module(m, [p/1]). p(wrong).",
             $":- clr_module('M'). :- clr_export(p/1, {determinism}, [out(value, integer)])."
         );
@@ -292,7 +294,7 @@ public sealed class PrologContractLinterTests : IDisposable
     public void MultipleOutputsHaveIndependentFindings()
     {
         const string source = ":- module(m, [p/2]). p(wrong, also_wrong).";
-        IReadOnlyList<Diagnostic> diagnostics = Lint(
+        var diagnostics = Lint(
             source,
             ":- clr_module('M'). :- clr_export(p/2, det, [out(first, integer), out(second, integer)])."
         );
@@ -314,6 +316,7 @@ public sealed class PrologContractLinterTests : IDisposable
             new PrologAtom("a"),
             new PrologInteger(1),
             new PrologBigInteger(System.Numerics.BigInteger.One),
+            new PrologBigInteger(System.Numerics.BigInteger.One << 80),
             new PrologFloat(1),
             new PrologRational(1, 2),
             new PrologString("a"),
@@ -329,9 +332,9 @@ public sealed class PrologContractLinterTests : IDisposable
             new(ContractTypeKind.List, new ContractType(ContractTypeKind.Atom)),
         ];
 
-        foreach (ContractType type in types)
+        foreach (var type in types)
         {
-            foreach (PrologValue value in values)
+            foreach (var value in values)
             {
                 Assert.Equal(Marshals(type, value), type.CanMarshalOutput(value));
             }
@@ -403,7 +406,7 @@ public sealed class PrologContractLinterTests : IDisposable
     )
     {
         var path = Path.Combine(Path.GetTempPath(), "rules.dpli");
-        ContractReadResult result = ContractReader.Read(contract, "Tests", path);
+        var result = ContractReader.Read(contract, "Tests", path);
         Assert.True(result.Success, string.Join("; ", result.Diagnostics));
         return PrologContractLinter.Analyze(sources, result.Contract!, path, options);
     }
