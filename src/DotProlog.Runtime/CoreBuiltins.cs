@@ -603,6 +603,10 @@ public static class CoreBuiltins
 
         if (goal.Tag == CellTag.Atom)
         {
+            if (extra.Count >= Machine.ArgumentRegisterCount)
+            {
+                throw PrologErrors.Representation(machine, "max_arity");
+            }
             var atomFunctor = machine.Symbols.InternFunctor(goal.Index, extra.Count);
             return machine.Unify(target, machine.CreateStructure(atomFunctor, CollectionsMarshal.AsSpan(extra)));
         }

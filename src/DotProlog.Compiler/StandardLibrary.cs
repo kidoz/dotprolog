@@ -486,12 +486,11 @@ internal static class StandardLibrary
                 ;   '$capture_end'(_),
                     fail
                 )
-            ;   current_output(Previous),
-                set_output(Sink),
+            ;   '$output_begin'(Sink),
                 (   catch(Goal, Error, true)
-                ->  set_output(Previous),
+                ->  '$output_end',
                     ( nonvar(Error) -> throw(Error) ; true )
-                ;   set_output(Previous),
+                ;   '$output_end',
                     fail
                 )
             ).

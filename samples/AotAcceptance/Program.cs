@@ -51,18 +51,50 @@ internal static class Program
             // Host marshalling must also reject cycles in a native executable.
         }
 
+        if (!engine.Query("length(L,255), '$add_args'(host_limit,L,G), functor(G,host_limit,255)").Prove())
+            return false;
+        foreach (var arity in new[] { 256, 257 })
+        {
+            if (
+                !engine
+                    .Query(
+                        $"catch((length(L,{arity}), '$add_args'(host_limit,L,_), fail), error(representation_error(max_arity),_), true)"
+                    )
+                    .Prove()
+            )
+                return false;
+        }
+
+        if (engine.RunGoal("(true;throw(ball);true)", out _) != RunResult.Success)
+            return false;
+        try
+        {
+            engine.Machine.Redo();
+            return false;
+        }
+        catch (PrologException)
+        {
+            if (engine.Machine.Redo() != RunResult.Failure)
+                return false;
+        }
+
         engine.ConsultOrThrow("loop :- loop.", "loop.pl");
+        if (engine.RunGoal("(true;with_output_to(atom(_),loop);true)", out _) != RunResult.Success)
+            return false;
         using var cancellation = new CancellationTokenSource();
         engine.Machine.CancellationToken = cancellation.Token;
         cancellation.CancelAfter(TimeSpan.FromMilliseconds(100));
         try
         {
-            engine.Query("loop").Prove();
+            engine.Machine.Redo();
             return false;
         }
         catch (OperationCanceledException)
         {
-            return !engine.Machine.IsRunning;
+            return !engine.Machine.IsRunning
+                && !engine.Machine.HasAlternatives
+                && ReferenceEquals(engine.Machine.Streams.UserOutput, engine.Machine.Streams.CurrentOutput)
+                && engine.Machine.Redo() == RunResult.Failure;
         }
     }
 

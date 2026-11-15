@@ -201,7 +201,9 @@ batch, reinstall the static program, and carry application state through detache
 values or an external store. A request limit or a measured memory/count threshold can trigger rotation.
 Finish or abandon enumeration before rotation. Dispose the old engine and release references to it,
 its host, queries, machine, and program so the GC can collect them; disposal alone closes streams.
-Cells, predicate handles, and compiled goal addresses belong to their original program.
+Cells and compiled goal addresses belong to their original program. Predicate handles belong to
+the machine that bound them; another host over that same machine may use them. Calls reject
+cross-machine, manually constructed, default, or modified handles with `ArgumentException`.
 
 For reproducible growth and lookup measurements, run the benchmark project's `--profile-churn`
 command described in [runtime performance measurements](explanation/runtime-performance.md).

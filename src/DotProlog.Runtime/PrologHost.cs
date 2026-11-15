@@ -34,6 +34,9 @@ public sealed class PrologHost
     public PrologPredicate Bind(string name, int arity)
     {
         ArgumentNullException.ThrowIfNull(name);
+        ArgumentOutOfRangeException.ThrowIfNegative(arity);
+        if (arity >= Machine.ArgumentRegisterCount)
+            throw PrologErrors.Representation(_machine, "max_arity");
 
         var functorId = _machine.Symbols.InternFunctor(name, arity);
         if (_machine.Program.IsStrictIsoExtension(functorId))
@@ -46,7 +49,8 @@ public sealed class PrologHost
             throw PrologErrors.UndefinedProcedure(_machine, functorId);
         }
 
-        return new PrologPredicate(functorId, name, arity);
+        var canonicalName = _machine.Symbols.AtomName(_machine.Symbols.GetFunctor(functorId).NameAtom);
+        return new PrologPredicate(functorId, canonicalName, arity) { Owner = _machine };
     }
 
     /// <summary>Proves the predicate once and reports whether it succeeded, ignoring any outputs.</summary>
@@ -61,7 +65,14 @@ public sealed class PrologHost
     {
         ValidateArguments(predicate, arguments.Length);
         Span<Cell> cells = stackalloc Cell[arguments.Length];
-        return Start(predicate, arguments, cells) == RunResult.Success;
+        try
+        {
+            return Start(predicate, arguments, cells) == RunResult.Success;
+        }
+        finally
+        {
+            _machine.DiscardCall();
+        }
     }
 
     /// <summary>
@@ -79,8 +90,15 @@ public sealed class PrologHost
     {
         ValidateArguments(predicate, arguments.Length);
         Span<Cell> cells = stackalloc Cell[arguments.Length];
-        var result = Start(predicate, arguments, cells);
-        return result == RunResult.Success ? ReadOutputs(arguments, cells) : null;
+        try
+        {
+            var result = Start(predicate, arguments, cells);
+            return result == RunResult.Success ? ReadOutputs(arguments, cells) : null;
+        }
+        finally
+        {
+            _machine.DiscardCall();
+        }
     }
 
     /// <summary>
@@ -101,9 +119,9 @@ public sealed class PrologHost
     )
     {
         ArgumentNullException.ThrowIfNull(arguments);
+        ValidateArguments(predicate, arguments.Length);
         var previousToken = _machine.CancellationToken;
         var callStarted = false;
-        var completed = false;
         _machine.CancellationToken = cancellationToken;
         try
         {
@@ -116,16 +134,14 @@ public sealed class PrologHost
                 yield return ReadOutputs(arguments, cells);
                 result = _machine.Redo();
             }
-
-            completed = true;
         }
         finally
         {
             try
             {
-                if (callStarted && !completed)
+                if (callStarted)
                 {
-                    _machine.BeginCall();
+                    _machine.DiscardCall();
                 }
             }
             finally
@@ -152,6 +168,13 @@ public sealed class PrologHost
         }
         if (count >= Machine.ArgumentRegisterCount)
             throw PrologErrors.Representation(_machine, "max_arity");
+        if (!ReferenceEquals(predicate.Owner, _machine))
+            throw new ArgumentException("The predicate handle must be bound to this machine.", nameof(predicate));
+        if ((uint)predicate.FunctorId >= (uint)_machine.Symbols.FunctorCount)
+            throw new ArgumentException("The predicate handle's identity has been changed.", nameof(predicate));
+        var functor = _machine.Symbols.GetFunctor(predicate.FunctorId);
+        if (functor.Arity != predicate.Arity || _machine.Symbols.AtomName(functor.NameAtom) != predicate.Name)
+            throw new ArgumentException("The predicate handle's identity has been changed.", nameof(predicate));
     }
 
     private RunResult Start(PrologPredicate predicate, ReadOnlySpan<PrologInput> arguments, Span<Cell> cells)

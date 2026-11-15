@@ -150,6 +150,20 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Fixed
 
+- Runtime term construction and atomic closures enforce the maximum arity of 255 before dispatch.
+  Escaping exceptions and cancellation discard suspended queries and restore temporary output
+  capture or stream redirection. One-shot host calls and disposed query enumerators release their
+  remaining alternatives, and host calls reject predicate handles bound to another machine.
+
+- Malformed language-server frames end the session with a protocol error instead of an unhandled
+  exception. Incoming headers are limited to 8 KiB and message bodies to 8 MiB.
+
+- Manual release recovery validates version inputs before downloading assets or acquiring publishing
+  credentials, and passes them through environment variables rather than inserting them into shell code.
+
+- Compatibility documentation distinguishes partial ISO support, executable independent tests,
+  audit-only declarations, and skipped or uncovered execution paths.
+
 - Deferred cleanup on a surrounding cut preserves caller variables, subsequent bindings, and frozen
   goals across bytecode and compiled calls. Stream property enumeration releases its snapshot with
   the machine call state. Text streams skip an initial UTF-8 byte-order mark, including after

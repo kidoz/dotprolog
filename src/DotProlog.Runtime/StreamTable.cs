@@ -13,7 +13,7 @@ public sealed class StreamTable
 {
     private readonly List<PrologStream> _streams = [];
     private readonly Dictionary<string, PrologStream> _aliases = new(StringComparer.Ordinal);
-    private readonly Stack<(PrologStream Previous, StringWriter Sink)> _captures = new();
+    private readonly Stack<(PrologStream Previous, StringWriter? Sink)> _outputScopes = new();
 
     /// <summary>Creates a table holding the three standard streams.</summary>
     public StreamTable()
@@ -252,7 +252,7 @@ public sealed class StreamTable
     public void BeginCapture()
     {
         var sink = new StringWriter(System.Globalization.CultureInfo.InvariantCulture);
-        _captures.Push((CurrentOutput, sink));
+        _outputScopes.Push((CurrentOutput, sink));
         CurrentOutput = new PrologStream(
             -1,
             "with_output_to",
@@ -270,14 +270,36 @@ public sealed class StreamTable
     /// <summary>Stops capturing and returns what was written.</summary>
     public string EndCapture()
     {
-        if (_captures.Count == 0)
+        if (_outputScopes.Count == 0)
         {
             return string.Empty;
         }
 
-        (var previous, var sink) = _captures.Pop();
-        CurrentOutput = previous;
-        return sink.ToString();
+        var scope = _outputScopes.Peek();
+        if (scope.Sink is null)
+            throw new InvalidOperationException("The current output scope is not a capture.");
+        var text = scope.Sink.ToString();
+        EndOutputScope();
+        return text;
+    }
+
+    internal void BeginOutputScope(PrologStream stream)
+    {
+        _outputScopes.Push((CurrentOutput, null));
+        CurrentOutput = stream;
+    }
+
+    internal void EndOutputScope()
+    {
+        var (previous, sink) = _outputScopes.Pop();
+        CurrentOutput = previous.IsOpen ? previous : UserOutput;
+        sink?.Dispose();
+    }
+
+    internal void AbortOutputScopes()
+    {
+        while (_outputScopes.Count > 0)
+            EndOutputScope();
     }
 
     private PrologStream Add(PrologStream stream)

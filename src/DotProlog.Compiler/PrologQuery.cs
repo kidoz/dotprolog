@@ -36,23 +36,47 @@ public sealed class PrologQuery
     public IEnumerable<PrologSolution> Solutions()
     {
         var machine = _engine.Machine;
-        var result = machine.Run(_address);
-
-        while (result == RunResult.Success)
+        try
         {
-            yield return Capture(machine);
-            result = machine.Redo();
+            var result = machine.Run(_address);
+            while (result == RunResult.Success)
+            {
+                yield return Capture(machine);
+                result = machine.Redo();
+            }
+        }
+        finally
+        {
+            machine.DiscardCall();
         }
     }
 
     /// <summary>Proves the goal once and reports whether it succeeded.</summary>
-    public bool Prove() => _engine.Machine.Run(_address) == RunResult.Success;
+    public bool Prove()
+    {
+        var machine = _engine.Machine;
+        try
+        {
+            return machine.Run(_address) == RunResult.Success;
+        }
+        finally
+        {
+            machine.DiscardCall();
+        }
+    }
 
     /// <summary>Returns the first answer, or <see langword="null"/> when the goal fails.</summary>
     public PrologSolution? FirstOrDefault()
     {
         var machine = _engine.Machine;
-        return machine.Run(_address) == RunResult.Success ? Capture(machine) : null;
+        try
+        {
+            return machine.Run(_address) == RunResult.Success ? Capture(machine) : null;
+        }
+        finally
+        {
+            machine.DiscardCall();
+        }
     }
 
     private PrologSolution Capture(Machine machine)

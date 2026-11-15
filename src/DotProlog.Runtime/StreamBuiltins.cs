@@ -120,6 +120,25 @@ internal static class StreamBuiltins
         registry.Register("$capture_begin", 0, CaptureBegin);
         registry.Register("$capture_end", 1, CaptureEnd);
         registry.Register(
+            "$output_begin",
+            1,
+            static machine =>
+            {
+                var stream = Resolve(machine, 0, input: false);
+                machine.Streams.BeginOutputScope(stream);
+                return true;
+            }
+        );
+        registry.Register(
+            "$output_end",
+            0,
+            static machine =>
+            {
+                machine.Streams.EndOutputScope();
+                return true;
+            }
+        );
+        registry.Register(
             "$output_sink",
             2,
             static machine =>

@@ -120,6 +120,7 @@ public sealed class Machine : IDisposable
             return;
         }
 
+        Streams.AbortOutputScopes();
         Streams.CloseAll();
         _disposed = true;
         _solutionPending = false;
@@ -231,6 +232,16 @@ public sealed class Machine : IDisposable
         ResetState();
     }
 
+    /// <summary>Discards the current query and its alternatives, retaining its exit code.</summary>
+    /// <remarks>Detached host answers remain valid. Call only after execution has stopped.</remarks>
+    public void DiscardCall()
+    {
+        EnsureNotRunning();
+        var exitCode = ExitCode;
+        ResetState();
+        ExitCode = exitCode;
+    }
+
     /// <summary>
     /// Calls <paramref name="functorId"/> with arguments already built on the heap since
     /// <see cref="BeginCall"/>. Further solutions come from <see cref="Redo"/>.
@@ -315,6 +326,8 @@ public sealed class Machine : IDisposable
                 {
                     var result = Execute();
                     _solutionPending = result == RunResult.Success;
+                    if (result == RunResult.Halted)
+                        Streams.AbortOutputScopes();
                     return result;
                 }
                 catch (PrologException error) when (error.HasBall && HasCatchFrame())
@@ -329,9 +342,18 @@ public sealed class Machine : IDisposable
                 }
             }
         }
+        catch
+        {
+            // Balls are detached from the heap. No failed dispatch may retain a resumable
+            // solution, a dynamic generation, or a temporary output scope.
+            ResetState();
+            throw;
+        }
         finally
         {
             IsRunning = false;
+            if (!_solutionPending && _program.HasRetiredClauses)
+                _program.ReclaimDynamicClauses();
         }
     }
 
@@ -1664,6 +1686,15 @@ public sealed class Machine : IDisposable
     /// <summary>Builds a compound term on the heap from <paramref name="arguments"/> and returns its cell.</summary>
     public Cell CreateStructure(int functorId, ReadOnlySpan<Cell> arguments)
     {
+        if (arguments.Length >= ArgumentRegisterCount || _symbols.ArityOf(functorId) >= ArgumentRegisterCount)
+        {
+            throw PrologErrors.Representation(this, "max_arity");
+        }
+        if (_symbols.ArityOf(functorId) != arguments.Length)
+        {
+            throw new ArgumentException("The argument count must match the functor's arity.", nameof(arguments));
+        }
+
         EnsureHeap(1 + arguments.Length);
         var address = _h;
         _heap[_h++] = Cell.Functor(functorId);
@@ -1786,6 +1817,10 @@ public sealed class Machine : IDisposable
             case CellTag.Structure:
                 functorId = _heap[goal.Index].Index;
                 arity = _symbols.ArityOf(functorId);
+                if (arity >= ArgumentRegisterCount)
+                {
+                    throw PrologErrors.Representation(this, "max_arity");
+                }
                 for (var i = 0; i < arity; i++)
                 {
                     _x[i] = _heap[goal.Index + 1 + i];
@@ -2002,9 +2037,14 @@ public sealed class Machine : IDisposable
 
     private void ResetState()
     {
+        Streams.AbortOutputScopes();
         // Backtrackable global assignments must not outlive their top-level goal: fire the whole
         // undo stack before the trail and heap they are ordered against are discarded.
         UndoTrail(0);
+
+        for (var i = 0; i < _b; i++)
+            _choicePoints[i].NextClause = null;
+        BuiltinCursor = null;
 
         _h = 0;
         _tr = 0;
@@ -2028,7 +2068,9 @@ public sealed class Machine : IDisposable
         _wokenCount = 0;
         _deferredCleanups.Clear();
         ExitCode = 0;
-        if (_program.HasRetiredClauses)
+        // A dispatch that is aborting is still marked running until its finally block, but its
+        // reset stacks no longer retain any dynamic-clause generation.
+        if (!IsRunning && _program.HasRetiredClauses)
             _program.ReclaimDynamicClauses();
         _callGeneration = _program.Generation;
     }

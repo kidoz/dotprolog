@@ -45,6 +45,10 @@ Finish enumerating or dispose the current query before starting another goal on 
 Use separate engines for independent concurrent callers. See the
 [embedding reference](../dotnet-integration.md#embed-the-engine) for value lifetimes and mode selection.
 
+`Prove()`, `FirstOrDefault()`, and `PrologHost.CallOnce()` discard remaining alternatives before
+returning. Disposing a `Solutions()` or `CallAll()` enumerator does the same. Detached answers
+remain valid; use the low-level machine API when deliberately managing `Call()` and `Redo()`.
+
 Dispose the engine after execution stops to flush and close streams opened by Prolog. Host-owned
 standard input, output, and error remain open. `using` gives the engine that lifetime automatically.
 When creating a typed facade over an existing engine, keep the engine alive for every facade call.
@@ -57,6 +61,8 @@ Set `engine.Machine.CancellationToken` before starting work to cancel execution 
 Cancellation raises `OperationCanceledException` between bytecode instructions or compiled blocks.
 After cancellation, wait for execution to finish before disposing the engine. Blocking host code
 and I/O require their own cancellation support; process isolation is needed for hard termination.
+An escaping exception or cancellation discards the interrupted query, so `Redo()` reports failure.
+Temporary `with_output_to/2` capture and redirection unwind to the preceding output selection.
 
 For repeated calls with .NET values, use [predicate binding](../dotnet-integration.md#bind-a-predicate).
 For generated methods such as `pricing.Discount(100.0, 15)`, follow
