@@ -19,7 +19,10 @@ internal static class ProjectEvaluator
             || configuration.Any(character => !(char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or '.'))
         )
             throw new InvalidDataException("Configuration must contain only letters, digits, dots, underscores or hyphens.");
-        ProcessStartInfo start = new("dotnet")
+        var dotnetPath = Environment.GetEnvironmentVariable("DOTPROLOG_DOTNET_PATH") is { Length: > 0 } configuredPath
+            ? configuredPath
+            : "dotnet";
+        ProcessStartInfo start = new(dotnetPath)
         {
             WorkingDirectory = Path.GetDirectoryName(path)!,
             RedirectStandardOutput = true,
@@ -27,7 +30,7 @@ internal static class ProjectEvaluator
             UseShellExecute = false,
         };
         foreach (
-            string argument in new[]
+            var argument in new[]
             {
                 "msbuild",
                 path,
@@ -41,16 +44,16 @@ internal static class ProjectEvaluator
         )
             start.ArgumentList.Add(argument);
         start.Environment["DOTNET_NOLOGO"] = "1";
-        using Process process = Process.Start(start) ?? throw new IOException("Could not start MSBuild.");
+        using var process = Process.Start(start) ?? throw new IOException("Could not start MSBuild.");
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
-        Task<string> output = process.StandardOutput.ReadToEndAsync(timeout.Token);
-        Task<string> errors = process.StandardError.ReadToEndAsync(timeout.Token);
+        var output = process.StandardOutput.ReadToEndAsync(timeout.Token);
+        var errors = process.StandardError.ReadToEndAsync(timeout.Token);
         try
         {
             await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
-            string text = await output.ConfigureAwait(false);
-            string error = await errors.ConfigureAwait(false);
+            var text = await output.ConfigureAwait(false);
+            var error = await errors.ConfigureAwait(false);
             if (process.ExitCode != 0)
                 throw new InvalidDataException($"Project evaluation failed: {error}{text}");
             return ProjectConfiguration.Parse(text);

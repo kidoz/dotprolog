@@ -1,5 +1,5 @@
 import { runTests, downloadAndUnzipVSCode } from "@vscode/test-electron";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
     mkdtemp,
     mkdir,
@@ -36,6 +36,24 @@ if (version !== "stable" && !/^\d+\.\d+\.\d+$/.test(version)) {
 console.log(
     `Testing VS Code ${version} (${requestedVersion}) with ${extensionPath}`,
 );
+const dotnetLookup = spawnSync(
+    process.platform === "win32" ? "where" : "which",
+    ["dotnet"],
+    { encoding: "utf8" },
+);
+if (dotnetLookup.status !== 0) {
+    throw new Error("Editor tests require dotnet on PATH.");
+}
+const dotnetPath = dotnetLookup.stdout.split(/\r?\n/, 1)[0].trim();
+const sdkList = spawnSync(dotnetPath, ["--list-sdks"], { encoding: "utf8" });
+if (sdkList.status !== 0) {
+    throw new Error(`Could not enumerate .NET SDKs: ${sdkList.stderr}`);
+}
+const net11Sdk = sdkList.stdout
+    .split(/\r?\n/)
+    .map((line) => /^((?:1[1-9]|[2-9]\d)\.\d+\.\d+)\s/.exec(line)?.[1])
+    .filter((version) => version !== undefined)
+    .at(-1);
 
 // Windows TEMP can use an 8.3 alias (RUNNER~1). .NET expands that alias when
 // publishing unopened-file diagnostics, so give both processes the same physical path.
@@ -81,6 +99,8 @@ try {
             DOTPROLOG_TEST_WORKSPACE: workspace,
             DOTPROLOG_TEST_RESTRICTED: restricted ? "1" : "",
             DOTPROLOG_TEST_VSCODE_VERSION: version,
+            DOTPROLOG_TEST_DOTNET_PATH: dotnetPath,
+            DOTPROLOG_TEST_NET11_SDK: net11Sdk ?? "",
         },
     };
     if (restricted) {

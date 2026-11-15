@@ -44,7 +44,16 @@ export function launch(
     } else {
         args = ["--mode", settings.mode];
     }
-    return server.toLowerCase().endsWith(".dll")
+    const command = server.toLowerCase().endsWith(".dll")
         ? { command: settings.dotnetPath || "dotnet", args: [server, ...args] }
         : { command: server, args };
+    return {
+        ...command,
+        options: {
+            env: {
+                ...process.env,
+                DOTPROLOG_DOTNET_PATH: settings.dotnetPath || "dotnet",
+            },
+        },
+    };
 }

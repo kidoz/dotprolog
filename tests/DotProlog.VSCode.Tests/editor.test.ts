@@ -302,6 +302,122 @@ suite("DotProlog in VS Code", () => {
         await vscode.commands.executeCommand("dotprolog.restartServer");
     });
 
+    test("configured dotnet evaluates projects with managed or native servers when PATH is empty", async () => {
+        const dotnetPath = process.env.DOTPROLOG_TEST_DOTNET_PATH;
+        assert.ok(dotnetPath);
+        const source = path.join(folder, "configured-dotnet-source.pl");
+        const project = path.join(folder, "ConfiguredDotnet.dplproj");
+        const emptyPath = path.join(folder, "empty-path");
+        await fs.mkdir(emptyPath);
+        await fs.writeFile(source, "configured_dotnet_source(.\n");
+        await fs.writeFile(
+            project,
+            '<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework><DotPrologLanguageMode>modern</DotPrologLanguageMode></PropertyGroup><ItemGroup><PrologCompile Include="configured-dotnet-source.pl"/></ItemGroup></Project>',
+        );
+        const config = vscode.workspace.getConfiguration("dotprolog");
+        const originalPath = process.env.PATH;
+        try {
+            await config.update(
+                "dotnetPath",
+                dotnetPath,
+                vscode.ConfigurationTarget.Workspace,
+            );
+            process.env.PATH = emptyPath;
+            await config.update(
+                "project",
+                project,
+                vscode.ConfigurationTarget.Workspace,
+            );
+            await eventually(
+                async () => {
+                    await ready();
+                    return vscode.languages.getDiagnostics(
+                        vscode.Uri.file(source),
+                    );
+                },
+                (diagnostics) =>
+                    diagnostics.some(
+                        (diagnostic) =>
+                            diagnostic.severity ===
+                            vscode.DiagnosticSeverity.Error,
+                    ),
+            );
+        } finally {
+            await config.update(
+                "project",
+                "",
+                vscode.ConfigurationTarget.Workspace,
+            );
+            if (originalPath === undefined) {
+                delete process.env.PATH;
+            } else {
+                process.env.PATH = originalPath;
+            }
+            await config.update(
+                "dotnetPath",
+                "dotnet",
+                vscode.ConfigurationTarget.Workspace,
+            );
+            await vscode.commands.executeCommand("dotprolog.restartServer");
+        }
+    });
+
+    test("net11 projects evaluate when a stable .NET 11 SDK or later is installed", async function () {
+        const sdk = process.env.DOTPROLOG_TEST_NET11_SDK;
+        if (!sdk) {
+            this.skip();
+            return;
+        }
+        const source = path.join(folder, "net11-source.pl");
+        const project = path.join(folder, "Net11.dplproj");
+        const globalJson = path.join(folder, "global.json");
+        await fs.writeFile(source, "net11_source(.\n");
+        await fs.writeFile(
+            project,
+            '<Project><PropertyGroup><TargetFramework>net11.0</TargetFramework><DotPrologLanguageMode>modern</DotPrologLanguageMode></PropertyGroup><ItemGroup><PrologCompile Include="net11-source.pl"/></ItemGroup></Project>',
+        );
+        await fs.writeFile(
+            globalJson,
+            JSON.stringify({
+                sdk: {
+                    version: sdk,
+                    rollForward: "major",
+                    allowPrerelease: false,
+                },
+            }),
+        );
+        const config = vscode.workspace.getConfiguration("dotprolog");
+        try {
+            await config.update(
+                "project",
+                project,
+                vscode.ConfigurationTarget.Workspace,
+            );
+            await eventually(
+                async () => {
+                    await ready();
+                    return vscode.languages.getDiagnostics(
+                        vscode.Uri.file(source),
+                    );
+                },
+                (diagnostics) =>
+                    diagnostics.some(
+                        (diagnostic) =>
+                            diagnostic.severity ===
+                            vscode.DiagnosticSeverity.Error,
+                    ),
+            );
+        } finally {
+            await config.update(
+                "project",
+                "",
+                vscode.ConfigurationTarget.Workspace,
+            );
+            await fs.rm(globalJson, { force: true });
+            await vscode.commands.executeCommand("dotprolog.restartServer");
+        }
+    });
+
     test("contracts and project XML retain separate language identities", async () => {
         const contract = vscode.Uri.file(path.join(folder, "example.dpli"));
         await fs.writeFile(contract.fsPath, ":- module(example, []).\n");

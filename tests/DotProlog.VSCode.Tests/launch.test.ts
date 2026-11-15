@@ -11,24 +11,34 @@ const settings: Settings = {
     mode: "modern",
 };
 const dll = path.resolve("folder with spaces/dotprolog-lsp.dll");
+const serverOptions = (dotnetPath = "dotnet") => ({
+    env: { ...process.env, DOTPROLOG_DOTNET_PATH: dotnetPath },
+});
 
 test("managed loose files use an argument array and the selected mode", () => {
     assert.deepEqual(launch({ ...settings, mode: "strict-iso" }, dll, []), {
         command: "dotnet",
         args: [dll, "--mode", "strict-iso"],
+        options: serverOptions(),
     });
 });
 
 test("project arguments omit mode and resolve paths against the workspace", () => {
     const folder = path.resolve("workspace with spaces");
+    const dotnetPath = path.resolve("custom dotnet/dotnet");
     assert.deepEqual(
         launch(
-            { ...settings, project: "App.dplproj", configuration: "Release" },
+            {
+                ...settings,
+                dotnetPath,
+                project: "App.dplproj",
+                configuration: "Release",
+            },
             dll,
             [folder],
         ),
         {
-            command: "dotnet",
+            command: dotnetPath,
             args: [
                 dll,
                 "--project",
@@ -36,6 +46,7 @@ test("project arguments omit mode and resolve paths against the workspace", () =
                 "--configuration",
                 "Release",
             ],
+            options: serverOptions(dotnetPath),
         },
     );
 });
@@ -43,12 +54,32 @@ test("project arguments omit mode and resolve paths against the workspace", () =
 test("native overrides launch directly without a stdio switch or shell interpolation", () => {
     const server = path.resolve("native server/dotprolog-lsp");
     const project = path.resolve("literal $(name)/App.dplproj");
+    const dotnetPath = path.resolve("custom dotnet/dotnet");
     assert.deepEqual(
-        launch({ ...settings, serverPath: server, project }, dll, []),
+        launch(
+            { ...settings, dotnetPath, serverPath: server, project },
+            dll,
+            [],
+        ),
         {
             command: server,
             args: ["--project", project, "--configuration", "Debug"],
+            options: serverOptions(dotnetPath),
         },
+    );
+});
+
+test("relative projects resolve against the current workspace folder", () => {
+    const first = path.resolve("first workspace");
+    const second = path.resolve("second workspace");
+    const project = "App.dplproj";
+    assert.equal(
+        launch({ ...settings, project }, dll, [first]).args[2],
+        path.join(first, project),
+    );
+    assert.equal(
+        launch({ ...settings, project }, dll, [second]).args[2],
+        path.join(second, project),
     );
 });
 

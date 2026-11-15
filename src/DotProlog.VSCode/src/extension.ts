@@ -7,6 +7,7 @@ import { launch, Settings } from "./launch";
 let client: LanguageClient | undefined;
 let pending: Promise<void> = Promise.resolve();
 let disposed = false;
+let relativeProjectClient = false;
 let output: vscode.LogOutputChannel;
 
 export function activate(context: vscode.ExtensionContext) {
@@ -17,6 +18,7 @@ export function activate(context: vscode.ExtensionContext) {
     async function start() {
         const previous = client;
         client = undefined;
+        relativeProjectClient = false;
         if (previous) {
             await previous.dispose();
         }
@@ -34,6 +36,8 @@ export function activate(context: vscode.ExtensionContext) {
             configuration: config.get("configuration", "Debug"),
             mode: config.get("mode", "modern"),
         };
+        relativeProjectClient =
+            !!settings.project && !path.isAbsolute(settings.project);
         const native = context.asAbsolutePath(
             path.join(
                 "bin",
@@ -63,7 +67,7 @@ export function activate(context: vscode.ExtensionContext) {
             "dotprolog",
             "DotProlog",
             // Omitted transport uses stdio without appending the unsupported --stdio switch.
-            { ...command, options: { shell: false } },
+            { ...command, options: { ...command.options, shell: false } },
             {
                 documentSelector: [
                     { scheme: "file", language: "dotprolog" },
@@ -156,6 +160,11 @@ export function activate(context: vscode.ExtensionContext) {
         }),
         vscode.workspace.onDidChangeConfiguration((event) => {
             if (event.affectsConfiguration("dotprolog")) {
+                void restart().catch(() => {});
+            }
+        }),
+        vscode.workspace.onDidChangeWorkspaceFolders(() => {
+            if (relativeProjectClient) {
                 void restart().catch(() => {});
             }
         }),

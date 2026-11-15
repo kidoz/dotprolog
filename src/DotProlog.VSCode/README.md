@@ -35,8 +35,9 @@ code --install-extension /absolute/path/to/dotprolog-0.1.0.vsix
 
 The universal managed package requires the .NET 10 runtime on the machine holding the workspace.
 Native platform packages include their server and need no separately installed .NET runtime for
-loose files. **Project mode always requires the .NET 10 SDK**, including with native packages.
-The extension does not install SDKs, restore packages or download servers automatically.
+loose files. **Project mode always requires a compatible .NET SDK**, including with native packages:
+use the .NET 10 SDK or later for `net10.0` projects, and the .NET 11 SDK or later for `net11.0`
+projects. The extension does not install SDKs, restore packages or download servers automatically.
 
 Open a `.pl` file. If another extension owns the suffix, select **DotProlog** in the language picker,
 or configure `"files.associations": { "*.pl": "dotprolog" }`.
@@ -56,7 +57,7 @@ evaluation and configured executables can execute code.
 | Setting                   | Default  | Purpose                                                                |
 | ------------------------- | -------- | ---------------------------------------------------------------------- |
 | `dotprolog.serverPath`    | Empty    | Absolute alternative server executable or DLL; empty uses the bundle.  |
-| `dotprolog.dotnetPath`    | `dotnet` | Executable used to launch a managed server.                            |
+| `dotprolog.dotnetPath`    | `dotnet` | Executable used to launch a managed server and evaluate projects.      |
 | `dotprolog.project`       | Empty    | Selected project; relative paths require exactly one workspace folder. |
 | `dotprolog.configuration` | `Debug`  | Selected project's MSBuild configuration.                              |
 | `dotprolog.mode`          | `modern` | Loose-session mode: `modern` or `strict-iso`.                          |
@@ -71,7 +72,7 @@ or unrestored project SDK packages explicitly outside the editor.
 
 ## Build and test
 
-Requires Node.js 22 or newer, npm and the repository's .NET 10 SDK. From this directory:
+Requires Node.js 22 or newer, npm and the repository's .NET 10 SDK or later. From this directory:
 
 ```sh
 npm ci
@@ -83,7 +84,9 @@ npm run package
 ```
 
 Editor tests use isolated Extension Hosts, profiles and temporary workspaces with spaces in their
-paths. VS Code stable is downloaded by default; set `VSCODE_EXECUTABLE_PATH` to use an installed
+paths. Project coverage checks configured SDK resolution with an empty executable search path and
+includes `net11.0` evaluation automatically when a stable .NET 11 SDK or later is installed.
+VS Code stable is downloaded by default; set `VSCODE_EXECUTABLE_PATH` to use an installed
 VS Code executable. Set `VSCODE_VERSION=minimum` to test the exact lower bound declared by the
 tested extension's `engines.vscode` (currently 1.91.0), or set an exact version such as `1.91.0`.
 Both integration and Restricted Mode tests honor this setting. The Extension Host logs its actual

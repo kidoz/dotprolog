@@ -117,7 +117,7 @@
           "type": "string",
           "default": "dotnet",
           "scope": "window",
-          "description": "dotnet executable used to launch a managed server."
+          "description": "dotnet executable used to launch a managed server and evaluate selected projects with managed or native servers."
         },
         "dotprolog.project": {
           "type": "string",
