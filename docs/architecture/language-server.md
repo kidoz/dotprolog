@@ -3,7 +3,8 @@
 DotProlog's language server adds editor services by reusing the parser and static linter.
 It runs in a separate process over LSP stdio; editor operations never consult Prolog or execute
 initialization goals. The implementation is staged so that each stage has an observable acceptance
-check. This is a development prototype, not an installable release or a complete editor integration.
+check. The implemented stages back the stable VS Code extension release; the server is not a complete
+editor integration and the post-release work below remains.
 
 ## Stage 1: protocol and file diagnostics — implemented
 
@@ -123,7 +124,7 @@ Background analysis:
   the existing 30-second evaluation timeout remains. These are internal cancellation tokens, not an
   additional analysis request capability. Document-symbol requests separately support `$/cancelRequest`.
 
-Remaining:
+Post-release work:
 
 1. Add import dependency resolution and verify client watcher coverage in an actual editor.
 2. Add multi-project selection and project-reference handling.
@@ -359,7 +360,7 @@ collisions and failure recovery. `AnalysisSchedulerTests` exercises cancellation
 and shutdown during blocked reevaluation. `verify-language-server-rename.py` checks the combined
 contract over managed and native stdio, including project reload failure and recovery.
 
-## Stage 4: editor and distribution — VS Code preview implemented
+## Stage 4: editor and distribution — VS Code release implemented
 
 `src/DotProlog.VSCode` supplies a TypeScript client using `vscode-languageclient`, source/contract
 language registration, TextMate highlighting, snippets and server launch. Project files retain XML
@@ -377,8 +378,10 @@ The workspace Node host keeps server and source locations together for remote de
 Browser-only and virtual workspaces are unsupported. Opening source triggers no builds or restores.
 
 Local packaging bundles a managed server requiring the .NET 10 runtime, or a NativeAOT server for
-an explicit platform target. Project mode still requires the .NET SDK. Packaging does not publish
-releases. See the [extension guide](https://github.com/kidoz/dotprolog/blob/main/src/DotProlog.VSCode/README.md)
+an explicit platform target. Project mode still requires the .NET SDK. Packaging writes local
+artifacts; the `vscode-publish.yml` workflow validates the four stable packages and publishes them
+to the Marketplace with the environment-scoped OIDC identity after manual approval. See the
+[extension guide](https://github.com/kidoz/dotprolog/blob/main/src/DotProlog.VSCode/README.md)
 for installation and settings.
 
 `tests/DotProlog.VSCode.Tests` exercises real Extension Hosts and server processes with isolated
@@ -395,7 +398,7 @@ A second independent editor client, other native architectures and Rider integra
 Acceptance: clean installation, editor diagnostics from an unsaved file, server restart/recovery,
 configuration, and native executable operation without a separately installed .NET runtime.
 
-## Try the current prototype
+## Try the current server
 
 Build once, then configure an LSP client to launch the DLL directly. Do not launch `dotnet run`
 from the editor: build output can contaminate the protocol's stdout.
@@ -419,7 +422,7 @@ Document symbols provide predicate outlines; builtin hover provides signatures, 
 language-mode notes; completion suggests predicate names and current-clause variables; definitions
 navigate to source clauses across the analyzed workspace; references list known calls and
 optionally clause heads; rename returns versioned edits when its conservative eligibility checks
-pass and the client supports versioned workspace edits. The VS Code preview exposes these services.
+pass and the client supports versioned workspace edits. The VS Code extension exposes these services.
 Project mode analyzes all evaluated sources;
 loose-file mode analyzes include closures. No performance or
 cross-platform NativeAOT claim is made from the initial host check.
@@ -520,7 +523,7 @@ was rejected by the in-host version assertion. Six launch/grammar tests, TypeScr
 and Prettier also passed. The GitHub Actions matrix now covers minimum/stable on Windows, Linux
 and macOS; remote CI execution and native packages were not rerun for this compatibility increment.
 
-VS Code preview verified on macOS arm64 on 2026-11-03 with VS Code 1.130.0 and .NET SDK 10.0.403:
+VS Code extension verified on macOS arm64 on 2026-11-03 with VS Code 1.130.0 and .NET SDK 10.0.403:
 
 - Six launch/grammar checks passed, and the language server suite passed all 132 tests.
 - The managed and native VSIX payloads passed eight real Extension Host tests each: unsaved
@@ -534,8 +537,8 @@ VS Code preview verified on macOS arm64 on 2026-11-03 with VS Code 1.130.0 and .
 - TypeScript compilation, Prettier, the strict documentation build and `git diff --check` passed.
 
 The Windows/Linux managed-package CI matrix is configured but was not executed locally. Native
-packages for other targets and Marketplace publication remain
-unverified or outside this local preview.
+packages for other targets remain unverified. Marketplace publication is a manual release step in
+this repository; local verification prepares and checks the stable packages but does not publish them.
 
 Verified on macOS arm64 on 2026-11-02:
 

@@ -22,15 +22,16 @@ Diagnostics update as you type, including changes in unsaved included files.
 ![Parser diagnostics in the editor and Problems panel](images/diagnostics.jpg)
 
 Analysis does not execute Prolog goals. Rename only covers the analyzed snapshot and can refuse
-operations when the server cannot prove an unambiguous static edit. Contract diagnostics, formatting,
-debugging and running queries are not provided by this preview.
+operations when the server cannot prove an unambiguous static edit. Formatting, debugging, running
+queries and contract diagnostics are not provided by this release.
 
 ## Install and use
 
-Use **Extensions: Install from VSIX...**, or:
+Install **DotProlog** from the Marketplace, use **Extensions: Install from VSIX...**, or:
 
 ```sh
-code --install-extension /absolute/path/to/dotprolog-0.1.0.vsix
+code --install-extension kidoz.dotprolog
+code --install-extension /absolute/path/to/dotprolog-1.0.0.vsix
 ```
 
 The universal managed package requires the .NET 10 runtime on the machine holding the workspace.
@@ -45,7 +46,7 @@ or configure `"files.associations": { "*.pl": "dotprolog" }`.
 Use **DotProlog: Select Project** to select a workspace project or choose **Loose files**. The
 selected project supplies its mode and flags; unrelated files in a project session use Modern mode.
 One client owns all Prolog buffers in the window. Simultaneous independent project contexts are
-not supported yet.
+not supported.
 
 The extension runs beside source files in the local or remote workspace Node host, including SSH,
 WSL, containers and Codespaces. Browser-only and virtual workspaces are unsupported. Restricted Mode
@@ -111,7 +112,7 @@ For example, in a POSIX shell, test a locally packaged managed extension at the 
 
 ```sh
 npm run package
-python3 -m zipfile -e bin/dotprolog-0.1.0.vsix bin/compatibility/managed
+python3 -m zipfile -e bin/dotprolog-1.0.0.vsix bin/compatibility/managed
 export DOTPROLOG_EXTENSION_PATH="$PWD/bin/compatibility/managed/extension"
 export VSCODE_VERSION=minimum
 npm run test:integration
@@ -124,8 +125,9 @@ The native targets are Windows x64, Linux x64 and macOS arm64. The Mocha harness
 CommonJS and runs serially, so tests also load in the older Node runtime embedded in VS Code 1.91.
 The test harness is excluded from the VSIX.
 
-`npm run package` creates `bin/dotprolog-0.1.0.vsix` with the managed server. To build a NativeAOT
-platform package on a matching OS and native toolchain:
+`npm run package` creates `bin/dotprolog-1.0.0.vsix` with the managed server. Native packaging
+requires a matching OS and native toolchain: clang and zlib on Linux, and OpenSSL
+(`libssl`/`libcrypto`) available to the linker on macOS. To build a NativeAOT platform package:
 
 ```sh
 npm run package -- darwin-arm64

@@ -12,10 +12,11 @@ All notable changes to DotProlog are recorded here. The format follows
   .NET 10 remains the default target and package baseline; repository SDK selection also accepts
   a later stable SDK when .NET 10 SDK is unavailable. CI covers SDK 11 and packed .NET 11 consumers.
 
-- A VS Code extension preview provides DotProlog highlighting, snippets and language server
+- A stable VS Code extension provides DotProlog highlighting, snippets and language server
   integration for diagnostics, hover, Outline, completion, definitions, references and predicate
   rename. It supports explicit project selection, server restart and local VSIX packaging, with
-  language services enabled in trusted workspaces.
+  language services enabled in trusted workspaces. The extension version is independent of the
+  .NET packages; its 1.0.0 changelog records the stable release.
 
 - The language server now prepares and returns versioned predicate rename edits for source heads,
   resolved calls and declaration/import/export indicators, including DCGs. Rename requires a

@@ -2,8 +2,8 @@
 
 A Prolog language implementation for .NET 10 and .NET 11, written in C# 14.
 
-[VS Code extension preview](src/DotProlog.VSCode/README.md): highlighting, diagnostics, completion,
-navigation and predicate rename, with local VSIX installation.
+[VS Code extension](src/DotProlog.VSCode/README.md): highlighting, diagnostics, completion,
+navigation and predicate rename, packaged for Marketplace and local VSIX installation.
 
 The goal is a first-class Prolog experience on the .NET SDK, the way C# and F# have one: `.dplproj` projects, a `plc` compiler, `dotnet prolog`, `dotnet new` templates, and NativeAOT publishing.
 
