@@ -1,14 +1,14 @@
-name: VS Code Marketplace preview
+name: VS Code Marketplace release
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: Exact extension version from package.json (for example 0.1.0)
+        description: Exact extension version from package.json (for example 1.0.0)
         required: true
         type: string
       publish:
-        description: Publish the validated packages to the Marketplace pre-release channel
+        description: Publish the validated packages to the Marketplace stable channel
         type: boolean
         default: false
 
@@ -40,8 +40,11 @@ jobs:
           const manifest = JSON.parse(fs.readFileSync('src/DotProlog.VSCode/package.json', 'utf8'));
           if (!/^\d+\.\d+\.\d+$/.test(process.env.EXPECTED_VERSION) || manifest.version !== process.env.EXPECTED_VERSION)
             throw new Error('The requested version must equal package.json.');
-          if (manifest.publisher !== 'kidoz' || manifest.name !== 'dotprolog' || manifest.preview !== true)
-            throw new Error('Expected the kidoz.dotprolog preview identity.');
+          if (manifest.publisher !== 'kidoz' || manifest.name !== 'dotprolog' || manifest.preview === true)
+            throw new Error('Expected the stable kidoz.dotprolog identity; remove the preview flag before releasing.');
+          const changelog = fs.readFileSync('src/DotProlog.VSCode/CHANGELOG.md', 'utf8');
+          if (!changelog.includes(`## ${manifest.version}`))
+            throw new Error('The extension changelog must contain an entry for the requested version.');
           if (process.env.PUBLISH === 'true' && process.env.GITHUB_REF !== 'refs/heads/main')
             throw new Error('Marketplace publication must run from main.');
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${manifest.version}\n`);
@@ -86,7 +89,7 @@ jobs:
         run: |
           echo "Prepared DotProlog $EXTENSION_VERSION: managed fallback and three native VSIX packages." >> "$GITHUB_STEP_SUMMARY"
           echo 'All 12 managed/native editor combinations passed before collection.' >> "$GITHUB_STEP_SUMMARY"
-          echo 'SHA256SUMS is included in the Marketplace artifact.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Stable release metadata and SHA256SUMS were verified for the four VSIX packages.' >> "$GITHUB_STEP_SUMMARY"
 
   publish:
     if: ${{ inputs.publish }}
@@ -117,4 +120,4 @@ jobs:
           mapfile -t packages < <(find "$GITHUB_WORKSPACE/bundles" -name '*.vsix' -type f | sort)
           test "${#packages[@]}" -eq 4
           cd src/DotProlog.VSCode
-          npx --no-install vsce publish --packagePath "${packages[@]}" --pre-release --oidc
+          npx --no-install vsce publish --packagePath "${packages[@]}" --oidc

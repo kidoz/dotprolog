@@ -1,4 +1,4 @@
-"""Verify the four Marketplace VSIX payloads and write their SHA-256 checksums."""
+"""Verify the four stable Marketplace VSIX payloads and write their SHA-256 checksums."""
 
 import argparse
 import hashlib
@@ -17,8 +17,8 @@ def verify_package(package: Path, version: str, target: str | None) -> None:
             "kidoz", "dotprolog", version
         ):
             raise ValueError(f"Unexpected extension identity in {package.name}")
-        if manifest.get("preview") is not True:
-            raise ValueError(f"Missing preview listing flag in {package.name}")
+        if manifest.get("preview") is True:
+            raise ValueError(f"Unexpected preview listing flag in {package.name}")
         icon = archive.read("extension/" + manifest["icon"])
         if icon[:8] != b"\x89PNG\r\n\x1a\n" or struct.unpack(">II", icon[16:24]) != (256, 256):
             raise ValueError(f"Expected a 256x256 PNG icon in {package.name}")
@@ -30,11 +30,11 @@ def verify_package(package: Path, version: str, target: str | None) -> None:
             "Publisher": "kidoz", "Id": "dotprolog", "Version": version
         }.items()):
             raise ValueError(f"Unexpected VSIX identity in {package.name}")
-        if not any(
+        if any(
             node.get("Id") == "Microsoft.VisualStudio.Code.PreRelease" and node.get("Value") == "true"
             for node in xml.iter()
         ):
-            raise ValueError(f"Missing pre-release channel flag in {package.name}")
+            raise ValueError(f"Unexpected pre-release channel flag in {package.name}")
         names = archive.namelist()
         if len(names) != len(set(names)):
             raise ValueError(f"Duplicate ZIP entries in {package.name}")
