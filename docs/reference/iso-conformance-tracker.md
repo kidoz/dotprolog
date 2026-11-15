@@ -1,7 +1,7 @@
 # ISO conformance tracker
 
 This page lists what the ISO/IEC 13211 documents require of a conforming processor, requirement by
-requirement, and records whether DotProlog's strictly conforming mode (`StrictIso`,
+requirement, and records whether DotProlog's ISO-oriented mode (`StrictIso`,
 `--mode strict-iso`) meets each one. Every deviation found has a gap ID, so it can be fixed and
 closed individually.
 
@@ -95,7 +95,8 @@ written term, such as GAP-03 or GAP-04, is rated below one that ordinary program
 | Part 3, grammar rules | 29 | 19 | 8 | 0 | 0 | 2 |
 | **Total** | **511** | **337** | **165** | **1** | **2** | **6** |
 
-There are 69 open gaps: 14 High, 24 Medium, and 31 Low. GAP-35 was closed after Cor.3 was
+The recorded audit lists 69 open gaps: 14 High, 24 Medium, and 31 Low. This is a historical
+count, not a revalidated count for current code; individual entries may already be fixed. GAP-35 was closed after Cor.3 was
 reviewed, and GAP-08 was fixed in 0.15.1. Most of the Partial rows in Part 1 share a few causes: the strict-mode handling of
 extension names (GAP-09 to GAP-11), existential `^` in `bagof/3` and `setof/3` and their reliance on
 public library names (GAP-15, GAP-66), and arithmetic exception classes and integers outside the

@@ -1,9 +1,8 @@
 # ISO/IEC 13211-1 conformance
 
-DotProlog's `StrictIso` language mode implements ISO/IEC 13211-1:1995, Technical
-Corrigendum 1:2007, Technical Corrigendum 2:2012, and Technical Corrigendum 3:2017. This
-declaration applies to Part 1, General core. Parts 2 and 3 are separate publications and are not
-included in this Part 1 declaration.
+DotProlog's `StrictIso` language mode targets ISO/IEC 13211-1:1995 and Technical Corrigenda
+1:2007, 2:2012, and 3:2017. Support is partial; this ledger records tested behavior and does not
+declare complete Part 1 conformance. Parts 2 and 3 have separate evidence ledgers.
 
 This page is an original traceability summary. It deliberately paraphrases the requirements and
 does not reproduce the licensed standard. The authoritative text remains the ISO publication.
@@ -16,8 +15,8 @@ Known deviations and coverage limits are recorded in the [conformance tracker](i
 | Code | Evidence |
 |---|---|
 | `R` | Focused reader, compiler, runtime, or integration tests |
-| `D` | The 608-case repository corpus in `tests/conformance/iso_conformance.pl` |
-| `I` | All 763 applicable declarations from the pinned Logtalk 3.101.0 ISO corpus |
+| `D` | The 608-case Modern-mode repository fixture, including characterization expectations |
+| `I` | 759 executable declarations from the pinned Logtalk 3.101.0 ISO corpus; four additional declarations are audit-only |
 | `C` | The generated-C# runner |
 | `CB` | Generated C# calling consulted bytecode |
 | `BC` | Consulted bytecode calling generated C# |
@@ -28,10 +27,14 @@ Known deviations and coverage limits are recorded in the [conformance tracker](i
 result. The reference distinguishes configuration, implementation-defined behavior, extensions, and
 required ISO behavior.
 
-The independent inventory is run unchanged through `I`, `C`, `CB`, `BC`, and `A`. The inventory
-gate rejects count drift, unsupported declarations, and changed upstream sources. The Part 1
-predefined-predicate and evaluable-functor inventory is also pinned by
-`IsoPartOneInventoryTests`.
+The 759 executable independent cases are used by managed consulted bytecode and the generated-C#
+three-path matrix, including its NativeAOT variant. Four applicable declarations are audit-only,
+not executed passes. The separate standalone consulted NativeAOT corpus test is unconditionally
+skipped, and the full independent corpus is not run through direct IL. Evidence codes identify
+available tests, not exhaustive verification of a requirement or proof that an optional gate ran.
+The inventory gate rejects count drift, unsupported executable declarations, and changed upstream
+sources. `IsoPartOneInventoryTests` separately pins the predefined-predicate and evaluable-functor
+inventory.
 
 ### Focused strict-mode review
 
@@ -271,13 +274,13 @@ The characteristics reference separates implementation-defined aspects from requ
 
 ## Continuing gate
 
-Part 1 conformance is a maintained property, not a one-time test result. A release must keep all of
-the following green:
+Part 1 compatibility needs continuing evidence. A release must report the results and limitations of
+the following gates, including skips and coverage omissions:
 
 1. The 608 repository cases.
-2. The exact 763-declaration independent inventory with zero unsupported or failed cases.
-3. All 2,304 generated and bidirectional cross-path checks.
-4. The direct and generated NativeAOT runners for every release RID.
+2. The exact independent inventory, separating 759 executable cases from four audit-only declarations and reporting failures, unsupported cases, and skipped paths.
+3. The generated three-path matrix: 759 cases per path, or 2,277 checks.
+4. The generated NativeAOT matrix and focused NativeAOT tests for every release RID; the standalone consulted full-corpus gate remains skipped.
 5. The focused parser, compiler, runtime, stream, database, arithmetic, flag, and strict-mode tests.
 6. The 125-case strict review fixture, including its generated, cross-path, and NativeAOT checks.
 

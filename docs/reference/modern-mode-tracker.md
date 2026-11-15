@@ -2,7 +2,7 @@
 
 This page records how DotProlog's default language mode, `Modern`, relates to ISO/IEC 13211,
 requirement by requirement. It is the companion of the
-[ISO conformance tracker](iso-conformance-tracker.md), which covers the strictly conforming mode,
+[ISO conformance tracker](iso-conformance-tracker.md), which covers the ISO-oriented mode and its known gaps,
 `StrictIso`. Modern is not meant to be strictly conforming: it adds features and keeps some
 SWI-Prolog readings. This page classifies the reviewed differences from ISO, and keeps the extensions
 that the standard permits apart from the changes it does not permit.

@@ -1,11 +1,14 @@
 # Language reference {#language-guide}
 
-DotProlog's `StrictIso` mode implements ISO/IEC 13211-1:1995 with Technical Corrigenda 1–3,
-ISO/IEC 13211-2:2000, and ISO/IEC TS 13211-3:2025. The declaration is backed by the repository's
-[Part 1 traceability ledger](reference/iso-part1-conformance.md), its 608 standard-derived cases,
-and a 763-case independent corpus executed through every engine path, plus the
-[Parts 2 and 3 traceability ledger](reference/iso-parts2-3-conformance.md) and focused cross-path
-tests. It does not claim SWI-Prolog compatibility.
+DotProlog's `StrictIso` mode targets ISO/IEC 13211-1:1995 with Technical Corrigenda 1–3,
+ISO/IEC 13211-2:2000, and ISO/IEC TS 13211-3:2025. Support is partial, with
+[known gaps](reference/iso-conformance-tracker.md). The
+[Part 1 ledger](reference/iso-part1-conformance.md) distinguishes the 608-case Modern-mode fixture
+from the pinned independent inventory of 759 executable and four audit-only cases. Managed and
+generated NativeAOT gates cover the executable subset; the standalone consulted NativeAOT corpus
+is skipped and full direct-IL coverage is absent. The
+[Parts 2 and 3 ledger](reference/iso-parts2-3-conformance.md) records focused tests.
+See [the compatibility policy](https://github.com/kidoz/dotprolog/blob/main/COMPATIBILITY.md) for execution-path limits.
 
 ## Language modes
 

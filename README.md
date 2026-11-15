@@ -565,15 +565,17 @@ reaches it, while normal control flow can leave it unevaluated.
 `call/2..8` checks the arity of the resulting goal; arity 255 is supported and 256 raises the
 catchable `representation_error(max_arity)`.
 
-DotProlog's `StrictIso` mode implements ISO/IEC 13211-1:1995 with Technical Corrigenda 1–3,
-ISO/IEC 13211-2:2000 modules, and ISO/IEC TS 13211-3:2025 definite clause grammars. The repository's
-608-case Part 1 corpus and all 763 applicable declarations in the independent pinned Logtalk corpus
-pass across consulted bytecode, generated C#, both cross-path directions, and NativeAOT. Parts 2
-and 3 have licensed-text traceability and focused managed, generated, and NativeAOT coverage. This
-is not a claim of SWI-Prolog compatibility. See
-[COMPATIBILITY.md](COMPATIBILITY.md) and the
+DotProlog's `StrictIso` mode provides partial support for ISO/IEC 13211-1:1995 with Technical
+Corrigenda 1–3, ISO/IEC 13211-2:2000 modules, and ISO/IEC TS 13211-3:2025 definite clause grammars.
+The pinned independent Logtalk inventory has 759 executable cases and four audit-only declarations.
+Managed consulted and generated-C# gates, both cross-path directions, and a generated NativeAOT
+matrix exercise the executable subset. The standalone consulted NativeAOT full-corpus test is
+skipped, and the full independent corpus is not run through direct IL. The repository's 608-case
+fixture includes Modern-mode characterization tests; Parts 2 and 3 have focused coverage.
+See [COMPATIBILITY.md](COMPATIBILITY.md), the
 [Part 1](docs/reference/iso-part1-conformance.md) and
-[Parts 2 and 3](docs/reference/iso-parts2-3-conformance.md) traceability ledgers.
+[Parts 2 and 3](docs/reference/iso-parts2-3-conformance.md) ledgers, and the
+[known gaps](docs/reference/iso-conformance-tracker.md).
 
 ## Diagnostics
 

@@ -2,7 +2,8 @@
 
 This ledger maps the normative areas of ISO/IEC 13211-2:2000 and ISO/IEC TS 13211-3:2025 to
 executable DotProlog evidence. It records clause identifiers and implementation behavior without
-reproducing the licensed publications.
+reproducing the licensed publications. Support is partial; focused tests are evidence for the
+listed behavior, not a declaration of complete conformance to either publication.
 
 Evidence codes are:
 

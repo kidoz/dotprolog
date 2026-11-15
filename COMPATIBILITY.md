@@ -2,31 +2,45 @@
 
 ## The claim
 
-DotProlog's opt-in `StrictIso` mode implements ISO/IEC 13211-1:1995 with Technical Corrigenda
+DotProlog's opt-in `StrictIso` mode targets ISO/IEC 13211-1:1995 with Technical Corrigenda
 1:2007, 2:2012, and 3:2017, ISO/IEC 13211-2:2000 modules, and ISO/IEC TS 13211-3:2025 definite
-clause grammars. The licensed-text audits are published as the [Part 1
-ledger](docs/reference/iso-part1-conformance.md) and [Parts 2 and 3
-ledger](docs/reference/iso-parts2-3-conformance.md). The complete applicable independent Part 1
-corpus passes on every execution path; Parts 2 and 3 use focused direct, generated-C#, and
-NativeAOT evidence. This is not a claim of SWI-Prolog compatibility; which parts of the SWI
-surface the default `Modern` mode does implement is recorded feature by feature in the
-[SWI compatibility ledger](docs/reference/swi-compatibility.md).
+clause grammars. Support is partial: known deviations and unverified requirements remain.
+The [Part 1 ledger](docs/reference/iso-part1-conformance.md),
+[Parts 2 and 3 ledger](docs/reference/iso-parts2-3-conformance.md), and
+[conformance tracker](docs/reference/iso-conformance-tracker.md) describe the evidence and gaps.
+The tracker includes historical observations that require revalidation against current code.
+The [SWI compatibility ledger](docs/reference/swi-compatibility.md) separately records the default
+`Modern` mode's supported surface.
 
 ## What has been measured
 
-**The 763 applicable declarations in the pinned Logtalk 3.101.0 ISO Prolog corpus all pass.**
-The same inventory passes as managed consulted bytecode, generated C#, generated C# calling
-consulted bytecode, consulted bytecode calling generated C#, and NativeAOT. The adapter inventories
-802 declarations in total: 29 are disabled upstream, five are non-applicable alternative branches,
-and five are gated on `current_prolog_flag(bounded, true)`, which stopped holding when integers
-became unbounded. CI pins and verifies the upstream revision and rejects changed
-counts.
+The pinned Logtalk 3.101.0 ISO Prolog inventory contains **763 applicable declarations:
+759 executable cases and four audit-only cases**. Audit-only cases are excluded from execution;
+they are not passes. Of 802 declarations in total, 29 are disabled upstream, five are
+non-applicable alternative branches, and five require bounded integers.
+
+| Execution path | Independent corpus coverage |
+|---|---|
+| Managed consulted bytecode | 759 executable cases; four audit-only |
+| Managed generated C# | The same 759 cases |
+| Generated C# calling consulted bytecode | The same 759 cases |
+| Consulted bytecode calling generated C# | The same 759 cases |
+| NativeAOT generated-C# matrix | The same 759 cases on each of the three matrix paths |
+| Standalone consulted NativeAOT corpus | Full-corpus test is unconditionally skipped; no full-corpus pass claim |
+| Direct IL | Focused tests; the full independent corpus is not covered |
+
+These are the executable gate inventories, not a claim that every optional gate ran in every build.
+The managed direct runner writes per-case results and counts for passed, failed, audit-only,
+unsupported, disabled, and non-applicable declarations. The generated matrices report aggregate
+execution results. Opt-in gates and their results must be checked for the exact build being assessed.
+Parts 2 and 3 have focused managed, generated-C#, and NativeAOT tests rather than complete
+independent-corpus coverage.
 
 The repository also carries conformance cases encoded from ISO/IEC 13211-1 and its published
-corrigenda, all passing.
-They live in
+corrigenda. These run in Modern mode and include implementation-characterization expectations;
+their passing status alone does not establish ISO conformance. They live in
 [`tests/conformance/iso_conformance.pl`](tests/conformance/iso_conformance.pl) as ordinary Prolog —
-a goal, and what the standard says that goal does — and run as part of the test suite.
+a goal and its recorded expected outcome — and run as part of the test suite.
 
 Clause 7 cases cover reading terms from text: number syntax including character, hexadecimal,
 octal, and binary literals; operator priority and associativity; list and curly notation; and what
@@ -284,7 +298,7 @@ samples and exercise NativeAOT.
 
 | Feature | Current state |
 |---|---|
-| Part 1 core | Licensed traceability plus the independent 763-declaration cross-path corpus |
+| Part 1 core | Partial support; traceability and 759 executable independent cases plus four audit-only declarations |
 | Part 2 modules | Licensed traceability; interface/body preparation, visibility, reflection, database, generated-code, and NativeAOT tests |
 | Part 3 grammars | Licensed traceability; static/runtime expansion, controls, steadfastness, errors, generated-code, and NativeAOT tests |
 
