@@ -15,6 +15,8 @@
         -->
         <RuntimeIdentifiers>linux-x64;win-x64;osx-arm64;any</RuntimeIdentifiers>
         <ToolPackageRuntimeIdentifiers>$(RuntimeIdentifiers)</ToolPackageRuntimeIdentifiers>
+        <!-- RID implementations are packed explicitly; SDK 11 must not repack them from the pointer. -->
+        <CreateRidSpecificToolPackages Condition="'$(RuntimeIdentifier)' == ''">false</CreateRidSpecificToolPackages>
         <PublishAot Condition="'$(RuntimeIdentifier)' != 'any'">true</PublishAot>
         <PublishAot Condition="'$(RuntimeIdentifier)' == 'any'">false</PublishAot>
         <SelfContained Condition="'$(RuntimeIdentifier)' == 'any'">false</SelfContained>
