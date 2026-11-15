@@ -61,21 +61,26 @@ public sealed class PrologTestFramework : ITestFramework, IDataProducer
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        switch (context.Request)
+        try
         {
-            case DiscoverTestExecutionRequest discover:
-                await PublishAsync(context, discover.Session.SessionUid, run: false).ConfigureAwait(false);
-                break;
+            switch (context.Request)
+            {
+                case DiscoverTestExecutionRequest discover:
+                    await PublishAsync(context, discover.Session.SessionUid, run: false).ConfigureAwait(false);
+                    break;
 
-            case RunTestExecutionRequest run:
-                await PublishAsync(context, run.Session.SessionUid, run: true, run.Filter).ConfigureAwait(false);
-                break;
+                case RunTestExecutionRequest run:
+                    await PublishAsync(context, run.Session.SessionUid, run: true, run.Filter).ConfigureAwait(false);
+                    break;
 
-            default:
-                break;
+                default:
+                    break;
+            }
         }
-
-        context.Complete();
+        finally
+        {
+            context.Complete();
+        }
     }
 
     private async Task PublishAsync(
@@ -85,7 +90,7 @@ public sealed class PrologTestFramework : ITestFramework, IDataProducer
         ITestExecutionFilter? filter = null
     )
     {
-        foreach (PrologTest test in _runner.Discover())
+        foreach (var test in _runner.DiscoverWithCancellation(context.CancellationToken))
         {
             if (run && !ShouldRun(filter, test.Uid))
             {
@@ -100,11 +105,12 @@ public sealed class PrologTestFramework : ITestFramework, IDataProducer
             }
             else
             {
-                PrologTestResult result = _runner.Run(test);
+                var result = _runner.RunWithCancellation(test, context.CancellationToken);
+                var description = Describe(result);
                 node.Properties.Add(
                     result.Succeeded
                         ? PassedTestNodeStateProperty.CachedInstance
-                        : new FailedTestNodeStateProperty(new PrologException(Describe(result)), result.Message)
+                        : new FailedTestNodeStateProperty(new PrologException(description), description)
                 );
             }
 

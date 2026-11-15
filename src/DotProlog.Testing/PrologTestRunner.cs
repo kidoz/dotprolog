@@ -40,9 +40,10 @@ public sealed class PrologTestRunner
         {
             // Muted while loading: directive output belongs to no single test, and during
             // discovery it would repeat once per scan.
+            var initializationOutput = new StringWriter();
             var engine = new PrologEngine
             {
-                Output = TextWriter.Null,
+                Output = initializationOutput,
                 Error = TextWriter.Null,
                 Input = TextReader.Null,
             };
@@ -55,7 +56,18 @@ public sealed class PrologTestRunner
                     engine.ConsultOrThrow(text, name);
                 }
 
-                engine.RunPendingGoals();
+                var initialization = engine.RunPendingGoals();
+                if (initialization == RunResult.Halted)
+                {
+                    throw new PrologException($"Test initialization halted with exit code {engine.Machine.ExitCode}.");
+                }
+
+                var initializationText = initializationOutput.ToString();
+                if (initializationText.Contains("Warning: initialization goal failed.", StringComparison.Ordinal))
+                {
+                    throw new PrologException($"Test initialization failed.\n{initializationText.TrimEnd()}");
+                }
+
                 return engine;
             }
             catch
@@ -88,29 +100,33 @@ public sealed class PrologTestRunner
     public TimeSpan Timeout { get; set; } = ConfiguredTimeout();
 
     /// <summary>Finds every test predicate, in the order the sources declare them.</summary>
-    public IReadOnlyList<PrologTest> Discover() => RunTimed("Test discovery", Discover);
+    public IReadOnlyList<PrologTest> Discover() => DiscoverWithCancellation(CancellationToken.None);
 
-    private IReadOnlyList<PrologTest> Discover(CancellationToken cancellationToken)
+    internal IReadOnlyList<PrologTest> DiscoverWithCancellation(CancellationToken cancellationToken) =>
+        RunTimed("Test discovery", DiscoverTests, cancellationToken);
+
+    private IReadOnlyList<PrologTest> DiscoverTests(CancellationToken cancellationToken)
     {
-        using PrologEngine engine = _engineFactory(cancellationToken);
+        using var engine = _engineFactory(cancellationToken);
         engine.Machine.CancellationToken = cancellationToken;
         engine.Output = TextWriter.Null;
         engine.Input = TextReader.Null;
 
         List<PrologTest> tests = [];
-        HashSet<string> seen = new(StringComparer.Ordinal);
+        HashSet<int> seen = [];
 
         // Names are read back from the symbol table, which holds every atom the sources mentioned.
         for (var functorId = 0; functorId < engine.Program.Symbols.FunctorCount; functorId++)
         {
-            Functor functor = engine.Program.Symbols.GetFunctor(functorId);
+            var functor = engine.Program.Symbols.GetFunctor(functorId);
             if (functor.Arity != 0 || !engine.Program.IsDefined(functorId))
             {
                 continue;
             }
 
             var name = engine.Program.Symbols.AtomName(functor.NameAtom);
-            if (name.StartsWith(TestPrefix, StringComparison.Ordinal) && seen.Add(name))
+            var localName = name[(name.LastIndexOf(':') + 1)..];
+            if (localName.StartsWith(TestPrefix, StringComparison.Ordinal) && seen.Add(engine.Program.EntryPointOf(functorId)))
             {
                 tests.Add(new PrologTest(name, functorId));
             }
@@ -125,35 +141,50 @@ public sealed class PrologTestRunner
     /// code or blocking I/O requires its own cancellation support. Process isolation is required
     /// for a hard termination guarantee. Only the worker disposes its engine and streams.
     /// </remarks>
-    public PrologTestResult Run(PrologTest test)
+    public PrologTestResult Run(PrologTest test) => RunWithCancellation(test, CancellationToken.None);
+
+    internal PrologTestResult RunWithCancellation(PrologTest test, CancellationToken cancellationToken)
     {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
         try
         {
             return RunTimed(
                 test.Name,
-                cancellationToken =>
+                workerToken =>
                 {
-                    using var output = new StringWriter();
-                    using var error = new StringWriter();
-                    using PrologEngine engine = _engineFactory(cancellationToken);
-                    engine.Machine.CancellationToken = cancellationToken;
+                    using var engine = _engineFactory(workerToken);
+                    engine.Machine.CancellationToken = workerToken;
                     engine.Output = output;
                     engine.Error = error;
                     engine.Input = TextReader.Null;
                     return Execute(engine, test, output, error);
-                }
+                },
+                cancellationToken
             );
         }
-        catch (TimeoutException error)
+        catch (TimeoutException exception)
         {
-            return PrologTestResult.Failed(error.Message, string.Empty, string.Empty);
+            return PrologTestResult.Failed(exception.Message, output.ToString(), error.ToString());
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            return PrologTestResult.Failed(
+                $"{test.Name} failed with {exception.GetType().Name}: {exception.Message}",
+                output.ToString(),
+                error.ToString()
+            );
         }
     }
 
-    private T RunTimed<T>(string name, Func<CancellationToken, T> action)
+    private T RunTimed<T>(string name, Func<CancellationToken, T> action, CancellationToken cancellationToken)
     {
-        using var cancellation = new CancellationTokenSource();
-        CancellationToken token = cancellation.Token;
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var token = cancellation.Token;
         T result = default!;
         ExceptionDispatchInfo? failure = null;
         var worker = new Thread(() =>
@@ -198,7 +229,7 @@ public sealed class PrologTestRunner
         try
         {
             var functorId = engine.Program.Symbols.InternFunctor(test.Name, 0);
-            RunResult result = engine.Machine.Solve(functorId);
+            var result = engine.Machine.Solve(functorId);
 
             return result switch
             {
