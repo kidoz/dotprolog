@@ -154,9 +154,6 @@ All notable changes to DotProlog are recorded here. The format follows
 - Foreign predicate registration preserves escaped C# method names, including keywords such as
   `@event`.
 
-- The foreign predicate generator targets the .NET 10 compiler baseline so earlier .NET 10 SDK
-  feature bands can load it when building applications and typed facades.
-
 - Runtime term construction and atomic closures enforce the maximum arity of 255 before dispatch.
   Escaping exceptions and cancellation discard suspended queries and restore temporary output
   capture or stream redirection. One-shot host calls and disposed query enumerators release their

@@ -4,8 +4,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <!-- Run the generator against the oldest supported compiler API, not the host SDK's Roslyn. -->
-        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
+        <!-- Match the compiler shipped with the SDK pinned in global.json. -->
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
     </ItemGroup>
 
     <ItemGroup>
