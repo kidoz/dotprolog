@@ -151,6 +151,9 @@ All notable changes to DotProlog are recorded here. The format follows
 
 ### Fixed
 
+- Foreign predicate registration preserves escaped C# method names, including keywords such as
+  `@event`.
+
 - Runtime term construction and atomic closures enforce the maximum arity of 255 before dispatch.
   Escaping exceptions and cancellation discard suspended queries and restore temporary output
   capture or stream redirection. One-shot host calls and disposed query enumerators release their

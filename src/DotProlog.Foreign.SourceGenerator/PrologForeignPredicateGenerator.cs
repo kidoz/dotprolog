@@ -184,7 +184,12 @@ public sealed class PrologForeignPredicateGenerator : IIncrementalGenerator
             var module = NamedString(attribute, "Module") ?? string.Empty;
             var determinism = NamedString(attribute, "Determinism") ?? "det";
             var arity = NamedInt(attribute, "Arity");
-            var methodName = method.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + "." + method.Name;
+            var identifier =
+                SyntaxFacts.GetKeywordKind(method.Name) != SyntaxKind.None
+                || SyntaxFacts.GetContextualKeywordKind(method.Name) != SyntaxKind.None
+                    ? "@" + method.Name
+                    : method.Name;
+            var methodName = method.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + "." + identifier;
 
             Diagnostic? diagnostic = null;
             if (!string.Equals(determinism, "det", StringComparison.Ordinal))

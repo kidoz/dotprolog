@@ -8,6 +8,30 @@ namespace DotProlog.Foreign.SourceGenerator.Tests;
 
 public sealed class PrologForeignPredicateGeneratorTests
 {
+    [Theory]
+    [InlineData("event")]
+    [InlineData("class")]
+    [InlineData("await")]
+    public void EscapedIdentifiersCompileAndRegisterCallablePredicates(string methodName)
+    {
+        var source = $$"""
+            using DotProlog.Runtime;
+            namespace @namespace;
+            internal static class @struct
+            {
+                [PrologPredicate(Name = "keyword", Arity = 0)]
+                internal static bool @{{methodName}}(ref PrologContext context) => true;
+            }
+            """;
+
+        (var compilation, var result, _) = Run(source);
+        Assert.Empty(result.Diagnostics);
+        var assembly = Emit(compilation);
+        using var engine = new PrologEngine();
+        InvokeRegistry(assembly, engine.Program.Builtins);
+        Assert.Equal(RunResult.Success, engine.RunGoal("keyword", out _));
+    }
+
     [Fact]
     public void EmitsStaticRegistryThatRuntimeBytecodeCanCall()
     {

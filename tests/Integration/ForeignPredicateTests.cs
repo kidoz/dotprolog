@@ -192,7 +192,7 @@ public sealed class ForeignPredicateTests
             }
 
             [PrologPredicate(Name = "foreign_write", Arity = 1)]
-            internal static bool Write(ref PrologContext context, Cell value)
+            internal static bool @event(ref PrologContext context, Cell value)
             {
                 context.Machine.Output.WriteLine(context.Format(value));
                 return true;
