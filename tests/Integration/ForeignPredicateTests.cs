@@ -209,7 +209,9 @@ public sealed class ForeignPredicateTests
 
     private static string CreateTempDirectory()
     {
-        var path = Directory.CreateTempSubdirectory("dotprolog foreign ").FullName;
+        // NativeAOT linker inputs from NUGET_PACKAGES are not quoted by the toolchain.
+        // Keep this cache root space-free; the consumer directory still exercises spaces.
+        var path = Directory.CreateTempSubdirectory("dotprolog-foreign-").FullName;
         return OperatingSystem.IsMacOS() && path.StartsWith("/var/", StringComparison.Ordinal) ? "/private" + path : path;
     }
 
