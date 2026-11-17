@@ -12,8 +12,9 @@ namespace DotProlog.Compiler;
 /// asks for the next one — so an infinite goal is fine as long as the consumer stops taking.
 /// </para>
 /// <para>
-/// A machine runs one goal at a time. Do not interleave two enumerations from the same engine, and do
-/// not use an engine from more than one thread.
+/// A machine runs one goal at a time. Nested calls while an enumeration is active throw
+/// InvalidOperationException. Finish or dispose the enumeration before reusing the engine.
+/// Do not use an engine from more than one thread.
 /// </para>
 /// </remarks>
 public sealed class PrologQuery
@@ -36,18 +37,19 @@ public sealed class PrologQuery
     public IEnumerable<PrologSolution> Solutions()
     {
         var machine = _engine.Machine;
+        machine.AcquireHostCall();
         try
         {
-            var result = machine.Run(_address);
+            var result = machine.RunHost(_address);
             while (result == RunResult.Success)
             {
                 yield return Capture(machine);
-                result = machine.Redo();
+                result = machine.RedoHost();
             }
         }
         finally
         {
-            machine.DiscardCall();
+            machine.ReleaseHostCall();
         }
     }
 
@@ -55,13 +57,14 @@ public sealed class PrologQuery
     public bool Prove()
     {
         var machine = _engine.Machine;
+        machine.AcquireHostCall();
         try
         {
-            return machine.Run(_address) == RunResult.Success;
+            return machine.RunHost(_address) == RunResult.Success;
         }
         finally
         {
-            machine.DiscardCall();
+            machine.ReleaseHostCall();
         }
     }
 
@@ -69,13 +72,14 @@ public sealed class PrologQuery
     public PrologSolution? FirstOrDefault()
     {
         var machine = _engine.Machine;
+        machine.AcquireHostCall();
         try
         {
-            return machine.Run(_address) == RunResult.Success ? Capture(machine) : null;
+            return machine.RunHost(_address) == RunResult.Success ? Capture(machine) : null;
         }
         finally
         {
-            machine.DiscardCall();
+            machine.ReleaseHostCall();
         }
     }
 

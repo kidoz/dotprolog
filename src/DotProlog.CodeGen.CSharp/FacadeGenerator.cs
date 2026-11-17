@@ -149,6 +149,10 @@ public static class FacadeGenerator
                 CultureInfo.InvariantCulture,
                 $"    /// <summary>Calls <c>{export.PredicateName}/{export.Arity}</c> ({Lower(export.Determinism)}).</summary>"
             );
+            if (export.IsStreaming)
+                text.AppendLine(
+                    "    /// <remarks>Finish or dispose this enumeration before making another call on the same engine; nested calls throw InvalidOperationException.</remarks>"
+                );
             text.AppendLine(CultureInfo.InvariantCulture, $"    {Signature(export)};");
             text.AppendLine();
         }

@@ -8,6 +8,34 @@ namespace DotProlog.Compiler.Tests;
 /// </summary>
 public sealed class EmbeddingTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SuspendedEnumerationRejectsNestedCallsWithoutLosingAnswers(bool typed)
+    {
+        using var engine = NewEngine("p(1). p(2). p(3). q(a).");
+        var host = new PrologHost(engine.Machine);
+        using var cancellation = new CancellationTokenSource();
+        var previous = engine.Machine.CancellationToken;
+        using var outer = typed
+            ? host.CallAll(host.Bind("p", 1), cancellation.Token, PrologInput.Output).Select(x => x[0].ToString()).GetEnumerator()
+            : engine.Query("p(X)").Solutions().Select(x => x["X"].ToString()).GetEnumerator();
+        Assert.True(outer.MoveNext());
+        Assert.Throws<InvalidOperationException>(() => engine.Query("q(Y)").Prove());
+        Assert.Throws<InvalidOperationException>(() => host.CallOnce(host.Bind("q", 1), PrologInput.Output));
+        using var inner = host.CallAll(host.Bind("q", 1), PrologInput.Output).GetEnumerator();
+        Assert.Throws<InvalidOperationException>(() => inner.MoveNext());
+        Assert.Throws<InvalidOperationException>(() => engine.RunGoal("true", out _));
+        Assert.Equal(typed ? cancellation.Token : previous, engine.Machine.CancellationToken);
+        Assert.True(outer.MoveNext());
+        Assert.Equal("2", outer.Current);
+        Assert.True(outer.MoveNext());
+        Assert.Equal("3", outer.Current);
+        Assert.False(outer.MoveNext());
+        Assert.Equal(previous, engine.Machine.CancellationToken);
+        Assert.True(engine.Query("true").Prove());
+    }
+
     [Fact]
     public void SpanHostCallsPreserveOutputsFailureAndDetachedValuesAcrossReuse()
     {

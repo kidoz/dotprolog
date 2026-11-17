@@ -29,7 +29,11 @@ remain valid while the query advances. Solutions are lazy; callers may stop enum
 unbounded goal.
 
 One engine runs one goal at a time and is not thread-safe. Use separate engine instances when
-independent callers need to execute concurrently.
+independent callers need to execute concurrently. Once a `PrologQuery.Solutions()` or
+`PrologHost.CallAll()` enumeration starts, it owns the machine until exhaustion or disposal.
+Another call on that engine throws `InvalidOperationException` before changing the active call;
+the original enumeration can continue. This also applies to generated streaming facade methods.
+Materialize results with `ToList()` before making calls inside a loop, or use a separate engine.
 
 The parameterless constructor selects `PrologLanguageMode.Modern`, where double-quoted text reads
 as a list of characters. Pass `PrologLanguageMode.StrictIso` before consulting any source to

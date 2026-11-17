@@ -15,6 +15,27 @@ namespace DotProlog.CodeGen.CSharp.Tests;
 public sealed class GeneratedFacadeTests
 {
     [Fact]
+    public void GeneratedEnumerationRejectsNestedCallsAndPreservesRemainingAnswers()
+    {
+        var contract = ContractReader.Read(
+            ":- clr_module('Nested'). :- clr_export(values/1, nondet, [out(value, atom)]). :- clr_export(check/0, semidet, []).",
+            "Generated.Nested"
+        );
+        var source = FacadeGenerator.Generate(contract.Contract!, "values(first). values(second). check.", "values.pl");
+        var type = CompileGenerated(source).GetType("Generated.Nested.NestedModule")!;
+        using var engine = new Compiler.PrologEngine();
+        var module = type.GetMethod("Create", [typeof(Compiler.PrologEngine)])!.Invoke(null, [engine])!;
+        using var enumerator = ((IEnumerable<string>)Call(module, type, "Values", CancellationToken.None)!).GetEnumerator();
+        Assert.True(enumerator.MoveNext());
+        var error = Assert.Throws<TargetInvocationException>(() => Call(module, type, "Check"));
+        Assert.IsType<InvalidOperationException>(error.InnerException);
+        Assert.True(enumerator.MoveNext());
+        Assert.Equal("second", enumerator.Current);
+        Assert.False(enumerator.MoveNext());
+        Assert.True((bool)Call(module, type, "Check")!);
+    }
+
+    [Fact]
     public void GeneratedForeignRegistryServesDirectCallsTailCallsAndRuntimeConsultation()
     {
         const string program = """

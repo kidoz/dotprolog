@@ -196,6 +196,7 @@ public sealed class Machine : IDisposable
     /// <exception cref="PrologException">The predicate is not defined.</exception>
     public RunResult Solve(int functorId)
     {
+        EnsureHostCallAvailable();
         EnsureNotRunning();
         _solutionPending = false;
         if (!TryEntryPoint(functorId, out var entry))
@@ -209,6 +210,12 @@ public sealed class Machine : IDisposable
     /// <summary>Runs the instruction stream from <paramref name="entryAddress"/> until it stops.</summary>
     /// <exception cref="PrologException">A goal threw a ball that no <c>catch/3</c> handles.</exception>
     public RunResult Run(int entryAddress)
+    {
+        EnsureHostCallAvailable();
+        return RunHost(entryAddress);
+    }
+
+    internal RunResult RunHost(int entryAddress)
     {
         EnsureNotRunning();
         ResetState();
@@ -228,6 +235,12 @@ public sealed class Machine : IDisposable
     /// </remarks>
     public void BeginCall()
     {
+        EnsureHostCallAvailable();
+        BeginHostCall();
+    }
+
+    internal void BeginHostCall()
+    {
         EnsureNotRunning();
         ResetState();
     }
@@ -236,6 +249,7 @@ public sealed class Machine : IDisposable
     /// <remarks>Detached host answers remain valid. Call only after execution has stopped.</remarks>
     public void DiscardCall()
     {
+        EnsureHostCallAvailable();
         EnsureNotRunning();
         var exitCode = ExitCode;
         ResetState();
@@ -248,6 +262,12 @@ public sealed class Machine : IDisposable
     /// </summary>
     /// <exception cref="PrologException">The predicate is not defined, or a ball went uncaught.</exception>
     public RunResult Call(int functorId, ReadOnlySpan<Cell> arguments)
+    {
+        EnsureHostCallAvailable();
+        return CallHost(functorId, arguments);
+    }
+
+    internal RunResult CallHost(int functorId, ReadOnlySpan<Cell> arguments)
     {
         EnsureNotRunning();
         if (arguments.Length >= ArgumentRegisterCount)
@@ -285,6 +305,12 @@ public sealed class Machine : IDisposable
     /// </returns>
     public RunResult Redo()
     {
+        EnsureHostCallAvailable();
+        return RedoHost();
+    }
+
+    internal RunResult RedoHost()
+    {
         EnsureNotRunning();
         if (!_solutionPending || !Backtrack())
         {
@@ -303,6 +329,29 @@ public sealed class Machine : IDisposable
     /// query's first choice point, so it survives every backtrack the query makes.
     /// </summary>
     public Cell QueryBindings { get; set; }
+
+    private bool _hostCallActive;
+
+    internal void AcquireHostCall()
+    {
+        EnsureNotRunning();
+        EnsureHostCallAvailable();
+        _hostCallActive = true;
+    }
+
+    internal void ReleaseHostCall()
+    {
+        _hostCallActive = false;
+        DiscardCall();
+    }
+
+    private void EnsureHostCallAvailable()
+    {
+        if (_hostCallActive)
+            throw new InvalidOperationException(
+                "Another host call is active on this engine. Finish or dispose its enumeration, materialize its results, or use a separate engine."
+            );
+    }
 
     private void EnsureNotRunning()
     {

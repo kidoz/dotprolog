@@ -65,13 +65,14 @@ public sealed class PrologHost
     {
         ValidateArguments(predicate, arguments.Length);
         Span<Cell> cells = stackalloc Cell[arguments.Length];
+        _machine.AcquireHostCall();
         try
         {
             return Start(predicate, arguments, cells) == RunResult.Success;
         }
         finally
         {
-            _machine.DiscardCall();
+            _machine.ReleaseHostCall();
         }
     }
 
@@ -90,6 +91,7 @@ public sealed class PrologHost
     {
         ValidateArguments(predicate, arguments.Length);
         Span<Cell> cells = stackalloc Cell[arguments.Length];
+        _machine.AcquireHostCall();
         try
         {
             var result = Start(predicate, arguments, cells);
@@ -97,7 +99,7 @@ public sealed class PrologHost
         }
         finally
         {
-            _machine.DiscardCall();
+            _machine.ReleaseHostCall();
         }
     }
 
@@ -120,29 +122,25 @@ public sealed class PrologHost
     {
         ArgumentNullException.ThrowIfNull(arguments);
         ValidateArguments(predicate, arguments.Length);
+        _machine.AcquireHostCall();
         var previousToken = _machine.CancellationToken;
-        var callStarted = false;
         _machine.CancellationToken = cancellationToken;
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            callStarted = true;
             var result = Start(predicate, arguments, out var cells);
 
             while (result == RunResult.Success)
             {
                 yield return ReadOutputs(arguments, cells);
-                result = _machine.Redo();
+                result = _machine.RedoHost();
             }
         }
         finally
         {
             try
             {
-                if (callStarted)
-                {
-                    _machine.DiscardCall();
-                }
+                _machine.ReleaseHostCall();
             }
             finally
             {
@@ -180,12 +178,12 @@ public sealed class PrologHost
     private RunResult Start(PrologPredicate predicate, ReadOnlySpan<PrologInput> arguments, Span<Cell> cells)
     {
         // Reset before building arguments, which may refer to the cleared heap.
-        _machine.BeginCall();
+        _machine.BeginHostCall();
         for (var i = 0; i < arguments.Length; i++)
         {
             cells[i] = arguments[i].Build(_machine);
         }
-        return _machine.Call(predicate.FunctorId, cells);
+        return _machine.CallHost(predicate.FunctorId, cells);
     }
 
     private PrologValue[] ReadOutputs(ReadOnlySpan<PrologInput> arguments, ReadOnlySpan<Cell> cells)
