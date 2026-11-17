@@ -30,7 +30,6 @@ What matters is when the engine does something the program did not ask for:
   written in safe C#, so this should be impossible; a way to do it is a serious bug.
 - A crash of the host process that a Prolog program can cause without calling `halt/0` — anything
   the host cannot catch as a `PrologException`.
-- Escaping the streams a host granted: reading or writing a file a program was not given.
 - A generated facade or entry point that emits C# doing something the contract did not describe.
 - Reading a term, or consulting a file, that executes code as a side effect of parsing it.
 
@@ -47,3 +46,8 @@ What matters is when the engine does something the program did not ask for:
   a module is a namespace, not a protection boundary.
 
 DotProlog is not a sandbox. A Prolog program has whatever access the process running it has.
+There is no per-engine filesystem grant or confinement policy. File predicates such as `open/3,4`,
+`consult/1`, `ensure_loaded/1`, `include/1`, `see/1`, `tell/1`, `append/1`, and
+`absolute_file_name/3` use process filesystem permissions. Redirecting `user_input` or
+`user_output` does not restrict access to other files. Run untrusted programs in a separate
+process with operating-system-enforced filesystem and resource restrictions.

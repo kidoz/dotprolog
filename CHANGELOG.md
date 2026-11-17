@@ -159,6 +159,8 @@ All notable changes to DotProlog are recorded here. The format follows
   and `__refvalue` with a contract diagnostic instead of producing invalid C#.
 - Git and archive packages cannot introduce local dependencies outside their verified snapshots,
   including through catalog entries or existing locks. Package sources reject UNC and device paths before acquisition.
+- The security policy clarifies that file predicates use process permissions and that redirecting
+  standard streams does not confine filesystem access.
 
 - Foreign predicate registration preserves escaped C# method names, including keywords such as
   `@event`.
