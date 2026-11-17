@@ -322,6 +322,10 @@ public sealed class ContractReaderTests
     }
 
     [Theory]
+    [InlineData("__arglist")]
+    [InlineData("__makeref")]
+    [InlineData("__reftype")]
+    [InlineData("__refvalue")]
     [InlineData("Not Valid")]
     [InlineData("double")]
     public void AGeneratedNameThatIsNotACSharpIdentifierIsRejected(string alias)

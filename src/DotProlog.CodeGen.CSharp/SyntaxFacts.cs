@@ -8,6 +8,10 @@ internal static class SyntaxFacts
 {
     private static readonly HashSet<string> Keywords = new(StringComparer.Ordinal)
     {
+        "__arglist",
+        "__makeref",
+        "__reftype",
+        "__refvalue",
         "abstract",
         "as",
         "base",
