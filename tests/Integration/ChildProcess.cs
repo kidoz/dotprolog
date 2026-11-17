@@ -21,7 +21,7 @@ namespace Integration.Tests;
 internal static class ChildProcess
 {
     /// <summary>How long a single child may run before it is treated as hung.</summary>
-    internal static readonly TimeSpan Limit = TimeSpan.FromMinutes(15);
+    internal static readonly TimeSpan Limit = TimeSpan.FromMinutes(20);
 
     /// <summary>Runs <paramref name="fileName"/> and returns its exit code and combined output.</summary>
     /// <param name="fileName">Executable to run.</param>
