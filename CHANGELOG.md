@@ -153,6 +153,8 @@ All notable changes to DotProlog are recorded here. The format follows
 
 - Nested host calls now fail with `InvalidOperationException` while a query or generated streaming
   facade enumeration is active, preserving its remaining answers and cancellation token.
+- SDK regeneration and cleaning delete only outputs recorded by the previous generation. Other
+  generators' files survive, and the project directory cannot be used as the generated-output root.
 
 - Foreign predicate registration preserves escaped C# method names, including keywords such as
   `@event`.

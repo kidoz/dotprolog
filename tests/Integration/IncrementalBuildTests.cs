@@ -110,6 +110,8 @@ public sealed class IncrementalBuildTests : IDisposable
         (var firstExit, var firstLog) = await Build();
         Assert.True(firstExit == 0, $"The first build failed:\n{firstLog}");
         Assert.True(File.Exists(rulesFacade), $"No generated facade at {rulesFacade}.");
+        var unrelated = Path.Combine(generatedPath, "Other.g.cs");
+        await File.WriteAllTextAsync(unrelated, "// unrelated generator output", TestContext.Current.CancellationToken);
         var generatedAt = File.GetLastWriteTimeUtc(stamp);
 
         // Nothing changed, so the stamp the generation target touches must not move.
@@ -124,6 +126,7 @@ public sealed class IncrementalBuildTests : IDisposable
 
         (var thirdExit, var thirdLog) = await Build();
         Assert.True(thirdExit == 0, $"The build after the rename failed:\n{thirdLog}");
+        Assert.True(File.Exists(unrelated), "Regeneration deleted another generator output.");
         Assert.True(File.Exists(Path.Combine(generatedPath, "PricingModule.g.cs")), "The renamed module was not generated.");
         Assert.False(File.Exists(rulesFacade), $"The stale facade {rulesFacade} survived the rename.");
 
@@ -197,7 +200,13 @@ public sealed class IncrementalBuildTests : IDisposable
 
         Assert.True(cleanExit == 0, $"Cleaning failed:\n{cleanLog}");
         Assert.False(File.Exists(stamp), "Clean left the generation stamp behind.");
+        Assert.True(File.Exists(unrelated), "Clean deleted another generator output.");
+        File.Delete(unrelated);
         Assert.Empty(Directory.GetFiles(generatedPath, "*.g.cs", SearchOption.AllDirectories));
+        var (unsafeExit, unsafeLog) = await Build("-p:DotPrologGeneratedPath=" + _project + Path.DirectorySeparatorChar);
+        Assert.NotEqual(0, unsafeExit);
+        Assert.Contains("must not be the project directory", unsafeLog, StringComparison.Ordinal);
+        Assert.True(File.Exists(Path.Combine(_project, "pricing.pl")));
     }
 
     [Theory]

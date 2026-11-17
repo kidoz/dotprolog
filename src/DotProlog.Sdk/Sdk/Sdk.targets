@@ -182,12 +182,12 @@
             LanguageMode="$(DotPrologLanguageMode)"
             Flags="$(DotPrologFlags)"
             PackageDirectory="$(DotPrologPackageDirectory)"
+            PreviousGeneratedFiles="@(_DotPrologExpectedGeneratedFile)"
         >
             <Output TaskParameter="GeneratedFiles" ItemName="DotPrologGeneratedCompile" />
         </GeneratePrologFacade>
 
         <ItemGroup>
-            <Compile Include="@(DotPrologGeneratedCompile)" />
             <FileWrites Include="@(DotPrologGeneratedCompile)" />
         </ItemGroup>
 
@@ -211,8 +211,12 @@
       to reach the compiler.
     -->
     <Target Name="IncludePrologFacade" BeforeTargets="BeforeCompile;CoreCompile" DependsOnTargets="GeneratePrologFacade">
+        <ReadLinesFromFile File="$(DotPrologGeneratedPath).generated" Condition="Exists('$(DotPrologGeneratedPath).generated')">
+            <Output TaskParameter="Lines" ItemName="_DotPrologOwnedCompile" />
+        </ReadLinesFromFile>
         <ItemGroup>
-            <Compile Include="$(DotPrologGeneratedPath)**\*.g.cs" Exclude="@(Compile)" />
+            <Compile Remove="@(_DotPrologOwnedCompile)" MatchOnMetadata="FullPath" MatchOnMetadataOptions="PathLike" />
+            <Compile Include="@(_DotPrologOwnedCompile)" />
         </ItemGroup>
     </Target>
 
@@ -220,12 +224,18 @@
       The generated files live outside IntermediateOutputPath, so the incremental-clean cache that
       FileWrites feeds filters them out; without this target they survive a clean.
     -->
-    <Target Name="CleanPrologFacade" AfterTargets="Clean">
-        <ItemGroup>
-            <_DotPrologCleanFile Include="$(DotPrologGeneratedPath)**\*.g.cs" />
-            <_DotPrologCleanFile Include="$(DotPrologGeneratedPath).generated;$(DotPrologGeneratedPath).inputs" />
-        </ItemGroup>
-
-        <Delete Files="@(_DotPrologCleanFile)" />
+    <Target Name="CleanPrologFacade" BeforeTargets="CoreClean" Condition="Exists('$(DotPrologGeneratedPath).generated')">
+        <ReadLinesFromFile File="$(DotPrologGeneratedPath).generated">
+            <Output TaskParameter="Lines" ItemName="_DotPrologCleanFile" />
+        </ReadLinesFromFile>
+        <GeneratePrologFacade
+            Sources="@(PrologCompile)"
+            Contracts="@(PrologContract)"
+            ProjectDirectory="$(MSBuildProjectDirectory)"
+            OutputPath="$(DotPrologGeneratedPath)"
+            PreviousGeneratedFiles="@(_DotPrologCleanFile)"
+            CleanOnly="true"
+        />
+        <Delete Files="$(DotPrologGeneratedPath).generated;$(DotPrologGeneratedPath).inputs" />
     </Target>
 </Project>

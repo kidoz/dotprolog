@@ -54,6 +54,12 @@ public sealed class GeneratePrologFacade : Task
     /// <summary>Optional package workspace, restored explicitly before building.</summary>
     public string PackageDirectory { get; set; } = string.Empty;
 
+    /// <summary>Files recorded by the previous successful generation.</summary>
+    public ITaskItem[] PreviousGeneratedFiles { get; set; } = [];
+
+    /// <summary>Deletes only previously recorded outputs without generating source.</summary>
+    public bool CleanOnly { get; set; }
+
     /// <summary>The generated C# files, to be added to <c>Compile</c>.</summary>
     [Output]
     public ITaskItem[] GeneratedFiles { get; private set; } = [];
@@ -61,6 +67,22 @@ public sealed class GeneratePrologFacade : Task
     /// <inheritdoc />
     public override bool Execute()
     {
+        var relativeProject = Path.GetRelativePath(Path.GetFullPath(OutputPath), Path.GetFullPath(ProjectDirectory));
+        if (
+            !Path.IsPathRooted(relativeProject)
+            && relativeProject != ".."
+            && !relativeProject.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+        )
+        {
+            Log.LogError("DotPrologGeneratedPath must not be the project directory or one of its ancestors.");
+            return false;
+        }
+        if (CleanOnly)
+        {
+            RemoveStaleOutputs([]);
+            return !Log.HasLoggedErrors;
+        }
+
         if (Contracts.Length == 0 && !GenerateEntryPoint)
         {
             Log.LogError(
@@ -266,20 +288,28 @@ public sealed class GeneratePrologFacade : Task
 
     /// <summary>
     /// Deletes generated files a previous build wrote but this one did not, so a renamed or removed
-    /// contract cannot leave its old facade behind to be compiled. The directory is task-owned,
-    /// which is what makes deleting unrecognised <c>.g.cs</c> files safe.
+    /// contract cannot leave its old facade behind to be compiled. Only manifest-owned files in
+    /// the output directory may be deleted; other generators can share the directory.
     /// </summary>
     private void RemoveStaleOutputs(List<ITaskItem> generated)
     {
-        HashSet<string> expected = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> expected = new(PathComparer);
         foreach (var item in generated)
         {
             expected.Add(Path.GetFullPath(item.ItemSpec));
         }
 
-        foreach (var file in Directory.EnumerateFiles(OutputPath, "*.g.cs", SearchOption.AllDirectories))
+        foreach (var file in PreviousGeneratedFiles)
         {
-            var path = Path.GetFullPath(file);
+            var path = Path.GetFullPath(file.ItemSpec);
+            if (
+                !PathComparer.Equals(Path.GetDirectoryName(path), Path.TrimEndingDirectorySeparator(Path.GetFullPath(OutputPath)))
+                || !path.EndsWith(".g.cs", StringComparison.OrdinalIgnoreCase)
+            )
+            {
+                Log.LogError($"Generated output manifest contains an invalid path: {path}.");
+                continue;
+            }
             if (expected.Contains(path))
             {
                 continue;
