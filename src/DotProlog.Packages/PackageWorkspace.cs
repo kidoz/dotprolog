@@ -76,6 +76,7 @@ public sealed partial class PackageWorkspace
             var request = requests[0];
             var remaining = requests.Skip(1).ToList();
             ValidateName(request.Name);
+            ValidateSourcePolicy(request.Source, request.AllowLocalSources, request.BaseDirectory);
             if (graph.TryGetValue(request.Name, out var existing))
             {
                 if (Satisfies(existing.Locked, request))
@@ -96,6 +97,8 @@ public sealed partial class PackageWorkspace
                 failure = $"No candidate for {request.Name} {request.Source.Version}, required by {request.Parent}.";
             foreach (var source in candidates)
             {
+                if (!explicitSource)
+                    ValidateSourcePolicy(source, request.AllowLocalSources);
                 var key = JsonSerializer.Serialize(source, PackageJsonContext.Default.PackageSource);
                 if (!explicitSource && unavailable.TryGetValue(key, out var transportFailure))
                 {
@@ -159,7 +162,13 @@ public sealed partial class PackageWorkspace
                 }
                 graph.Add(request.Name, candidate);
                 var next = candidate
-                    .Manifest.Dependencies.Select(p => new Request(p.Key, p.Value, candidate.BaseDirectory, request.Name))
+                    .Manifest.Dependencies.Select(p => new Request(
+                        p.Key,
+                        p.Value,
+                        candidate.BaseDirectory,
+                        request.Name,
+                        request.AllowLocalSources && candidate.Locked.Source.Path is not null
+                    ))
                     .Concat(remaining)
                     .ToList();
                 if (Solve(next, graph))
@@ -249,10 +258,10 @@ public sealed partial class PackageWorkspace
         }
         Dictionary<string, string> modules = new(StringComparer.Ordinal);
         AddModules(root, _root, modules);
-        HashSet<string> visited = new(StringComparer.Ordinal);
+        HashSet<(string Name, bool AllowLocalSources)> visited = [];
         HashSet<string> active = new(StringComparer.Ordinal);
-        Visit(root, _root);
-        if (visited.Count != graph.Count)
+        Visit(root, _root, allowLocalSources: true);
+        if (visited.Select(item => item.Name).Distinct(StringComparer.Ordinal).Count() != graph.Count)
             throw new InvalidDataException("Lockfile contains unreachable packages.");
         foreach (var package in locked.Packages)
         {
@@ -264,23 +273,26 @@ public sealed partial class PackageWorkspace
             CheckEngine(manifest, root.Engine, null);
             AddModules(manifest, directory, modules);
         }
-        void Visit(PackageManifest manifest, string baseDirectory)
+        void Visit(PackageManifest manifest, string baseDirectory, bool allowLocalSources)
         {
             if (!active.Add(manifest.Name))
                 throw new InvalidDataException($"Dependency cycle at {manifest.Name}.");
             foreach (var (name, source) in manifest.Dependencies)
             {
-                var request = new Request(name, source, baseDirectory, manifest.Name);
+                var request = new Request(name, source, baseDirectory, manifest.Name, allowLocalSources);
+                ValidateSourcePolicy(source, allowLocalSources, baseDirectory);
                 if (!graph.TryGetValue(name, out var child) || !Satisfies(child, request))
                     throw new InvalidDataException($"Dependency conflict: {manifest.Name} requires {name} {source.Version}.");
+                ValidateSourcePolicy(child.Source, allowLocalSources, HasSource(source) ? baseDirectory : null);
                 if (active.Contains(name))
                     throw new InvalidDataException($"Dependency cycle at {name}.");
-                if (visited.Add(name))
+                var childAllowsLocal = allowLocalSources && child.Source.Path is not null;
+                if (visited.Add((name, childAllowsLocal)))
                 {
                     var directory = ValidatePackage(child, request, acquire);
                     var sourceBase = HasSource(request.Source) ? baseDirectory : _root;
                     var childBase = Normalize(child.Source, sourceBase).Path ?? directory;
-                    Visit(ReadManifest(directory), childBase);
+                    Visit(ReadManifest(directory), childBase, childAllowsLocal);
                 }
             }
             active.Remove(manifest.Name);
@@ -441,9 +453,44 @@ public sealed partial class PackageWorkspace
     private static bool HasSource(PackageSource source) =>
         source.Path is not null || source.Git is not null || source.Archive is not null;
 
+    private static void ValidateSourcePolicy(PackageSource source, bool allowLocalSources, string? parentDirectory = null)
+    {
+        if (allowLocalSources || !HasSource(source))
+            return;
+        // Bundled subpackages stay inside the verified parent snapshot and inherit its restrictions.
+        if (
+            source.Path is not null
+            && parentDirectory is not null
+            && !Path.IsPathRooted(source.Path)
+            && !source.Path.Replace('\\', '/').StartsWith('/')
+        )
+        {
+            try
+            {
+                _ = PackageFiles.Inside(parentDirectory, source.Path);
+                return;
+            }
+            catch (InvalidDataException)
+            {
+                throw new InvalidDataException("Imported packages cannot declare local sources outside their snapshot.");
+            }
+        }
+        var remoteGit =
+            source.Git is not null && Uri.TryCreate(source.Git, UriKind.Absolute, out var git) && git.Scheme is "https" or "ssh";
+        var remoteArchive =
+            source.Archive is not null
+            && Uri.TryCreate(source.Archive, UriKind.Absolute, out var archive)
+            && archive.Scheme == "https";
+        if (source.Path is not null || (!remoteGit && !remoteArchive))
+            throw new InvalidDataException("Imported Git and archive packages cannot declare local sources for dependencies.");
+    }
+
     private static PackageSource Normalize(PackageSource source, string directory)
     {
         PackageFiles.ValidateSourceText(source);
+        foreach (var location in new[] { source.Path, source.Git, source.Archive })
+            if (location is not null && location.Replace('\\', '/').StartsWith("//", StringComparison.Ordinal))
+                throw new InvalidDataException("Network and device paths are not supported as package sources.");
         if ((source.Path is null ? 0 : 1) + (source.Git is null ? 0 : 1) + (source.Archive is null ? 0 : 1) != 1)
             throw new InvalidDataException("Specify exactly one of path, git, archive.");
         string Location(string value)
@@ -477,7 +524,13 @@ public sealed partial class PackageWorkspace
     [GeneratedRegex("^[a-f0-9]{64}$", RegexOptions.CultureInvariant)]
     private static partial Regex HashPattern();
 
-    private sealed record Request(string Name, PackageSource Source, string BaseDirectory, string Parent);
+    private sealed record Request(
+        string Name,
+        PackageSource Source,
+        string BaseDirectory,
+        string Parent,
+        bool AllowLocalSources = true
+    );
 
     private sealed record Candidate(PackageManifest Manifest, LockedPackage Locked, string BaseDirectory);
 }

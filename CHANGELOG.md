@@ -157,6 +157,8 @@ All notable changes to DotProlog are recorded here. The format follows
   generators' files survive, and the project directory cannot be used as the generated-output root.
 - Explicit facade aliases reject the reserved C# identifiers `__arglist`, `__makeref`, `__reftype`,
   and `__refvalue` with a contract diagnostic instead of producing invalid C#.
+- Git and archive packages cannot introduce local dependencies outside their verified snapshots,
+  including through catalog entries or existing locks. Package sources reject UNC and device paths before acquisition.
 
 - Foreign predicate registration preserves escaped C# method names, including keywords such as
   `@event`.

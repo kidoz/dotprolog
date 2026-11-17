@@ -17,6 +17,148 @@ public sealed class PackageTests : IDisposable
     public void Dispose() => PackageFiles.DeleteDirectory(_directory);
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Imported_dependencies_cannot_escape_through_bundles_or_catalogs(bool catalog)
+    {
+        var outside = Package("outside", "demo/outside", "1.0.0", "outside", "value(secret).");
+        var parent = Package("parent", "demo/parent", "1.0.0", "parent", "value(parent).");
+        var manifest = PackageWorkspace.ReadManifest(parent);
+        if (catalog)
+        {
+            manifest.Dependencies["demo/outside"] = new PackageSource { Version = "*" };
+        }
+        else
+        {
+            var child = Path.Combine(parent, "child");
+            Directory.CreateDirectory(child);
+            Write(
+                child,
+                new PackageManifest
+                {
+                    Name = "demo/child",
+                    Dependencies = new() { ["demo/outside"] = new() { Path = outside } },
+                }
+            );
+            manifest.Dependencies["demo/child"] = new PackageSource { Path = "child" };
+        }
+        Write(parent, manifest);
+        Write(
+            Root,
+            new PackageManifest
+            {
+                Name = "demo/app",
+                Catalog = "catalog.json",
+                Dependencies = new() { ["demo/parent"] = Source(parent, "zip") },
+            }
+        );
+        Dictionary<string, List<PackageSource>> sources = new()
+        {
+            ["demo/outside"] = [new PackageSource { Version = "1.0.0", Path = outside }],
+        };
+        File.WriteAllText(
+            Path.Combine(Root, "catalog.json"),
+            JsonSerializer.Serialize(sources, PackageJsonContext.Default.DictionaryStringListPackageSource)
+        );
+        Assert.Contains(
+            "local sources",
+            Assert.Throws<InvalidDataException>(() => Workspace.Restore()).Message,
+            StringComparison.Ordinal
+        );
+        Assert.False(File.Exists(Path.Combine(Root, "propack.lock.json")));
+    }
+
+    [Fact]
+    public void Existing_lock_cannot_bypass_imported_dependency_policy()
+    {
+        var outside = Package("outside", "demo/outside", "1.0.0", "outside", "value(secret).");
+        var parent = Package("parent", "demo/parent", "1.0.0", "parent", "value(parent).");
+        var parentManifest = JsonSerializer.Deserialize(
+            File.ReadAllText(Path.Combine(parent, "propack.json")),
+            PackageJsonContext.Default.PackageManifest
+        )!;
+        parentManifest.Dependencies["demo/outside"] = new PackageSource { Path = outside };
+        Write(parent, parentManifest);
+        var root = new PackageManifest
+        {
+            Name = "demo/app",
+            Dependencies = new() { ["demo/parent"] = new() { Path = parent } },
+        };
+        Write(Root, root);
+        Workspace.Restore();
+        var imported = Source(parent, "zip");
+        root.Dependencies["demo/parent"] = imported;
+        Write(Root, root);
+        var lockPath = Path.Combine(Root, "propack.lock.json");
+        var locked = JsonSerializer.Deserialize(File.ReadAllText(lockPath), PackageJsonContext.Default.PackageLock)!;
+        locked.ManifestHash = PackageFiles.HashFile(Path.Combine(Root, "propack.json"));
+        locked.Packages.Single(p => p.Name == "demo/parent").Source = imported;
+        File.WriteAllText(lockPath, JsonSerializer.Serialize(locked, PackageJsonContext.Default.PackageLock));
+        Assert.Contains(
+            "local sources",
+            Assert.Throws<InvalidDataException>(() => Workspace.Restore(locked: true)).Message,
+            StringComparison.Ordinal
+        );
+        Assert.Contains(
+            "local sources",
+            Assert.Throws<InvalidDataException>(() => Workspace.GetLibraries()).Message,
+            StringComparison.Ordinal
+        );
+    }
+
+    [Theory]
+    [InlineData("zip")]
+    [InlineData("git")]
+    public void Imported_packages_cannot_pull_local_dependencies(string transport)
+    {
+        var outside = Package("outside", "demo/outside", "1.0.0", "outside", "value(secret).");
+        var parent = Package("parent", "demo/parent", "1.0.0", "parent", "value(parent).");
+        var manifest = JsonSerializer.Deserialize(
+            File.ReadAllText(Path.Combine(parent, "propack.json")),
+            PackageJsonContext.Default.PackageManifest
+        )!;
+        manifest.Dependencies["demo/outside"] = new PackageSource { Path = outside };
+        Write(parent, manifest);
+        Write(
+            Root,
+            new PackageManifest
+            {
+                Name = "demo/app",
+                Dependencies = new() { ["demo/parent"] = Source(parent, transport) },
+            }
+        );
+        var error = Assert.Throws<InvalidDataException>(() => Workspace.Restore());
+        Assert.Contains("local sources", error.Message, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(Root, "propack.lock.json")));
+        Assert.DoesNotContain(Directory.EnumerateFiles(Cache, "outside.pl", SearchOption.AllDirectories), _ => true);
+    }
+
+    [Theory]
+    [InlineData("path")]
+    [InlineData("git")]
+    [InlineData("archive")]
+    public void Network_paths_are_rejected_before_acquisition(string kind)
+    {
+        const string network = @"\\untrusted.invalid\share\package";
+        var source = kind switch
+        {
+            "path" => new PackageSource { Path = network },
+            "git" => new PackageSource { Git = network, Revision = "HEAD" },
+            _ => new PackageSource { Archive = network },
+        };
+        Write(
+            Root,
+            new PackageManifest
+            {
+                Name = "demo/app",
+                Dependencies = new() { ["demo/lib"] = source },
+            }
+        );
+        var error = Assert.Throws<InvalidDataException>(() => Workspace.Restore());
+        Assert.Contains("Network and device paths", error.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData(".", false)]
     [InlineData(".", true)]
     [InlineData("cache", false)]

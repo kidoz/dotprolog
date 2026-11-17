@@ -234,3 +234,13 @@ Existing filename imports are unchanged. The `plc` CLI does not yet expose a pac
 Compiled applications contain imported predicates and do not need the source cache to run.
 This does not embed a package resolver or source map for later runtime imports into a published
 application; hosts that consult additional source at runtime must supply their own library map.
+
+## Dependency source boundaries
+
+Root manifests and local `path` packages may explicitly select local dependencies. Packages
+imported through Git or archives, including local Git repositories and ZIP files, may depend only
+on HTTPS/SSH Git sources, SHA-256-pinned HTTPS archives, or catalog entries resolving to those
+remote sources. Relative `path` dependencies are allowed only within the verified parent snapshot,
+and those bundled subpackages inherit the same restrictions. Imported packages cannot select
+arbitrary local filesystem dependencies. The same rule applies to
+existing lockfiles before acquisition or use. UNC and device paths are rejected as package sources.
