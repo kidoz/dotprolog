@@ -342,9 +342,11 @@ public sealed class SwiDifferentialTests
         }
 
         // -f none keeps a user's init file from changing flags or loading libraries.
+        // Flush before shutdown: SWI 9.2.9 can intermittently exit with status zero
+        // without delivering buffered output (reproduced with the empty aggregate case).
         (var exitCode, var log) = await ChildProcess.RunAsync(
             swipl!,
-            ["-f", "none", "-q", "-g", goal, "-t", "halt"],
+            ["-f", "none", "-q", "-g", goal, "-g", "flush_output(user_output), flush_output(user_error)", "-t", "halt"],
             Path.GetTempPath()
         );
 
