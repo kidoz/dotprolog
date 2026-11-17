@@ -57,9 +57,6 @@ public sealed class GeneratePrologFacade : Task
     /// <summary>Files recorded by the previous successful generation.</summary>
     public ITaskItem[] PreviousGeneratedFiles { get; set; } = [];
 
-    /// <summary>Deletes only previously recorded outputs without generating source.</summary>
-    public bool CleanOnly { get; set; }
-
     /// <summary>The generated C# files, to be added to <c>Compile</c>.</summary>
     [Output]
     public ITaskItem[] GeneratedFiles { get; private set; } = [];
@@ -77,12 +74,6 @@ public sealed class GeneratePrologFacade : Task
             Log.LogError("DotPrologGeneratedPath must not be the project directory or one of its ancestors.");
             return false;
         }
-        if (CleanOnly)
-        {
-            RemoveStaleOutputs([]);
-            return !Log.HasLoggedErrors;
-        }
-
         if (Contracts.Length == 0 && !GenerateEntryPoint)
         {
             Log.LogError(

@@ -209,6 +209,57 @@ public sealed class IncrementalBuildTests : IDisposable
         Assert.True(File.Exists(Path.Combine(_project, "pricing.pl")));
     }
 
+    [Fact]
+    public async Task CleanNeedsNoGeneratorAssemblyAndPreservesFilesOutsideItsOwnedOutputs()
+    {
+        Assert.SkipUnless(
+            Environment.GetEnvironmentVariable(OptInVariable) == "1",
+            $"Set {OptInVariable}=1 to run the toolchain integration tests."
+        );
+        WriteProjectFile();
+        var output = Path.Combine(_project, "obj", "prolog");
+        Directory.CreateDirectory(Path.Combine(output, "nested"));
+        var owned = Path.Combine(output, "Owned.g.cs");
+        var unrelated = Path.Combine(output, "Other.g.cs");
+        var nested = Path.Combine(output, "nested", "Nested.g.cs");
+        var outside = Path.Combine(_project, "Outside.g.cs");
+        var notes = Path.Combine(output, "notes.txt");
+        foreach (var file in new[] { owned, unrelated, nested, outside, notes })
+            await File.WriteAllTextAsync(file, "// preserve unless owned", TestContext.Current.CancellationToken);
+        var stamp = Path.Combine(output, ".generated");
+        await File.WriteAllLinesAsync(
+            stamp,
+            [owned, nested, outside, notes, Path.Combine(output, "Missing.g.cs")],
+            TestContext.Current.CancellationToken
+        );
+        var missingTask = "-p:DotPrologTasksAssembly=" + Path.Combine(_project, "missing-task.dll");
+        var project = Path.Combine(_project, "Incremental.dplproj");
+
+        var (exit, log) = await Run("dotnet", ["clean", project, "-nodereuse:false", "--nologo", missingTask]);
+        Assert.True(exit == 0, $"Clean required the generator assembly:\n{log}");
+        Assert.False(File.Exists(owned));
+        Assert.False(File.Exists(stamp));
+        foreach (var file in new[] { unrelated, nested, outside, notes })
+            Assert.True(File.Exists(file), $"Clean deleted an unowned file: {file}");
+
+        // Even a forged manifest must not make the project root a valid output directory.
+        await File.WriteAllLinesAsync(Path.Combine(_project, ".generated"), [outside], TestContext.Current.CancellationToken);
+        var (unsafeExit, unsafeLog) = await Run(
+            "dotnet",
+            [
+                "clean",
+                project,
+                "-nodereuse:false",
+                "--nologo",
+                missingTask,
+                "-p:DotPrologGeneratedPath=" + _project + Path.DirectorySeparatorChar,
+            ]
+        );
+        Assert.NotEqual(0, unsafeExit);
+        Assert.Contains("must not be the project directory", unsafeLog, StringComparison.Ordinal);
+        Assert.True(File.Exists(outside));
+    }
+
     [Theory]
     [InlineData("Library")]
     [InlineData("Exe")]

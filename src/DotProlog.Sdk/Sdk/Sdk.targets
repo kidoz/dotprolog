@@ -225,17 +225,33 @@
       FileWrites feeds filters them out; without this target they survive a clean.
     -->
     <Target Name="CleanPrologFacade" BeforeTargets="CoreClean" Condition="Exists('$(DotPrologGeneratedPath).generated')">
+        <!-- Cleaning must not load the generator: Rebuild may next rebuild that very DLL. -->
+        <FindUnderPath Path="$(DotPrologGeneratedPath)" Files="$(MSBuildProjectFullPath)">
+            <Output TaskParameter="InPath" ItemName="_DotPrologUnsafeCleanRoot" />
+        </FindUnderPath>
+        <Error
+            Condition="'@(_DotPrologUnsafeCleanRoot)' != ''"
+            Text="DotPrologGeneratedPath must not be the project directory or one of its ancestors."
+        />
         <ReadLinesFromFile File="$(DotPrologGeneratedPath).generated">
             <Output TaskParameter="Lines" ItemName="_DotPrologCleanFile" />
         </ReadLinesFromFile>
-        <GeneratePrologFacade
-            Sources="@(PrologCompile)"
-            Contracts="@(PrologContract)"
-            ProjectDirectory="$(MSBuildProjectDirectory)"
-            OutputPath="$(DotPrologGeneratedPath)"
-            PreviousGeneratedFiles="@(_DotPrologCleanFile)"
-            CleanOnly="true"
-        />
+        <!-- Intersect the manifest with direct generated children, preserving every other file. -->
+        <ItemGroup>
+            <_DotPrologCleanCandidate Include="$(DotPrologGeneratedPath)*.g.cs" />
+            <_DotPrologUnownedCleanCandidate Include="@(_DotPrologCleanCandidate)" />
+            <_DotPrologUnownedCleanCandidate
+                Remove="@(_DotPrologCleanFile)"
+                MatchOnMetadata="FullPath"
+                MatchOnMetadataOptions="PathLike"
+            />
+            <_DotPrologCleanCandidate
+                Remove="@(_DotPrologUnownedCleanCandidate)"
+                MatchOnMetadata="FullPath"
+                MatchOnMetadataOptions="PathLike"
+            />
+        </ItemGroup>
+        <Delete Files="@(_DotPrologCleanCandidate)" />
         <Delete Files="$(DotPrologGeneratedPath).generated;$(DotPrologGeneratedPath).inputs" />
     </Target>
 </Project>

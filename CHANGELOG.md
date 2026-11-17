@@ -155,6 +155,7 @@ All notable changes to DotProlog are recorded here. The format follows
   facade enumeration is active, preserving its remaining answers and cancellation token.
 - SDK regeneration and cleaning delete only outputs recorded by the previous generation. Other
   generators' files survive, and the project directory cannot be used as the generated-output root.
+  Cleaning does not load the generator assembly, allowing full MSBuild to rebuild it on Windows.
 - Explicit facade aliases reject the reserved C# identifiers `__arglist`, `__makeref`, `__reftype`,
   and `__refvalue` with a contract diagnostic instead of producing invalid C#.
 - Git and archive packages cannot introduce local dependencies outside their verified snapshots,
