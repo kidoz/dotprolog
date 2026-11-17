@@ -39,7 +39,7 @@ dotnet run --project src/DotProlog.Compiler.Cli -- samples/HelloProlog/hello.pl 
 Install the compiler from NuGet.org as the `DotProlog.Compiler.Cli` .NET tool:
 
 ```console
-dotnet tool install DotProlog.Compiler.Cli --tool-path artifacts/compiler-tools --version 0.17.0
+dotnet tool install DotProlog.Compiler.Cli --tool-path artifacts/compiler-tools --version 0.18.0
 ./artifacts/compiler-tools/plc --version
 ./artifacts/compiler-tools/plc samples/HelloProlog/hello.pl --output artifacts/installed-hello --aot
 ```
