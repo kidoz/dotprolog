@@ -4,7 +4,7 @@ All notable changes to DotProlog are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.18.0] — 2026-11-18
 
 ### Added
 
@@ -135,6 +135,30 @@ All notable changes to DotProlog are recorded here. The format follows
   goals. Determinism-aware reachability accounts for failing earlier guards without executing source,
   and SDK façade generation reports the same positioned warning through MSBuild.
 
+- `propack.policy.json` supplies a vulnerability list and a license allow list. When the file is
+  present, restore, update, check, and compilation reject a matching advisory or a declared
+  `UPSTREAM.json` license outside the allow list. The lock is left unchanged.
+- Stable `propack` release 0.17.0 provides a .NET tool package and native ZIPs for Linux x64,
+  Windows x64, and macOS ARM64, with checksums and a software bill of materials. The dedicated
+  release workflow validates clean installation and the pinned upstream `heaps` library under
+  both engines before publication. The schema 1 format and editor schemas define the contract.
+- An experimental standalone `propack` tool restores pure Prolog source packages from local
+  directories, Git revisions, ZIP archives, and local version catalogs. Lockfiles pin the graph
+  and content hashes; conflicting requirements, duplicate module names, and changed cached
+  content produce errors.
+- DotProlog's CLI and SDK consume the same package lock without downloading during compilation.
+  Modern `use_module(library(Name))` resolves explicit host-supplied aliases. The portable package
+  sample runs a transitive dependency under SWI-Prolog, DotProlog, and a compiled SDK application.
+- `plc --packages DIR` compiles standalone applications against the same verified package workspaces.
+  Package sources are embedded in the direct IL output, so the resulting application runs without the
+  workspace or cache.
+- Direct IL compilation emits a deterministic Portable PDB with Prolog source documents and sequence
+  points preserved through block fusion, including nested source includes. `plc` stages
+  `PrologProgram.pdb` beside the managed assembly and preserves it through publication so NativeAOT
+  can emit source debugging information.
+- `DotProlog.Compiler.Cli` is published as a .NET tool, making the standalone `plc` compiler available
+  from NuGet.org alongside the existing DotProlog packages.
+
 ### Changed
 
 - Standard-order comparison handles atomic terms directly and reuses machine-owned scratch for
@@ -190,36 +214,6 @@ All notable changes to DotProlog are recorded here. The format follows
 
 - Reachability and unused-import linting conservatively suppress analysis for module-qualified clause
   heads instead of reporting their local helpers as unreferenced.
-
-## [0.17.0] — 2026-11-01
-
-### Added
-
-- `propack.policy.json` supplies a vulnerability list and a license allow list. When the file is
-  present, restore, update, check, and compilation reject a matching advisory or a declared
-  `UPSTREAM.json` license outside the allow list. The lock is left unchanged.
-- Stable `propack` release 0.17.0 provides a .NET tool package and native ZIPs for Linux x64,
-  Windows x64, and macOS ARM64, with checksums and a software bill of materials. The dedicated
-  release workflow validates clean installation and the pinned upstream `heaps` library under
-  both engines before publication. The schema 1 format and editor schemas define the contract.
-- An experimental standalone `propack` tool restores pure Prolog source packages from local
-  directories, Git revisions, ZIP archives, and local version catalogs. Lockfiles pin the graph
-  and content hashes; conflicting requirements, duplicate module names, and changed cached
-  content produce errors.
-- DotProlog's CLI and SDK consume the same package lock without downloading during compilation.
-  Modern `use_module(library(Name))` resolves explicit host-supplied aliases. The portable package
-  sample runs a transitive dependency under SWI-Prolog, DotProlog, and a compiled SDK application.
-- `plc --packages DIR` compiles standalone applications against the same verified package workspaces.
-  Package sources are embedded in the direct IL output, so the resulting application runs without the
-  workspace or cache.
-- Direct IL compilation emits a deterministic Portable PDB with Prolog source documents and sequence
-  points preserved through block fusion, including nested source includes. `plc` stages
-  `PrologProgram.pdb` beside the managed assembly and preserves it through publication so NativeAOT
-  can emit source debugging information.
-- `DotProlog.Compiler.Cli` is published as a .NET tool, making the standalone `plc` compiler available
-  from NuGet.org alongside the existing DotProlog packages.
-
-### Fixed
 
 - The language server resolves Windows file URIs with an escaped drive colon, as sent by VS Code.
   Includes and project file-change notifications now use the same paths as disk analysis, avoiding
@@ -1095,7 +1089,7 @@ binary: a published executable can consult a `.pl` file it has never seen and ru
 **Full Changelog**: https://github.com/kidoz/dotprolog/commits/v0.1.0
 
 [Unreleased]: https://github.com/kidoz/dotprolog/compare/v0.17.0...HEAD
-[0.17.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.17.0
+[0.18.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.18.0
 [0.16.1]: https://github.com/kidoz/dotprolog/releases/tag/v0.16.1
 [0.16.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.16.0
 [0.15.0]: https://github.com/kidoz/dotprolog/releases/tag/v0.15.0

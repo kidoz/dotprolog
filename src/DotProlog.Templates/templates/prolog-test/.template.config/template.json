@@ -24,7 +24,7 @@
     "DotPrologVersion": {
       "type": "parameter",
       "datatype": "string",
-      "defaultValue": "0.17.0",
+      "defaultValue": "0.18.0",
       "replaces": "DOTPROLOG_VERSION",
       "description": "Version of the DotProlog SDK and libraries to reference."
     }
