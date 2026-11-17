@@ -38,7 +38,7 @@ jobs:
     # the publish job.
     if: github.event_name == 'push'
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 60
     strategy:
       # One platform's flake must not cancel its siblings mid-run; a cancelled hung job is what
       # left the 0.1.0 release without native binaries.
@@ -149,14 +149,16 @@ jobs:
           package="tool-package/DotProlog.Tool.${{ matrix.rid }}.$version.nupkg"
           test -f "$package"
           test "$(find tool-package -maxdepth 1 -type f -name '*.nupkg' | wc -l)" -eq 1
-          dotnet tool install "DotProlog.Tool.${{ matrix.rid }}" \
-            --tool-path "$RUNNER_TEMP/dotprolog-native-tool" --version "$version" \
-            --source tool-package --no-http-cache
-          tool="$RUNNER_TEMP/dotprolog-native-tool/dotnet-prolog"
-          if [ -f "$tool.exe" ]; then
-            tool="$tool.exe"
-          fi
-          "$tool" run samples/HelloProlog/hello.pl | grep -Fx "Hello! World!"
+          # A RID package is a dependency of the DotProlog.Tool pointer, not an installable tool.
+          # Pack the pointer into a feed that holds only the package being uploaded, so the binary
+          # executed here is the binary attached to the release.
+          feed="$RUNNER_TEMP/dotprolog-native-tool-feed"
+          mkdir -p "$feed"
+          cp "$package" "$feed/"
+          dotnet pack src/DotProlog.Tool -c Release -o "$feed" -p:ContinuousIntegrationBuild=true
+          test "$(find "$feed" -maxdepth 1 -type f -name '*.nupkg' | wc -l)" -eq 2
+          dotnet tool exec --source "$feed" "DotProlog.Tool@$version" \
+            run samples/HelloProlog/hello.pl | grep -Fx "Hello! World!"
 
       - name: Name the binary after its platform
         shell: bash
