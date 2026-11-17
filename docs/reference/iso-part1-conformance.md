@@ -27,11 +27,11 @@ Known deviations and coverage limits are recorded in the [conformance tracker](i
 result. The reference distinguishes configuration, implementation-defined behavior, extensions, and
 required ISO behavior.
 
-The 759 executable independent cases are used by managed consulted bytecode and the generated-C#
-three-path matrix, including its NativeAOT variant. Four applicable declarations are audit-only,
-not executed passes. The separate standalone consulted NativeAOT corpus test is unconditionally
-skipped, and the full independent corpus is not run through direct IL. Evidence codes identify
-available tests, not exhaustive verification of a requirement or proof that an optional gate ran.
+The 759 executable independent cases are used by managed consulted bytecode, the generated-C#
+three-path matrix including its NativeAOT variant, and the standalone consulted NativeAOT gate.
+Four applicable declarations are audit-only, not executed passes. The standalone gate checks their
+IDs and reasons separately in its report. The full independent corpus is not run through direct IL.
+Evidence codes identify available tests, not exhaustive verification of a requirement or proof that an optional gate ran.
 The inventory gate rejects count drift, unsupported executable declarations, and changed upstream
 sources. `IsoPartOneInventoryTests` separately pins the predefined-predicate and evaluable-functor
 inventory.
@@ -280,7 +280,7 @@ the following gates, including skips and coverage omissions:
 1. The 608 repository cases.
 2. The exact independent inventory, separating 759 executable cases from four audit-only declarations and reporting failures, unsupported cases, and skipped paths.
 3. The generated three-path matrix: 759 cases per path, or 2,277 checks.
-4. The generated NativeAOT matrix and focused NativeAOT tests for every release RID; the standalone consulted full-corpus gate remains skipped.
+4. The generated NativeAOT matrix, standalone consulted NativeAOT executable-subset gate, and focused NativeAOT tests for every release RID; audit-only declarations remain separate from executed passes.
 5. The focused parser, compiler, runtime, stream, database, arithmetic, flag, and strict-mode tests.
 6. The 125-case strict review fixture, including its generated, cross-path, and NativeAOT checks.
 

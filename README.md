@@ -568,10 +568,10 @@ catchable `representation_error(max_arity)`.
 DotProlog's `StrictIso` mode provides partial support for ISO/IEC 13211-1:1995 with Technical
 Corrigenda 1–3, ISO/IEC 13211-2:2000 modules, and ISO/IEC TS 13211-3:2025 definite clause grammars.
 The pinned independent Logtalk inventory has 759 executable cases and four audit-only declarations.
-Managed consulted and generated-C# gates, both cross-path directions, and a generated NativeAOT
-matrix exercise the executable subset. The standalone consulted NativeAOT full-corpus test is
-skipped, and the full independent corpus is not run through direct IL. The repository's 608-case
-fixture includes Modern-mode characterization tests; Parts 2 and 3 have focused coverage.
+Managed consulted and generated-C# gates, both cross-path directions, the generated NativeAOT
+matrix, and the standalone consulted NativeAOT gate exercise the executable subset. The four
+audit-only declarations remain excluded, and the full independent corpus is not run through direct IL.
+The repository's 608-case fixture includes Modern-mode characterization tests; Parts 2 and 3 have focused coverage.
 See [COMPATIBILITY.md](COMPATIBILITY.md), the
 [Part 1](docs/reference/iso-part1-conformance.md) and
 [Parts 2 and 3](docs/reference/iso-parts2-3-conformance.md) ledgers, and the

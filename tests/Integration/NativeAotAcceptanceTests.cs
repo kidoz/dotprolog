@@ -275,11 +275,8 @@ public sealed class NativeAotAcceptanceTests
     }
 
     [Fact]
-    public async Task PublishedExecutableRunsTheFullIndependentIsoCorpus()
+    public async Task PublishedExecutableRunsTheExecutableIndependentIsoCorpus()
     {
-        Assert.Skip(
-            "The StrictIso corpus has four audit-only cases; the direct NativeAOT runner must stop claiming 763/763 before this gate resumes."
-        );
         Assert.SkipUnless(
             Environment.GetEnvironmentVariable(OptInVariable) == "1",
             $"Set {OptInVariable}=1 to run the NativeAOT conformance test."
@@ -319,14 +316,30 @@ public sealed class NativeAotAcceptanceTests
 
             (var runExit, var runLog) = await RunAsync(executable, [report], RepositoryLayout.Root);
             Assert.True(runExit == 0, $"Native independent ISO corpus failed:\n{runLog}");
-            Assert.Contains("763/763 passed", runLog, StringComparison.Ordinal);
+            Assert.Contains("759/759 executable cases passed; 4 audit-only cases not executed", runLog, StringComparison.Ordinal);
 
             using var document = JsonDocument.Parse(await File.ReadAllTextAsync(report, TestContext.Current.CancellationToken));
             var summary = document.RootElement.GetProperty("summary");
+            Assert.Equal(802, summary.GetProperty("total").GetInt32());
+            Assert.Equal(773, summary.GetProperty("enabled").GetInt32());
             Assert.Equal(763, summary.GetProperty("applicable").GetInt32());
-            Assert.Equal(763, summary.GetProperty("passed").GetInt32());
+            Assert.Equal(759, summary.GetProperty("passed").GetInt32());
+            Assert.Equal(4, summary.GetProperty("audit_only").GetInt32());
+            Assert.Equal(29, summary.GetProperty("disabled").GetInt32());
+            Assert.Equal(10, summary.GetProperty("not_applicable").GetInt32());
             Assert.Equal(0, summary.GetProperty("failed").GetInt32());
             Assert.Equal(0, summary.GetProperty("unsupported").GetInt32());
+            var cases = document.RootElement.GetProperty("cases").EnumerateArray().ToArray();
+            Assert.Equal(802, cases.Length);
+            Assert.Equal(759, cases.Count(item => item.GetProperty("status").GetString() == "passed"));
+            Assert.Equal(29, cases.Count(item => item.GetProperty("status").GetString() == "upstream-disabled"));
+            Assert.Equal(10, cases.Count(item => item.GetProperty("status").GetString() == "not-applicable"));
+            var auditCases = cases.Where(item => item.GetProperty("status").GetString() == "audit-only").ToArray();
+            Assert.Equal(
+                ["iso_bagof_3_09", "iso_bagof_3_13", "iso_open_4_03", "iso_setof_3_11"],
+                auditCases.Select(item => item.GetProperty("id").GetString()).Order(StringComparer.Ordinal)
+            );
+            Assert.All(auditCases, item => Assert.False(string.IsNullOrWhiteSpace(item.GetProperty("audit_reason").GetString())));
         }
         finally
         {

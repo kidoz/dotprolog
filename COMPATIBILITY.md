@@ -26,11 +26,11 @@ non-applicable alternative branches, and five require bounded integers.
 | Generated C# calling consulted bytecode | The same 759 cases |
 | Consulted bytecode calling generated C# | The same 759 cases |
 | NativeAOT generated-C# matrix | The same 759 cases on each of the three matrix paths |
-| Standalone consulted NativeAOT corpus | Full-corpus test is unconditionally skipped; no full-corpus pass claim |
+| Standalone consulted NativeAOT corpus | The same 759 executable cases; the report separately records four audit-only cases |
 | Direct IL | Focused tests; the full independent corpus is not covered |
 
 These are the executable gate inventories, not a claim that every optional gate ran in every build.
-The managed direct runner writes per-case results and counts for passed, failed, audit-only,
+The managed and standalone NativeAOT direct runners write per-case results and counts for passed, failed, audit-only,
 unsupported, disabled, and non-applicable declarations. The generated matrices report aggregate
 execution results. Opt-in gates and their results must be checked for the exact build being assessed.
 Parts 2 and 3 have focused managed, generated-C#, and NativeAOT tests rather than complete
