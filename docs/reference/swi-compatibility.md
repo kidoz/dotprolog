@@ -11,6 +11,10 @@ Unless a row says otherwise, a supported feature is available in `Modern` and re
 `StrictIso` as an implementation-specific extension. An opt-in
 differential suite (`DOTPROLOG_RUN_SWI_DIFFERENTIAL_TESTS=1`, requires `swipl` on `PATH`) executes
 a corpus of ledger goals against SWI-Prolog itself and asserts the outputs agree.
+Two comparisons require newer oracle baselines: the numeric `~a` argument error requires
+SWI 10.0 or later, and U+200B classification requires SWI 10.1 or later. Older installations
+report these comparisons as skipped; ordinary DotProlog regression tests still assert both
+results without requiring SWI.
 
 ## Syntax and data types
 

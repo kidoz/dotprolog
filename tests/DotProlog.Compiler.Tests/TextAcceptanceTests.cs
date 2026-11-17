@@ -65,6 +65,7 @@ public sealed class TextAcceptanceTests
 
     [Theory]
     [InlineData("catch(format(\"~a\", [f(x)]), error(E, _), true), writeq(E)", "format_argument_type(a,f(x))")]
+    [InlineData("catch(format(atom(_), '~a', [42]), error(E, _), true), writeq(E)", "format_argument_type(a,42)")]
     [InlineData("catch(format(\"~s\", [f(x)]), error(E, _), true), writeq(E)", "format_argument_type(s,f(x))")]
     [InlineData("catch(format(f(x), []), error(E, _), true), writeq(E)", "type_error(text,f(x))")]
     [InlineData("catch(format([foo], []), error(E, _), true), writeq(E)", "type_error(text,[foo])")]

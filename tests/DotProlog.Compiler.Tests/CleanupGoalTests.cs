@@ -230,12 +230,13 @@ public sealed class CleanupGoalTests
     public void SurroundingCutClosesTheSetupResource()
     {
         var path = Path.Combine(Path.GetTempPath(), $"dotprolog-cleanup-{Guid.NewGuid():N}.txt");
+        var atom = path.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("'", "''", StringComparison.Ordinal);
         try
         {
             Assert.Equal(
                 "closed",
                 PrologTestHost.RunGoal(
-                    $"setup_call_cleanup(open('{path}', write, S), member(_, [a, b]), close(S)), !, "
+                    $"setup_call_cleanup(open('{atom}', write, S), member(_, [a, b]), close(S)), !, "
                         + "\\+ stream_property(S, _), write(closed)"
                 )
             );

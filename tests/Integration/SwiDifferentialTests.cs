@@ -17,6 +17,9 @@ namespace Integration.Tests;
 public sealed class SwiDifferentialTests
 {
     private const string OptInVariable = "DOTPROLOG_RUN_SWI_DIFFERENTIAL_TESTS";
+    private const string AtomFormatTypeError = "catch(format(atom(_), '~a', [42]), error(E, _), true), writeq(E)";
+    private const string UnicodeFormatCharacter =
+        "findall(T, (member(T, [graph, print, punct, cntrl]), code_type(0x200B, T)), L), write(L)";
 
     public static readonly TheoryData<string> Corpus = new(
         "ord_union([a, c], [b, c, d], U), write(U)",
@@ -130,7 +133,7 @@ public sealed class SwiDifferentialTests
         "catch(with_output_to(foo(x), true), error(E, _), true), writeq(E)",
         "catch(with_output_to(_, true), error(E, _), true), writeq(E)",
         "catch(format(42, '~w', [x]), error(E, _), true), writeq(E)",
-        "catch(format(atom(_), '~a', [42]), error(E, _), true), writeq(E)",
+        AtomFormatTypeError,
         "atom_chars(abc, L), format(atom(A), '~s', [L]), writeq(A)",
         "atom_string(ab, S), format(atom(A), '~a', [S]), writeq(A)",
         "catch(must_be(text, [a|_]), error(E, _), true), writeq(E)",
@@ -172,7 +175,7 @@ public sealed class SwiDifferentialTests
         "atom_codes(A, [0'x, 0x301]), writeq(A)",
         "atom_codes(A, [0'a, 0x2028, 0'b]), writeq(A)",
         "findall(T, (member(T, [graph, print, punct, cntrl]), code_type(0x378, T)), L), write(L)",
-        "findall(T, (member(T, [graph, print, punct, cntrl]), code_type(0x200B, T)), L), write(L)",
+        UnicodeFormatCharacter,
         "findall(C, (between(9, 14, C), code_type(C, end_of_line)), L), write(L)",
         "( number_chars(1.0e9, ['1', '.', '0', 'E', '9']) -> write(yes) ; write(no) )",
         "catch((L = ['1'|L], number_chars(_, L)), error(type_error(list, C), _), true), nonvar(C), C = ['1'|T], C == T, write(caught)",
@@ -308,6 +311,35 @@ public sealed class SwiDifferentialTests
         Assert.SkipWhen(swipl is null, "swipl was not found on PATH.");
 
         var ours = RunDotProlog(goal);
+
+        // The compatibility ledger targets SWI 10's atom/string-only ~a and SWI 10.1's
+        // locale-independent Unicode classification. Older oracles cannot validate these
+        // cases; their DotProlog results remain covered by the ordinary compiler tests.
+        var (minimumVersion, baseline) = goal switch
+        {
+            AtomFormatTypeError => (100000, "10.0"),
+            UnicodeFormatCharacter => (100100, "10.1"),
+            _ => (0, string.Empty),
+        };
+        if (minimumVersion != 0)
+        {
+            var (versionExitCode, versionLog) = await ChildProcess.RunAsync(
+                swipl!,
+                [
+                    "-f",
+                    "none",
+                    "-q",
+                    "-g",
+                    $"(current_prolog_flag(version, V), V >= {minimumVersion} -> write(supported) ; write(unsupported))",
+                    "-t",
+                    "halt",
+                ],
+                Path.GetTempPath()
+            );
+            Assert.True(versionExitCode == 0, $"Could not query the SWI-Prolog version: {versionLog}");
+            Assert.True(versionLog.Trim() is "supported" or "unsupported", $"Unexpected SWI version probe: {versionLog}");
+            Assert.SkipWhen(versionLog.Trim() == "unsupported", $"This comparison requires SWI-Prolog {baseline} or later.");
+        }
 
         // -f none keeps a user's init file from changing flags or loading libraries.
         (var exitCode, var log) = await ChildProcess.RunAsync(
